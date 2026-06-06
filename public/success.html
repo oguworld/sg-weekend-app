@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登録完了 — 今週末どこいく？SG</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #1A3A2A;
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px;
+      text-align: center;
+    }
+    .check { font-size: 72px; margin-bottom: 24px; animation: pop 0.5s ease; }
+    @keyframes pop {
+      0% { transform: scale(0); opacity: 0; }
+      80% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    h1 { font-family: 'DM Serif Display', serif; font-size: 28px; margin-bottom: 12px; }
+    p { font-size: 14px; color: rgba(255,255,255,0.7); line-height: 1.7; margin-bottom: 32px; }
+    .btn {
+      display: inline-block;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #C4973A 0%, #E8A800 100%);
+      color: #1A3A2A;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 14px;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .btn:active { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="check">🎉</div>
+  <h1>プレミアム登録完了！</h1>
+  <p>おめでとうございます！<br>全スポット＆AI秘書機能が<br>ご利用いただけます。</p>
+  <a href="/" class="btn" id="back-btn">アプリに戻る →</a>
+
+  <script>
+    // Pass session_id to app
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    if (sessionId) {
+      localStorage.setItem('sg_session_id', sessionId);
+    }
+    // Auto-redirect after 2.5s
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 2500);
+  </script>
+</body>
+</html>

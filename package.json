@@ -1,0 +1,20 @@
+{
+  "name": "sg-weekend-app",
+  "version": "1.0.0",
+  "description": "今週末どこいく？SG - シンガポール在住日本人ファミリーのための週末おでかけ提案PWA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
+    "axios": "^1.16.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "node-cron": "^4.2.1",
+    "rss-parser": "^3.13.0",
+    "sharp": "^0.34.5",
+    "stripe": "^17.7.0"
+  }
+}

@@ -1,0 +1,399 @@
+// scripts/filter-events.js
+// Claude APIで記事を判定・分類・日本語化して data/{city}/events.json に保存する
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+
+const Anthropic = require('@anthropic-ai/sdk');
+const fs        = require('fs');
+const path      = require('path');
+
+const client = new Anthropic();
+
+const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
+const CITY_LOCATIONS = { sg: 'Singapore', bkk: 'Bangkok', syd: 'Sydney' };
+const CITY_AREAS = {
+  sg:  '"Central"/"East"/"West"/"North"/"North-East"/"Island-wide"',
+  bkk: '"Sukhumvit"/"Silom"/"Sathorn"/"Siam"/"Riverside"/"Thonglor"/"Ekkamai"/"Asok"/"On Nut"/"City-wide"',
+  syd: '"CBD"/"Inner West"/"Eastern Suburbs"/"North Shore"/"Northern Beaches"/"Western Sydney"/"South"/"City-wide"',
+};
+
+const BATCH_SIZE = 10;
+
+// ─── X投稿のリンク先記事コンテンツ取得 ─────────────────────────────
+async function fetchArticleContent(url) {
+  if (!url || url.includes('x.com') || url.includes('twitter.com')) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].replace(/\s+/g, ' ').trim() : '';
+
+    const ogDescMatch = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)
+                      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i);
+    const metaDescMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+                        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+    const desc = (ogDescMatch?.[1] || metaDescMatch?.[1] || '').replace(/\s+/g, ' ').trim();
+
+    const ogTitleMatch = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
+                       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
+    const ogTitle = (ogTitleMatch?.[1] || title).replace(/\s+/g, ' ').trim();
+
+    const parts = [ogTitle, desc].filter(Boolean);
+    return parts.length > 0 ? parts.join(' — ').slice(0, 600) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── OGP画像取得 ──────────────────────────────────────────────────
+async function fetchOgpImage(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(5000),
+    });
+    const html = await res.text();
+    const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const twMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+    const imgUrl = (ogMatch && ogMatch[1]) || (twMatch && twMatch[1]) || null;
+    // Instagram CDNは期限切れ・動画URLになるため除外
+    if (imgUrl && (imgUrl.includes('cdninstagram.com') || imgUrl.match(/\.(mp4|mov|webm)(\?|$)/i))) return null;
+    return imgUrl;
+  } catch {
+    return null;
+  }
+}
+
+// ─── バッチ処理 ──────────────────────────────────────────────────
+async function processBatch(batch, cityKey = 'sg') {
+  const today = new Date().toISOString().slice(0, 10);
+  const twoWeeksLater = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+
+  const articlesJson = JSON.stringify(
+    batch.map((item, i) => ({
+      index: i,
+      title: item.title,
+      description: item.description.slice(0, 800),
+      article_content: item.articleContent || null,
+      url: item.link,
+      date: (() => { if (!item.pubDate) return null; const d = new Date(item.pubDate); return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); })(),
+      source: item.source,
+      image: item.image || null,
+    })),
+    null,
+    2
+  );
+
+  const cityName = CITY_NAMES[cityKey] || 'シンガポール';
+  const cityLocation = CITY_LOCATIONS[cityKey] || 'Singapore';
+  const cityAreas = CITY_AREAS[cityKey] || CITY_AREAS.sg;
+
+  const scoreThreshold = 6;
+
+  const scoringCriteria = `採用基準（score ${scoreThreshold}以上のみ採用）：
+- 日本文化・日本ブランドとの関連で加点
+- ファミリー・子連れ対応で加点
+- 発見感・意外性で加点（major_scoreが低いほど加点）
+- 情報が具体的（日時・場所・価格）で加点`;
+
+  // キャッシュ対象: 記事JSON以外の命令テンプレート全体（同一runで内容が変わらない）
+  const instructionText = `あなたは${cityName}在住の日本人向けおでかけアプリのコンテンツ編集者です。
+以下の記事を評価し、採用するもののみJSON配列で返してください。
+
+【X（Twitter）投稿について】
+source が "X /" で始まる記事はXのリストから取得したツイートです。
+- article_content フィールドがある場合は、リンク先記事の内容です。title・description より優先して情報を読み取ってください。
+- url フィールドが x.com を含まない場合は記事URLです。x.com を含む場合はツイートURLです。どちらの場合もそのまま url として使用してください。
+- ツイート本文は短いですが、article_content に詳細があれば正確なイベント情報を生成できます。
+
+typeの定義（厳密に守ること）：
+- "event": 公園・大型施設・会場・テーマパーク・動物園・美術館・図書館・モール内の体験型イベント・ワークショップ・学校オープンハウス・教育キャンプ・マーケット・バザー・マルシェなど「週末に行く場所・体験・学ぶ・見る」を主目的とするものすべて。飲食は絶対に含めない。
+- "gourmet": 飲食店・カフェ・ホテルが開催する【期間限定】のフード体験のみ。例：期間限定デザート・コラボカフェ・フードフェスティバル・ポップアップレストラン・テーマビュッフェ・季節限定ハイティー（開催期間が明記されているもの）。通常営業・定番メニュー紹介など常設コンテンツは含めない。
+- "sale": スーパー・ファッション・家電・雑貨・ドラッグストア・モール全体など小売店の割引・セール・クーポン・キャッシュバックはすべてsale。購入することが主目的のものはすべてsale。
+- "opening": レストラン・カフェ・ショップ・施設・モール・アトラクションなどの【グランドオープン（初めて営業を開始する）】記事のみ。オープン日が明記されているもの。今後も継続して営業・運営される全く新しいお店・施設に限る。リニューアルオープン・新エリア追加・新ゾーン開設・改装再開業はopeningに含めない（eventまたはgourmetで分類）。
+
+【重要】"other"/"market"/"edu" は使わない。上記4つのいずれかに必ず分類すること。
+分類の判断基準（迷ったらこれで決める）：
+- 全く新しいお店・施設のグランドオープン（初めて営業開始）→ opening。飲食店・カフェ・ショップ・施設問わず
+- リニューアル・改装再開業・新エリア追加・新ゾーン開設は opening にしない → event またはgourmetで分類
+- 「食べる・飲む」が主目的かつ【期間限定】かつグランドオープンでない → gourmet
+- 「体験する・見る・遊ぶ・行く・学ぶ・マーケットを楽しむ」が主目的かつグランドオープンでない → event
+- 「買う・割引で得をする」が主目的 → sale（食品スーパーのセールもsale）
+
+【重要】食品メーカーやスーパーの割引・新商品はsale。飲食店の限定メニュー・フェアはgourmet。この2つを混同しないこと。
+
+各採用記事について以下のフィールドを含めること（typeに関わらず共通）：
+
+- index: 元の記事のインデックス番号（0始まり）
+- title_ja: 日本語タイトル（20文字以内）
+- store: 施設名・店名・イベント名（英語OK）
+- content_ja: 日本人向け説明文（150〜200文字）。内容・特徴・なぜおすすめかを具体的に記述すること
+- content_en: English description for the same event (100–150 chars). Concise, informative, highlights what makes it worth visiting.
+- tips_ja: ひとことアドバイスの配列（2〜3点、各50文字以内）例: ["混雑を避けるなら開店直後がおすすめ", "ベビーカー入場可", "予約は公式サイトから"]
+- tips_en: English tips array (2–3 points, each under 60 chars) e.g. ["Arrive early to beat crowds", "Stroller-friendly", "Book via official site"]
+- type: "event" | "gourmet" | "sale" | "opening"（"other"/"edu"/"market" は絶対に使わない）
+- who: ["family","couple","solo","group"] から該当するもの（複数可）。子連れ不可なら who:["couple","solo"]
+- age: ["all","baby","preschool","school"] から該当するもの（複数可）。子連れ不可なら["all"]ではなくwhoで制御
+- style: ["beginner","resident","local"] から該当するもの（複数可）
+- score: 0-10（${cityName}在住の日本人にとっての週末おでかけとしての有益度）
+- major_score: 1-5（1=超ニッチ発見感あり、5=誰でも知ってる定番）
+- start_date: "YYYY-MM-DD"（不明な場合は今日 ${today}）
+- end_date: "YYYY-MM-DD"（記事に終了日の記載がない場合は${twoWeeksLater}）
+- area: ${cityAreas}
+- emoji: 内容に合った絵文字1つ
+- image: 記事のサムネイルURL（ない場合はnull）
+
+${scoringCriteria}
+- 不動産・金融・求人・保険・ビザ関連は採用しない
+- storeが「Various」「TBC」「Multiple locations」「${cityLocation}」など場所が不特定・具体的でないものは採用しない
+- 具体的な店名・施設名・イベント名が明記されていないものは採用しない
+- 複数店舗・複数スポットを紹介するまとめ記事（listicle）は採用しない。1つのお店・1つの施設・1つのイベントを対象とした記事のみ採用する
+- 単一施設で開催される大型フェア・フードフェスティバル（複数店舗が出店していても開催場所が1ヶ所に限定されているもの）はeventとして採用してよい
+- 【重要】常設・通年営業のレストラン/カフェ/ホーカー/飲食店の通常メニュー紹介・グルメレビューは採用しない。「新メニュー」でも開催期間が明記されていなければ不採用とする（ただし新規オープン記事はopeningとして採用する）
+- openingの場合、end_dateは記事に終了日がなければstart_dateの1ヶ月後とすること
+- 【日本人フィルタ】以下は不採用とする：
+  - 地元コミュニティ限定・現地の特定民族向けのイベント
+  - 現地の国・代表チームを応援するスポーツ観戦イベント（例：オーストラリア代表のワールドカップ観戦パブリックビューイング、タイ代表戦応援イベント、AFL/NRL/クリケット等のローカルスポーツ観戦）
+  - 現地国民・市民を主な対象とした政治・市民・コミュニティイベント
+  - 在住外国人（日本人）が参加する動機がほぼない純粋なローカル向けイベント
+  言語は問わない。観光客歓迎・外国人が普通に参加できるもの（コンサート・展示・フードフェス等）は採用すること
+
+JSON配列のみ返すこと（前置き・説明・コードブロック不要）。不採用は配列に含めない。
+
+記事:`;
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 4000,
+    system: [
+      {
+        type: 'text',
+        text: `あなたは${cityName}在住の日本人向けコンテンツ編集者です。指示されたJSONのみを返してください。`,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: instructionText,
+            cache_control: { type: 'ephemeral' }, // 同一run内でキャッシュ再利用
+          },
+          {
+            type: 'text',
+            text: articlesJson,
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = response.content[0].text.trim();
+  const clean = text.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+
+  const match = clean.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+
+  return JSON.parse(match[0]);
+}
+
+// ─── メイン関数：フィルタリング＆保存 ──────────────────────────
+async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
+  if (!eventsPath) {
+    eventsPath = path.join(__dirname, '..', 'data', cityKey, 'events.json');
+  }
+
+  // 外部リンクのある記事コンテンツを事前取得してdescriptionを補強
+  const itemsWithExternalLink = items.filter(item => {
+    if (!item.link) return false;
+    if (item.source?.startsWith('X /') && !item.link.includes('x.com')) return true;
+    if (item.source?.startsWith('Instagram /') && !item.link.includes('instagram.com')) return true;
+    return false;
+  });
+  if (itemsWithExternalLink.length > 0) {
+    console.log(`\n  🔗 外部リンク記事を取得中... (${itemsWithExternalLink.length}件)`);
+    await Promise.all(
+      itemsWithExternalLink.map(async item => {
+        const content = await fetchArticleContent(item.link);
+        if (content) {
+          item.articleContent = content;
+          console.log(`    ✅ 取得: ${item.link.slice(0, 60)}...`);
+        }
+      })
+    );
+  }
+
+  let totalAccepted = 0;
+  let totalRejected = 0;
+
+  const newItems = [];
+  const sourceStats = {}; // { sourceName: { sent: N, accepted: N } }
+
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(items.length / BATCH_SIZE);
+    console.log(`\n  [バッチ ${batchNum}/${totalBatches}] ${batch.length}件を処理中...`);
+
+    try {
+      // ソース別送信カウント
+      for (const item of batch) {
+        const src = item.source || 'Unknown';
+        if (!sourceStats[src]) sourceStats[src] = { sent: 0, accepted: 0 };
+        sourceStats[src].sent++;
+      }
+
+      const results = await processBatch(batch, cityKey);
+      totalAccepted += results.length;
+      totalRejected += batch.length - results.length;
+
+      for (const r of results) {
+        const original = batch[r.index] || {};
+        const id = `e_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+        const validType = ['event', 'gourmet', 'sale', 'opening'].includes(r.type) ? r.type : 'event';
+        const endDate = validType === 'opening'
+          ? oneMonthLater(r.start_date)
+          : r.end_date;
+        const period = validType === 'opening'
+          ? formatOpenDate(r.start_date)
+          : formatPeriod(r.start_date, endDate);
+
+        const defaultLocation = CITY_LOCATIONS[cityKey] || 'Singapore';
+        const defaultArea = cityKey === 'bkk' ? 'Sukhumvit' : cityKey === 'syd' ? 'CBD' : 'Central';
+        const item = {
+          id,
+          city:        cityKey,
+          fetched_at:  new Date().toISOString().slice(0, 10),
+          type:        validType,
+          emoji:       r.emoji || '📌',
+          image:       r.image || original.image || null,
+          store:       r.store || '',
+          who:         Array.isArray(r.who) ? r.who : ['family', 'couple', 'solo', 'group'],
+          age:         Array.isArray(r.age) ? r.age : ['all'],
+          style:       r.style || ['beginner'],
+          major_score: r.major_score || 3,
+          period,
+          start_date:  r.start_date,
+          end_date:    endDate,
+          content:     r.content_ja || '',
+          content_en:  r.content_en || '',
+          tips:        Array.isArray(r.tips_ja) ? r.tips_ja : (r.tips_ja ? [r.tips_ja] : []),
+          tips_en:     Array.isArray(r.tips_en) ? r.tips_en : (r.tips_en ? [r.tips_en] : []),
+          location:    r.area || defaultLocation,
+          area:        r.area || defaultArea,
+          url:         original.link || '',
+          source:      original.source || '',
+        };
+
+        // ソース別採用カウント
+        const src = original.source || 'Unknown';
+        if (sourceStats[src]) sourceStats[src].accepted++;
+
+        console.log(`    ✅ 採用: ${r.title_ja} (score: ${r.score}, type: ${r.type}, source: ${src})`);
+        newItems.push(item);
+      }
+
+      if (i + BATCH_SIZE < items.length) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    } catch (e) {
+      console.error(`    ❌ バッチ処理エラー: ${e.message}`);
+      totalRejected += batch.length;
+    }
+  }
+
+  // OGP画像の取得（imageがnullのものだけ）
+  if (newItems.length > 0) {
+    console.log(`\n  🖼 OGP画像取得中... (${newItems.length}件)`);
+    await Promise.all(
+      newItems.map(async item => {
+        // 外部URLがある場合はOGP優先（Instagram CDNは期限切れになるため）
+        const hasExternalUrl = item.url && !item.url.includes('instagram.com');
+        const isInstagramCdn = item.image && item.image.includes('cdninstagram.com');
+        if ((item.image === null || isInstagramCdn) && hasExternalUrl) {
+          const ogp = await fetchOgpImage(item.url);
+          if (ogp) item.image = ogp;
+        }
+      })
+    );
+  }
+
+  if (newItems.length > 0) {
+    const existing = fs.existsSync(eventsPath)
+      ? JSON.parse(fs.readFileSync(eventsPath, 'utf8'))
+      : [];
+    fs.writeFileSync(eventsPath, JSON.stringify([...existing, ...newItems], null, 2), 'utf8');
+    console.log(`\n  💾 ${eventsPath} に ${newItems.length}件追記`);
+  }
+
+  console.log(`\n  📊 Claude API結果: ${totalAccepted + totalRejected}件送信 → 採用${totalAccepted}件 / 不採用${totalRejected}件`);
+  console.log('\n  📊 ソース別採用率:');
+  for (const [src, stat] of Object.entries(sourceStats).sort((a, b) => b[1].sent - a[1].sent)) {
+    const rate = stat.sent > 0 ? Math.round(stat.accepted / stat.sent * 100) : 0;
+    console.log(`    ${stat.accepted > 0 ? '✅' : '  '} ${src}: ${stat.accepted}/${stat.sent}件 (${rate}%)`);
+  }
+
+  return { accepted: totalAccepted, rejected: totalRejected, newItems, sourceStats };
+}
+
+// ─── ユーティリティ ──────────────────────────────────────────────
+function oneMonthLater(dateStr) {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const year = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear();
+  const month = (d.getMonth() + 1) % 12;
+  const day = Math.min(d.getDate(), new Date(year, month + 1, 0).getDate());
+  return new Date(year, month, day).toISOString().slice(0, 10);
+}
+
+function formatOpenDate(dateStr) {
+  if (!dateStr) return '';
+  const [, m, d] = dateStr.split('-');
+  return `${parseInt(m)}/${parseInt(d)} OPEN`;
+}
+
+function formatPeriod(startDate, endDate) {
+  if (!startDate || !endDate) return '';
+  const [, sm, sd] = startDate.split('-');
+  const [, em, ed] = endDate.split('-');
+  const s = `${parseInt(sm)}/${parseInt(sd)}`;
+  const e = `${parseInt(em)}/${parseInt(ed)}`;
+  return s === e ? s : `${s}〜${e}`;
+}
+
+// 旧インターフェース互換
+async function filterAndEnrich(events) {
+  const results = [];
+  for (let i = 0; i < events.length; i += BATCH_SIZE) {
+    const batch = events.slice(i, i + BATCH_SIZE);
+    try {
+      const processed = await processBatch(batch);
+      processed.forEach(r => {
+        const original = batch[r.index] || {};
+        results.push({
+          ...original,
+          titleJa:    r.title_ja,
+          type:       r.type,
+          area:       r.area,
+          emoji:      r.emoji,
+          status:     'pending',
+          isRelevant: true,
+        });
+      });
+    } catch(e) {
+      console.error(`バッチエラー: ${e.message}`);
+    }
+  }
+  return results;
+}
+
+module.exports = { filterAndSave, filterAndEnrich };

@@ -1,0 +1,3355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#FFF8F0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="おでかけNavi" />
+  <meta name="description" content="シンガポール在住日本人ファミリーのための週末おでかけ提案アプリ" />
+  <link rel="manifest" href="manifest.json" />
+  <!-- Safari / iOS ホーム画面アイコン（manifest.jsonは参照されないため必須） -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <!-- ブラウザタブ用 favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon.png" />
+  <title>週末どうする？SG</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --cream: #FFF9F2;
+      --warm-white: #FFFDF9;
+      --sand: #F0E6D3;
+      --sand-dark: #E2D0B8;
+      --caramel: #C8804A;
+      --caramel-light: #E0A878;
+      --caramel-pale: #FDF0E6;
+      --sage: #6E9E88;
+      --sage-light: #A0C4B4;
+      --sage-pale: #EDF4F1;
+      --terracotta: #C4705A;
+      --terracotta-light: #E09A88;
+      --midnight: #2C2420;
+      --warm-gray: #6B5E52;
+      --light-gray: #C4B8AC;
+      --gold: #C0903A;
+      --gold-light: #E4C472;
+      --sky: #7AADCC;
+      --radius-card: 24px;
+      --radius-btn: 14px;
+      --shadow-soft: 0 4px 20px rgba(42,37,32,0.07);
+      --shadow-card: 0 6px 28px rgba(42,37,32,0.10);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--cream);
+      color: var(--midnight);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── HEADER ─── */
+    .app-header {
+      background: var(--warm-white);
+      padding: 54px 20px 16px;
+      border-bottom: 1px solid var(--sand);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 18px rgba(42,37,32,0.06);
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .app-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 24px;
+      color: var(--midnight);
+      line-height: 1.15;
+      font-weight: 700;
+    }
+    .app-title span {
+      display: block;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 11px;
+      font-weight: 300;
+      color: var(--warm-gray);
+      letter-spacing: 0.12em;
+      margin-top: 3px;
+    }
+
+    .header-share-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      opacity: 0.8;
+      transition: opacity 0.15s;
+    }
+    .header-share-btn:active { opacity: 0.5; }
+
+    /* ─── TABS ─── */
+    .tabs-section {
+      padding: 0;
+    }
+    .tabs-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--light-gray);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      flex-shrink: 0;
+      padding: 10px 18px;
+      border-radius: 50px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      color: var(--warm-gray);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .tab.active {
+      background: var(--caramel);
+      color: white;
+      border-color: var(--caramel);
+    }
+    .tab:not(.active):active {
+      background: var(--sand);
+    }
+
+    /* ─── MAIN SCROLL AREA ─── */
+    .main {
+      padding: 20px 20px 110px;
+    }
+
+    /* ─── WEATHER BANNER ─── */
+    .weather-banner {
+      background: white;
+      border-radius: 20px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border: 1px solid var(--sand);
+      animation: fadeUp 0.4s ease both;
+    }
+    .weather-icon { font-size: 42px; flex-shrink: 0; line-height: 1; }
+    .weather-info { flex: 1; }
+    .weather-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      color: var(--light-gray);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .weather-headline {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 16px;
+      color: var(--midnight);
+      font-weight: 700;
+      margin-bottom: 3px;
+      line-height: 1.3;
+    }
+    .weather-sub {
+      font-size: 12px;
+      color: var(--warm-gray);
+      font-weight: 300;
+    }
+    .weather-temp {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 28px;
+      color: var(--caramel);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ─── PROFILE SETTINGS ─── */
+    .profile-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .profile-chip {
+      padding: 10px 18px;
+      border-radius: 50px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      color: var(--warm-gray);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'Noto Sans JP', sans-serif;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .profile-chip.selected {
+      background: var(--caramel);
+      color: white;
+      border-color: var(--caramel);
+      font-weight: 700;
+    }
+
+    /* ─── CARD SORT INDICATOR ─── */
+    .sort-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--sage-pale);
+      color: var(--sage);
+      border: 1px solid var(--sage-light);
+    }
+
+    /* ─── AGE FILTERS ─── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 20px;
+      color: var(--midnight);
+      font-weight: 700;
+    }
+    .result-count {
+      font-size: 12px;
+      color: var(--warm-gray);
+      font-weight: 300;
+    }
+
+    .age-filters {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      margin-bottom: 22px;
+      padding-bottom: 2px;
+    }
+    .age-filters::-webkit-scrollbar { display: none; }
+    .age-chip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 16px;
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      color: var(--warm-gray);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .age-chip .chip-emoji { font-size: 15px; }
+    .age-chip.active {
+      background: var(--sage);
+      color: white;
+      border-color: var(--sage);
+    }
+    .age-chip.active-rose {
+      background: var(--terracotta);
+      color: white;
+      border-color: var(--terracotta);
+    }
+    .age-chip.active-caramel {
+      background: var(--caramel);
+      color: white;
+      border-color: var(--caramel);
+    }
+
+    /* ─── CARDS ─── */
+    .cards-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .spot-card {
+      background: white;
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .spot-card:active {
+      transform: scale(0.99);
+    }
+
+    .card-image-area {
+      height: 170px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card-image-bg {
+      width: 100%; height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 68px;
+      position: relative;
+    }
+    .card-image-bg.kite {
+      background: linear-gradient(160deg, #87CEEB 0%, #B8E4F7 40%, #7AADCC 70%, #C8E8D4 100%);
+    }
+    .card-image-bg.jewel {
+      background: linear-gradient(160deg, #1A3A2A 0%, #2D5A3D 40%, #4A8C6A 70%, #7AADCC 100%);
+    }
+    .card-image-bg.science {
+      background: linear-gradient(160deg, #0D1B2A 0%, #1A2D4A 40%, #2A4570 70%, #3D6B9E 100%);
+    }
+    .card-image-bg.gardens {
+      background: linear-gradient(160deg, #1A4A2A 0%, #2D7A3D 40%, #5AAD6A 70%, #A8D4A8 100%);
+    }
+    .card-image-bg.sentosa {
+      background: linear-gradient(160deg, #1A4A6A 0%, #2D7AAD 40%, #5AADCC 70%, #A8D4E8 100%);
+    }
+    .card-image-bg.safari {
+      background: linear-gradient(160deg, #4A3A1A 0%, #8C6A2D 40%, #C4904A 70%, #E8C47A 100%);
+    }
+    .card-image-bg.aquarium {
+      background: linear-gradient(160deg, #0A1A3A 0%, #1A3A6A 40%, #2A6AAD 70%, #4A9ACC 100%);
+    }
+    .card-image-bg.haji {
+      background: linear-gradient(160deg, #3A1A0A 0%, #6A2D1A 40%, #AD5A2A 70%, #CC8A4A 100%);
+    }
+    .card-image-bg.eastcoast {
+      background: linear-gradient(160deg, #0A2A4A 0%, #1A5A8A 40%, #2A8ACC 70%, #4AAAE8 100%);
+    }
+    .card-image-bg.botanical {
+      background: linear-gradient(160deg, #1A3A0A 0%, #3A6A1A 40%, #6AAD2A 70%, #A8CC4A 100%);
+    }
+
+    .card-overlay-text {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      right: 16px;
+    }
+    .card-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .card-tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 4px 12px;
+      border-radius: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .tag-weekend { background: rgba(200,128,74,0.9); color: white; }
+    .tag-holiday { background: rgba(110,158,136,0.9); color: white; }
+    .tag-summer  { background: rgba(42,69,112,0.9); color: white; }
+    .tag-nextholiday { background: rgba(196,112,90,0.9); color: white; }
+    .tag-age { background: rgba(255,255,255,0.28); color: white; border: 1px solid rgba(255,255,255,0.5); }
+
+    .card-body {
+      padding: 18px;
+    }
+
+    .card-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 18px;
+      line-height: 1.35;
+      color: var(--midnight);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .card-meta {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--warm-gray);
+      font-weight: 300;
+    }
+    .meta-icon { font-size: 14px; }
+
+    .stars {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 14px;
+    }
+    .star {
+      font-size: 15px;
+      color: var(--light-gray);
+    }
+    .star.filled { color: var(--gold); }
+
+    /* Tips Box */
+    .tips-box {
+      background: var(--caramel-pale);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      border-left: 3px solid var(--caramel-light);
+    }
+    .tips-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      color: var(--caramel);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .tips-list {
+      list-style: none;
+    }
+    .tips-list li {
+      font-size: 13px;
+      color: var(--warm-gray);
+      line-height: 1.65;
+      padding: 2px 0;
+      font-weight: 400;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .tips-list li::before {
+      content: '•';
+      color: var(--caramel-light);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .card-dismiss-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.35);
+      border: none;
+      border-radius: 50%;
+      width: 26px; height: 26px;
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      z-index: 10;
+      transition: background 0.15s;
+    }
+    .card-dismiss-btn:active { background: rgba(0,0,0,0.6); }
+
+    /* Action Row */
+    .card-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ─── PIN BUTTON ─── */
+    .pin-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: var(--radius-btn);
+      font-size: 13px;
+      font-weight: 500;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      color: var(--warm-gray);
+      font-family: 'Noto Sans JP', sans-serif;
+      white-space: nowrap;
+    }
+    .pin-btn .pin-emoji { font-size: 15px; }
+    .pin-btn.pinned {
+      background: var(--caramel-pale);
+      border-color: var(--caramel-light);
+      color: var(--caramel);
+      font-weight: 700;
+    }
+
+    .share-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: var(--radius-btn);
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--sand);
+      color: var(--warm-gray);
+      border: 1.5px solid var(--sand-dark);
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .share-btn:active { opacity: 0.7; }
+    .share-btn .share-icon { font-size: 15px; }
+
+    /* ─── CARD INFO ROW (cost / ticket / site) ─── */
+    .card-info-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+    .info-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 50px;
+      white-space: nowrap;
+    }
+    .info-badge.free {
+      background: var(--sage-pale);
+      color: var(--sage);
+      border: 1px solid var(--sage-light);
+    }
+    .info-badge.paid {
+      background: #FFF8EC;
+      color: var(--gold);
+      border: 1px solid var(--gold-light);
+    }
+    .info-badge.ticket-required {
+      background: #FFF3F0;
+      color: var(--terracotta);
+      border: 1px solid var(--terracotta-light);
+      font-weight: 700;
+    }
+    .info-badge.ticket-free {
+      background: var(--sage-pale);
+      color: var(--sage);
+      border: 1px solid var(--sage-light);
+    }
+    .official-site-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 50px;
+      background: var(--warm-gray);
+      color: white;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+      font-family: 'Noto Sans JP', sans-serif;
+      white-space: nowrap;
+    }
+    .official-site-btn:active { opacity: 0.75; }
+
+    /* ─── CARD HIDDEN STATE ─── */
+    .spot-card.hidden {
+      display: none;
+    }
+
+    /* ─── EMPTY STATE ─── */
+    .empty-state {
+      display: none;
+      text-align: center;
+      padding: 52px 24px;
+    }
+    .empty-state.visible { display: block; }
+    .empty-emoji { font-size: 52px; margin-bottom: 14px; }
+    .empty-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 20px;
+      color: var(--midnight);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    .empty-desc {
+      font-size: 14px;
+      color: var(--warm-gray);
+      font-weight: 300;
+      line-height: 1.8;
+    }
+
+    /* ─── SCREENS (pin list, calendar, settings) ─── */
+    .screen {
+      display: none;
+      padding: 20px 20px 110px;
+      min-height: 80vh;
+    }
+    .screen.visible { display: block; }
+
+    .screen-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 22px;
+      color: var(--midnight);
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    /* ─── PIN LIST SCREEN ─── */
+    .pin-empty {
+      text-align: center;
+      padding: 60px 24px;
+    }
+    .pin-empty-emoji { font-size: 52px; margin-bottom: 14px; }
+    .pin-empty-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 20px;
+      color: var(--midnight);
+      margin-bottom: 10px;
+    }
+    .pin-empty-desc {
+      font-size: 14px;
+      color: var(--warm-gray);
+      font-weight: 300;
+      line-height: 1.8;
+    }
+
+    .pin-card {
+      background: white;
+      border-radius: 18px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      animation: fadeUp 0.3s ease both;
+    }
+    .pin-card-emoji { font-size: 36px; flex-shrink: 0; }
+    .pin-card-info { flex: 1; }
+    .pin-card-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 16px;
+      color: var(--midnight);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .pin-card-meta {
+      font-size: 12px;
+      color: var(--warm-gray);
+      font-weight: 300;
+    }
+    .pin-remove-btn {
+      background: none;
+      border: 1.5px solid var(--sand-dark);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--warm-gray);
+      transition: all 0.15s;
+    }
+    .pin-remove-btn:active { background: var(--sand); }
+
+    /* ─── CALENDAR SCREEN ─── */
+    .cal-months-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .cal-month-block {
+      background: white;
+      border-radius: 20px;
+      padding: 18px 16px 20px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .cal-month-heading {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 18px;
+      color: var(--midnight);
+      font-weight: 700;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--sand);
+    }
+
+    .cal-grid-header {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      margin-bottom: 6px;
+    }
+    .cal-day-label {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--light-gray);
+      padding: 4px 0;
+    }
+    .cal-day-label:first-child { color: var(--terracotta); }
+    .cal-day-label:last-child { color: var(--sky); }
+
+    .cal-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .cal-week {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+      position: relative;
+    }
+    .cal-vacation-bar {
+      position: absolute;
+      bottom: 3px;
+      left: 0; right: 0;
+      height: 4px;
+      background: rgba(200, 128, 74, 0.35);
+      border-radius: 2px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .cal-cell {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      cursor: default;
+      position: relative;
+      transition: background 0.15s;
+      z-index: 1;
+    }
+    .cal-cell.has-event {
+      cursor: pointer;
+    }
+    .cal-cell.has-event:active { background: var(--sand); }
+    .cal-cell.today {
+      background: var(--caramel);
+    }
+    .cal-cell.today .cal-date { color: white; font-weight: 700; }
+    .cal-cell.other-month { visibility: hidden; }
+    .cal-date {
+      font-size: 13px;
+      color: var(--midnight);
+      font-weight: 400;
+      line-height: 1;
+    }
+    .cal-event-counts {
+      display: flex;
+      gap: 2px;
+      margin-top: 3px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .cal-count-badge {
+      font-size: 8px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 1px 3px;
+      border-radius: 4px;
+    }
+    .cal-count-event {
+      background: var(--caramel-pale);
+      color: var(--caramel);
+    }
+    .cal-count-sale {
+      background: var(--sage-pale);
+      color: var(--sage);
+    }
+    .cal-cell.today .cal-count-event {
+      background: rgba(255,255,255,0.3);
+      color: white;
+    }
+    .cal-cell.today .cal-count-sale {
+      background: rgba(255,255,255,0.3);
+      color: white;
+    }
+
+    /* Calendar event popup */
+    .cal-popup {
+      display: none;
+      position: fixed;
+      bottom: 110px;
+      left: 16px; right: 16px;
+      background: white;
+      border-radius: 20px;
+      padding: 18px 18px 16px;
+      box-shadow: 0 8px 40px rgba(42,37,32,0.18);
+      z-index: 300;
+      animation: popUp 0.25s ease;
+      max-height: 60vh;
+      display: none;
+      flex-direction: column;
+    }
+    .cal-popup.visible { display: flex; }
+    @keyframes popUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .cal-popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .cal-popup-date {
+      font-size: 13px;
+      color: var(--caramel);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .cal-popup-close {
+      background: var(--sand);
+      border: none;
+      border-radius: 50%;
+      width: 30px; height: 30px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .cal-popup-events {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cal-popup-event-item {
+      border-radius: 14px;
+      background: var(--cream);
+      padding: 12px 14px;
+      border-left: 3px solid var(--caramel-light);
+    }
+    .cal-popup-event-item + .cal-popup-event-item {
+      border-left-color: var(--sage-light);
+    }
+    .cal-popup-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 15px;
+      color: var(--midnight);
+      font-weight: 700;
+      margin-bottom: 5px;
+      line-height: 1.3;
+    }
+    .cal-popup-meta {
+      font-size: 12px;
+      color: var(--warm-gray);
+      margin-bottom: 6px;
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .cal-popup-tips {
+      font-size: 12px;
+      color: var(--warm-gray);
+      line-height: 1.6;
+      border-top: 1px solid var(--sand);
+      padding-top: 7px;
+      margin-top: 4px;
+    }
+    .cal-popup-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .cal-icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      font-size: 17px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      line-height: 1;
+    }
+    .cal-icon-btn:active { background: var(--sand); }
+    .cal-icon-btn.pinned {
+      background: var(--caramel-pale);
+      border-color: var(--caramel-light);
+    }
+    /* ─── HIDDEN GEMS SECTION ─── */
+    .gems-section {
+      margin: 8px 0 24px;
+    }
+    .gems-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .gems-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 20px;
+      color: var(--midnight);
+      font-weight: 700;
+    }
+    .gems-more {
+      font-size: 12px;
+      color: var(--caramel);
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      background: none;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+
+    .gems-scroll {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 4px;
+    }
+    .gems-scroll::-webkit-scrollbar { display: none; }
+
+    .gem-card {
+      flex-shrink: 0;
+      width: 200px;
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      animation: fadeUp 0.4s ease both;
+    }
+    .gem-card:active { transform: scale(0.97); }
+
+    .gem-image {
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 52px;
+      position: relative;
+    }
+    .gem-image.ramen { background: linear-gradient(135deg, #2C1A0E 0%, #5C3520 50%, #8B4513 100%); }
+    .gem-image.cafe  { background: linear-gradient(135deg, #1A2A1A 0%, #2D4A2D 50%, #4A7A4A 100%); }
+    .gem-image.park  { background: linear-gradient(135deg, #0A1A2A 0%, #1A3A5A 50%, #2A6A8A 100%); }
+
+    .gem-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: rgba(200,128,74,0.92);
+      color: white;
+      letter-spacing: 0.06em;
+    }
+
+    .gem-body {
+      padding: 12px 14px 14px;
+    }
+    .gem-name {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 14px;
+      color: var(--midnight);
+      font-weight: 700;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+    .gem-meta {
+      font-size: 11px;
+      color: var(--warm-gray);
+      font-weight: 300;
+      margin-bottom: 6px;
+    }
+    .gem-teaser {
+      font-size: 11px;
+      color: var(--warm-gray);
+      line-height: 1.55;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ─── DETAIL PAGE ─── */
+    .detail-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--cream);
+      z-index: 200;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .detail-screen.visible { display: block; }
+
+    .detail-header-img {
+      height: 260px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 90px;
+      position: relative;
+    }
+    .detail-back-btn {
+      position: absolute;
+      top: 54px;
+      left: 16px;
+      background: rgba(255,255,255,0.9);
+      border: none;
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+
+    .detail-body {
+      padding: 24px 20px 100px;
+    }
+
+    .detail-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: var(--caramel-pale);
+      color: var(--caramel);
+      border: 1px solid var(--caramel-light);
+      margin-bottom: 12px;
+      letter-spacing: 0.06em;
+    }
+
+    .detail-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 24px;
+      color: var(--midnight);
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+
+    .detail-meta-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .detail-meta-item {
+      font-size: 13px;
+      color: var(--warm-gray);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .detail-section {
+      margin-bottom: 24px;
+    }
+    .detail-section-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 17px;
+      color: var(--midnight);
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .detail-section-body {
+      font-size: 14px;
+      color: var(--warm-gray);
+      line-height: 1.85;
+      font-weight: 300;
+    }
+
+    .detail-tips-box {
+      background: var(--caramel-pale);
+      border-radius: 16px;
+      padding: 16px 18px;
+      border-left: 3px solid var(--caramel-light);
+    }
+    .detail-tips-list {
+      list-style: none;
+    }
+    .detail-tips-list li {
+      font-size: 13px;
+      color: var(--warm-gray);
+      line-height: 1.7;
+      padding: 3px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-weight: 400;
+    }
+    .detail-tips-list li::before {
+      content: '✦';
+      color: var(--caramel);
+      flex-shrink: 0;
+      font-size: 10px;
+      margin-top: 4px;
+    }
+
+    .detail-resident-box {
+      background: var(--sage-pale);
+      border-radius: 16px;
+      padding: 16px 18px;
+      border-left: 3px solid var(--sage-light);
+    }
+    .detail-resident-author {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--sage);
+      margin-bottom: 8px;
+    }
+    .detail-resident-text {
+      font-size: 13px;
+      color: var(--warm-gray);
+      line-height: 1.75;
+      font-weight: 300;
+    }
+
+    /* ─── SALE SCREEN ─── */
+    .sale-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .sale-card {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow-soft);
+      position: relative;
+      animation: fadeUp 0.3s ease both;
+    }
+
+    .sale-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .sale-card-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .sale-store {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 15px;
+      color: var(--midnight);
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .sale-area-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: var(--sage-pale);
+      color: var(--sage);
+      border: 1px solid var(--sage-light);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .sale-area-badge.nearby {
+      background: var(--sage);
+      color: white;
+      border-color: var(--sage);
+    }
+    .sale-period {
+      font-size: 11px;
+      color: var(--caramel);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .sale-content {
+      font-size: 13px;
+      color: var(--warm-gray);
+      line-height: 1.6;
+      margin-bottom: 6px;
+      font-weight: 300;
+    }
+    .sale-location {
+      font-size: 11px;
+      color: var(--light-gray);
+      margin-bottom: 10px;
+    }
+    .sale-dismiss-btn {
+      background: none;
+      border: none;
+      font-size: 14px;
+      color: var(--light-gray);
+      cursor: pointer;
+      padding: 2px 4px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .sale-pin-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: white;
+      color: var(--warm-gray);
+      border: 1.5px solid var(--sand-dark);
+      cursor: pointer;
+      transition: all 0.18s ease;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .sale-pin-btn.pinned {
+      background: var(--caramel-pale);
+      border-color: var(--caramel-light);
+      color: var(--caramel);
+      font-weight: 700;
+    }
+
+    .sale-official-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--warm-gray);
+      color: white;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+      font-family: 'Noto Sans JP', sans-serif;
+      margin-top: 6px;
+    }
+    .sale-official-btn:active { opacity: 0.75; }
+
+    .sale-filter-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      margin-bottom: 18px;
+      padding-bottom: 2px;
+    }
+    .sale-filter-row::-webkit-scrollbar { display: none; }
+    .sale-filter-chip {
+      flex-shrink: 0;
+      padding: 8px 16px;
+      border-radius: 50px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      color: var(--warm-gray);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .sale-filter-chip.active {
+      background: var(--caramel);
+      color: white;
+      border-color: var(--caramel);
+      font-weight: 700;
+    }
+
+    .sale-empty {
+      text-align: center;
+      padding: 60px 24px;
+    }
+    .sale-empty-emoji { font-size: 52px; margin-bottom: 14px; }
+    .sale-empty-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 20px;
+      color: var(--midnight);
+      margin-bottom: 10px;
+    }
+    .sale-empty-desc {
+      font-size: 14px;
+      color: var(--warm-gray);
+      font-weight: 300;
+      line-height: 1.8;
+    }
+
+    .sale-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--light-gray);
+      text-transform: uppercase;
+      margin: 18px 0 10px;
+    }
+    .sale-section-label:first-child { margin-top: 0; }
+
+    /* ─── SETTINGS SCREEN ─── */
+    .settings-section {
+      margin-bottom: 28px;
+    }
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--light-gray);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .settings-item {
+      background: white;
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .settings-item-label {
+      font-size: 14px;
+      color: var(--midnight);
+      font-weight: 500;
+    }
+    .settings-item-value {
+      font-size: 13px;
+      color: var(--warm-gray);
+      font-weight: 300;
+    }
+
+    .area-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .area-chip {
+      padding: 10px 18px;
+      border-radius: 50px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      color: var(--warm-gray);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .area-chip.selected {
+      background: var(--sage);
+      color: white;
+      border-color: var(--sage);
+      font-weight: 700;
+    }
+
+    /* ─── BOTTOM NAV ─── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--warm-white);
+      border-top: 1px solid var(--sand);
+      display: flex;
+      padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+      z-index: 100;
+      box-shadow: 0 -2px 16px rgba(42,37,32,0.06);
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 4px 0;
+      transition: opacity 0.15s;
+    }
+    .nav-item:active { opacity: 0.6; }
+    .nav-icon { font-size: 23px; }
+    .nav-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--light-gray);
+      letter-spacing: 0.04em;
+    }
+    .nav-item.active .nav-label { color: var(--caramel); font-weight: 700; }
+
+    /* ─── DECORATIVE DIVIDER ─── */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 24px 0;
+    }
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: var(--sand);
+    }
+    .divider-dot {
+      width: 5px; height: 5px;
+      background: var(--caramel-light);
+      border-radius: 50%;
+    }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .spot-card {
+      animation: fadeUp 0.4s ease both;
+    }
+    .spot-card:nth-child(1) { animation-delay: 0.05s; }
+    .spot-card:nth-child(2) { animation-delay: 0.12s; }
+    .spot-card:nth-child(3) { animation-delay: 0.19s; }
+
+    /* ─── TOAST NOTIFICATION ─── */
+    .toast {
+      position: fixed;
+      bottom: 98px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--midnight);
+      color: white;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 11px 22px;
+      border-radius: 50px;
+      opacity: 0;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      z-index: 9999;
+      pointer-events: none;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    /* ─── PIN DETAIL MODAL ─── */
+    .pin-detail-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(44,36,32,0.45);
+      z-index: 350;
+    }
+    .pin-detail-overlay.visible { display: block; }
+
+    .pin-detail-modal {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--warm-white);
+      border-radius: 24px 24px 0 0;
+      padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+      z-index: 360;
+      box-shadow: 0 -8px 40px rgba(42,37,32,0.18);
+      animation: slideUp 0.28s ease;
+    }
+    .pin-detail-modal.visible { display: block; }
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .pin-detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .pin-detail-emoji { font-size: 42px; line-height: 1; }
+    .pin-detail-close {
+      background: var(--sand);
+      border: none;
+      border-radius: 50%;
+      width: 32px; height: 32px;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pin-detail-body { margin-bottom: 18px; }
+    .pin-detail-title {
+      font-family: 'Kaisei Opti', serif;
+      font-size: 20px;
+      color: var(--midnight);
+      font-weight: 700;
+      line-height: 1.35;
+      margin-bottom: 10px;
+    }
+    .pin-detail-meta {
+      font-size: 13px;
+      color: var(--warm-gray);
+      font-weight: 300;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .pin-detail-tips {
+      background: var(--caramel-pale);
+      border-radius: 14px;
+      padding: 12px 16px;
+      border-left: 3px solid var(--caramel-light);
+      font-size: 13px;
+      color: var(--warm-gray);
+      line-height: 1.65;
+    }
+    .pin-detail-remove {
+      width: 100%;
+      padding: 13px;
+      border-radius: var(--radius-btn);
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      color: var(--warm-gray);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: 'Noto Sans JP', sans-serif;
+      transition: all 0.18s;
+    }
+    .pin-detail-remove:active { background: var(--sand); }
+
+    /* ─── INSTALL BANNER ─── */
+    .install-banner {
+      display: none;
+      position: fixed;
+      bottom: 90px;
+      left: 12px; right: 12px;
+      background: var(--midnight);
+      color: white;
+      border-radius: 18px;
+      padding: 14px 16px;
+      z-index: 400;
+      box-shadow: 0 8px 32px rgba(42,37,32,0.3);
+      animation: slideUp 0.3s ease;
+      align-items: center;
+      gap: 12px;
+    }
+    .install-banner.visible { display: flex; }
+    .install-banner-icon { font-size: 28px; flex-shrink: 0; }
+    .install-banner-body { flex: 1; }
+    .install-banner-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 3px;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .install-banner-desc {
+      font-size: 11px;
+      opacity: 0.75;
+      line-height: 1.5;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-weight: 300;
+    }
+    .install-banner-btn {
+      background: var(--caramel);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Noto Sans JP', sans-serif;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .install-banner-close {
+      background: none;
+      border: none;
+      color: white;
+      opacity: 0.5;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 0 0 4px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- ─── HEADER ─── -->
+  <!-- ─── INSTALL BANNER ─── -->
+  <div class="install-banner" id="install-banner">
+    <div class="install-banner-icon">📱</div>
+    <div class="install-banner-body">
+      <div class="install-banner-title">ホーム画面に追加しよう！</div>
+      <div class="install-banner-desc" id="install-banner-desc">おでかけNaviとして使えます</div>
+    </div>
+    <button class="install-banner-btn" id="install-banner-btn" onclick="handleInstall()">追加</button>
+    <button class="install-banner-close" onclick="dismissInstallBanner()">✕</button>
+  </div>
+
+  <header class="app-header">
+    <div class="header-top">
+      <div>
+        <div class="app-title">
+          週末どうする？SG 🇸🇬
+          <span>シンガポール在住者の週末おでかけガイド</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="header-share-btn" onclick="openInstallModal()">
+          <span style="font-size:18px;">📱</span>
+          <span style="display:block;font-size:9px;font-family:'Noto Sans JP',sans-serif;font-weight:600;color:var(--warm-gray);letter-spacing:0.05em;margin-top:2px;">追加</span>
+        </button>
+        <button class="header-share-btn" onclick="openShareModal()">
+          <span style="font-size:18px;">📤</span>
+          <span style="display:block;font-size:9px;font-family:'Noto Sans JP',sans-serif;font-weight:600;color:var(--warm-gray);letter-spacing:0.05em;margin-top:2px;">シェア</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-section">
+      <div class="tabs-label">いつ行く？</div>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="weekend" id="tab-weekend">🌤 今週末</button>
+        <button class="tab" data-tab="nextweekend" id="tab-nextweekend">🌈 来週末</button>
+        <button class="tab" data-tab="holiday" id="tab-holiday">🎌 次の連休</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── HOME SCREEN ─── -->
+  <main class="main" id="screen-home">
+
+    <!-- Weather Banner -->
+    <div class="weather-banner" id="weather-banner">
+      <div class="weather-icon" id="weather-icon">⏳</div>
+      <div class="weather-info">
+        <div class="weather-label">今週末の天気予報</div>
+        <div class="weather-headline" id="weather-headline">読み込み中...</div>
+        <div class="weather-sub" id="weather-sub"></div>
+      </div>
+      <div class="weather-temp" id="weather-temp"></div>
+    </div>
+
+    <!-- Section Header -->
+    <div class="section-header">
+      <div class="section-title">おでかけ先</div>
+      <div class="result-count" id="result-count">3件</div>
+    </div>
+
+    <!-- Cards -->
+    <div class="cards-grid" id="cards-grid">
+      <!-- /api/events から動的生成 -->
+    </div><!-- /cards-grid -->
+
+    <!-- Empty State -->
+    <div class="empty-state" id="empty-state">
+      <div class="empty-emoji">🔍</div>
+      <div class="empty-title">まだスポット準備中！</div>
+      <div class="empty-desc">このカテゴリのおでかけ先は<br>近日公開予定です。<br>タブを切り替えて他の候補を見てみましょう。</div>
+    </div>
+
+    <div class="section-divider">
+      <div class="divider-line"></div>
+      <div class="divider-dot"></div>
+      <div class="divider-line"></div>
+    </div>
+
+    <!-- ─── HIDDEN GEMS SECTION ─── -->
+  </main>
+
+  <!-- ─── DETAIL PAGE ─── -->
+  <div class="detail-screen" id="detail-screen">
+    <div class="detail-header-img ramen" id="detail-header-img">
+      <button class="detail-back-btn" onclick="closeDetail()">←</button>
+      <span id="detail-emoji">🍜</span>
+    </div>
+    <div class="detail-body">
+      <div class="detail-badge" id="detail-badge">隠れた名店</div>
+      <div class="detail-title" id="detail-title"></div>
+      <div class="detail-meta-row" id="detail-meta-row"></div>
+
+      <div class="detail-section" id="detail-owner-section">
+        <div class="detail-section-title">👨‍🍳 オーナーのストーリー</div>
+        <div class="detail-section-body" id="detail-owner"></div>
+      </div>
+
+      <div class="detail-section" id="detail-resident-section">
+        <div class="detail-section-title">💬 在住者目線のコメント</div>
+        <div class="detail-resident-box">
+          <div class="detail-resident-author" id="detail-resident-author"></div>
+          <div class="detail-resident-text" id="detail-resident-text"></div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">✦ ここだけの話Tips</div>
+        <div class="detail-tips-box">
+          <ul class="detail-tips-list" id="detail-tips-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SALE SCREEN ─── -->
+  <div class="screen" id="screen-sale">
+    <div class="screen-title">⏳ 期間限定情報</div>
+    <div class="sale-filter-row" id="sale-filter-row">
+      <button class="sale-filter-chip active" data-cat="all" onclick="setSaleFilter('all')">📋 すべて</button>
+      <button class="sale-filter-chip" data-cat="food" onclick="setSaleFilter('food')">🍽 フェア・グルメ</button>
+      <button class="sale-filter-chip" data-cat="sale" onclick="setSaleFilter('sale')">🏷 セール</button>
+      <button class="sale-filter-chip" data-cat="mall" onclick="setSaleFilter('mall')">🏬 モール</button>
+      <button class="sale-filter-chip" data-cat="other" onclick="setSaleFilter('other')">✨ その他</button>
+    </div>
+    <div id="sale-list-content"></div>
+  </div>
+
+  <!-- ─── PIN LIST SCREEN ─── -->
+  <div class="screen" id="screen-pin">
+    <div class="screen-title">📌 ピン留め</div>
+    <div id="pin-list-content"></div>
+  </div>
+
+  <!-- ─── CALENDAR SCREEN ─── -->
+  <div class="screen" id="screen-calendar">
+    <div class="screen-title">📅 カレンダー</div>
+    <div class="cal-months-wrap" id="cal-months-wrap"></div>
+  </div>
+
+  <!-- ─── SETTINGS SCREEN ─── -->
+  <div class="screen" id="screen-settings">
+    <div class="screen-title">⚙️ 設定</div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">プロフィール</div>
+
+      <!-- 誰と行く？ -->
+      <div class="settings-item" style="flex-direction:column; align-items:flex-start; gap:14px;">
+        <span class="settings-item-label">🙋 誰と行く？</span>
+        <div class="profile-chips" id="who-setting-chips">
+          <div class="profile-chip" data-pref="who" data-val="family" onclick="selectProfile('who','family')">👨‍👩‍👧‍👦 ファミリー</div>
+          <div class="profile-chip" data-pref="who" data-val="solo" onclick="selectProfile('who','solo')">🧑‍💼 ひとりで</div>
+          <div class="profile-chip" data-pref="who" data-val="couple" onclick="selectProfile('who','couple')">👫 夫婦・カップル</div>
+          <div class="profile-chip" data-pref="who" data-val="group" onclick="selectProfile('who','group')">👥 グループ・友人</div>
+        </div>
+      </div>
+
+      <!-- 子どもの年齢（ファミリー選択時のみ表示） -->
+      <div class="settings-item" id="age-setting-section" style="flex-direction:column; align-items:flex-start; gap:14px; margin-top:8px; display:none;">
+        <span class="settings-item-label">👶 子どもの年齢</span>
+        <div class="profile-chips" id="age-setting-chips">
+          <div class="profile-chip" data-pref="age" data-val="baby" onclick="selectProfile('age','baby')">🍼 0〜2歳</div>
+          <div class="profile-chip" data-pref="age" data-val="preschool" onclick="selectProfile('age','preschool')">🚀 3〜6歳</div>
+          <div class="profile-chip" data-pref="age" data-val="school" onclick="selectProfile('age','school')">📚 小学生以上</div>
+        </div>
+      </div>
+
+      <!-- アクティブ度 -->
+      <div class="settings-item" style="flex-direction:column; align-items:flex-start; gap:14px; margin-top:8px;">
+        <span class="settings-item-label">🏃 アクティブ度</span>
+        <div class="profile-chips" id="active-setting-chips">
+          <div class="profile-chip" data-pref="active" data-val="outdoor" onclick="selectProfile('active','outdoor')">🌳 アウトドア派</div>
+          <div class="profile-chip" data-pref="active" data-val="indoor" onclick="selectProfile('active','indoor')">🏠 屋内派</div>
+        </div>
+      </div>
+
+      <!-- シンガポールスタイル → スタイル -->
+      <div class="settings-item" style="flex-direction:column; align-items:flex-start; gap:14px; margin-top:8px;">
+        <span class="settings-item-label">🗺 おでかけスタイル</span>
+        <div class="profile-chips" id="style-setting-chips">
+          <div class="profile-chip" data-pref="style" data-val="beginner" onclick="selectProfile('style','beginner')">✈️ 移住したて<br><span style="font-size:10px;font-weight:300;opacity:0.7;">目安：〜2年</span></div>
+          <div class="profile-chip" data-pref="style" data-val="resident" onclick="selectProfile('style','resident')">🏠 すっかり定住<br><span style="font-size:10px;font-weight:300;opacity:0.7;">目安：3〜5年</span></div>
+          <div class="profile-chip" data-pref="style" data-val="local" onclick="selectProfile('style','local')">🦁 もはや地元民<br><span style="font-size:10px;font-weight:300;opacity:0.7;">目安：5年以上</span></div>
+        </div>
+      </div>
+
+      <!-- 居住エリア（プロフィール内に移動） -->
+      <div class="settings-item" style="flex-direction:column; align-items:flex-start; gap:14px; margin-top:8px;">
+        <span class="settings-item-label">📍 居住エリア</span>
+        <div class="area-chips" id="area-chips">
+          <div class="area-chip" data-area="Central" onclick="selectArea('Central')">Central</div>
+          <div class="area-chip" data-area="East" onclick="selectArea('East')">East</div>
+          <div class="area-chip" data-area="West" onclick="selectArea('West')">West</div>
+          <div class="area-chip" data-area="North" onclick="selectArea('North')">North</div>
+          <div class="area-chip" data-area="North-East" onclick="selectArea('North-East')">North-East</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">フィードバック</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <textarea id="feedback-text" placeholder="改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！"
+          style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:13px;color:var(--midnight);background:white;resize:none;height:100px;outline:none;line-height:1.6;"></textarea>
+        <button onclick="sendFeedback()"
+          style="padding:12px;border-radius:var(--radius-btn);background:var(--sage);color:white;border:none;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
+          onmousedown="this.style.opacity=0.8" onmouseup="this.style.opacity=1">
+          📨 送信する
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">アプリ情報</div>
+      <div class="settings-item">
+        <span class="settings-item-label">アプリ名</span>
+        <span class="settings-item-value">週末どうする？SG</span>
+      </div>
+      <div class="settings-item">
+        <span class="settings-item-label">バージョン</span>
+        <span class="settings-item-value">1.0.0</span>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">データ</div>
+      <div class="settings-item" style="cursor:pointer;" onclick="clearPins()">
+        <span class="settings-item-label">ピン留めをすべて削除</span>
+        <span class="settings-item-value">🗑</span>
+      </div>
+      <div class="settings-item" style="cursor:pointer;" onclick="clearHiddenEvents(); clearHiddenSpots();">
+        <span class="settings-item-label">非表示にした情報をリセット</span>
+        <span class="settings-item-value">🔄</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── INSTALL MODAL ─── -->
+  <div class="pin-detail-overlay" id="install-overlay" onclick="closeInstallModal()"></div>
+  <div class="pin-detail-modal" id="install-modal">
+    <div class="pin-detail-header">
+      <div class="pin-detail-emoji">📱</div>
+      <button class="pin-detail-close" onclick="closeInstallModal()">✕</button>
+    </div>
+    <div class="pin-detail-body">
+      <div class="pin-detail-title">ホーム画面に追加する</div>
+      <div style="font-size:13px;color:var(--warm-gray);margin-bottom:16px;line-height:1.65;">
+        アプリとして使えるようになります。毎回ブラウザを開く必要がなくなって便利です！
+      </div>
+
+      <div id="install-android-btn-wrap" style="display:none;margin-bottom:16px;">
+        <button onclick="handleInstall()" style="width:100%;padding:13px;border-radius:var(--radius-btn);background:var(--caramel);color:white;border:none;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">
+          📲 ホーム画面に追加する
+        </button>
+      </div>
+
+      <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;">
+        <div style="font-size:13px;font-weight:700;color:var(--caramel);margin-bottom:12px;">手順</div>
+
+        <div style="font-size:13px;color:var(--warm-gray);margin-bottom:8px;font-weight:600;">iPhone（Safari）</div>
+        <div style="font-size:12px;color:var(--warm-gray);line-height:1.9;margin-bottom:14px;">
+          1. Safari でこのページを開く<br>
+          2. 下部の <strong>共有ボタン（□↑）</strong> をタップ<br>
+          3. 「<strong>ホーム画面に追加</strong>」を選択<br>
+          4. 「追加」をタップして完了！
+        </div>
+
+        <div style="font-size:13px;color:var(--warm-gray);margin-bottom:8px;font-weight:600;">Android（Chrome）</div>
+        <div style="font-size:12px;color:var(--warm-gray);line-height:1.9;">
+          1. Chrome でこのページを開く<br>
+          2. 右上の <strong>⋮メニュー</strong> をタップ<br>
+          3. 「<strong>ホーム画面に追加</strong>」を選択<br>
+          4. 「追加」をタップして完了！
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SHARE MODAL ─── -->
+  <div class="pin-detail-overlay" id="share-overlay" onclick="closeShareModal()"></div>
+  <div class="pin-detail-modal" id="share-modal">
+    <div class="pin-detail-header">
+      <div class="pin-detail-emoji">📤</div>
+      <button class="pin-detail-close" onclick="closeShareModal()">✕</button>
+    </div>
+    <div class="pin-detail-body">
+      <div class="pin-detail-title">友達に教える</div>
+      <div style="font-size:13px;color:var(--warm-gray);margin-bottom:16px;line-height:1.65;">
+        シンガポール在住の友達にこのアプリを紹介しよう！
+      </div>
+      <button onclick="doShare()" style="width:100%;padding:13px;border-radius:var(--radius-btn);background:var(--sage);color:white;border:none;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:20px;">
+        🔗 リンクをシェアする
+      </button>
+
+      <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;">
+        <div style="font-size:13px;font-weight:700;color:var(--caramel);margin-bottom:12px;">📱 ホーム画面への追加方法</div>
+
+        <div style="font-size:13px;color:var(--warm-gray);margin-bottom:10px;font-weight:600;">iPhone（Safari）</div>
+        <div style="font-size:12px;color:var(--warm-gray);line-height:1.8;margin-bottom:14px;">
+          1. Safari でこのページを開く<br>
+          2. 下部の <strong>共有ボタン（□↑）</strong> をタップ<br>
+          3. 「<strong>ホーム画面に追加</strong>」を選択<br>
+          4. 「追加」をタップして完了！
+        </div>
+
+        <div style="font-size:13px;color:var(--warm-gray);margin-bottom:10px;font-weight:600;">Android（Chrome）</div>
+        <div style="font-size:12px;color:var(--warm-gray);line-height:1.8;">
+          1. Chrome でこのページを開く<br>
+          2. 右上の <strong>⋮メニュー</strong> をタップ<br>
+          3. 「<strong>ホーム画面に追加</strong>」を選択<br>
+          4. 「追加」をタップして完了！
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── PIN DETAIL MODAL ─── -->
+  <div class="pin-detail-overlay" id="pin-detail-overlay" onclick="closePinDetail()"></div>
+  <div class="pin-detail-modal" id="pin-detail-modal">
+    <div class="pin-detail-header">
+      <div class="pin-detail-emoji" id="pin-detail-emoji">📌</div>
+      <button class="pin-detail-close" onclick="closePinDetail()">✕</button>
+    </div>
+    <div class="pin-detail-body">
+      <div class="pin-detail-title" id="pin-detail-title"></div>
+      <div class="pin-detail-meta" id="pin-detail-meta"></div>
+      <div class="pin-detail-tips" id="pin-detail-tips"></div>
+    </div>
+    <button class="pin-detail-remove" id="pin-detail-remove">📌 ピン留めを外す</button>
+  </div>
+
+  <!-- ─── BOTTOM NAV ─── -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" id="nav-home" onclick="switchNav('home')">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">おでかけ</span>
+    </div>
+    <div class="nav-item" id="nav-sale" onclick="switchNav('sale')">
+      <span class="nav-icon">⏳</span>
+      <span class="nav-label">期間限定</span>
+    </div>
+    <div class="nav-item" id="nav-pin" onclick="switchNav('pin')">
+      <span class="nav-icon">📌</span>
+      <span class="nav-label">ピン留め</span>
+    </div>
+    <div class="nav-item" id="nav-calendar" onclick="switchNav('calendar')">
+      <span class="nav-icon">📅</span>
+      <span class="nav-label">カレンダー</span>
+    </div>
+    <div class="nav-item" id="nav-settings" onclick="switchNav('settings')">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">設定</span>
+    </div>
+  </nav>
+
+  <!-- Calendar Popup Overlay -->
+  <div class="cal-popup-overlay" id="cal-popup-overlay" onclick="closeCalPopup()"></div>
+
+  <!-- Calendar Popup -->
+  <div class="cal-popup" id="cal-popup">
+    <div class="cal-popup-header">
+      <div class="cal-popup-date" id="cal-popup-date"></div>
+      <button class="cal-popup-close" onclick="closeCalPopup()">✕</button>
+    </div>
+    <div class="cal-popup-events" id="cal-popup-events"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ─── HOLIDAY / LONG VACATION CONFIG ───
+    // SIJSカレンダーに合わせて毎年更新する
+    const LONG_VACATIONS = [
+      { name: '春休み',            start: new Date(2026, 2, 13), end: new Date(2026, 3, 11) },
+      { name: 'ゴールデンウィーク', start: new Date(2026, 3, 29), end: new Date(2026, 4, 5)  },
+      { name: '夏休み',            start: new Date(2026, 7, 1),  end: new Date(2026, 7, 31) },
+      { name: '冬休み',            start: new Date(2026, 11, 24), end: new Date(2027, 0, 6) },
+    ];
+
+    // シンガポール祝日 (2026)
+    const SG_HOLIDAYS_2026 = [
+      new Date(2026, 0, 1),   // 元日
+      new Date(2026, 1, 17),  // 旧正月1日
+      new Date(2026, 1, 18),  // 旧正月2日
+      new Date(2026, 3, 3),   // 聖金曜日
+      new Date(2026, 4, 1),   // 労働者の日
+      new Date(2026, 4, 12),  // ウェサク
+      new Date(2026, 5, 5),   // ハリラヤ・ハジ
+      new Date(2026, 7, 9),   // 建国記念日
+      new Date(2026, 9, 20),  // ディパバリ
+      new Date(2026, 11, 25), // クリスマス
+    ];
+
+    // ─── NEXT LONG HOLIDAY CALCULATION ───
+    function getNextLongHoliday(from) {
+      const today = from || new Date();
+      today.setHours(0,0,0,0);
+
+      // SG祝日から連続する連休（3日以上）を探す
+      let candidates = [];
+
+      // 長期休暇候補
+      LONG_VACATIONS.forEach(v => {
+        if (v.end >= today) candidates.push({ name: v.name, start: v.start, end: v.end });
+      });
+
+      // SG祝日を土日と結合して3日以上になる連休を生成（簡易計算）
+      SG_HOLIDAYS_2026.forEach(h => {
+        if (h < today) return;
+        const dow = h.getDay();
+        let rangeStart = new Date(h), rangeEnd = new Date(h);
+        // 前後の土日を拡張
+        while (rangeStart.getDay() === 0 || rangeStart.getDay() === 6 ||
+               SG_HOLIDAYS_2026.some(hh => sameDay(hh, new Date(rangeStart.getTime() - 86400000)))) {
+          rangeStart = new Date(rangeStart.getTime() - 86400000);
+        }
+        rangeStart = new Date(rangeStart.getTime() + 86400000);
+        while (rangeEnd.getDay() === 0 || rangeEnd.getDay() === 6 ||
+               SG_HOLIDAYS_2026.some(hh => sameDay(hh, new Date(rangeEnd.getTime() + 86400000)))) {
+          rangeEnd = new Date(rangeEnd.getTime() + 86400000);
+        }
+        const days = Math.round((rangeEnd - rangeStart) / 86400000) + 1;
+        if (days >= 3) candidates.push({ name: h.toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) + '連休', start: rangeStart, end: rangeEnd });
+      });
+
+      if (candidates.length === 0) return null;
+      candidates.sort((a,b) => a.start - b.start);
+      // 今日以降の最初の候補
+      const next = candidates.find(c => c.end >= today);
+      return next || null;
+    }
+
+    function sameDay(a, b) {
+      return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+    }
+
+    function formatDateRange(start, end) {
+      const m1 = start.getMonth()+1, d1 = start.getDate();
+      const m2 = end.getMonth()+1,   d2 = end.getDate();
+      if (m1 === m2) return m1 + '/' + d1 + '〜' + d2;
+      return m1 + '/' + d1 + '〜' + m2 + '/' + d2;
+    }
+
+    function getWeekendDates(weeksAhead) {
+      const today = new Date();
+      const dow = today.getDay();
+      const daysToSat = (6 - dow + weeksAhead * 7) % 7 + (weeksAhead === 0 && dow > 6 ? 7 : 0);
+      const sat = new Date(today);
+      sat.setDate(today.getDate() + (dow <= 6 ? 6 - dow + weeksAhead * 7 : 6));
+      // simpler approach
+      const diffToSat = ((6 - today.getDay()) % 7) + weeksAhead * 7;
+      const saturday = new Date(today);
+      saturday.setDate(today.getDate() + diffToSat);
+      const sunday = new Date(saturday);
+      sunday.setDate(saturday.getDate() + 1);
+      return { sat: saturday, sun: sunday };
+    }
+
+    // ─── UPDATE TAB LABELS ───
+    function updateTabLabels() {
+      const today = new Date();
+      const nextHol = getNextLongHoliday(today);
+
+      document.getElementById('tab-weekend').textContent = '🌤 今週末';
+      document.getElementById('tab-nextweekend').textContent = '🌈 来週末';
+
+      if (nextHol) {
+        document.getElementById('tab-holiday').textContent =
+          '🎌 次の連休 ' + formatDateRange(nextHol.start, nextHol.end);
+      }
+    }
+    updateTabLabels();
+
+    // ─── TAB LOGIC ───
+    const tabs = document.querySelectorAll('.tab');
+    const emptyState = document.getElementById('empty-state');
+    const resultCount = document.getElementById('result-count');
+
+    let currentTab = 'weekend';
+    let EVENT_DATA = [];
+
+    // ─── おでかけデータ読み込み ───
+    async function loadEventData() {
+      const grid = document.getElementById('cards-grid');
+      grid.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
+        <div style="font-size:28px;margin-bottom:8px;">⏳</div>
+        <div style="font-size:14px;">おでかけ情報を読み込み中...</div>
+      </div>`;
+      try {
+        const res = await fetch('/api/events');
+        EVENT_DATA = res.ok ? await res.json() : [];
+      } catch(e) {
+        EVENT_DATA = [];
+      }
+      renderEventCards();
+      renderCalendar();
+    }
+
+    function renderEventCard(e, i) {
+      const pins = getPins();
+      const pinned = !!pins[e.id];
+      const hidden = getHiddenSpots();
+      if (hidden.includes(String(e.id))) return '';
+
+      // タブラベル
+      const tabLabels = {
+        weekend:     { label: '今週末',   style: 'background:rgba(200,128,74,0.9);color:white;' },
+        nextweekend: { label: '来週末',   style: 'background:rgba(110,158,136,0.9);color:white;' },
+        holiday:     { label: '次の連休', style: 'background:rgba(122,173,204,0.9);color:white;' },
+      };
+      const tabInfo = tabLabels[e.tab] || { label: e.tab || '', style: '' };
+
+      // 星（major_score）
+      const stars = Array.from({length: 5}, (_, i) =>
+        `<span class="star${i < (e.major_score || 3) ? ' filled' : ''}">★</span>`
+      ).join('');
+
+      // tipsリスト
+      const tipsList = Array.isArray(e.tips) && e.tips.length
+        ? `<div class="tips-box">
+            <div class="tips-label">🎒 ひとことメモ</div>
+            <ul class="tips-list">${e.tips.map(t => `<li>${t}</li>`).join('')}</ul>
+          </div>`
+        : e.tip
+          ? `<div class="tips-box">
+              <div class="tips-label">💡 ヒント</div>
+              <ul class="tips-list"><li>${e.tip}</li></ul>
+            </div>`
+          : '';
+
+      const bgClass = e.bgClass || 'cafe';
+      const safeTitle = (e.store || e.title || '').replace(/'/g, "\\'");
+      const safeLocation = (e.location || '').replace(/'/g, "\\'");
+      const safePeriod = (e.period || e.hours || '').replace(/'/g, "\\'");
+      const safeEmoji = (e.emoji || '📍').replace(/'/g, "\\'");
+      const safeTip = (e.tip || '').replace(/'/g, "\\'");
+
+      return `
+        <article class="spot-card" data-tab="${e.tab || 'weekend'}" data-age="${e.age || 'all'}"
+                 data-id="${e.id}" style="animation-delay:${i * 0.06}s;">
+          <div class="card-image-area">
+            <div class="card-image-bg ${bgClass}">${e.emoji || '📍'}</div>
+            <div class="card-overlay-text">
+              <div class="card-tags">
+                <span class="card-tag" style="${tabInfo.style}">${tabInfo.label}</span>
+              </div>
+            </div>
+            <button onclick="hideSpot('${e.id}')" class="card-dismiss-btn">✕</button>
+          </div>
+          <div class="card-body">
+            <h2 class="card-title">${e.store || e.title || ''}</h2>
+            <div class="card-meta">
+              <span class="meta-item"><span class="meta-icon">📍</span>${e.location || ''}</span>
+              ${e.period || e.hours ? `<span class="meta-item"><span class="meta-icon">📅</span>${e.period || e.hours}</span>` : ''}
+            </div>
+            <div class="stars">${stars}</div>
+            <div class="card-info-row">
+              ${e.url ? `<a class="official-site-btn" href="${e.url}" target="_blank" rel="noopener">🌐 公式サイト</a>` : ''}
+            </div>
+            ${tipsList}
+            <div class="card-actions">
+              <button class="pin-btn${pinned ? ' pinned' : ''}" id="pin-${e.id}"
+                onclick="togglePin('${e.id}', '${safeTitle}', '${safeLocation}', '${safePeriod}', '${safeEmoji}', '${safeTip}')">
+                <span class="pin-emoji">📌</span>
+                <span id="pin-label-${e.id}">${pinned ? '留め済み' : 'ピン留め'}</span>
+              </button>
+              <button class="share-btn" onclick="shareApp('${safeTitle}')">
+                <span class="share-icon">📤</span> 共有する
+              </button>
+            </div>
+          </div>
+        </article>`;
+    }
+
+    function renderEventCards() {
+      const grid = document.getElementById('cards-grid');
+      const { who, age } = getProfile();
+      const hidden = getHiddenSpots();
+
+      const filtered = EVENT_DATA.filter(e => {
+        if (hidden.includes(String(e.id))) return false;
+        const tabMatch = currentTab === 'all' || e.tab === currentTab;
+        const ageMatch = who !== 'family' || age === 'all' || e.age === age || e.age === 'all' || !e.age;
+        return tabMatch && ageMatch;
+      });
+
+      grid.innerHTML = filtered.map((e, i) => renderEventCard(e, i)).join('');
+      resultCount.textContent = filtered.length + '件';
+      emptyState.classList.toggle('visible', filtered.length === 0);
+      updatePinButtons();
+    }
+
+    function applyFilters() {
+      renderEventCards();
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+        renderEventCards();
+      });
+    });
+
+    loadEventData();
+
+    // ─── PIN LOGIC ───
+    function getPins() {
+      try { return JSON.parse(localStorage.getItem('sg_pins') || '{}'); } catch { return {}; }
+    }
+    function savePins(pins) {
+      localStorage.setItem('sg_pins', JSON.stringify(pins));
+    }
+
+    function togglePin(id, title, location, hours, emoji, tip) {
+      const pins = getPins();
+      if (pins[id]) {
+        delete pins[id];
+        showToast('📌 ピン留めを外しました');
+      } else {
+        pins[id] = { id, title, location, hours, emoji, tip: tip || '' };
+        showToast('📌 ピン留めしました！');
+      }
+      savePins(pins);
+      updatePinButtons();
+    }
+
+    function updatePinButtons() {
+      const pins = getPins();
+      document.querySelectorAll('.spot-card').forEach(card => {
+        const id = card.dataset.id;
+        const btn = document.getElementById('pin-' + id);
+        const label = document.getElementById('pin-label-' + id);
+        if (!btn || !label) return;
+        if (pins[id]) {
+          btn.classList.add('pinned');
+          label.textContent = '留め済み';
+        } else {
+          btn.classList.remove('pinned');
+          label.textContent = 'ピン留め';
+        }
+      });
+    }
+
+    function renderPinList() {
+      const pins = getPins();
+      const container = document.getElementById('pin-list-content');
+      const entries = Object.values(pins);
+      if (entries.length === 0) {
+        container.innerHTML = `
+          <div class="pin-empty">
+            <div class="pin-empty-emoji">📌</div>
+            <div class="pin-empty-title">まだピン留めがありません</div>
+            <div class="pin-empty-desc">気になるスポットのカードから<br>📌ピン留めしてみましょう！</div>
+          </div>`;
+        return;
+      }
+      container.innerHTML = entries.map((p, i) => `
+        <div class="pin-card" style="animation-delay:${i * 0.07}s; cursor:pointer;" onclick="openPinDetail('${p.id}')">
+          <div class="pin-card-emoji">${p.emoji}</div>
+          <div class="pin-card-info">
+            <div class="pin-card-title">${p.title}</div>
+            <div class="pin-card-meta">📍 ${p.location}　📅 ${p.hours}</div>
+          </div>
+          <button class="pin-remove-btn" onclick="event.stopPropagation(); removePin('${p.id}')">✕</button>
+        </div>`).join('');
+    }
+
+    function openPinDetail(id) {
+      const pins = getPins();
+      const p = pins[id];
+      if (!p) return;
+      document.getElementById('pin-detail-emoji').textContent = p.emoji;
+      document.getElementById('pin-detail-title').textContent = p.title;
+      document.getElementById('pin-detail-meta').innerHTML =
+        `<span>📍 ${p.location}</span><span>📅 ${p.hours}</span>`;
+      document.getElementById('pin-detail-tips').textContent = p.tip || '詳細情報はおでかけ先カードをご確認ください。';
+      document.getElementById('pin-detail-remove').onclick = () => { removePin(id); closePinDetail(); };
+      document.getElementById('pin-detail-modal').classList.add('visible');
+      document.getElementById('pin-detail-overlay').classList.add('visible');
+    }
+
+    function closePinDetail() {
+      document.getElementById('pin-detail-modal').classList.remove('visible');
+      document.getElementById('pin-detail-overlay').classList.remove('visible');
+    }
+
+    function removePin(id) {
+      const pins = getPins();
+      delete pins[id];
+      savePins(pins);
+      updatePinButtons();
+      renderPinList();
+    }
+
+    function clearPins() {
+      if (!confirm('ピン留めをすべて削除しますか？')) return;
+      localStorage.removeItem('sg_pins');
+      updatePinButtons();
+      renderPinList();
+      showToast('ピン留めをすべて削除しました');
+    }
+
+    updatePinButtons();
+
+    // ─── INSTALL BANNER ───
+    let deferredPrompt = null;
+    const INSTALL_DISMISSED_KEY = 'sg_install_dismissed';
+
+    function isIOS() {
+      return /iphone|ipad|ipod/i.test(navigator.userAgent);
+    }
+    function isInStandaloneMode() {
+      return window.matchMedia('(display-mode: standalone)').matches ||
+             window.navigator.standalone === true;
+    }
+
+    // Android: beforeinstallprompt をキャッチ
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      showInstallBanner('android');
+    });
+
+    function showInstallBanner(platform) {
+      // すでにインストール済みまたは閉じた場合はスキップ
+      if (isInStandaloneMode()) return;
+      if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return;
+
+      const desc = document.getElementById('install-banner-desc');
+      const btn = document.getElementById('install-banner-btn');
+
+      if (platform === 'ios') {
+        desc.textContent = '画面下の共有ボタン（□↑）→「ホーム画面に追加」でOK！';
+        btn.textContent = '方法を見る';
+      } else {
+        desc.textContent = 'おでかけNaviとしてホーム画面から起動できます';
+        btn.textContent = '追加する';
+      }
+
+      setTimeout(() => {
+        document.getElementById('install-banner').classList.add('visible');
+      }, 3000); // 3秒後に表示
+    }
+
+    function handleInstall() {
+      if (deferredPrompt) {
+        // Android: ネイティブダイアログを表示
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(choice => {
+          if (choice.outcome === 'accepted') {
+            dismissInstallBanner();
+          }
+          deferredPrompt = null;
+        });
+      } else {
+        // iOS: シェアモーダルを開く
+        dismissInstallBanner();
+        openShareModal();
+      }
+    }
+
+    function dismissInstallBanner() {
+      document.getElementById('install-banner').classList.remove('visible');
+      localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+    }
+
+    // iOS: 初回アクセス時にバナー表示
+    if (isIOS() && !isInStandaloneMode()) {
+      showInstallBanner('ios');
+    }
+
+    // ─── PROFILE SETTINGS ───
+    function getWhoList() {
+      try { return JSON.parse(localStorage.getItem('sg_who') || '[]'); } catch { return []; }
+    }
+
+    function getActiveList() {
+      try { return JSON.parse(localStorage.getItem('sg_active') || '[]'); } catch { return []; }
+    }
+
+    function getProfile() {
+      return {
+        who: getWhoList(),
+        age: localStorage.getItem('sg_age') || 'all',
+        active: getActiveList(),
+        style: localStorage.getItem('sg_style') || '',
+      };
+    }
+
+    function updateAgeVisibility() {
+      const who = getWhoList();
+      const ageSection = document.getElementById('age-setting-section');
+      if (ageSection) {
+        // 未指定（全対象）or ファミリーが含まれる場合に表示
+        ageSection.style.display = (who.length === 0 || who.includes('family')) ? 'flex' : 'none';
+      }
+    }
+
+    function selectWho(val) {
+      let who = getWhoList();
+      if (who.includes(val)) {
+        who = who.filter(w => w !== val); // 空になってもOK＝指定なし
+      } else {
+        who.push(val);
+      }
+      localStorage.setItem('sg_who', JSON.stringify(who));
+      document.querySelectorAll('[data-pref="who"]').forEach(chip => {
+        chip.classList.toggle('selected', who.includes(chip.dataset.val));
+      });
+      const label = who.length === 0 ? '指定なし（すべて）' :
+        who.map(w => ({ family:'ファミリー', solo:'ひとりで', couple:'夫婦・カップル', group:'グループ・友人' }[w])).join('・');
+      showToast('✅ ' + label + ' に設定しました');
+      updateAgeVisibility();
+      applyProfileSort();
+    }
+
+    function selectActive(val) {
+      let active = getActiveList();
+      if (active.includes(val)) {
+        active = active.filter(a => a !== val); // 空になってもOK＝指定なし
+      } else {
+        active.push(val);
+      }
+      localStorage.setItem('sg_active', JSON.stringify(active));
+      document.querySelectorAll('[data-pref="active"]').forEach(chip => {
+        chip.classList.toggle('selected', active.includes(chip.dataset.val));
+      });
+      const label = active.length === 0 ? '指定なし（すべて）' :
+        active.map(a => ({ outdoor:'アウトドア派', indoor:'屋内派' }[a])).join('・');
+      showToast('✅ ' + label + ' に設定しました');
+      applyProfileSort();
+    }
+
+    function selectProfile(pref, val) {
+      if (pref === 'who') { selectWho(val); return; }
+      if (pref === 'active') { selectActive(val); return; }
+      if (pref === 'style') {
+        let styles = [];
+        try { styles = JSON.parse(localStorage.getItem('sg_style') || '[]'); } catch { styles = []; }
+        if (styles.includes(val)) {
+          styles = styles.filter(s => s !== val);
+        } else {
+          styles.push(val);
+        }
+        localStorage.setItem('sg_style', JSON.stringify(styles));
+        document.querySelectorAll('[data-pref="style"]').forEach(chip => {
+          chip.classList.toggle('selected', styles.includes(chip.dataset.val));
+        });
+        const labels = { beginner:'移住したて', resident:'すっかり定住', local:'もはや地元民' };
+        const label = styles.length === 0 ? 'スタイルの指定を解除しました' :
+          styles.map(s => labels[s]).join('・') + ' に設定しました';
+        showToast('✅ ' + label);
+        return;
+      }
+      // age: 選択済みをもう一度タップで「指定なし（all）」に戻す
+      const current = localStorage.getItem('sg_age') || 'all';
+      const next = current === val ? 'all' : val;
+      localStorage.setItem('sg_age', next);
+      document.querySelectorAll('[data-pref="age"]').forEach(chip => {
+        chip.classList.toggle('selected', chip.dataset.val === next);
+      });
+      const labels = { baby:'0〜2歳', preschool:'3〜6歳', school:'小学生以上', all:'指定なし（すべて）' };
+      showToast('✅ ' + labels[next] + ' に設定しました');
+      applyProfileSort();
+    }
+
+    function initProfileChips() {
+      const who = getWhoList();
+      document.querySelectorAll('[data-pref="who"]').forEach(chip => {
+        chip.classList.toggle('selected', who.includes(chip.dataset.val));
+      });
+      const age = localStorage.getItem('sg_age') || 'all';
+      document.querySelectorAll('[data-pref="age"]').forEach(chip => {
+        chip.classList.toggle('selected', chip.dataset.val === age);
+      });
+      const active = getActiveList();
+      document.querySelectorAll('[data-pref="active"]').forEach(chip => {
+        chip.classList.toggle('selected', active.includes(chip.dataset.val));
+      });
+      let styles = [];
+      try { styles = JSON.parse(localStorage.getItem('sg_style') || '[]'); } catch { styles = []; }
+      document.querySelectorAll('[data-pref="style"]').forEach(chip => {
+        chip.classList.toggle('selected', styles.includes(chip.dataset.val));
+      });
+      updateAgeVisibility();
+    }
+
+    // プロフィールに基づいてカードをソート
+    function applyProfileSort() {
+      const { who, age, active } = getProfile();
+      const grid = document.getElementById('cards-grid');
+      const cards = Array.from(grid.querySelectorAll('.spot-card'));
+
+      cards.sort((a, b) => {
+        const scoreA = profileScore(a, who, age, active);
+        const scoreB = profileScore(b, who, age, active);
+        return scoreB - scoreA;
+      });
+      cards.forEach(c => grid.appendChild(c));
+      applyFilters();
+    }
+
+    function profileScore(card, who, age, active) {
+      let score = 0;
+      const cardAge = card.dataset.age;
+      const cardWho = card.dataset.who || 'family';
+      const cardType = card.dataset.type || '';
+
+      // 誰と行くか（空＝指定なし＝全マッチ）
+      if (who.length === 0) score += 1;
+      else if (who.includes(cardWho)) score += 3;
+      else if (cardWho === 'all') score += 1;
+
+      // 年齢（ファミリー選択中 or 未指定の場合）
+      if (who.length === 0 || who.includes('family')) {
+        if (age !== 'all' && cardAge === age) score += 2;
+        if (age === 'all') score += 1;
+      }
+
+      // アクティブ度（空＝指定なし＝全マッチ）
+      if (active.length === 0) score += 1;
+      else if (active.includes(cardType)) score += 2;
+
+      return score;
+    }
+
+    initProfileChips();
+    applyProfileSort();
+    applyHiddenSpots();
+
+    // ─── WEATHER BANNER ───
+    const WEEKEND_WEATHER = [
+      // シンガポールの天気パターン（OpenWeatherMap APIで本番は差し替え）
+      // 現在はダミーデータ。APIキーを設定すれば自動取得に切り替わる
+    ];
+
+    async function loadWeekendWeather() {
+      const API_KEY = ''; // OpenWeatherMap APIキーをここに設定
+      const { sat } = getWeekendDates(0);
+      const dayStr = sat.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
+
+      if (API_KEY) {
+        try {
+          // 本番: OpenWeatherMap APIで週末の予報を取得
+          const res = await fetch(
+            `https://api.openweathermap.org/data/2.5/forecast?q=Singapore&appid=${API_KEY}&units=metric&lang=ja`
+          );
+          const data = await res.json();
+          // 週末の予報を抽出
+          const satTimestamp = Math.floor(sat.getTime() / 1000);
+          const forecast = data.list.find(f => Math.abs(f.dt - satTimestamp) < 43200);
+          if (forecast) {
+            renderWeatherBanner(forecast.weather[0].main, Math.round(forecast.main.temp), dayStr);
+            return;
+          }
+        } catch(e) {}
+      }
+
+      // APIキーなし → ダミー天気
+      renderWeatherBannerDummy(dayStr);
+    }
+
+    function renderWeatherBanner(condition, temp, dayStr) {
+      const isOutdoor = !['Rain','Drizzle','Thunderstorm'].includes(condition);
+      const { active } = getProfile();
+
+      const icon = condition === 'Clear' ? '☀️' :
+                   condition === 'Clouds' ? '⛅' :
+                   condition === 'Rain' || condition === 'Drizzle' ? '🌧' :
+                   condition === 'Thunderstorm' ? '⛈' : '🌤';
+
+      const headline = condition === 'Clear' ? '晴れ予報！アウトドア日和です' :
+                       condition === 'Clouds' ? '曇りですが過ごしやすい週末' :
+                       condition === 'Rain' || condition === 'Drizzle' ? '雨の予報。屋内スポットがおすすめ' :
+                       condition === 'Thunderstorm' ? 'スコールに注意。屋内を優先します' : '週末の天気を確認中';
+
+      const sub = isOutdoor ? '外遊びにぴったりな週末です 🌴' : '屋内スポットを上位表示しています';
+
+      document.getElementById('weather-icon').textContent = icon;
+      document.getElementById('weather-headline').textContent = headline;
+      document.getElementById('weather-sub').textContent = dayStr + '  ' + sub;
+      document.getElementById('weather-temp').textContent = temp ? temp + '°' : '';
+
+      // 雨なら屋内カードを上位に自動ソート
+      if (!isOutdoor) prioritizeIndoor();
+    }
+
+    function renderWeatherBannerDummy(dayStr) {
+      // ダミー: シンガポールの典型的な週末（スコール多め）
+      const patterns = [
+        { icon: '☀️', headline: '晴れ予報！アウトドア日和です', sub: '外遊びにぴったりな週末です 🌴', temp: '31°', indoor: false },
+        { icon: '⛅', headline: '曇りですが過ごしやすい週末', sub: '気温も穏やか、どこでも楽しめます', temp: '29°', indoor: false },
+        { icon: '🌧', headline: '雨の予報。屋内スポットがおすすめ', sub: '屋内スポットを上位表示しています', temp: '27°', indoor: true },
+      ];
+      const p = patterns[new Date().getDay() % patterns.length];
+      document.getElementById('weather-icon').textContent = p.icon;
+      document.getElementById('weather-headline').textContent = p.headline;
+      document.getElementById('weather-sub').textContent = dayStr + '　' + p.sub;
+      document.getElementById('weather-temp').textContent = p.temp;
+      if (p.indoor) prioritizeIndoor();
+    }
+
+    function prioritizeIndoor() {
+      const grid = document.getElementById('cards-grid');
+      const cards = Array.from(grid.querySelectorAll('.spot-card'));
+      cards.sort((a, b) => {
+        const aIn = (a.dataset.type === 'indoor') ? 1 : 0;
+        const bIn = (b.dataset.type === 'indoor') ? 1 : 0;
+        return bIn - aIn;
+      });
+      cards.forEach(c => grid.appendChild(c));
+    }
+
+    loadWeekendWeather();
+
+    // ─── AREA SETTING ───
+    const AREAS = ['Central', 'East', 'West', 'North', 'North-East'];
+
+    // エリアごとの代表スポット（セールカードのエリア判定に使用）
+    const AREA_KEYWORDS = {
+      'Central': ['orchard', 'bishan', 'novena', 'toa payoh', 'central', 'city', 'marina', 'bugis', 'Clarke quay'],
+      'East':    ['tampines', 'bedok', 'changi', 'pasir ris', 'east coast', 'simei', 'kembangan'],
+      'West':    ['jurong', 'clementi', 'buona vista', 'holland', 'west', 'boon lay', 'pioneer'],
+      'North':   ['woodlands', 'yishun', 'sembawang', 'admiralty', 'north'],
+      'North-East': ['sengkang', 'punggol', 'hougang', 'serangoon', 'north-east', 'northeast'],
+    };
+
+    function getArea() {
+      try { return JSON.parse(localStorage.getItem('sg_area') || '[]'); } catch { return []; }
+    }
+
+    function selectArea(area) {
+      let areas = getArea();
+      if (areas.includes(area)) {
+        areas = areas.filter(a => a !== area);
+      } else {
+        areas.push(area);
+      }
+      localStorage.setItem('sg_area', JSON.stringify(areas));
+      document.querySelectorAll('.area-chip').forEach(chip => {
+        chip.classList.toggle('selected', areas.includes(chip.dataset.area));
+      });
+      const msg = areas.length === 0 ? '📍 エリア選択を解除しました' : '📍 ' + areas.join(' / ') + ' を設定しました';
+      showToast(msg);
+      if (document.getElementById('screen-sale').classList.contains('visible')) {
+        renderSaleList();
+      }
+    }
+
+    function initAreaChips() {
+      const saved = getArea();
+      document.querySelectorAll('.area-chip').forEach(chip => {
+        chip.classList.toggle('selected', saved.includes(chip.dataset.area));
+      });
+    }
+    initAreaChips();
+
+    function isNearby(locationText) {
+      const areas = getArea();
+      if (!areas.length) return false;
+      const loc = locationText.toLowerCase();
+      return areas.some(area => {
+        const keywords = AREA_KEYWORDS[area] || [];
+        return keywords.some(kw => loc.includes(kw.toLowerCase()));
+      });
+    }
+
+    // ─── 旬の情報データ (APIから取得) ───
+    let currentSaleFilter = 'all';
+    let SALE_DATA = [];
+
+    async function loadSaleData() {
+      const container = document.getElementById('sale-list-content');
+      if (container) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
+            <div style="font-size:28px;margin-bottom:8px;">⏳</div>
+            <div style="font-size:14px;">情報を読み込み中...</div>
+          </div>`;
+      }
+      try {
+        const salesRes = await fetch('/api/sales');
+        const sales = salesRes.ok ? await salesRes.json() : [];
+        SALE_DATA = sales;
+      } catch(e) {
+        SALE_DATA = [];
+        container.innerHTML = `
+          <div class="sale-empty">
+            <div class="sale-empty-emoji">⚠️</div>
+            <div class="sale-empty-title">情報の読み込みに失敗しました</div>
+            <div class="sale-empty-desc">しばらくしてからもう一度お試しください</div>
+          </div>`;
+        return;
+      }
+      renderSaleList();
+      renderCalendar();
+    }
+
+    loadSaleData();
+
+    function setSaleFilter(cat) {
+      currentSaleFilter = cat;
+      document.querySelectorAll('.sale-filter-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.cat === cat);
+      });
+      renderSaleList();
+    }
+
+    // ─── HIDDEN SPOTS ───
+    function getHiddenSpots() {
+      try { return JSON.parse(localStorage.getItem('sg_hidden_spots') || '[]'); } catch { return []; }
+    }
+    function hideSpot(id) {
+      const hidden = getHiddenSpots();
+      if (!hidden.includes(id)) hidden.push(id);
+      localStorage.setItem('sg_hidden_spots', JSON.stringify(hidden));
+      applyHiddenSpots();
+      showToast('🙈 非表示にしました');
+    }
+    function clearHiddenSpots() {
+      localStorage.removeItem('sg_hidden_spots');
+      applyHiddenSpots();
+      showToast('✅ 非表示リストをリセットしました');
+    }
+    function applyHiddenSpots() {
+      const hidden = getHiddenSpots();
+      document.querySelectorAll('.spot-card').forEach(card => {
+        const id = card.dataset.id;
+        card.style.display = hidden.includes(id) ? 'none' : '';
+      });
+      updateResultCount();
+    }
+    function updateResultCount() {
+      const visible = document.querySelectorAll('.spot-card:not([style*="display: none"]):not([style*="display:none"])');
+      const countEl = document.getElementById('result-count');
+      if (countEl) countEl.textContent = visible.length + '件';
+    }
+
+    // ─── HIDDEN EVENTS ───
+    function getHiddenEvents() {
+      try { return JSON.parse(localStorage.getItem('sg_hidden_events') || '[]'); } catch { return []; }
+    }
+    function hideEvent(id) {
+      const hidden = getHiddenEvents();
+      if (!hidden.includes(id)) hidden.push(id);
+      localStorage.setItem('sg_hidden_events', JSON.stringify(hidden));
+      renderSaleList();
+      showToast('🙈 非表示にしました');
+    }
+    function clearHiddenEvents() {
+      localStorage.removeItem('sg_hidden_events');
+      renderSaleList();
+      showToast('✅ 非表示リストをリセットしました');
+    }
+
+    function renderSaleList() {
+      const container = document.getElementById('sale-list-content');
+      const userArea = getArea();
+      const hidden = getHiddenEvents();
+
+      // 非表示・カテゴリフィルター適用
+      const filtered = SALE_DATA
+        .filter(s => !hidden.includes(s.id))
+        .filter(s => currentSaleFilter === 'all' || s.category === currentSaleFilter);
+
+      // エリア設定があれば近い順に並べ替え
+      const sorted = [...filtered].sort((a, b) => {
+        const aNearby = isNearby(a.location);
+        const bNearby = isNearby(b.location);
+        if (aNearby && !bNearby) return -1;
+        if (!aNearby && bNearby) return 1;
+        return 0;
+      });
+
+      const nearby = sorted.filter(s => isNearby(s.location));
+      const others = sorted.filter(s => !isNearby(s.location));
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="sale-empty">
+            <div class="sale-empty-emoji">🔍</div>
+            <div class="sale-empty-title">該当する情報がありません</div>
+            <div class="sale-empty-desc">他のカテゴリを選んでみてください</div>
+          </div>`;
+        return;
+      }
+
+      let html = '';
+
+      if (userArea.length > 0 && nearby.length > 0) {
+        html += `<div class="sale-section-label">📍 ${userArea.join('/')}エリア付近</div>`;
+        html += '<div class="sale-list">';
+        nearby.forEach((s, i) => { html += renderSaleCard(s, true, i); });
+        html += '</div>';
+        if (others.length > 0) {
+          html += `<div class="sale-section-label">その他の情報</div>`;
+          html += '<div class="sale-list">';
+          others.forEach((s, i) => { html += renderSaleCard(s, false, i); });
+          html += '</div>';
+        }
+      } else {
+        if (userArea.length === 0) {
+          html += `<div style="background:var(--caramel-pale);border-radius:14px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--caramel);font-weight:500;">
+            📍 設定からエリアを選ぶと近い順に表示されます
+          </div>`;
+        }
+        html += '<div class="sale-list">';
+        sorted.forEach((s, i) => { html += renderSaleCard(s, false, i); });
+        html += '</div>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    function renderSaleCard(s, nearby, i) {
+      const pins = getPins();
+      const pinned = !!pins['sale_' + s.id];
+      return `
+        <div class="sale-card${nearby ? ' nearby' : ''}" style="animation-delay:${i * 0.06}s;">
+          <div class="sale-card-top">
+            <div class="sale-card-left">
+              <div class="sale-store">${s.store}</div>
+              <span class="sale-area-badge${nearby ? ' nearby' : ''}">${s.area}</span>
+            </div>
+            <a href="${s.url}" target="_blank" rel="noopener" style="font-size:15px;text-decoration:none;opacity:0.45;margin:0 8px;flex-shrink:0;" title="公式サイト">🌐</a>
+            <button class="sale-dismiss-btn" onclick="hideEvent('${s.id}')">✕</button>
+          </div>
+          <div class="sale-period">🗓 ${s.period}</div>
+          <div class="sale-content">${s.content}</div>
+          <div class="sale-location">📍 ${s.location}</div>
+          <div class="card-actions">
+            <button class="pin-btn${pinned ? ' pinned' : ''}"
+              onclick="toggleSalePin('${s.id}', '${s.store}', '${s.location}', '${s.period}', '${s.emoji}')">
+              <span class="pin-emoji">📌</span>
+              <span>${pinned ? '留め済み' : 'ピン留め'}</span>
+            </button>
+            <button class="share-btn" onclick="shareApp('${s.store}')">
+              <span class="share-icon">📤</span> 共有する
+            </button>
+          </div>
+        </div>`;
+    }
+
+    function toggleSalePin(id, store, location, period, emoji) {
+      const pins = getPins();
+      const key = 'sale_' + id;
+      if (pins[key]) {
+        delete pins[key];
+        showToast('📌 ピン留めを外しました');
+      } else {
+        pins[key] = { id: key, title: store, location, hours: period, emoji };
+        showToast('📌 ピン留めしました！');
+      }
+      savePins(pins);
+      renderSaleList();
+    }
+
+    function openInstallModal() {
+      // Androidでインストール可能な場合はボタンを表示
+      document.getElementById('install-android-btn-wrap').style.display =
+        deferredPrompt ? 'block' : 'none';
+      document.getElementById('install-modal').classList.add('visible');
+      document.getElementById('install-overlay').classList.add('visible');
+    }
+    function closeInstallModal() {
+      document.getElementById('install-modal').classList.remove('visible');
+      document.getElementById('install-overlay').classList.remove('visible');
+    }
+
+    function openShareModal() {
+      document.getElementById('share-modal').classList.add('visible');
+      document.getElementById('share-overlay').classList.add('visible');
+    }
+    function closeShareModal() {
+      document.getElementById('share-modal').classList.remove('visible');
+      document.getElementById('share-overlay').classList.remove('visible');
+    }
+    async function doShare() {
+      const data = {
+        title: '週末どうする？SG',
+        text: 'シンガポール在住者向け週末おでかけアプリ！週末の予定はここで決まる👇',
+        url: 'https://dosuru.app',
+      };
+      if (navigator.share) {
+        try { await navigator.share(data); } catch(e) {}
+      } else {
+        await navigator.clipboard.writeText(data.url);
+        showToast('🔗 URLをコピーしました！');
+      }
+    }
+
+    async function sendFeedback() {
+      const text = document.getElementById('feedback-text').value.trim();
+      if (!text) { showToast('💬 メッセージを入力してください'); return; }
+      try {
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        if (res.ok) {
+          document.getElementById('feedback-text').value = '';
+          showToast('📨 フィードバックを送信しました！');
+        } else {
+          showToast('⚠️ 送信に失敗しました。もう一度お試しください');
+        }
+      } catch(e) {
+        showToast('⚠️ 送信に失敗しました。ネットワークを確認してください');
+      }
+    }
+
+    // ─── NAV LOGIC ───
+    function switchNav(screen) {
+      ['home','sale','pin','calendar','settings'].forEach(s => {
+        document.getElementById('nav-' + s).classList.remove('active');
+        const el = document.getElementById('screen-' + s);
+        if (el) el.classList.remove('visible');
+      });
+      document.getElementById('nav-' + screen).classList.add('active');
+
+      if (screen === 'home') {
+        document.getElementById('screen-home').style.display = 'block';
+        document.querySelector('.app-header').style.display = 'block';
+      } else {
+        document.getElementById('screen-home').style.display = 'none';
+        document.querySelector('.app-header').style.display = 'none';
+        const el = document.getElementById('screen-' + screen);
+        if (el) el.classList.add('visible');
+        if (screen === 'pin') renderPinList();
+        if (screen === 'calendar') renderCalendar();
+        if (screen === 'sale') renderSaleList();
+      }
+    }
+
+    // ─── CALENDAR LOGIC ───
+    function buildCalendarEvents(year, month) {
+      const eventMap = {}; // { date: { events: [], sales: [] } }
+
+      const addToMap = (date, type, item) => {
+        if (!eventMap[date]) eventMap[date] = { events: [], sales: [] };
+        eventMap[date][type].push(item);
+      };
+
+      // おでかけ（EVENT_DATA）：start_date〜end_date の期間で登録
+      EVENT_DATA.forEach(e => {
+        if (!e.start_date || !e.end_date) return;
+        let d = new Date(e.start_date + 'T00:00:00');
+        const end = new Date(e.end_date + 'T00:00:00');
+        while (d <= end) {
+          if (d.getFullYear() === year && d.getMonth() === month) {
+            addToMap(d.getDate(), 'events', {
+              title: e.store || e.title || '',
+              location: e.location || '',
+              hours: e.period || '',
+              tip: e.tip || '',
+              emoji: e.emoji || '📍',
+            });
+          }
+          d.setDate(d.getDate() + 1);
+        }
+      });
+
+      // 期間限定（SALE_DATA）：start_date〜end_date の期間で登録
+      SALE_DATA.forEach(s => {
+        if (!s.start_date || !s.end_date) return;
+        let d = new Date(s.start_date + 'T00:00:00');
+        const end = new Date(s.end_date + 'T00:00:00');
+        while (d <= end) {
+          if (d.getFullYear() === year && d.getMonth() === month) {
+            addToMap(d.getDate(), 'sales', {
+              title: s.store || '',
+              location: s.location || '',
+              hours: s.period || '',
+              tip: s.content || '',
+              emoji: s.emoji || '🏷',
+            });
+          }
+          d.setDate(d.getDate() + 1);
+        }
+      });
+
+      return eventMap;
+    }
+
+    const CAL_MONTHS_TO_SHOW = 12; // 今月から12ヶ月分表示
+
+    function renderCalendarMonth(year, month) {
+      const today = new Date();
+      const eventMap = buildCalendarEvents(year, month);
+      const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+      const weeks = totalCells / 7;
+
+      // 連休の日付マップ {date: vacationName}
+      const vacationMap = {};
+      LONG_VACATIONS.forEach(vac => {
+        let d = new Date(vac.start); d.setHours(0,0,0,0);
+        const end = new Date(vac.end); end.setHours(0,0,0,0);
+        while (d <= end) {
+          if (d.getFullYear() === year && d.getMonth() === month) {
+            vacationMap[d.getDate()] = vac.name;
+          }
+          d = new Date(d); d.setDate(d.getDate() + 1);
+        }
+      });
+
+      const DAY_LABELS = ['日','月','火','水','木','金','土'];
+      const headerHtml = DAY_LABELS.map((d, i) =>
+        `<div class="cal-day-label" style="${i===0?'color:var(--terracotta)':i===6?'color:var(--sky)':''}">${d}</div>`
+      ).join('');
+
+      let weeksHtml = '';
+      for (let w = 0; w < weeks; w++) {
+        let cellsHtml = '';
+        // この週で連休が占めるセルの範囲を計算（バー描画用）
+        let barStart = -1, barEnd = -1;
+        const cellUnit = 100 / 7;
+
+        for (let c = 0; c < 7; c++) {
+          const i = w * 7 + c;
+          let date, isOtherMonth = false;
+          if (i < firstDay || i >= firstDay + daysInMonth) {
+            isOtherMonth = true; date = 0;
+          } else {
+            date = i - firstDay + 1;
+          }
+
+          if (!isOtherMonth && date && vacationMap[date]) {
+            if (barStart === -1) barStart = c;
+            barEnd = c;
+          }
+
+          const isToday = !isOtherMonth &&
+            today.getFullYear() === year &&
+            today.getMonth() === month &&
+            today.getDate() === date;
+          const dayData = !isOtherMonth && date ? eventMap[date] : null;
+          const hasEvent = dayData && (dayData.events.length > 0 || dayData.sales.length > 0);
+
+          let classes = 'cal-cell';
+          if (isOtherMonth) classes += ' other-month';
+          if (isToday) classes += ' today';
+          if (hasEvent) classes += ' has-event';
+
+          const sunStyle = c === 0 && !isOtherMonth ? 'color:var(--terracotta)' : '';
+          const satStyle = c === 6 && !isOtherMonth ? 'color:var(--sky)' : '';
+          const dateStyle = sunStyle || satStyle;
+
+          if (isOtherMonth) {
+            cellsHtml += `<div class="${classes}"></div>`;
+          } else {
+            // 件数バッジ
+            let badgesHtml = '';
+            if (hasEvent) {
+              const ec = dayData.events.length;
+              const sc = dayData.sales.length;
+              const allItems = [...dayData.events, ...dayData.sales];
+              badgesHtml = `<div class="cal-event-counts">
+                ${ec > 0 ? `<span class="cal-count-badge cal-count-event">${ec}</span>` : ''}
+                ${sc > 0 ? `<span class="cal-count-badge cal-count-sale">${sc}</span>` : ''}
+              </div>`;
+              const clickAttr = ` onclick='showCalPopup(${date}, ${year}, ${month+1}, ${JSON.stringify(allItems).replace(/'/g,"&#39;")})'`;
+              cellsHtml += `<div class="${classes}"${clickAttr}>
+                <span class="cal-date"${dateStyle ? ` style="${dateStyle}"` : ''}>${date}</span>
+                ${badgesHtml}
+              </div>`;
+            } else {
+              cellsHtml += `<div class="${classes}">
+                <span class="cal-date"${dateStyle ? ` style="${dateStyle}"` : ''}>${date}</span>
+              </div>`;
+            }
+          }
+        }
+
+        // 連休バーを週の中のセル範囲に重ねて描画
+        let barHtml = '';
+        if (barStart !== -1) {
+          const left = barStart * cellUnit;
+          const width = (barEnd - barStart + 1) * cellUnit;
+          // バーの最初のセルに連休名を表示
+          const vacName = (() => {
+            for (let c = barStart; c <= barEnd; c++) {
+              const i = w * 7 + c;
+              const date = i < firstDay ? 0 : i - firstDay + 1;
+              if (date && vacationMap[date]) return vacationMap[date];
+            }
+            return '';
+          })();
+          // 連休開始日かどうか（この週の最初のバーセルが連休全体の最初か）
+          const firstVacDate = (() => {
+            for (let c = barStart; c <= barEnd; c++) {
+              const i = w * 7 + c;
+              const date = i - firstDay + 1;
+              return date;
+            }
+          })();
+          const showLabel = firstVacDate && !vacationMap[firstVacDate - 1];
+
+          barHtml = `<div class="cal-vacation-bar" style="left:calc(${left}% + 2px);width:calc(${width}% - 4px);">
+            ${showLabel ? `<span style="position:absolute;left:4px;top:-12px;font-size:8px;color:var(--caramel);font-weight:700;white-space:nowrap;opacity:0.85;">${vacName}<span style="font-weight:400;opacity:0.75;">（SIJS）</span></span>` : ''}
+          </div>`;
+        }
+
+        weeksHtml += `<div class="cal-week">${barHtml}${cellsHtml}</div>`;
+      }
+
+      return `
+        <div class="cal-month-block">
+          <div class="cal-month-heading">${year}年 ${monthNames[month]}</div>
+          <div class="cal-grid-header">${headerHtml}</div>
+          <div class="cal-grid">${weeksHtml}</div>
+        </div>`;
+    }
+
+    function renderCalendar() {
+      const today = new Date();
+      let html = '';
+      for (let i = 0; i < CAL_MONTHS_TO_SHOW; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        html += renderCalendarMonth(d.getFullYear(), d.getMonth());
+      }
+      document.getElementById('cal-months-wrap').innerHTML = html;
+    }
+
+    function showCalPopup(date, year, month, events) {
+      const evList = Array.isArray(events) ? events : [events];
+      document.getElementById('cal-popup-date').textContent =
+        year + '年' + month + '月' + date + '日　' + evList.length + '件';
+      document.getElementById('cal-popup-events').innerHTML = evList.map((ev, i) => {
+        const pinId = 'cal_' + year + '_' + month + '_' + date + '_' + i;
+        const pins = getPins();
+        const pinned = !!pins[pinId];
+        return `
+        <div class="cal-popup-event-item">
+          <div class="cal-popup-title">${ev.emoji} ${ev.title}</div>
+          <div class="cal-popup-meta">
+            <span>📍 ${ev.location}</span>
+            <span>📅 ${ev.hours}</span>
+          </div>
+          <div class="cal-popup-tips">${ev.tip}</div>
+          <div class="cal-popup-actions">
+            <button class="cal-icon-btn${pinned ? ' pinned' : ''}" id="cal-pin-${pinId}"
+              onclick="toggleCalPin('${pinId}', '${ev.title.replace(/'/g,"\\'")}', '${ev.location.replace(/'/g,"\\'")}', '${ev.hours.replace(/'/g,"\\'")}', '${ev.emoji}')">📌</button>
+            <button class="cal-icon-btn"
+              onclick="shareApp('${ev.title.replace(/'/g,"\\'")}')">📤</button>
+          </div>
+        </div>`;
+      }).join('');
+      document.getElementById('cal-popup').classList.add('visible');
+      document.getElementById('cal-popup-overlay').classList.add('visible');
+    }
+
+    function toggleCalPin(pinId, title, location, hours, emoji) {
+      const pins = getPins();
+      if (pins[pinId]) {
+        delete pins[pinId];
+        showToast('📌 ピン留めを外しました');
+      } else {
+        pins[pinId] = { id: pinId, title, location, hours, emoji, tip: '' };
+        showToast('📌 ピン留めしました！');
+      }
+      savePins(pins);
+      const btn = document.getElementById('cal-pin-' + pinId);
+      if (btn) btn.classList.toggle('pinned', !!pins[pinId]);
+    }
+
+    function closeCalPopup() {
+      document.getElementById('cal-popup').classList.remove('visible');
+      document.getElementById('cal-popup-overlay').classList.remove('visible');
+    }
+
+    renderCalendar();
+
+    // ─── HIDDEN GEMS DATA ───
+    const GEMS_DATA = [
+      {
+        id: 'g1',
+        emoji: '🍜',
+        bgClass: 'ramen',
+        badge: '隠れた名店',
+        name: '麺屋 暁（あかつき）',
+        location: 'Tanjong Pagar',
+        hours: '11:30〜14:30 / 18:00〜22:00（月曜定休）',
+        teaser: '元ミシュランシェフが脱サラして開いた、行列のできる博多ラーメン店。',
+        owner: '東京の有名フレンチレストランで10年修行した後、故郷の博多ラーメンへの愛が忘れられず、2019年にシンガポールへ。「本物の博多の味を世界に届けたい」という思いで、毎朝4時から豚骨スープを仕込む。食材は可能な限り日本から空輸。妻のエリさんが担当するデザートの抹茶プリンも密かな人気メニュー。',
+        residentAuthor: 'シンガポール在住 5年目・Mさん（2児のママ）',
+        residentText: '子どもたちがラーメン好きで毎月通っています。子ども用の細麺・薄味対応をお願いすると快く対応してくれます。ランチは13時を過ぎると少し空くので、その時間を狙うのがコツ。駐車場はないのでMRT Tanjong Pagar駅から徒歩5分。',
+        tips: [
+          '人気No.1は「特製とんこつ $18」。麺の硬さは「バリカタ」で注文すると本場の食感',
+          '12時〜13時は行列必至。13時15分以降に行くとほぼ待たずに入れる',
+          'ランチの〆に頼める「替え玉 $2」はコスパ最高。ニンニクは自分で入れる派がコツ',
+          '駐車場なし。Tanjong Pagar駅A出口から徒歩5分',
+          'テイクアウト不可。必ず店内で食べること',
+        ],
+      },
+      {
+        id: 'g2',
+        emoji: '☕',
+        bgClass: 'cafe',
+        badge: '穴場カフェ',
+        name: 'Forest Brew',
+        location: 'Dempsey Hill',
+        hours: '9:00〜18:00（火曜定休）',
+        teaser: 'Dempsey Hillの森の中に隠れた、地元在住者だけが知るオーガニックカフェ。',
+        owner: 'マレーシア出身のLinaとシンガポール人のJamesが2021年に開業。2人とも元々はIT業界出身で、コロナ禍をきっかけに「本当にやりたいこと」を追求してカフェをオープン。コーヒー豆はスマトラとエチオピアから直接仕入れ、フードは全てオーガニック食材を使用。小さな農園も裏に持っており、ハーブは自家栽培。',
+        residentAuthor: 'シンガポール在住 3年目・Kさん（ワーキングマム）',
+        residentText: '週末の午前中に子どもを連れてよく来ます。広い庭があって子どもが走り回れるので、ゆっくりコーヒーを楽しめます。ベビーチェアも完備。パンケーキが絶品で、うちの子は毎回これをリクエスト。駐車場も広いので車でのアクセスが楽です。',
+        tips: [
+          '人気メニューは「シングルオリジン フラットホワイト $7」と「バナナパンケーキ $14」',
+          '庭席は週末の10時前後に埋まる。9時台に来ると確実に取れる',
+          '犬同伴OK。ペット用の水とおやつも用意してくれる',
+          'Dempsey Hillの奥まった場所にあるのでGoogleマップ必須。看板が小さくて見逃しやすい',
+          'テイクアウトのコーヒー豆（$28/250g）はお土産にも最適',
+        ],
+      },
+      {
+        id: 'g3',
+        emoji: '🌊',
+        bgClass: 'park',
+        badge: '知る人ぞ知る',
+        name: 'Coney Island Park',
+        location: 'Punggol',
+        hours: '7:00〜19:00（年中無休）',
+        teaser: 'シンガポール北東端の小島。地元ファミリーだけが知る「もうひとつのセントーサ」。',
+        owner: '観光化されていない自然保護区で、シンガポール政府が管理する公園。1980年代まで民間所有だったが、現在は誰でも無料でアクセスできる。島内には在来種の植物や野鳥が生息し、自然観察の場としても貴重。ローカルのサイクリストや家族連れに人気だが、観光客にはほとんど知られていない。',
+        residentAuthor: 'シンガポール在住 7年目・Tさん（小学生2人のパパ）',
+        residentText: '子どもたちが小さいうちから毎年来ています。サイクリングロードが整備されていて、6歳くらいから自転車で一周できます。島内に売店はないので、飲み物・おやつは必ず持参。朝7時に入ると人も少なく、野生のオオトカゲや珍しい鳥に会えることも。日が高くなる前に切り上げるのがベスト。',
+        tips: [
+          '入口はPunggol Promenade Nature Walk側のみ。迷ったらGoogleマップで「Coney Island West Entrance」と検索',
+          'レンタル自転車あり（入口付近 $8/時間）。6歳以上なら一周（約4km）楽しめる',
+          '売店ゼロ。水・おやつ・虫除けスプレーは必ず持参',
+          '野生のカピバラが目撃される唯一のスポット。朝7〜9時が遭遇率高め',
+          '日陰が少ないので帽子必須。10時以降は気温が上がり子どもにはきつい',
+        ],
+      },
+    ];
+
+    function renderGems() {
+      const container = document.getElementById('gems-scroll');
+      container.innerHTML = GEMS_DATA.map((g, i) => `
+        <div class="gem-card" style="animation-delay:${i * 0.1}s" onclick="openDetail('${g.id}')">
+          <div class="gem-image ${g.bgClass}">
+            <span class="gem-badge">${g.badge}</span>
+            ${g.emoji}
+          </div>
+          <div class="gem-body">
+            <div class="gem-name">${g.name}</div>
+            <div class="gem-meta">📍 ${g.location}</div>
+            <div class="gem-teaser">${g.teaser}</div>
+          </div>
+        </div>`).join('');
+    }
+
+    function openDetail(id) {
+      const g = GEMS_DATA.find(x => x.id === id);
+      if (!g) return;
+
+      document.getElementById('detail-emoji').textContent = g.emoji;
+      document.getElementById('detail-header-img').className = 'detail-header-img ' + g.bgClass;
+      document.getElementById('detail-badge').textContent = g.badge;
+      document.getElementById('detail-title').textContent = g.name;
+      document.getElementById('detail-meta-row').innerHTML = `
+        <span class="detail-meta-item">📍 ${g.location}</span>
+        <span class="detail-meta-item">🕐 ${g.hours}</span>`;
+      document.getElementById('detail-owner').textContent = g.owner;
+      document.getElementById('detail-resident-author').textContent = g.residentAuthor;
+      document.getElementById('detail-resident-text').textContent = g.residentText;
+      document.getElementById('detail-tips-list').innerHTML =
+        g.tips.map(t => `<li>${t}</li>`).join('');
+
+      const screen = document.getElementById('detail-screen');
+      screen.classList.add('visible');
+      screen.scrollTop = 0;
+    }
+
+    function closeDetail() {
+      document.getElementById('detail-screen').classList.remove('visible');
+    }
+
+    renderGems();
+
+    // ─── SHARE APP ───
+    async function shareApp(spotName) {
+      const shareData = {
+        title: '週末どうする？SG',
+        text: `「${spotName}」が気になってます！シンガポール在住者向けの週末おでかけアプリ「週末どうする？SG」もチェックしてみて🌴`,
+        url: window.location.href,
+      };
+      try {
+        if (navigator.share) {
+          await navigator.share(shareData);
+        } else {
+          // Web Share API非対応の場合はURLをコピー
+          await navigator.clipboard.writeText(shareData.url);
+          showToast('🔗 URLをコピーしました！');
+        }
+      } catch(e) {
+        if (e.name !== 'AbortError') showToast('🔗 URLをコピーしました！');
+      }
+    }
+
+    // ─── TOAST ───
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2500);
+    }
+
+    // ─── PWA SERVICE WORKER ───
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        console.log('PWA ready 🌴');
+      });
+    }
+  </script>
+</body>
+</html>
