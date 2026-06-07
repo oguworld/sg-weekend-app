@@ -1,5 +1,5 @@
 // ─── Service Worker for 今週末どこいく？SG ───
-const CACHE_NAME = 'sg-weekend-v205';
+const CACHE_NAME = 'sg-weekend-v277';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icons/icon-192.svg',
@@ -19,18 +19,19 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// ── Activate: clean up old caches ──
+// ── Activate: clean up old caches, notify clients if this is an update ──
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    const oldKeys = keys.filter(key => key !== CACHE_NAME);
+    const isUpdate = oldKeys.length > 0;
+    await Promise.all(oldKeys.map(key => caches.delete(key)));
+    await self.clients.claim(); // claim してから matchAll しないと空配列になる
+    if (isUpdate) {
+      const clients = await self.clients.matchAll({ type: 'window' });
+      clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+    }
+  })());
 });
 
 // ── Fetch: Network-first for API, Cache-first for static ──
@@ -84,10 +85,10 @@ self.addEventListener('push', event => {
   if (!event.data) return;
   const data = event.data.json();
   event.waitUntil(
-    self.registration.showNotification(data.title || '今週末どこいく？SG', {
+    self.registration.showNotification(data.title || 'おでかけNavi', {
       body: data.body,
-      icon: '/icons/icon-192.svg',
-      badge: '/icons/icon-192.svg',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-96.png',
       tag: 'sg-weekend',
       renotify: true,
     })

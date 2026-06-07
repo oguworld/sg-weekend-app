@@ -3,6 +3,40 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const webpush = require('web-push');
+
+webpush.setVapidDetails(
+  'mailto:oguworld@gmail.com',
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
+
+const PUSH_SUBS_PATH = path.join(__dirname, 'data', 'push-subscriptions.json');
+function loadPushSubs() {
+  try { return JSON.parse(fs.readFileSync(PUSH_SUBS_PATH, 'utf8')); } catch { return []; }
+}
+function savePushSubs(subs) {
+  fs.writeFileSync(PUSH_SUBS_PATH, JSON.stringify(subs, null, 2), 'utf8');
+}
+async function sendPushToAll(cityKey) {
+  const cityConf = CITIES[cityKey] || CITIES.sg;
+  const payload = JSON.stringify({
+    title: '新着おでかけ情報',
+    body: '最新の週末スポット情報が届きました！',
+  });
+  const subs = loadPushSubs();
+  if (subs.length === 0) return 0;
+  const expiredEndpoints = new Set();
+  await Promise.allSettled(subs.map(async sub => {
+    try {
+      await webpush.sendNotification(sub, payload);
+    } catch (e) {
+      if (e.statusCode === 410 || e.statusCode === 404) expiredEndpoints.add(sub.endpoint);
+    }
+  }));
+  if (expiredEndpoints.size > 0) savePushSubs(subs.filter(s => !expiredEndpoints.has(s.endpoint)));
+  return subs.length - expiredEndpoints.size;
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1152,6 +1186,40 @@ app.post('/api/line-webhook', async (req, res) => {
     } catch (e) {
       console.error('LINE webhook error:', e.message);
     }
+  }
+});
+
+// ─────────────────────────────────────────────
+// PUSH NOTIFICATIONS
+// ─────────────────────────────────────────────
+app.get('/api/vapid-public-key', (req, res) => {
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/push-subscribe', (req, res) => {
+  const { subscription } = req.body;
+  if (!subscription?.endpoint) return res.status(400).json({ error: 'invalid' });
+  const subs = loadPushSubs();
+  const idx = subs.findIndex(s => s.endpoint === subscription.endpoint);
+  if (idx >= 0) subs[idx] = subscription;
+  else subs.push(subscription);
+  savePushSubs(subs);
+  res.json({ ok: true });
+});
+
+app.delete('/api/push-subscribe', (req, res) => {
+  const { endpoint } = req.body;
+  savePushSubs(loadPushSubs().filter(s => s.endpoint !== endpoint));
+  res.json({ ok: true });
+});
+
+app.post('/api/notify-events-updated', async (req, res) => {
+  const city = req.query.city || 'sg';
+  try {
+    const sent = await sendPushToAll(city);
+    res.json({ ok: true, sent });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

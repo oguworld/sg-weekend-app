@@ -385,6 +385,12 @@ async function main() {
 
   console.log('\n🎉 fetch-events.js 完了\n');
 
+  if (result.accepted > 0) {
+    const port = process.env.PORT || 3000;
+    fetch(`http://localhost:${port}/api/notify-events-updated?city=${cityKey}`, { method: 'POST' })
+      .catch(() => {});
+  }
+
   saveFetchSummary({
     cityKey,
     cityLabel:   conf.nameJa,

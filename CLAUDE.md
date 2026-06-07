@@ -761,13 +761,6 @@ xxx: {
 ## 17. 今後の実装予定
 
 ### 🔴 優先度：高
-- [ ] **X投稿 credentials 修正**（post-to-x.js が 401 Unauthorized で止まっている）
-  1. [developer.x.com/en/portal](https://developer.x.com/en/portal) → App Settings → User authentication settings
-  2. App permissions を `Read and Write` に変更して Save
-  3. Keys and Tokens → Access Token & Secret を **Regenerate**
-  4. 新しい値を `.env` の `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET` に上書き
-  5. `node scripts/post-to-x.js --type=event --city=sg` で動作確認
-  - ※ `post-to-line.js` からはX投稿コードを削除済み。X投稿は `post-to-x.js` に一本化している
 - [ ] OpenWeatherMap API連携（天気バナー本番化）
 - [ ] カレンダーの件数バッジ表示（おでかけ：オレンジ）
 

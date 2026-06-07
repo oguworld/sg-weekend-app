@@ -7,6 +7,10 @@ LOG=$REPO/logs/github-backup.log
 echo "[$(date '+%Y-%m-%d %H:%M:%S SGT')] Starting backup" >> "$LOG"
 
 cd "$REPO"
+
+# CLAUDE.md をソースコードの変更内容に合わせて更新
+/home/masahiko/.nvm/versions/node/v22.22.3/bin/node "$REPO/scripts/update-claude-md.js" >> "$LOG" 2>&1
+
 /usr/bin/git add .
 
 if /usr/bin/git diff --cached --quiet; then

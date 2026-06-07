@@ -13,9 +13,9 @@ const HISTORY_PATH = path.join(__dirname, '../data/x-post-history.json');
 const HISTORY_MAX  = 50;
 
 const CITY_CONFIG = {
-  sg:  { nameJa: 'シンガポール', appUrl: 'https://dosuru.app/sg',  eventsPath: path.join(__dirname, '../data/sg/events.json') },
-  bkk: { nameJa: 'バンコク',     appUrl: 'https://dosuru.app/bkk', eventsPath: path.join(__dirname, '../data/bkk/events.json') },
-  syd: { nameJa: 'シドニー',     appUrl: 'https://dosuru.app/syd', eventsPath: path.join(__dirname, '../data/syd/events.json') },
+  sg:  { nameJa: 'シンガポール', flag: '🇸🇬', code: 'SG',  appUrl: 'https://dosuru.app/sg',  eventsPath: path.join(__dirname, '../data/sg/events.json') },
+  bkk: { nameJa: 'バンコク',     flag: '🇹🇭', code: 'BKK', appUrl: 'https://dosuru.app/bkk', eventsPath: path.join(__dirname, '../data/bkk/events.json') },
+  syd: { nameJa: 'シドニー',     flag: '🇦🇺', code: 'SYD', appUrl: 'https://dosuru.app/syd', eventsPath: path.join(__dirname, '../data/syd/events.json') },
 };
 
 const APP_FEATURES = [
@@ -113,15 +113,16 @@ ${tipsText}
 
 【要件】
 - 日本語
-- 絵文字を1〜2個使う
-- URLを除く本文は100文字以内（厳守）
+- 絵文字を1〜2個使う（国旗絵文字🇸🇬🇹🇭🇦🇺は使わない）
+- URLを除く本文は150文字以内（厳守）
 - 末尾のURLは含めない（別途追加します）
 - SNS投稿として完成した文章のみ出力（前置き・説明不要）`,
     }],
   });
 
   const body = res.content[0].text.trim();
-  return ensureBlankLineBeforeUrl(body, conf.appUrl);
+  const cityPrefix = `${conf.flag} ${conf.code} イベント情報`;
+  return ensureBlankLineBeforeUrl(`${cityPrefix}\n${body}`, conf.appUrl);
 }
 
 async function generateFeaturePost(feature) {

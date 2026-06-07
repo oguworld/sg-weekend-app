@@ -19,13 +19,13 @@ const THRESHOLDS = {
   maxHistoryRuns:   12,    // ファイルに保持する最大ラン数
 };
 
-// コンテンツ種別の目標比率（イベント50% / グルメ35% / セール15%）
-const TARGET_TYPE_RATIO = { event: 0.50, gourmet: 0.35, sale: 0.15 };
+// コンテンツ種別の目標比率（イベント40% / 展示・公演20% / グルメ30% / セール10%）
+const TARGET_TYPE_RATIO = { event: 0.40, show: 0.20, gourmet: 0.30, sale: 0.10 };
 // この差分(実績-目標)がある場合に「偏り」とみなす
 const TYPE_IMBALANCE_THRESHOLD = 0.15;
 
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
-const TYPE_LABELS = { event: 'イベント・展示', gourmet: 'グルメ・フェア', sale: 'セール・プロモ' };
+const TYPE_LABELS = { event: 'イベント', show: '展示・公演', gourmet: 'グルメ・フェア', sale: 'セール・プロモ' };
 
 const PATHS = {
   history:    path.join(__dirname, '..', 'data', 'source-history.json'),
@@ -76,7 +76,7 @@ function analyzeTypeDistribution(cityKey) {
   const events     = loadJson(eventsPath, []);
   if (events.length === 0) return { counts: {}, ratios: {}, total: 0, mostNeeded: null };
 
-  const counts = { event: 0, gourmet: 0, sale: 0 };
+  const counts = { event: 0, show: 0, gourmet: 0, sale: 0 };
   for (const e of events) {
     if (counts[e.type] !== undefined) counts[e.type]++;
   }
@@ -314,7 +314,7 @@ function buildReport(results) {
 
     // コンテンツ構成の偏り
     if (r.mostNeeded) {
-      lines.push(`📊 ${TYPE_LABELS[r.mostNeeded]}が不足（目標比率: event50%/gourmet35%/sale15%）`);
+      lines.push(`📊 ${TYPE_LABELS[r.mostNeeded]}が不足（目標: event40%/show20%/gourmet30%/sale10%）`);
     }
   }
 

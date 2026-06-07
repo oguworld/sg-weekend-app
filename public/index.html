@@ -12,6 +12,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#FFF8F0" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="おでかけNavi" />
@@ -54,7 +55,9 @@
       --shadow-card: 0 6px 28px rgba(42,37,32,0.10);
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+    html { background: var(--warm-white); overscroll-behavior-y: none; }
 
     body {
       font-family: 'Noto Sans JP', sans-serif;
@@ -62,6 +65,7 @@
       color: var(--midnight);
       min-height: 100vh;
       overflow-x: hidden;
+      overscroll-behavior-y: none;
     }
 
     /* ─── HEADER ─── */
@@ -165,6 +169,24 @@
       padding: 20px 20px calc(80px + env(safe-area-inset-bottom, 0px));
     }
 
+    /* ─── PULL-TO-REFRESH ─── */
+    #ptr-indicator {
+      height: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: -20px -20px 20px;
+      background: var(--warm-white);
+    }
+    .ptr-arrow { font-size: 18px; color: var(--caramel); transition: transform 0.2s ease; display: inline-block; }
+    .ptr-label { font-size: 12px; color: var(--warm-gray); }
+    .ptr-spinner { width: 20px; height: 20px; border: 2.5px solid var(--caramel-pale); border-top-color: var(--caramel); border-radius: 50%; display: none; }
+    #ptr-indicator.ptr-loading .ptr-spinner { display: block; animation: ptr-spin 0.7s linear infinite; }
+    #ptr-indicator.ptr-loading .ptr-arrow, #ptr-indicator.ptr-loading .ptr-label { display: none; }
+    @keyframes ptr-spin { to { transform: rotate(360deg); } }
+
     /* ─── PROFILE SETTINGS ─── */
     .profile-chips {
       display: flex;
@@ -191,6 +213,91 @@
       color: white;
       border-color: var(--caramel);
       font-weight: 700;
+    }
+    .custom-select-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .custom-select-summary {
+      font-size: 13px;
+      color: var(--midnight);
+      font-weight: 600;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .custom-select-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 50px;
+      border: 1.5px solid var(--sand-dark);
+      background: white;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--midnight);
+      flex-shrink: 0;
+    }
+    .custom-select-arrow {
+      font-size: 10px;
+      color: var(--light-gray);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .custom-select-arrow.open {
+      transform: rotate(180deg);
+    }
+    .custom-dropdown-panel {
+      border-top: 1px solid rgba(0,0,0,0.06);
+      padding: 2px 18px 10px;
+      animation: dropdownIn 0.15s ease;
+    }
+    @keyframes dropdownIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .custom-dropdown-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--midnight);
+    }
+    .custom-dropdown-option:last-child { border-bottom: none; padding-bottom: 2px; }
+    .custom-dropdown-check {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1.5px solid var(--light-gray);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: white;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .custom-dropdown-check.checked {
+      background: var(--caramel);
+      border-color: var(--caramel);
+    }
+    .custom-dropdown-sublabel {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--light-gray);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 12px 0 4px;
+      border-top: 1px solid rgba(0,0,0,0.06);
+      margin-top: 4px;
     }
 
     .city-select-wrapper {
@@ -272,6 +379,8 @@
       font-size: 12px;
       color: var(--warm-gray);
       font-weight: 300;
+      min-width: 3em;
+      text-align: right;
     }
 
     .age-filters {
@@ -1494,6 +1603,39 @@
       font-weight: 300;
     }
 
+    /* ─── Push toggle switch ─── */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--light-gray);
+      border-radius: 26px;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      left: 3px;
+      bottom: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--caramel); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+    .toggle-switch input:disabled + .toggle-slider { opacity: 0.4; cursor: not-allowed; }
+
     /* ─── FAB ─── */
     .fab {
       position: fixed;
@@ -1839,6 +1981,37 @@
     .spot-card:nth-child(2) { animation-delay: 0.12s; }
     .spot-card:nth-child(3) { animation-delay: 0.19s; }
 
+    /* ─── UPDATE BANNER ─── */
+    .update-banner {
+      display: none;
+      position: fixed;
+      bottom: 90px;
+      left: 12px; right: 12px;
+      background: var(--midnight);
+      color: white;
+      border-radius: 18px;
+      padding: 14px 16px;
+      z-index: 10000;
+      box-shadow: 0 8px 32px rgba(42,37,32,0.3);
+      animation: slideUp 0.3s ease;
+      align-items: center;
+      gap: 12px;
+    }
+    .update-banner.show { display: flex; }
+    .update-banner-btn {
+      background: var(--caramel);
+      border: none;
+      color: white;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'Noto Sans JP', sans-serif;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
     /* ─── TOAST NOTIFICATION ─── */
     .toast {
       position: fixed;
@@ -2043,6 +2216,7 @@
   </style>
 </head>
 <body>
+  </div>
 
   <!-- ─── HEADER ─── -->
   <!-- ─── INSTALL BANNER ─── -->
@@ -2065,7 +2239,7 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button class="header-share-btn" onclick="openShareModal()">
+        <button class="header-share-btn" id="howto-btn" onclick="openShareModal()">
           <span style="font-size:22px;">🗺</span>
           <span data-i18n="howtoLabel" style="display:block;font-size:11px;font-family:'Noto Sans JP',sans-serif;font-weight:600;color:var(--warm-gray);letter-spacing:0.05em;margin-top:2px;">使い方</span>
         </button>
@@ -2086,24 +2260,29 @@
 
   <!-- ─── HOME SCREEN ─── -->
   <main class="main" id="screen-home">
+  <div id="ptr-indicator">
+    <span class="ptr-arrow">↓</span>
+    <span class="ptr-label"></span>
+    <div class="ptr-spinner"></div>
+  </div>
 
     <!-- Section Header -->
     <div class="section-header">
       <div class="tabs-label" data-i18n="labelWhat">なにを探す？</div>
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-        <button id="ending-filter-btn" class="sort-btn" onclick="setCategoryFilter('ending')" title="今週末が見納め・ラストチャンスのものを表示">🔥 ラストチャンス</button>
-        <button id="event-sort-btn" class="sort-btn" onclick="toggleEventSort()" title="開始日で並び替え">開始日↓</button>
-        <div id="result-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);"></div>
-        <button onclick="loadEventData()" title="再読み込み" style="background:none;border:none;padding:0;cursor:pointer;color:var(--light-gray);font-size:17px;line-height:1;display:flex;align-items:center;margin-top:3px;transition:color 0.2s;" onmouseenter="this.style.color='var(--caramel)'" onmouseleave="this.style.color='var(--light-gray)'">↻</button>
+        <button id="ending-filter-btn" class="sort-btn" title="今週末が見納め・ラストチャンスのものを表示">🔥 今週で終了</button>
+        <button id="event-sort-btn" class="sort-btn" title="開始日で並び替え">開始日↓</button>
+        <div id="result-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
       </div>
     </div>
 
     <!-- Category Filter -->
     <div class="category-filter-row" id="category-filter-row">
-      <button class="sale-filter-chip" data-cat="event"    onclick="setCategoryFilter('event')"    data-i18n="catEvent">🗺 イベント</button>
-      <button class="sale-filter-chip" data-cat="gourmet"  onclick="setCategoryFilter('gourmet')"  data-i18n="catGourmet">🍽 グルメ・フェア</button>
-      <button class="sale-filter-chip" data-cat="sale"     onclick="setCategoryFilter('sale')"     data-i18n="catSale">🏷 プロモ・お得</button>
-      <button class="sale-filter-chip" data-cat="opening"  onclick="setCategoryFilter('opening')"  data-i18n="catOpening">🎊 新規オープン</button>
+      <button class="sale-filter-chip" data-cat="event"    data-i18n="catEvent">🗺 イベント</button>
+      <button class="sale-filter-chip" data-cat="show"     data-i18n="catShow">🎭 展示・公演</button>
+      <button class="sale-filter-chip" data-cat="gourmet"  data-i18n="catGourmet">🍽 グルメ・フェア</button>
+      <button class="sale-filter-chip" data-cat="sale"     data-i18n="catSale">🏷 プロモ・お得</button>
+      <button class="sale-filter-chip" data-cat="opening"  data-i18n="catOpening">🎊 新規オープン</button>
       <!-- <button class="sale-filter-chip" data-cat="starting" onclick="setCategoryFilter('starting')" data-i18n="catStarting">🆕 今週から</button> -->
       <!-- <button class="sale-filter-chip" data-cat="ending"   onclick="setCategoryFilter('ending')"   data-i18n="catEnding">🔥 今週まで</button> -->
     </div>
@@ -2182,88 +2361,63 @@
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secProfile">プロフィール</div>
 
-      <div class="settings-item" style="flex-direction:column; align-items:flex-start; gap:14px;">
-        <span class="settings-item-label" data-i18n="labelWho">一緒に行く人</span>
-        <div class="profile-chips" id="who-setting-chips">
-          <div class="profile-chip" data-pref="who" data-val="family" onclick="selectProfile('who','family')" data-i18n="whoFamily">👨‍👩‍👧‍👦 ファミリー</div>
-          <div class="profile-chip" data-pref="who" data-val="solo" onclick="selectProfile('who','solo')" data-i18n="whoSolo">🧑‍💼 ひとりで</div>
-          <div class="profile-chip" data-pref="who" data-val="couple" onclick="selectProfile('who','couple')" data-i18n="whoCouple">👫 夫婦・カップル</div>
-          <div class="profile-chip" data-pref="who" data-val="group" onclick="selectProfile('who','group')" data-i18n="whoGroup">👥 グループ・友人</div>
-        </div>
-      </div>
-
-      <div class="settings-item" id="age-setting-section" style="flex-direction:column; align-items:flex-start; gap:14px; margin-top:8px; display:none;">
-        <span class="settings-item-label" data-i18n="labelAge">子どもの年齢</span>
-        <div class="profile-chips" id="age-setting-chips">
-          <div class="profile-chip" data-pref="age" data-val="baby" onclick="selectProfile('age','baby')" data-i18n="ageBaby">🍼 0〜2歳</div>
-          <div class="profile-chip" data-pref="age" data-val="preschool" onclick="selectProfile('age','preschool')" data-i18n="agePreschool">🚀 3〜6歳</div>
-          <div class="profile-chip" data-pref="age" data-val="school" onclick="selectProfile('age','school')" data-i18n="ageSchool">📚 小学生以上</div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- 2. データ -->
-    <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secData">データ</div>
-      <div class="settings-item" style="cursor:pointer;" onclick="clearPins()">
-        <span class="settings-item-label" data-i18n="clearPins">ピン留めをすべて削除</span>
-        <span class="settings-item-value">🗑</span>
-      </div>
-      <div class="settings-item" style="cursor:pointer;" onclick="clearHiddenAll()">
-        <span class="settings-item-label" data-i18n="clearHidden">非表示にした情報をリセット</span>
-        <span class="settings-item-value">🔄</span>
-      </div>
-    </div>
-
-    <!-- 3. 応援する -->
-    <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secSupport">応援する</div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <p id="share-settings-desc" style="font-size:13px;color:var(--warm-gray);line-height:1.65;margin:0;">シンガポール在住の友達にこのアプリを紹介しよう！</p>
-        <button onclick="doShare()"
-          style="width:100%;padding:12px;border-radius:var(--radius-btn);background:var(--caramel-pale);color:var(--caramel);border:1.5px solid var(--caramel-light);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
-          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1" ontouchend="this.style.opacity=1">
-          🔗 <span data-i18n="shareSettingsBtn">友達にシェアする</span>
-        </button>
-        <div style="border-top:1px solid var(--caramel-pale);padding-top:10px;">
-          <p style="font-size:13px;color:var(--warm-gray);line-height:1.65;margin:0 0 10px;" data-i18n="supportDesc">このアプリは無料で運営しています。気に入っていただけたら、コーヒー1杯分で応援していただけると嬉しいです☕</p>
-          <a href="https://buy.stripe.com/28EfZ9eN56aZaEEbmY4c800" target="_blank" rel="noopener" data-i18n="supportBtn"
-            style="display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;box-sizing:border-box;padding:12px;border-radius:var(--radius-btn);background:var(--caramel-pale);color:var(--caramel);border:1.5px solid var(--caramel-light);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;transition:opacity 0.15s;"
-            onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1" ontouchend="this.style.opacity=1">
-            ☕ アプリを応援する（SGD 5）
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. フィードバック -->
-    <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secFeedback">フィードバック</div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <textarea id="feedback-text" data-i18n-ph="feedbackPlaceholder"
-          placeholder="改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！"
-          style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:16px;color:var(--midnight);background:white;resize:none;height:100px;outline:none;line-height:1.6;"></textarea>
-        <button onclick="sendFeedback()" data-i18n="feedbackSend"
-          style="padding:12px;border-radius:var(--radius-btn);background:var(--sage-pale);color:var(--sage);border:1.5px solid var(--sage-light);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
-          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
-          📨 送信する
-        </button>
-      </div>
-    </div>
-
-    <!-- 5. アプリ設定 -->
-    <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secAppSettings">アプリ設定</div>
-
-      <div class="settings-item">
+      <div class="settings-item" style="padding:10px 18px;">
         <span class="settings-item-label" data-i18n="labelCity">都市</span>
         <div class="city-select-wrapper">
           <select id="city-select" class="city-select" onchange="selectCity(this.value)"></select>
         </div>
       </div>
 
-      <div class="settings-item">
+      <div class="settings-item" style="flex-direction:column; align-items:stretch; padding:0; gap:0; overflow:hidden;">
+        <div class="custom-select-trigger" onclick="toggleProfileDropdown()" style="padding:12px 18px;">
+          <span class="settings-item-label" data-i18n="labelWho">おでかけスタイル</span>
+          <div class="custom-select-pill">
+            <span class="custom-select-summary" id="who-select-display"></span>
+            <span class="custom-select-arrow" id="profile-select-arrow">▾</span>
+          </div>
+        </div>
+        <div id="profile-dropdown" class="custom-dropdown-panel" style="display:none;">
+          <div class="custom-dropdown-option" data-pref="who" data-val="solo" onclick="selectProfile('who','solo')">
+            <span data-i18n="whoSolo">🧑‍💼 ひとりで</span>
+            <div class="custom-dropdown-check" id="who-check-solo"></div>
+          </div>
+          <div class="custom-dropdown-option" data-pref="who" data-val="couple" onclick="selectProfile('who','couple')">
+            <span data-i18n="whoCouple">👫 夫婦・カップル</span>
+            <div class="custom-dropdown-check" id="who-check-couple"></div>
+          </div>
+          <div class="custom-dropdown-option" data-pref="who" data-val="group" onclick="selectProfile('who','group')">
+            <span data-i18n="whoGroup">👥 グループ・友人</span>
+            <div class="custom-dropdown-check" id="who-check-group"></div>
+          </div>
+          <div class="custom-dropdown-option" data-pref="who" data-val="family" onclick="selectProfile('who','family')">
+            <span data-i18n="whoFamily">👨‍👩‍👧‍👦 ファミリー</span>
+            <div class="custom-dropdown-check" id="who-check-family"></div>
+          </div>
+          <div id="age-setting-section" style="display:none;">
+            <div class="custom-dropdown-sublabel" data-i18n="labelAge">子どもの年齢</div>
+            <div class="custom-dropdown-option" data-pref="age" data-val="baby" onclick="selectProfile('age','baby')">
+              <span data-i18n="ageBaby">🍼 0〜2歳</span>
+              <div class="custom-dropdown-check" id="age-check-baby"></div>
+            </div>
+            <div class="custom-dropdown-option" data-pref="age" data-val="preschool" onclick="selectProfile('age','preschool')">
+              <span data-i18n="agePreschool">🚀 3〜6歳</span>
+              <div class="custom-dropdown-check" id="age-check-preschool"></div>
+            </div>
+            <div class="custom-dropdown-option" data-pref="age" data-val="school" onclick="selectProfile('age','school')">
+              <span data-i18n="ageSchool">📚 小学生以上</span>
+              <div class="custom-dropdown-check" id="age-check-school"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 2. アプリ設定 -->
+    <div class="settings-section">
+      <div class="settings-section-title" data-i18n="secAppSettings">アプリ設定</div>
+
+      <div class="settings-item" style="padding:10px 18px;">
         <span class="settings-item-label" data-i18n="labelLang">言語</span>
         <button id="lang-toggle-btn" onclick="setLang(getLang()==='ja'?'en':'ja')"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
@@ -2272,20 +2426,59 @@
         </button>
       </div>
 
+      <div class="settings-item" style="padding:10px 18px;" id="push-setting-item">
+        <span class="settings-item-label" data-i18n="labelPush">イベント通知</span>
+        <button id="push-toggle-btn"
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--light-gray);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;color:var(--warm-gray);transition:all 0.18s;flex-shrink:0;">
+          ―
+        </button>
+      </div>
+
+      <div class="settings-item" id="clear-hidden-item" style="padding:10px 18px;">
+        <span class="settings-item-label" data-i18n="clearHidden">非表示イベントのリセット</span>
+        <button id="clear-hidden-btn" onclick="clearHiddenAll()"
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;"
+          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
+          <span data-i18n="resetBtn">リセット</span>
+        </button>
+      </div>
+
     </div>
 
-    <!-- 6. アプリ情報 -->
+    <!-- 3. その他 -->
     <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secAbout">アプリ情報</div>
-      <div class="settings-item">
-        <span class="settings-item-label" data-i18n="aboutAppName">アプリ名</span>
-        <span class="settings-item-value">おでかけNavi</span>
+      <div class="settings-section-title" data-i18n="secOther">その他</div>
+
+      <div class="settings-item" style="flex-direction:column;align-items:stretch;gap:10px;padding:16px 18px;">
+        <textarea id="feedback-text" data-i18n-ph="feedbackPlaceholder"
+          placeholder="改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！"
+          style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:16px;color:var(--midnight);background:var(--cream);resize:none;height:100px;outline:none;line-height:1.6;"></textarea>
+        <button id="feedback-send-btn" onclick="sendFeedback()" data-i18n="feedbackSend"
+          style="padding:12px;border-radius:var(--radius-btn);background:white;color:var(--warm-gray);border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
+          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
+          📨 送信する
+        </button>
       </div>
-      <div class="settings-item">
-        <span class="settings-item-label" data-i18n="aboutVersion">バージョン</span>
-        <span class="settings-item-value">1.0.0</span>
+
+      <div class="settings-item" style="padding:10px 18px;">
+        <span class="settings-item-label" data-i18n="shareSettingsBtn">友達にシェアする</span>
+        <button id="do-share-btn" onclick="doShare()"
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;"
+          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
+          <span data-i18n="shareLabel">シェア</span>
+        </button>
       </div>
-      <div class="settings-item">
+
+      <div class="settings-item" style="padding:10px 18px;">
+        <span class="settings-item-label" data-i18n="supportLabel">アプリを応援する</span>
+        <a href="https://buy.stripe.com/28EfZ9eN56aZaEEbmY4c800" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;text-decoration:none;"
+          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
+          SGD 5
+        </a>
+      </div>
+
+      <div class="settings-item" style="padding:16px 18px;">
         <span class="settings-item-label">公式X</span>
         <a href="https://x.com/willoa_sg" target="_blank" rel="noopener"
           style="display:inline-flex;align-items:center;gap:6px;color:var(--midnight);text-decoration:none;font-size:14px;font-weight:600;">
@@ -2293,6 +2486,7 @@
           @willoa_sg
         </a>
       </div>
+
     </div>
   </div>
 
@@ -2342,7 +2536,7 @@
   <div class="pin-detail-modal" id="share-modal">
     <div class="pin-detail-header">
       <div class="pin-detail-emoji">🗺</div>
-      <button class="pin-detail-close" onclick="closeShareModal()">✕</button>
+      <button class="pin-detail-close" id="share-modal-close" onclick="closeShareModal()">✕</button>
     </div>
     <div id="howto-content" style="overflow-y:auto;max-height:72vh;padding-bottom:4px;"></div>
   </div>
@@ -2371,19 +2565,19 @@
 
   <!-- ─── BOTTOM NAV ─── -->
   <nav class="bottom-nav">
-    <div class="nav-item active" id="nav-home" onclick="switchNav('home')">
+    <div class="nav-item active" id="nav-home">
       <span class="nav-icon">🔍</span>
       <span class="nav-label" data-i18n="navHome">探索</span>
     </div>
-    <div class="nav-item" id="nav-calendar" onclick="switchNav('calendar')">
+    <div class="nav-item" id="nav-calendar">
       <span class="nav-icon">📅</span>
       <span class="nav-label" data-i18n="navCalendar">カレンダー</span>
     </div>
-    <div class="nav-item" id="nav-pin" onclick="switchNav('pin')">
+    <div class="nav-item" id="nav-pin">
       <span class="nav-icon">📌</span>
       <span class="nav-label" data-i18n="navPin">ピン留め</span>
     </div>
-    <div class="nav-item" id="nav-settings" onclick="switchNav('settings')">
+    <div class="nav-item" id="nav-settings">
       <span class="nav-icon">⚙️</span>
       <span class="nav-label" data-i18n="navSettings">設定</span>
     </div>
@@ -2420,18 +2614,29 @@
       <div class="cal-popup-date" id="cal-popup-date"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
         <button id="cal-sort-btn" class="sort-btn" onclick="toggleCalSort()" title="開始日で並び替え">開始日↓</button>
-        <div id="cal-popup-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);"></div>
+        <div id="cal-popup-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
         <button class="cal-popup-close" onclick="closeCalPopup()">✕</button>
       </div>
     </div>
     <div class="cal-popup-filter-row" id="cal-popup-filter-row">
-      <button class="sale-filter-chip" data-cat="event"   onclick="setCalPopupFilter('event')">🗺 イベント</button>
-      <button class="sale-filter-chip" data-cat="gourmet" onclick="setCalPopupFilter('gourmet')">🍽 グルメ・フェア</button>
-      <button class="sale-filter-chip" data-cat="sale"    onclick="setCalPopupFilter('sale')">🏷 プロモ・お得</button>
-      <button class="sale-filter-chip" data-cat="opening" onclick="setCalPopupFilter('opening')">🎊 新規オープン</button>
+      <button class="sale-filter-chip" data-cat="event">🗺 イベント</button>
+      <button class="sale-filter-chip" data-cat="show">🎭 展示・公演</button>
+      <button class="sale-filter-chip" data-cat="gourmet">🍽 グルメ・フェア</button>
+      <button class="sale-filter-chip" data-cat="sale">🏷 プロモ・お得</button>
+      <button class="sale-filter-chip" data-cat="opening">🎊 新規オープン</button>
     </div>
     <div class="cal-popup-events" id="cal-popup-events"></div>
     <button class="cal-popup-fab" id="cal-popup-fab" onclick="calPopupScrollTop()" aria-label="トップへ戻る">↑</button>
+  </div>
+
+  <!-- Update Banner -->
+  <div class="update-banner" id="update-banner">
+    <div class="install-banner-icon">🔄</div>
+    <div class="install-banner-body">
+      <div class="install-banner-title">アプリが更新されました</div>
+      <div class="install-banner-desc">タップして最新版を反映</div>
+    </div>
+    <button class="update-banner-btn" onclick="location.reload()">反映する</button>
   </div>
 
   <!-- Toast -->
@@ -2452,6 +2657,7 @@
         sectionTitle: '絞り込む',
         catAll: '📋 すべて',
         catEvent: '🗺 イベント',
+        catShow: '🎭 展示・公演',
         catGourmet: '🍽 グルメ・フェア',
         catSale: '🏷 プロモ・お得',
         catOpening: '🎊 新規オープン',
@@ -2466,7 +2672,7 @@
         settingsTitle: '⚙️ 設定',
         secProfile: 'プロフィール',
         secAppSettings: 'アプリ設定',
-        labelWho: '一緒に行く人',
+        labelWho: 'おでかけスタイル',
         whoFamily: '👨‍👩‍👧‍👦 ファミリー',
         whoSolo: '🧑‍💼 ひとりで',
         whoCouple: '👫 夫婦・カップル',
@@ -2475,16 +2681,19 @@
         ageBaby: '🍼 0〜2歳',
         agePreschool: '🚀 3〜6歳',
         ageSchool: '📚 小学生以上',
-        labelLang: '言語',
+        labelLang: '表示言語',
         secData: 'データ',
+        secOther: 'その他',
         clearPins: 'ピン留めをすべて削除',
-        clearHidden: '非表示にした情報をリセット',
+        clearHidden: '非表示イベントのリセット',
+        resetBtn: 'リセット',
         secFeedback: 'フィードバック',
         feedbackPlaceholder: '改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！',
         feedbackSend: '📨 送信する',
         secSupport: '応援する',
-        supportDesc: 'このアプリは無料で運営しています。気に入っていただけたら、コーヒー1杯分で応援していただけると嬉しいです☕',
-        supportBtn: '☕ アプリを応援する（SGD 5）',
+        supportDesc: 'このアプリは無料で運営しています。気に入っていただけたら、コーヒー1杯分で応援していただけると嬉しいです',
+        supportLabel: 'アプリを応援する',
+        supportBtn: 'アプリを応援する（SGD 5）',
         secAbout: 'アプリ情報',
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
@@ -2509,7 +2718,7 @@
         agePreschoolBadge: '🚀 3〜6歳',
         ageSchoolBadge: '📚 小学生',
         confirmClearPins: 'ピン留めをすべて削除しますか？',
-        confirmClearHidden: '非表示にした情報をすべてリセットしますか？',
+        confirmClearHidden: '非表示イベントをすべてリセットしますか？',
         toastPinned: '📌 ピン留めしました！',
         toastUnpinned: '📌 ピン留めを外しました',
         toastFeedbackSent: '📨 フィードバックを送信しました！',
@@ -2520,12 +2729,30 @@
         toastClearedHidden: '✅ 非表示リストをリセットしました',
         toastUrlCopied: '🔗 URLをコピーしました！',
         loadingEvents: 'おでかけ情報を読み込み中...',
+        labelPush: 'イベント更新の通知',
+        pushOn: 'ON',
+        pushOff: 'OFF',
+        pushDenied: '許可が必要',
+        pushUnsupported: '非対応',
+        toastPushOn: '🔔 プッシュ通知をONにしました！',
+        toastPushOff: '🔕 プッシュ通知をOFFにしました',
+        toastPushDenied: '⚙️ 設定アプリから通知を許可してください',
+        toastPushError: '⚠️ 通知の設定に失敗しました',
         countSuffix: '件',
         pinEmpty: 'まだピン留めがありません',
         pinEmptyDesc: '気になるスポットのカードから<br>📌ピン留めしてみましょう！',
         howtoLabel: '使い方',
         shareSettingsDesc: 'シンガポール在住の友達にこのアプリを紹介しよう！',
         shareSettingsBtn: '友達にシェアする',
+        bannerToday: '⏰ 本日まで',
+        bannerTomorrow: '⏰ 明日まで',
+        bannerDaysLeft: '⏰ あと{d}日',
+        toastProfileSet: '✅ {label} に設定しました',
+        profileLabelAll: '指定なし（すべて）',
+        installDescIos: '画面下の共有ボタン（□↑）→「ホーム画面に追加」でOK！',
+        installDescAndroid: 'おでかけNaviとしてホーム画面から起動できます',
+        installBtnIos: '方法を見る',
+        installBtnAndroid: '追加する',
       },
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
@@ -2538,7 +2765,8 @@
         tabHoliday: '🏫 Next Holiday',
         sectionTitle: 'Filter',
         catAll: '📋 All',
-        catEvent: '🗺 Events & Exhibitions',
+        catEvent: '🗺 Events',
+        catShow: '🎭 Shows & Exhibitions',
         catGourmet: '🍽 Food & Fairs',
         catSale: '🏷 Promos & Deals',
         catOpening: '🎊 Grand Openings',
@@ -2553,7 +2781,7 @@
         settingsTitle: '⚙️ Settings',
         secProfile: 'Profile',
         secAppSettings: 'App Settings',
-        labelWho: 'Going with',
+        labelWho: 'Outing Style',
         whoFamily: '👨‍👩‍👧‍👦 Family',
         whoSolo: '🧑‍💼 Solo',
         whoCouple: '👫 Couple',
@@ -2562,16 +2790,19 @@
         ageBaby: '🍼 0–2 yrs',
         agePreschool: '🚀 3–6 yrs',
         ageSchool: '📚 School age+',
-        labelLang: 'Language',
+        labelLang: 'Display Language',
         secData: 'Data',
+        secOther: 'Other',
         clearPins: 'Clear all pins',
         clearHidden: 'Reset hidden items',
+        resetBtn: 'Reset',
         secFeedback: 'Feedback',
         feedbackPlaceholder: 'Suggestions, bug reports, spot requests — anything welcome!',
         feedbackSend: '📨 Send',
         secSupport: 'Support',
-        supportDesc: 'This app is free to use. If you enjoy it, buying us a coffee would mean a lot ☕',
-        supportBtn: '☕ Support the app (SGD 5)',
+        supportDesc: 'This app is free to use. If you enjoy it, buying us a coffee would mean a lot.',
+        supportLabel: 'Support the app',
+        supportBtn: 'Support the app (SGD 5)',
         secAbout: 'About',
         aboutAppName: 'App',
         aboutVersion: 'Version',
@@ -2607,12 +2838,30 @@
         toastClearedHidden: '✅ Hidden items reset',
         toastUrlCopied: '🔗 URL copied!',
         loadingEvents: 'Loading events...',
+        labelPush: 'Update Notifications',
+        pushOn: 'ON',
+        pushOff: 'OFF',
+        pushDenied: 'Permission needed',
+        pushUnsupported: 'Not supported',
+        toastPushOn: '🔔 Push notifications enabled!',
+        toastPushOff: '🔕 Push notifications disabled',
+        toastPushDenied: '⚙️ Please allow notifications in Settings',
+        toastPushError: '⚠️ Failed to configure notifications',
         countSuffix: '',
         pinEmpty: 'No pins yet',
         pinEmptyDesc: 'Tap 📌 on any card to pin it!',
         howtoLabel: 'How to Use',
         shareSettingsDesc: 'Share this app with your friends in Singapore!',
         shareSettingsBtn: 'Share with Friends',
+        bannerToday: '⏰ Today only',
+        bannerTomorrow: '⏰ Until tomorrow',
+        bannerDaysLeft: '⏰ {d} days left',
+        toastProfileSet: '✅ Set to: {label}',
+        profileLabelAll: 'All (no preference)',
+        installDescIos: 'Tap the share button (□↑) at the bottom → "Add to Home Screen"',
+        installDescAndroid: 'Add おでかけNavi to your home screen for quick access',
+        installBtnIos: 'How to',
+        installBtnAndroid: 'Add',
       }
     };
 
@@ -2685,6 +2934,7 @@
       if (langName) langName.textContent = isEn ? 'English' : '日本語';
       buildCitySelect();
       updateTabLabels();
+      updateProfileDropdownDisplay();
     }
 
     function setLang(lang) {
@@ -2781,8 +3031,6 @@
       ],
     };
     function getCityHolidays() { return CITY_HOLIDAYS_2026[getCity()] || CITY_HOLIDAYS_2026.sg; }
-    // 後方互換
-    const SG_HOLIDAYS_2026 = CITY_HOLIDAYS_2026.sg;
 
     // ─── NEXT LONG HOLIDAY CALCULATION ───
     function getNextLongHoliday(from) {
@@ -2991,9 +3239,9 @@
       let bannerLabel = '';
       if (isEndingSoon && e.type !== 'opening') {
         const d = Math.round((_endDate - _today) / 86400000);
-        if (d === 0)      bannerLabel = '⏰ 本日まで';
-        else if (d === 1) bannerLabel = '⏰ 明日まで';
-        else              bannerLabel = `⏰ あと${d}日`;
+        if (d === 0)      bannerLabel = t('bannerToday');
+        else if (d === 1) bannerLabel = t('bannerTomorrow');
+        else              bannerLabel = t('bannerDaysLeft').replace('{d}', d);
       }
 
       return `
@@ -3144,28 +3392,99 @@
         activeCategoryFilters.delete('ending');
         btn.classList.remove('active');
       }
-      const jaLabels = { weekend: '🔥 ラストチャンス', nextweekend: '⏰ 来週で終了', afterweekend: '⏰ 再来週で終了' };
+      const jaLabels = { weekend: '🔥 今週で終了', nextweekend: '⏰ 来週で終了', afterweekend: '⏰ 再来週で終了' };
       const enLabels = { weekend: '🔥 Last Chance', nextweekend: '⏰ Ends Next Week', afterweekend: '⏰ Ends in 2 Wks' };
       const labelMap = getLang() === 'en' ? enLabels : jaLabels;
       btn.textContent = labelMap[currentTab] || jaLabels.weekend;
     }
 
+    function selectTab(tab) {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTab = tab.dataset.tab;
+      activeCategoryFilters.clear();
+      document.querySelectorAll('#category-filter-row .sale-filter-chip').forEach(chip => chip.classList.remove('active'));
+      const endingBtn = document.getElementById('ending-filter-btn');
+      if (endingBtn) endingBtn.classList.remove('active');
+      updateEndingFilterLabel();
+      renderEventCards();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
     tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        currentTab = tab.dataset.tab;
-        activeCategoryFilters.clear();
-        document.querySelectorAll('#category-filter-row .sale-filter-chip').forEach(chip => chip.classList.remove('active'));
-        const endingBtn = document.getElementById('ending-filter-btn');
-        if (endingBtn) endingBtn.classList.remove('active');
-        updateEndingFilterLabel();
-        renderEventCards();
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
+      tab.addEventListener('touchend', e => { e.preventDefault(); selectTab(tab); }, { passive: false });
+      tab.addEventListener('click', () => selectTab(tab));
     });
 
+    // ─── ボトムナビ 即時タップ対応 ───
+    document.querySelector('.bottom-nav')?.addEventListener('touchend', e => {
+      const item = e.target.closest('.nav-item');
+      if (!item) return;
+      e.preventDefault();
+      switchNav(item.id.replace('nav-', ''));
+    }, { passive: false });
+
+    // ─── カテゴリフィルター 即時タップ対応 ───
+    document.getElementById('category-filter-row').addEventListener('touchend', e => {
+      const chip = e.target.closest('.sale-filter-chip');
+      if (!chip) return;
+      e.preventDefault();
+      setCategoryFilter(chip.dataset.cat);
+    }, { passive: false });
+
+    // ─── Section Header ボタン 即時タップ対応 ───
+    document.querySelector('.section-header')?.addEventListener('touchend', e => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      e.preventDefault();
+      if (btn.id === 'ending-filter-btn') setCategoryFilter('ending');
+      else if (btn.id === 'event-sort-btn') toggleEventSort();
+    }, { passive: false });
+
+    // ─── 設定画面 即時タップ対応 ───
+    document.getElementById('screen-settings').addEventListener('touchend', e => {
+      const ddOption = e.target.closest('.custom-dropdown-option');
+      if (ddOption)                               { e.preventDefault(); selectProfile(ddOption.dataset.pref, ddOption.dataset.val); return; }
+      const ddTrigger = e.target.closest('.custom-select-trigger');
+      if (ddTrigger)                              { e.preventDefault(); toggleProfileDropdown(); return; }
+      if (e.target.closest('#clear-pins-item'))   { e.preventDefault(); clearPins();    return; }
+      if (e.target.closest('#clear-hidden-btn'))   { e.preventDefault(); clearHiddenAll(); return; }
+      if (e.target.closest('#do-share-btn'))      { e.preventDefault(); doShare();      return; }
+      if (e.target.closest('#feedback-send-btn')) { e.preventDefault(); sendFeedback(); return; }
+      if (e.target.closest('#lang-toggle-btn'))   { e.preventDefault(); setLang(getLang() === 'ja' ? 'en' : 'ja'); return; }
+      if (e.target.closest('#push-toggle-btn'))   { e.preventDefault(); togglePush(); return; }
+    }, { passive: false });
+
+    // ─── カレンダーポップアップ 即時タップ対応 ───
+    document.getElementById('cal-popup-filter-row').addEventListener('touchend', e => {
+      const chip = e.target.closest('.sale-filter-chip');
+      if (!chip) return;
+      e.preventDefault();
+      setCalPopupFilter(chip.dataset.cat);
+    }, { passive: false });
+
+    // ─── ヘッダー「使い方」ボタン 即時タップ対応 ───
+    {
+      const el = document.getElementById('howto-btn');
+      if (el) el.addEventListener('touchend', e => { e.preventDefault(); openShareModal(); }, { passive: false });
+    }
+
+    // ─── オーバーレイ・モーダル閉じる 即時タップ対応 ───
+    [
+      ['install-overlay',    () => closeInstallModal()],
+      ['share-overlay',      () => closeShareModal()],
+      ['share-modal-close',  () => closeShareModal()],
+      ['pin-detail-overlay', () => closePinDetail()],
+      ['chat-overlay',       () => closeAIChat()],
+      ['cal-popup-overlay',  () => closeCalPopup()],
+      ['update-banner',      () => location.reload()],
+    ].forEach(([id, fn]) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
+    });
+
+
     loadEventData();
+    initPushState();
 
     // ─── FAB ───
     (function() {
@@ -3442,8 +3761,10 @@
       // モーダルをカードレイアウト用にリセット
       const modal = document.getElementById('pin-detail-modal');
       modal.style.padding = '0';
-      modal.querySelector('.pin-detail-header').style.display = 'none';
-      document.getElementById('pin-detail-actions').style.display = 'none';
+      const pinHeader = modal.querySelector('.pin-detail-header');
+      if (pinHeader) pinHeader.style.display = 'none';
+      const pinActions = document.getElementById('pin-detail-actions');
+      if (pinActions) pinActions.style.display = 'none';
 
       const scroll = document.getElementById('pin-detail-scroll');
       scroll.style.overflow = 'auto';
@@ -3497,14 +3818,13 @@
       const modal = document.getElementById('pin-detail-modal');
       modal.classList.remove('visible');
       document.getElementById('pin-detail-overlay').classList.remove('visible');
-      // スタイルをリセット
       modal.style.padding = '';
-      modal.querySelector('.pin-detail-header').style.display = '';
-      document.getElementById('pin-detail-actions').style.display = '';
+      const pinHeader = modal.querySelector('.pin-detail-header');
+      if (pinHeader) pinHeader.style.display = '';
+      const pinActions = document.getElementById('pin-detail-actions');
+      if (pinActions) pinActions.style.display = '';
       const scroll = document.getElementById('pin-detail-scroll');
-      scroll.style.maxHeight = '';
-      scroll.style.marginBottom = '';
-      scroll.style.overflow = '';
+      if (scroll) { scroll.style.maxHeight = ''; scroll.style.marginBottom = ''; scroll.style.overflow = ''; }
     }
 
     function removePin(id) {
@@ -3553,11 +3873,11 @@
       const btn = document.getElementById('install-banner-btn');
 
       if (platform === 'ios') {
-        desc.textContent = '画面下の共有ボタン（□↑）→「ホーム画面に追加」でOK！';
-        btn.textContent = '方法を見る';
+        desc.textContent = t('installDescIos');
+        btn.textContent = t('installBtnIos');
       } else {
-        desc.textContent = 'おでかけNaviとしてホーム画面から起動できます';
-        btn.textContent = '追加する';
+        desc.textContent = t('installDescAndroid');
+        btn.textContent = t('installBtnAndroid');
       }
 
       setTimeout(() => {
@@ -3608,8 +3928,47 @@
       const who = getWhoList();
       const ageSection = document.getElementById('age-setting-section');
       if (ageSection) {
-        ageSection.style.display = who.includes('family') ? 'flex' : 'none';
+        ageSection.style.display = who.includes('family') ? 'block' : 'none';
       }
+    }
+
+    function toggleProfileDropdown() {
+      const panel = document.getElementById('profile-dropdown');
+      const arrow = document.getElementById('profile-select-arrow');
+      if (!panel) return;
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'block';
+      if (arrow) arrow.classList.toggle('open', !isOpen);
+    }
+
+    function updateProfileDropdownDisplay() {
+      const who = getWhoList();
+      const age = localStorage.getItem('sg_age') || 'all';
+      const isEn = getLang() === 'en';
+      const whoMap = isEn
+        ? { solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Friends' }
+        : { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
+      const ageMap = isEn
+        ? { baby: '0–2', preschool: '3–6', school: 'Primary+' }
+        : { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
+      let summary;
+      if (who.length === 0) {
+        summary = isEn ? 'All' : '指定なし';
+      } else {
+        const parts = who.map(v => whoMap[v]);
+        if (who.includes('family') && age !== 'all' && ageMap[age]) parts.push(ageMap[age]);
+        summary = parts.join('・');
+      }
+      const displayEl = document.getElementById('who-select-display');
+      if (displayEl) displayEl.textContent = summary;
+      ['solo', 'couple', 'family', 'group'].forEach(v => {
+        const check = document.getElementById(`who-check-${v}`);
+        if (check) { const c = who.includes(v); check.classList.toggle('checked', c); check.textContent = c ? '✓' : ''; }
+      });
+      ['baby', 'preschool', 'school'].forEach(v => {
+        const check = document.getElementById(`age-check-${v}`);
+        if (check) { const c = age === v; check.classList.toggle('checked', c); check.textContent = c ? '✓' : ''; }
+      });
     }
 
     function selectWho(val) {
@@ -3623,10 +3982,11 @@
       document.querySelectorAll('[data-pref="who"]').forEach(chip => {
         chip.classList.toggle('selected', who.includes(chip.dataset.val));
       });
-      const label = who.length === 0 ? '指定なし（すべて）' :
-        who.map(w => ({ family:'ファミリー', solo:'ひとりで', couple:'夫婦・カップル', group:'グループ・友人' }[w])).join('・');
-      showToast('✅ ' + label + ' に設定しました');
+      const whoLabelMap = { family: t('whoFamily'), solo: t('whoSolo'), couple: t('whoCouple'), group: t('whoGroup') };
+      const label = who.length === 0 ? t('profileLabelAll') : who.map(w => whoLabelMap[w]).join('・');
+      showToast(t('toastProfileSet').replace('{label}', label));
       updateAgeVisibility();
+      updateProfileDropdownDisplay();
       applyProfileSort();
     }
 
@@ -3636,23 +3996,14 @@
       const current = localStorage.getItem('sg_age') || 'all';
       const next = current === val ? 'all' : val;
       localStorage.setItem('sg_age', next);
-      document.querySelectorAll('[data-pref="age"]').forEach(chip => {
-        chip.classList.toggle('selected', chip.dataset.val === next);
-      });
-      const labels = { baby:'0〜2歳', preschool:'3〜6歳', school:'小学生以上', all:'指定なし（すべて）' };
-      showToast('✅ ' + labels[next] + ' に設定しました');
+      const ageLabels = { baby: t('ageBaby'), preschool: t('agePreschool'), school: t('ageSchool'), all: t('profileLabelAll') };
+      showToast(t('toastProfileSet').replace('{label}', ageLabels[next]));
+      updateProfileDropdownDisplay();
       applyProfileSort();
     }
 
     function initProfileChips() {
-      const who = getWhoList();
-      document.querySelectorAll('[data-pref="who"]').forEach(chip => {
-        chip.classList.toggle('selected', who.includes(chip.dataset.val));
-      });
-      const age = localStorage.getItem('sg_age') || 'all';
-      document.querySelectorAll('[data-pref="age"]').forEach(chip => {
-        chip.classList.toggle('selected', chip.dataset.val === age);
-      });
+      updateProfileDropdownDisplay();
       updateAgeVisibility();
     }
 
@@ -3731,9 +4082,11 @@
       updateResultCount();
     }
     function updateResultCount() {
-      const visible = document.querySelectorAll('.spot-card:not([style*="display: none"]):not([style*="display:none"])');
+      const cards = document.querySelectorAll('.spot-card');
+      let count = 0;
+      cards.forEach(c => { if (getComputedStyle(c).display !== 'none') count++; });
       const countEl = document.getElementById('result-count');
-      if (countEl) countEl.textContent = visible.length + t('countSuffix');
+      if (countEl) countEl.textContent = String(count).padStart(2, '0') + t('countSuffix');
     }
 
     // ─── HIDDEN EVENTS ───
@@ -3792,7 +4145,7 @@
             <span style="font-size:14px;">🗑</span>
           </div>
           <div style="display:flex;align-items:center;padding:8px 6px;border-radius:8px;background:var(--caramel-pale);margin-top:4px;">
-            <span style="font-size:12px;color:var(--caramel);font-weight:700;flex:1;">${isEn ? 'Reset hidden items' : '非表示にした情報をリセット'}</span>
+            <span style="font-size:12px;color:var(--caramel);font-weight:700;flex:1;">${isEn ? 'Reset hidden items' : '非表示イベントのリセット'}</span>
             <span style="font-size:14px;">🔄</span>
           </div>
         </div>`;
@@ -3827,8 +4180,8 @@
         <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:14px;">
           <div style="font-size:13px;font-weight:700;color:var(--caramel);margin-bottom:10px;">🔍 ${isEn ? 'Explore Tab' : '探索タブの使い方'}</div>
           <div style="font-size:12px;color:var(--warm-gray);line-height:1.85;">${isEn
-            ? 'Switch between <strong>🌤 This Weekend</strong> / <strong>🌈 Next Weekend</strong> / <strong>🎌 Next Holiday</strong> to browse events by timing.<br>Use the category filter (<strong>Events &amp; Exhibitions / Food &amp; Fairs / Promos &amp; Deals</strong>) to narrow down results.<br>Set your profile (who you\'re going with, kids\' age) in Settings to prioritize content that matches you.'
-            : '<strong>🌤 今週末 / 🌈 来週末 / 🎌 次の連休</strong> のタブで表示するイベントを切り替えられます。<br>カテゴリフィルター（<strong>イベント・展示 / グルメ・フェア / プロモ・お得</strong>）でさらに絞り込み可能。<br>設定でプロフィール（誰と行く・子どもの年齢）を設定すると、あなたに合った情報が優先表示されます。'}</div>
+            ? 'Switch between <strong>🌤 This Weekend</strong> / <strong>🌈 Next Weekend</strong> / <strong>🎌 Next Holiday</strong> to browse events by timing.<br>Use the category filter (<strong>Events / Shows &amp; Exhibitions / Food &amp; Fairs / Promos &amp; Deals</strong>) to narrow down results.<br>Set your profile (who you\'re going with, kids\' age) in Settings to prioritize content that matches you.'
+            : '<strong>🌤 今週末 / 🌈 来週末 / 🎌 次の連休</strong> のタブで表示するイベントを切り替えられます。<br>カテゴリフィルター（<strong>イベント / 展示・公演 / グルメ・フェア / プロモ・お得</strong>）でさらに絞り込み可能。<br>設定でプロフィール（誰と行く・子どもの年齢）を設定すると、あなたに合った情報が優先表示されます。'}</div>
         </div>
 
         <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:14px;">
@@ -3928,6 +4281,73 @@
       }
     }
 
+    // ─── PUSH NOTIFICATIONS ───
+    let _pushSubscription = null;
+
+    function _urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(base64);
+      return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+    }
+
+    async function initPushState() {
+      const item = document.getElementById('push-setting-item');
+      if (!item) return;
+      if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
+        item.style.display = 'none';
+        return;
+      }
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        _pushSubscription = await reg.pushManager.getSubscription();
+      } catch(e) {}
+      _updatePushBtn();
+    }
+
+    function _updatePushBtn() {
+      const btn = document.getElementById('push-toggle-btn');
+      if (!btn) return;
+      const denied = Notification.permission === 'denied';
+      btn.textContent = denied ? t('pushDenied') : _pushSubscription ? t('pushOn') : t('pushOff');
+    }
+
+    async function togglePush() {
+      if (!('PushManager' in window)) { showToast(t('toastPushError')); return; }
+      if (Notification.permission === 'denied') { showToast(t('toastPushDenied')); return; }
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        if (_pushSubscription) {
+          await _pushSubscription.unsubscribe();
+          await fetch('/api/push-subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: _pushSubscription.endpoint }),
+          });
+          _pushSubscription = null;
+          showToast(t('toastPushOff'));
+        } else {
+          const perm = await Notification.requestPermission();
+          if (perm !== 'granted') { _updatePushBtn(); showToast(t('toastPushDenied')); return; }
+          const res = await fetch('/api/vapid-public-key');
+          const { publicKey } = await res.json();
+          _pushSubscription = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: _urlBase64ToUint8Array(publicKey),
+          });
+          await fetch('/api/push-subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription: _pushSubscription }),
+          });
+          showToast(t('toastPushOn'));
+        }
+      } catch(e) {
+        showToast(t('toastPushError'));
+      }
+      _updatePushBtn();
+    }
+
     // ─── NAV LOGIC ───
     function closeAllPopups() {
       closeInstallModal();
@@ -3959,14 +4379,15 @@
 
       const cityChanged = getCity() !== _loadedCity;
 
+      const appHeader = document.querySelector('.app-header');
       if (screen === 'home') {
         document.getElementById('screen-home').style.display = 'block';
-        document.querySelector('.app-header').style.display = 'block';
+        if (appHeader) appHeader.style.display = 'block';
         if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
         else setCategoryFilter('all');
       } else {
         document.getElementById('screen-home').style.display = 'none';
-        document.querySelector('.app-header').style.display = 'none';
+        if (appHeader) appHeader.style.display = 'none';
         const el = document.getElementById('screen-' + screen);
         if (el) el.classList.add('visible');
         if (screen === 'pin') renderPinList();
@@ -3974,6 +4395,7 @@
           if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
           else renderCalendar();
         }
+
       }
     }
 
@@ -4051,7 +4473,7 @@
       });
 
       const sgHolidaySet = new Set();
-      SG_HOLIDAYS_2026.forEach(h => {
+      getCityHolidays().forEach(h => {
         if (h.getFullYear() === year && h.getMonth() === month) sgHolidaySet.add(h.getDate());
       });
 
@@ -4204,8 +4626,9 @@
 
     function setCalPopupFilter(cat) {
       if (_calPopupFilters.has(cat)) {
-        _calPopupFilters.delete(cat);
+        _calPopupFilters.clear();
       } else {
+        _calPopupFilters.clear();
         _calPopupFilters.add(cat);
       }
       document.querySelectorAll('#cal-popup-filter-row .sale-filter-chip').forEach(chip => {
@@ -4354,6 +4777,7 @@
 
     function renderGems() {
       const container = document.getElementById('gems-scroll');
+      if (!container) return;
       container.innerHTML = GEMS_DATA.map((g, i) => `
         <div class="gem-card" style="animation-delay:${i * 0.1}s" onclick="openDetail('${g.id}')">
           <div class="gem-image ${g.bgClass}">
@@ -4432,10 +4856,87 @@
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
+    // ─── PULL-TO-REFRESH ───
+    (function() {
+      let startY = 0, lastY = 0, isPulling = false, isRefreshing = false;
+      const TRIGGER = 80;
+      const MAX_H = 56;
+      const ind   = document.getElementById('ptr-indicator');
+      const arrow = ind.querySelector('.ptr-arrow');
+      const label = ind.querySelector('.ptr-label');
+
+      function scrollTop() {
+        return Math.max(window.scrollY || 0, document.documentElement.scrollTop || 0);
+      }
+      function isHomeActive() {
+        const s = document.getElementById('screen-home');
+        return s && s.style.display !== 'none';
+      }
+      function reset() {
+        isPulling = false;
+        ind.style.transition = 'height 0.3s ease';
+        ind.style.height = '0px';
+        ind.classList.remove('ptr-loading');
+        if (arrow) { arrow.style.transform = ''; }
+        if (label) { label.textContent = ''; }
+      }
+
+      document.addEventListener('touchstart', e => {
+        startY = lastY = e.touches[0].clientY;
+        isPulling = false;
+      }, { passive: true });
+
+      document.addEventListener('touchmove', e => {
+        if (isRefreshing || !isHomeActive() || scrollTop() > 5) return;
+        lastY = e.touches[0].clientY;
+        const dy = lastY - startY;
+        if (dy <= 0) { if (isPulling) reset(); return; }
+        isPulling = true;
+        const h = Math.min(dy * 0.55, MAX_H);
+        ind.style.transition = 'none';
+        ind.style.height = h + 'px';
+        if (arrow) arrow.style.transform = dy >= TRIGGER ? 'rotate(180deg)' : 'rotate(0deg)';
+        if (label) label.textContent = dy >= TRIGGER ? '離して更新' : '';
+      }, { passive: true });
+
+      document.addEventListener('touchend', () => {
+        if (!isPulling) return;
+        const dy = lastY - startY;
+        isPulling = false;
+        if (dy >= TRIGGER && !isRefreshing) {
+          isRefreshing = true;
+          ind.style.transition = 'height 0.2s ease';
+          ind.style.height = MAX_H + 'px';
+          ind.classList.add('ptr-loading');
+          loadEventData().finally(() => {
+            isRefreshing = false;
+            setTimeout(reset, 300);
+          });
+        } else {
+          reset();
+        }
+      }, { passive: true });
+    })();
+
+
+
     // ─── PWA SERVICE WORKER ───
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        console.log('PWA ready 🌴');
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.warn('SW registration failed:', err);
+        });
+      });
+      navigator.serviceWorker.addEventListener('message', e => {
+        if (e.data?.type === 'SW_UPDATED') {
+          const banner = document.getElementById('update-banner');
+          if (banner) banner.classList.add('show');
+        }
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          navigator.serviceWorker.getRegistration().then(reg => reg?.update());
+        }
       });
     }
   </script>
