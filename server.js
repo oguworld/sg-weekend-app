@@ -234,6 +234,35 @@ const CITIES = {
   },
 };
 
+// 都市別祝日 2026（週末tabを祝日まで拡張するため）
+const CITY_HOLIDAYS = {
+  sg: [
+    '2026-01-01','2026-02-17','2026-02-18','2026-03-21','2026-04-03',
+    '2026-05-01','2026-05-27','2026-05-31','2026-06-01',
+    '2026-08-09','2026-08-10','2026-11-08','2026-11-09','2026-12-25',
+  ],
+  bkk: [
+    '2026-01-01','2026-03-03','2026-04-06','2026-04-13','2026-04-14','2026-04-15',
+    '2026-05-01','2026-05-04','2026-05-31','2026-06-01','2026-06-03',
+    '2026-07-28','2026-07-29','2026-08-12','2026-10-13','2026-10-23',
+    '2026-12-05','2026-12-07','2026-12-10','2026-12-31',
+  ],
+  syd: [
+    '2026-01-01','2026-01-26','2026-04-03','2026-04-04','2026-04-05','2026-04-06',
+    '2026-04-25','2026-04-27','2026-06-08','2026-08-03','2026-10-05',
+    '2026-12-25','2026-12-26','2026-12-28',
+  ],
+};
+
+function fmtDateLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// イベントが週（月〜日）と重なるか判定
+function weekOverlap(eventStart, eventEnd, weekStart, weekEnd) {
+  return eventStart <= weekEnd && eventEnd >= weekStart;
+}
+
 function resolveCity(req) {
   const c = (req.query.city || req.body?.city || 'sg').toLowerCase();
   return CITIES[c] ? c : 'sg';
@@ -316,7 +345,7 @@ app.get('/api/spots', (req, res) => {
 });
 
 // GET /api/events — おでかけ・イベント情報一覧
-// start_date / end_date から tab を動的付与（weekend / nextweekend / holiday）
+// start_date / end_date から tab を動的付与（weekend / nextweekend / afterweekend / threeweeks）
 app.get('/api/events', (req, res) => {
   try {
     const city = resolveCity(req);
@@ -328,52 +357,48 @@ app.get('/api/events', (req, res) => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
 
     // 期限切れ・end_dateなし（常設）を除外
-    const active = all.filter(e => e.end_date && new Date(e.end_date + 'T00:00:00') >= today);
+    // opening は start_date から2週間で非表示（データは1ヶ月保持）
+    const active = all.filter(e => {
+      if (!e.end_date) return false;
+      if (new Date(e.end_date + 'T00:00:00') < today) return false;
+      if (e.type === 'opening' && e.start_date) {
+        const openLimit = new Date(e.start_date + 'T00:00:00');
+        openLimit.setDate(openLimit.getDate() + 14);
+        if (today > openLimit) return false;
+      }
+      return true;
+    });
     const dow = today.getDay(); // 0=日, 1=月 ... 6=土
 
-    // 今週末の土・日を求める
-    // 今日が土(6)→今日と明日、今日が日(0)→今日のみ、月〜金→この週の土日
-    let weekendStart, weekendEnd;
-    if (dow === 0) {
-      // 今日は日曜：今週末は今日1日
-      weekendStart = new Date(today);
-      weekendEnd   = new Date(today);
-    } else {
-      const satOffset = 6 - dow; // 今日から土曜までの日数
-      weekendStart = new Date(today); weekendStart.setDate(today.getDate() + satOffset);
-      weekendEnd   = new Date(today); weekendEnd.setDate(today.getDate() + satOffset + 1);
-    }
+    // 今週の月曜を求める（日曜は -6 日、それ以外は 1-dow 日）
+    const mondayOffset = dow === 0 ? -6 : 1 - dow;
+    const thisMonday = new Date(today); thisMonday.setDate(today.getDate() + mondayOffset);
+    const thisSunday = new Date(thisMonday); thisSunday.setDate(thisMonday.getDate() + 6);
 
-    // 来週末の土・日
-    const nextWeekStart = new Date(weekendStart); nextWeekStart.setDate(weekendStart.getDate() + 7);
-    const nextWeekEnd   = new Date(weekendEnd);   nextWeekEnd.setDate(weekendEnd.getDate()   + 7);
-
-    // 再来週末の土・日
-    const afterWeekStart = new Date(weekendStart); afterWeekStart.setDate(weekendStart.getDate() + 14);
-    const afterWeekEnd   = new Date(weekendEnd);   afterWeekEnd.setDate(weekendEnd.getDate()   + 14);
-
-    // school-calendar.json から次の連休期間を取得
-    let holStart = null, holEnd = null;
-    const cp = calendarPath(city);
-    if (fs.existsSync(cp)) {
-      const cal = JSON.parse(fs.readFileSync(cp, 'utf8'));
-      const nextVac = (cal.vacations || [])
-        .map(v => ({ start: new Date(v.start + 'T00:00:00'), end: new Date(v.end + 'T00:00:00') }))
-        .filter(v => v.end >= today)
-        .sort((a, b) => a.start - b.start)[0];
-      if (nextVac) { holStart = nextVac.start; holEnd = nextVac.end; }
-    }
+    // 来週・2週後・3週後の月〜日
+    const nextMonday      = new Date(thisMonday); nextMonday.setDate(thisMonday.getDate() + 7);
+    const nextSunday      = new Date(thisSunday); nextSunday.setDate(thisSunday.getDate() + 7);
+    const afterMonday     = new Date(thisMonday); afterMonday.setDate(thisMonday.getDate() + 14);
+    const afterSunday     = new Date(thisSunday); afterSunday.setDate(thisSunday.getDate() + 14);
+    const threeMonday     = new Date(thisMonday); threeMonday.setDate(thisMonday.getDate() + 21);
+    const threeSunday     = new Date(thisSunday); threeSunday.setDate(thisSunday.getDate() + 21);
 
     const tagged = active.map(e => {
       if (!e.start_date || !e.end_date) return { ...e, tab: 'weekend' };
       const start = new Date(e.start_date + 'T00:00:00');
-      const end   = new Date(e.end_date   + 'T00:00:00');
+      let end     = new Date(e.end_date   + 'T00:00:00');
+      // opening はタブ表示もオープン日から2週間でキャップ
+      if (e.type === 'opening') {
+        const openLimit = new Date(e.start_date + 'T00:00:00');
+        openLimit.setDate(openLimit.getDate() + 14);
+        if (end > openLimit) end = openLimit;
+      }
 
       const tabs = [];
-      if (start <= weekendEnd   && end >= weekendStart)                             tabs.push('weekend');
-      if (start <= nextWeekEnd  && end >= nextWeekStart)                            tabs.push('nextweekend');
-      if (start <= afterWeekEnd && end >= afterWeekStart)                           tabs.push('afterweekend');
-      if (holStart && holEnd && start <= holEnd && end >= holStart)                 tabs.push('holiday');
+      if (weekOverlap(start, end, thisMonday,  thisSunday))  tabs.push('weekend');
+      if (weekOverlap(start, end, nextMonday,  nextSunday))  tabs.push('nextweekend');
+      if (weekOverlap(start, end, afterMonday, afterSunday)) tabs.push('afterweekend');
+      if (weekOverlap(start, end, threeMonday, threeSunday)) tabs.push('threeweeks');
       if (tabs.length === 0) return { ...e, tab: 'future', tabs: [] };
       return { ...e, tab: tabs[0], tabs };
     }).filter(Boolean);
@@ -726,15 +751,20 @@ async function fetchWebContent(url) {
       responseType: 'text',
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; sg-weekend-bot/1.0)' },
     });
-    return String(res.data)
+    const html = String(res.data);
+    const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const ogImage = ogMatch ? ogMatch[1] : null;
+    const text = html
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 6000);
+    return { text, ogImage };
   } catch (_) {
-    return '';
+    return { text: '', ogImage: null };
   }
 }
 
@@ -780,23 +810,21 @@ async function generateEventDraft(image, userText, webContent, city = 'sg') {
 
 生成ルール:
 - store: 施設・店舗・イベント名（固有名詞は英語のまま）
-- type: "event"（体験・展示・公演・教育）/ "gourmet"（飲食・カフェ）/ "sale"（セール・割引）/ "market"（マーケット・バザー・マルシェ）
+- type: "event"（体験・展示・公演・教育）/ "gourmet"（飲食・カフェ）/ "sale"（セール・割引）/ "opening"（グランドオープン）
 - emoji: 内容を表す絵文字1文字
 - who: ["family","couple","solo","group"] から1つ以上
 - age: ["all","baby","preschool","school"] から1つ以上
-- style: ["beginner","resident","local"] から1つ以上（beginner=観光客向け, resident=在住者向け, local=地元民向け）
+- style: ["beginner","resident"] から1つ以上（beginner=観光客向け, resident=在住者向け）
 - major_score: 1〜5（${cityConf.nameJa}在住日本人にとっての魅力度）
 - content: 150〜200文字の日本語説明文
 - content_en: 100〜150文字の英語説明文
-- tips: 日本語ヒント2〜3点の配列
-- tips_en: 英語ヒント2〜3点の配列
+- tips: 日本語ヒント2〜3点の配列（各26文字以内）
+- tips_en: 英語ヒント2〜3点の配列（各38文字以内）
 - period: "M/D〜M/D" 形式（単日なら "M/D"）
 - start_date / end_date: "YYYY-MM-DD"（不明なら今日から1ヶ月後を end_date に）
 - location: エリア名（${areaGuide} のいずれか。住所は入れない）
 - area: location と同じ値
-- url: ソースURL（不明なら ""）
-- image: 画像URL（不明なら null）
-- type が "sale" のときのみ category: "food" / "mall" / "other"`,
+- url: ソースURL（不明なら ""）`,
       messages: [{ role: 'user', content: userContent }],
       tools: [{
         name: 'create_event',
@@ -806,7 +834,7 @@ async function generateEventDraft(image, userText, webContent, city = 'sg') {
           required: ['store', 'type', 'emoji', 'who', 'age', 'style', 'major_score', 'content', 'content_en', 'tips', 'tips_en', 'period', 'start_date', 'end_date', 'location', 'area'],
           properties: {
             store:      { type: 'string' },
-            type:       { type: 'string', enum: ['event', 'gourmet', 'sale', 'market'] },
+            type:       { type: 'string', enum: ['event', 'gourmet', 'sale', 'opening'] },
             emoji:      { type: 'string' },
             who:        { type: 'array', items: { type: 'string' } },
             age:        { type: 'array', items: { type: 'string' } },
@@ -822,8 +850,6 @@ async function generateEventDraft(image, userText, webContent, city = 'sg') {
             location:   { type: 'string' },
             area:       { type: 'string' },
             url:        { type: 'string' },
-            image:      { type: ['string', 'null'] },
-            category:   { type: 'string', enum: ['food', 'mall', 'other'] },
           },
         },
       }],
@@ -873,12 +899,23 @@ function buildEventFlexMessage(pendingId, event, city = 'sg') {
   const typeText = typeMap[event.type] || event.type;
   const preview  = (event.content || '').slice(0, 120) + ((event.content || '').length > 120 ? '…' : '');
 
+  const hasImage = !!(event.image);
+
   return {
     type: 'flex',
     altText: `📋 確認: ${cityFlag} ${event.emoji} ${event.store}`,
     contents: {
       type: 'bubble',
       size: 'mega',
+      ...(hasImage ? {
+        hero: {
+          type: 'image',
+          url: event.image,
+          size: 'full',
+          aspectRatio: '20:9',
+          aspectMode: 'cover',
+        },
+      } : {}),
       header: {
         type: 'box',
         layout: 'vertical',
@@ -901,6 +938,7 @@ function buildEventFlexMessage(pendingId, event, city = 'sg') {
         contents: [
           { type: 'text', text: `${typeText}　${whoText}　⭐${event.major_score}`, size: 'xs', color: '#6B5E52', wrap: true },
           { type: 'text', text: `📅 ${event.period || ''}　📍 ${event.area || ''}`, size: 'xs', color: '#6B5E52', wrap: true },
+          { type: 'text', text: hasImage ? '🖼️ 画像あり' : '🚫 画像なし', size: 'xxs', color: hasImage ? '#6E9E88' : '#C4705A', margin: 'xs' },
           { type: 'separator', margin: 'sm' },
           { type: 'text', text: preview, size: 'xs', wrap: true, color: '#2C2420' },
           ...(event.tips?.length ? [{
@@ -1080,8 +1118,9 @@ app.post('/api/line-webhook', async (req, res) => {
           if (session?.imageMessageId) {
             try { image = await downloadLineImage(session.imageMessageId); } catch (_) {}
           }
-          const webContent = url ? await fetchWebContent(url) : '';
+          const { text: webContent, ogImage } = url ? await fetchWebContent(url) : { text: '', ogImage: null };
           const draft      = await generateEventDraft(image, text, webContent, city);
+          draft.image      = ogImage || null;
           draft.city        = city;
           draft.fetched_at  = new Date().toISOString().slice(0, 10);
           const pendingId  = savePendingEvent(draft, userId, city);
@@ -1221,6 +1260,177 @@ app.post('/api/notify-events-updated', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─────────────────────────────────────────────
+// INSTAGRAM OEMBED（Meta oEmbed Read 権限が必要 — App Review 通過後に有効化）
+// ─────────────────────────────────────────────
+/*
+const igEmbedCache = new Map();
+app.get('/api/ig-embed', async (req, res) => {
+  const { shortcode } = req.query;
+  if (!shortcode || !/^[A-Za-z0-9_-]+$/.test(shortcode)) return res.status(400).json({ error: 'invalid shortcode' });
+  const cached = igEmbedCache.get(shortcode);
+  if (cached && Date.now() - cached.cachedAt < 24 * 60 * 60 * 1000) return res.json({ html: cached.html });
+  try {
+    const accessToken = `${process.env.INSTAGRAM_APP_ID}|${process.env.INSTAGRAM_APP_SECRET}`;
+    const resp = await axios.get('https://graph.facebook.com/v25.0/instagram_oembed', {
+      params: { url: `https://www.instagram.com/p/${shortcode}/`, hidecaption: true, omitscript: true, access_token: accessToken },
+      timeout: 8000,
+    });
+    igEmbedCache.set(shortcode, { html: resp.data.html, cachedAt: Date.now() });
+    res.json({ html: resp.data.html });
+  } catch (e) { res.status(500).json({ error: 'oembed failed' }); }
+});
+*/
+
+// ─────────────────────────────────────────────
+// 共有カレンダー API
+// ─────────────────────────────────────────────
+const QRCode = require('qrcode');
+const SHARED_CAL_DIR = path.join(__dirname, 'data', 'shared-calendars');
+if (!fs.existsSync(SHARED_CAL_DIR)) fs.mkdirSync(SHARED_CAL_DIR, { recursive: true });
+
+function generateGroupId() {
+  // 紛らわしい文字(0,O,1,I)を除いた32文字から6文字
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = '';
+  for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
+
+function getCalFilePath(groupId) {
+  if (!/^[A-Z2-9]{6}$/.test(groupId)) return null;
+  return path.join(SHARED_CAL_DIR, `${groupId}.json`);
+}
+
+app.post('/api/calendar/create', async (req, res) => {
+  try {
+    const { city = 'sg', customPlans = [], eventPlans = [] } = req.body;
+    let groupId;
+    do { groupId = generateGroupId(); }
+    while (fs.existsSync(path.join(SHARED_CAL_DIR, `${groupId}.json`)));
+
+    const joinUrl = `https://dosuru.app/?join=${groupId}&city=${city}`;
+    const qrDataUrl = await QRCode.toDataURL(joinUrl, {
+      width: 220, margin: 2,
+      color: { dark: '#2C2420', light: '#FFF9F2' }
+    });
+
+    fs.writeFileSync(getCalFilePath(groupId), JSON.stringify({
+      groupId, city,
+      createdAt: new Date().toISOString(),
+      lastSyncAt: new Date().toISOString(),
+      customPlans, eventPlans, qrDataUrl
+    }, null, 2));
+    res.json({ groupId, qrDataUrl });
+  } catch (e) {
+    console.error('calendar create:', e);
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
+app.get('/api/calendar/:groupId', (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  try { res.json(JSON.parse(fs.readFileSync(fp, 'utf8'))); }
+  catch (e) { res.status(500).json({ error: 'read failed' }); }
+});
+
+app.put('/api/calendar/:groupId', (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  try {
+    const existing = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const { customPlans = [], eventPlans = [] } = req.body;
+    const updated = { ...existing, customPlans, eventPlans, lastSyncAt: new Date().toISOString() };
+    fs.writeFileSync(fp, JSON.stringify(updated, null, 2));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'write failed' }); }
+});
+
+app.post('/api/calendar/:groupId/join', (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  try {
+    const existing = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const { customPlans = [], eventPlans = [] } = req.body;
+    const mergeArr = (a, b) => {
+      const map = {};
+      [...a, ...b].forEach(p => { if (p && p.id) map[p.id] = p; });
+      return Object.values(map);
+    };
+    const merged = {
+      ...existing,
+      customPlans: mergeArr(existing.customPlans || [], customPlans),
+      eventPlans:  mergeArr(existing.eventPlans  || [], eventPlans),
+      lastSyncAt: new Date().toISOString()
+    };
+    fs.writeFileSync(fp, JSON.stringify(merged, null, 2));
+    res.json({ customPlans: merged.customPlans, eventPlans: merged.eventPlans });
+  } catch (e) { res.status(500).json({ error: 'join failed' }); }
+});
+
+app.post('/api/calendar/:groupId/push-subscribe', (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  const { subscription, deviceId } = req.body;
+  if (!subscription?.endpoint) return res.status(400).json({ error: 'invalid' });
+  try {
+    const cal = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const subs = cal.pushSubscriptions || [];
+    const idx = subs.findIndex(s => s.endpoint === subscription.endpoint);
+    const entry = { ...subscription, deviceId: deviceId || null };
+    if (idx >= 0) subs[idx] = entry;
+    else subs.push(entry);
+    fs.writeFileSync(fp, JSON.stringify({ ...cal, pushSubscriptions: subs }, null, 2));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'subscribe failed' }); }
+});
+
+app.delete('/api/calendar/:groupId/push-subscribe', (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  const { endpoint } = req.body;
+  if (!endpoint) return res.status(400).json({ error: 'invalid' });
+  try {
+    const cal = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const subs = (cal.pushSubscriptions || []).filter(s => s.endpoint !== endpoint);
+    fs.writeFileSync(fp, JSON.stringify({ ...cal, pushSubscriptions: subs }, null, 2));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'unsubscribe failed' }); }
+});
+
+app.post('/api/calendar/:groupId/notify', async (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  const { title = '📅 カレンダーが更新されました', body = '予定が更新されました', deviceId } = req.body;
+  try {
+    const cal = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const subs = (cal.pushSubscriptions || []).filter(s => !deviceId || s.deviceId !== deviceId);
+    if (subs.length === 0) return res.json({ ok: true, sent: 0 });
+    const gid = req.params.groupId;
+    const city = cal.city || 'sg';
+    const payload = JSON.stringify({
+      title,
+      body,
+      data: { url: `/?join=${gid}&city=${city}` },
+    });
+    const expired = new Set();
+    await Promise.allSettled(subs.map(async sub => {
+      const { deviceId: _d, ...webSub } = sub;
+      try {
+        await webpush.sendNotification(webSub, payload);
+      } catch (e) {
+        if (e.statusCode === 410 || e.statusCode === 404) expired.add(sub.endpoint);
+      }
+    }));
+    if (expired.size > 0) {
+      const allSubs = (cal.pushSubscriptions || []).filter(s => !expired.has(s.endpoint));
+      fs.writeFileSync(fp, JSON.stringify({ ...cal, pushSubscriptions: allSubs }, null, 2));
+    }
+    res.json({ ok: true, sent: subs.length - expired.size });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─────────────────────────────────────────────

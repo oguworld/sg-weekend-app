@@ -30,7 +30,7 @@ async function pushToLine(text) {
 }
 
 async function main() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' });
   const now   = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Singapore', hour12: false });
 
   const lines = [`🌴 おでかけNavi イベント取込み結果`, `📅 ${now}（SGT）`, ''];
@@ -84,6 +84,13 @@ async function main() {
 
   await pushToLine(message);
   console.log('📱 LINE通知送信完了');
+
+  if (totalAccepted > 0) {
+    const port = process.env.PORT || 3000;
+    fetch(`http://localhost:${port}/api/notify-events-updated`, { method: 'POST' })
+      .then(() => console.log('🔔 Webプッシュ通知送信完了'))
+      .catch(() => {});
+  }
 }
 
 main().catch(e => {

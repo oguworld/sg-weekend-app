@@ -242,7 +242,7 @@ async function fetchInstagramPosts(accounts = []) {
       const url = new URL(`https://graph.facebook.com/v25.0/${igUserId}`);
       url.searchParams.set(
         'fields',
-        `business_discovery.username(${username}){media{caption,media_url,timestamp,permalink}}`
+        `business_discovery.username(${username}){media{caption,media_url,thumbnail_url,media_type,timestamp,permalink}}`
       );
       url.searchParams.set('access_token', pageToken);
 
@@ -271,7 +271,7 @@ async function fetchInstagramPosts(accounts = []) {
           description: post.caption.slice(0, 800),
           link:        externalLink || post.permalink,
           pubDate:     post.timestamp,
-          image:       post.media_url || null,
+          image:       (post.media_type === 'VIDEO' ? post.thumbnail_url : post.media_url) || post.thumbnail_url || post.media_url || null,
           source:      `Instagram / @${username}`,
         });
         count++;
@@ -298,7 +298,7 @@ function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, ra
     uniqueTotal,
     sourceStats: sourceStats || {},
     newItems: (newItems || []).map(e => ({ emoji: e.emoji, store: e.store, period: e.period || e.start_date || '', source: e.source || '' })),
-    date: new Date().toISOString().slice(0, 10),
+    date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' }),
     updatedAt: new Date().toISOString(),
   };
   fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
@@ -384,12 +384,6 @@ async function main() {
   deduplicateSaved(conf.eventsPath);
 
   console.log('\n🎉 fetch-events.js 完了\n');
-
-  if (result.accepted > 0) {
-    const port = process.env.PORT || 3000;
-    fetch(`http://localhost:${port}/api/notify-events-updated?city=${cityKey}`, { method: 'POST' })
-      .catch(() => {});
-  }
 
   saveFetchSummary({
     cityKey,

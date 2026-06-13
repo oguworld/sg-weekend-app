@@ -139,8 +139,8 @@ typeの定義（厳密に守ること）：
 - store: 施設名・店名・イベント名（英語OK）
 - content_ja: 日本人向け説明文（150〜200文字）。内容・特徴・なぜおすすめかを具体的に記述すること
 - content_en: English description for the same event (100–150 chars). Concise, informative, highlights what makes it worth visiting.
-- tips_ja: ひとことアドバイスの配列（2〜3点、各50文字以内）例: ["混雑を避けるなら開店直後がおすすめ", "ベビーカー入場可", "予約は公式サイトから"]
-- tips_en: English tips array (2–3 points, each under 60 chars) e.g. ["Arrive early to beat crowds", "Stroller-friendly", "Book via official site"]
+- tips_ja: ひとことアドバイスの配列（2〜3点、各26文字以内・1行に収まる短さ）例: ["週末は混むので午前中がねらい目", "ベビーカー入場可", "要予約"]
+- tips_en: English tips array (2–3 points, each under 38 chars, one-liner) e.g. ["Go early on weekends to avoid crowds", "Stroller-friendly", "Booking required"]
 - type: "event" | "show" | "gourmet" | "sale" | "opening"（"other"/"edu"/"market" は絶対に使わない）
 - who: ["family","couple","solo","group"] から該当するもの（複数可）。子連れ不可なら who:["couple","solo"]
 - age: ["all","baby","preschool","school"] から該当するもの（複数可）。子連れ不可なら["all"]ではなくwhoで制御

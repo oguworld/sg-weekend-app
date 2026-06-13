@@ -286,12 +286,7 @@ function analyzeCity(cityKey, history, sources, candidates) {
 
 // ─── LINE 通知用レポート生成 ──────────────────────────────────────
 function buildReport(results) {
-  const hasChanges  = Object.values(results).some(r => r.paused.length > 0 || r.activated.length > 0);
-  const hasWarnings = Object.values(results).some(r => r.warnings.length > 0);
-
-  if (!hasChanges && !hasWarnings && !isDryRun) return null;
-
-  const lines = [isDryRun ? '🔍 [DRY-RUN] ソース分析' : '🔄 ソース自動最適化', '━'.repeat(22)];
+  const lines = [isDryRun ? '🔍 [DRY-RUN] ソース分析' : '🔄 ソース採用率チェック', '━'.repeat(22)];
 
   for (const [cityKey, r] of Object.entries(results)) {
     const cityName = CITY_NAMES[cityKey] || cityKey;
@@ -360,12 +355,8 @@ async function main() {
 
   // レポート & LINE 通知
   const report = buildReport(results);
-  if (report) {
-    log('\n' + report);
-    await notifyLINE(report);
-  } else {
-    log('変更なし（全ソース採用率OK / コンテンツ構成適正）');
-  }
+  log('\n' + report);
+  await notifyLINE(report);
 
   log('===== analyze-sources.js 完了 =====\n');
 }

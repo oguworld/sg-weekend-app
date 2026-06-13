@@ -1,5 +1,5 @@
 // ─── Service Worker for 今週末どこいく？SG ───
-const CACHE_NAME = 'sg-weekend-v277';
+const CACHE_NAME = 'sg-weekend-v434';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icons/icon-192.svg',
@@ -80,7 +80,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ── Push notifications (future use) ──
+// ── Push notifications ──
 self.addEventListener('push', event => {
   if (!event.data) return;
   const data = event.data.json();
@@ -91,13 +91,23 @@ self.addEventListener('push', event => {
       badge: '/icons/icon-96.png',
       tag: 'sg-weekend',
       renotify: true,
+      data: data.data || {},
     })
   );
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const url = event.notification.data?.url || '/';
   event.waitUntil(
-    clients.openWindow('/')
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
   );
 });
