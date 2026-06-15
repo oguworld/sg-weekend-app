@@ -7835,12 +7835,24 @@
           const banner = document.getElementById('update-banner');
           if (banner) banner.classList.add('show');
         }
+        if (e.data?.type === 'SW_VERSION') {
+          const incoming = e.data.version;
+          const saved = localStorage.getItem('sw-version');
+          if (saved && saved !== incoming) {
+            const banner = document.getElementById('update-banner');
+            if (banner) banner.classList.add('show');
+          }
+          localStorage.setItem('sw-version', incoming);
+        }
       });
 
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(err => {
           console.warn('SW registration failed:', err);
         });
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
+        }
       });
 
       document.addEventListener('visibilitychange', () => {
