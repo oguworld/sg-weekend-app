@@ -3657,11 +3657,11 @@
       <div class="plan-flag-row">
         <label class="plan-important-label" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-event-important-cb">
-          <span>⭐ 重要</span>
+          <span>⭐ 重要イベント</span>
         </label>
         <label class="plan-notify-row" id="plan-event-notify-row" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-event-notify-cb">
-          <span>🔔 通知</span>
+          <span>🔔 参加メンバーに通知</span>
         </label>
       </div>
       <button class="plan-modal-add-btn" id="plan-event-add-btn" disabled onclick="saveEventPlan()" data-i18n="planModalAddBtn">追加する</button>
@@ -3706,11 +3706,11 @@
       <div class="plan-flag-row">
         <label class="plan-important-label" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-custom-important-cb">
-          <span>⭐ 重要</span>
+          <span>⭐ 重要イベント</span>
         </label>
         <label class="plan-notify-row" id="plan-custom-notify-row" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-custom-notify-cb">
-          <span>🔔 通知</span>
+          <span>🔔 参加メンバーに通知</span>
         </label>
       </div>
       <button class="plan-modal-add-btn" id="plan-custom-add-btn" disabled onclick="saveCustomPlan()" data-i18n="planModalAddBtn">追加する</button>
@@ -3762,11 +3762,11 @@
         <div class="plan-flag-row" style="margin-bottom:10px;">
           <label class="plan-important-label" onclick="event.stopPropagation()">
             <input type="checkbox" id="plan-detail-important-cb">
-            <span>⭐ 重要</span>
+            <span>⭐ 重要イベント</span>
           </label>
           <label class="plan-notify-row" id="plan-detail-notify-row" style="margin:0;" onclick="event.stopPropagation()">
             <input type="checkbox" id="plan-detail-notify-cb">
-            <span>🔔 通知</span>
+            <span>🔔 参加メンバーに通知</span>
           </label>
         </div>
         <button class="plan-modal-save-btn" onclick="savePlanDetail()" data-i18n="planModalSaveBtn">保存する</button>
@@ -5773,6 +5773,11 @@
       _updatePushBtn();
     }
 
+    async function enablePushForCalendar() {
+      await togglePush();
+      if (getSharedGroupId()) renderCalSyncModal();
+    }
+
     // ─── NAV LOGIC ───
     function closeAllPopups() {
       closeInstallModal();
@@ -7324,8 +7329,44 @@
     // ─── 共有カレンダー ───
     let _calSyncFromServer = false;
     let _pendingJoinGroupId = null;
+    let _pendingJoinKey = null;
     let _scannerStream = null;
     let _scannerRafId = null;
+
+    // ─── E2E ENCRYPTION (AES-256-GCM, key lives in URL fragment only) ───
+    function getCalKey() { return localStorage.getItem(getCity()+'_shared_cal_key') || null; }
+    function setCalKey(k) { if (k) localStorage.setItem(getCity()+'_shared_cal_key', k); else localStorage.removeItem(getCity()+'_shared_cal_key'); }
+
+    async function _genCalKey() {
+      const k = await crypto.subtle.generateKey({name:'AES-GCM',length:256}, true, ['encrypt','decrypt']);
+      const raw = await crypto.subtle.exportKey('raw', k);
+      return btoa(String.fromCharCode(...new Uint8Array(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    }
+    async function _importCalKey(b64) {
+      const raw = Uint8Array.from(atob(b64.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+      return crypto.subtle.importKey('raw', raw, {name:'AES-GCM'}, false, ['encrypt','decrypt']);
+    }
+    async function _encryptPlans(keyB64, data) {
+      const key = await _importCalKey(keyB64);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(JSON.stringify(data)));
+      const buf = new Uint8Array(12 + ct.byteLength);
+      buf.set(iv); buf.set(new Uint8Array(ct), 12);
+      return btoa(String.fromCharCode(...buf)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    }
+    async function _decryptPlans(keyB64, encB64) {
+      const key = await _importCalKey(keyB64);
+      const buf = Uint8Array.from(atob(encB64.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+      const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(0,12)}, key, buf.slice(12));
+      return JSON.parse(new TextDecoder().decode(plain));
+    }
+    async function _generateQR(url) {
+      if (!window.qrcode) await _loadScript('/qrcode-generator.js');
+      const qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      return qr.createDataURL(4, 0);
+    }
 
     function getSharedGroupId() { return localStorage.getItem(getCity()+'_shared_group_id')||null; }
     function setSharedGroupId(id) {
@@ -7398,13 +7439,19 @@
     async function syncToServer() {
       const gid = getSharedGroupId(); if (!gid) return;
       try {
+        const customPlans = JSON.parse(localStorage.getItem(getCity()+'_custom_plans')||'[]');
+        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const key = getCalKey();
+        let body;
+        if (key) {
+          body = { encryptedData: await _encryptPlans(key, {customPlans, eventPlans}) };
+        } else {
+          body = { customPlans, eventPlans };
+        }
         await fetch('/api/calendar/'+gid, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customPlans: JSON.parse(localStorage.getItem(getCity()+'_custom_plans')||'[]'),
-            eventPlans:  JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]')
-          })
+          body: JSON.stringify(body)
         });
       } catch(e) {}
     }
@@ -7418,9 +7465,22 @@
           return false;
         }
         const d = await r.json();
+        let customPlans, eventPlans;
+        if (d.encryptedData) {
+          const key = getCalKey();
+          if (!key) return false;
+          try {
+            const dec = await _decryptPlans(key, d.encryptedData);
+            customPlans = dec.customPlans || [];
+            eventPlans  = dec.eventPlans  || [];
+          } catch(e) { showToast('復号に失敗しました'); return false; }
+        } else {
+          customPlans = d.customPlans || [];
+          eventPlans  = d.eventPlans  || [];
+        }
         _calSyncFromServer = true;
-        saveCustomPlans(d.customPlans || []);
-        saveEventPlans(d.eventPlans  || []);
+        saveCustomPlans(customPlans);
+        saveEventPlans(eventPlans);
         _calSyncFromServer = false;
         return true;
       } catch(e) { _calSyncFromServer = false; return false; }
@@ -7449,9 +7509,21 @@
       const gid = getSharedGroupId();
       const el = document.getElementById('cal-sync-modal-content');
       if (gid) {
+        const showPushPrompt = !_pushSubscription && 'PushManager' in window && Notification.permission !== 'denied';
         el.innerHTML = `
+          ${showPushPrompt ? `
+          <div style="background:var(--caramel-pale);border:1px solid var(--caramel-light);border-radius:12px;padding:12px 14px;margin-bottom:14px;text-align:center;">
+            <div style="font-size:13px;font-weight:600;color:var(--midnight);margin-bottom:4px;">🔔 通知をオンにしましょう</div>
+            <div style="font-size:12px;color:var(--warm-gray);margin-bottom:10px;line-height:1.6;">メンバーの予定が更新されたとき<br>プッシュ通知で受け取れます</div>
+            <button class="cal-sync-action primary" style="margin-bottom:0;" onclick="enablePushForCalendar()">通知をオンにする</button>
+          </div>` : ''}
           <div class="cal-sync-status-line">✅ グループ接続中</div>
           <div class="cal-sync-groupid-line">グループID: <strong>${gid}</strong></div>
+          <div style="background:var(--sage-pale);border:1px solid var(--sage-light);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--warm-gray);line-height:1.65;">
+            🔒 予定は<strong>暗号化</strong>して保存されています。共有メンバー以外は読めません（アプリ管理者も含む）。<br>
+            <span style="color:var(--terracotta);">⚠️ リンク（またはQR）を知っている人は誰でも参加できます。</span><br>
+            信頼できる相手にだけ共有してください。
+          </div>
           <p style="font-size:12px;color:var(--warm-gray);text-align:center;margin:0 0 10px;">QRコードを読み取るか、リンクを送ると参加できます</p>
           <div id="cal-qr-wrap" style="display:flex;justify-content:center;margin-bottom:12px;min-height:200px;align-items:center;">
             <span style="font-size:12px;color:var(--light-gray);">読み込み中...</span>
@@ -7476,13 +7548,11 @@
 
     async function loadCalQR(gid) {
       try {
-        const r = await fetch('/api/calendar/'+gid);
-        if (!r.ok) return;
-        const d = await r.json();
+        const key = getCalKey();
+        const url = `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
+        const dataUrl = await _generateQR(url);
         const wrap = document.getElementById('cal-qr-wrap');
-        if (wrap && d.qrDataUrl) {
-          wrap.innerHTML = `<img src="${d.qrDataUrl}" width="200" height="200" style="border-radius:12px;" alt="QR">`;
-        }
+        if (wrap) wrap.innerHTML = `<img src="${dataUrl}" width="200" height="200" style="border-radius:12px;" alt="QR">`;
       } catch(e) {}
     }
 
@@ -7490,24 +7560,22 @@
       const btn = document.getElementById('cal-create-btn');
       if (btn) { btn.disabled = true; btn.textContent = '作成中...'; }
       try {
+        const city = getCity();
+        const key = await _genCalKey();
+        const customPlans = JSON.parse(localStorage.getItem(city+'_custom_plans')||'[]');
+        const eventPlans  = JSON.parse(localStorage.getItem(city+'_event_plans')||'[]');
+        const encryptedData = await _encryptPlans(key, {customPlans, eventPlans});
         const r = await fetch('/api/calendar/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            city: getCity(),
-            customPlans: JSON.parse(localStorage.getItem(getCity()+'_custom_plans')||'[]'),
-            eventPlans:  JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]')
-          })
+          body: JSON.stringify({ city, encryptedData })
         });
         const d = await r.json();
+        setCalKey(key);
         setSharedGroupId(d.groupId);
         if (_pushSubscription) await _registerGroupPush(d.groupId);
         updateCalSyncBtn();
         renderCalSyncModal();
-        const wrap = document.getElementById('cal-qr-wrap');
-        if (wrap && d.qrDataUrl) {
-          wrap.innerHTML = `<img src="${d.qrDataUrl}" width="200" height="200" style="border-radius:12px;" alt="QR">`;
-        }
       } catch(e) {
         showToast('グループ作成に失敗しました');
         if (btn) { btn.disabled = false; btn.textContent = '🔗 グループを作成する'; }
@@ -7527,6 +7595,7 @@
       if (gid && _pushSubscription) await _deregisterGroupPush(gid);
       await fetchFromServer();
       setSharedGroupId(null);
+      setCalKey(null);
       updateCalSyncBtn();
       renderScheduleTab();
       closeCalSync();
@@ -7534,7 +7603,8 @@
     }
 
     function copyJoinLink(gid) {
-      const url = `https://dosuru.app/?join=${gid}&city=${getCity()}`;
+      const key = getCalKey();
+      const url = `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(url).then(() => showToast('リンクをコピーしました')).catch(() => _fallbackCopy(url));
       } else {
@@ -7550,7 +7620,8 @@
     }
 
     function shareViaLine(gid) {
-      const url = `https://dosuru.app/?join=${gid}&city=${getCity()}`;
+      const key = getCalKey();
+      const url = `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
       const msg = `おでかけNaviの予定表グループに参加してください！\n${url}`;
       window.open(`https://line.me/R/share?text=${encodeURIComponent(msg)}`, '_blank');
     }
@@ -7639,17 +7710,18 @@
     function handleScannedQR(raw) {
       if (_scannerStream) { _scannerStream.getTracks().forEach(t => t.stop()); _scannerStream = null; }
       if (_scannerRafId) { cancelAnimationFrame(_scannerRafId); _scannerRafId = null; }
-      let joinId = null;
+      let joinId = null, joinKey = null;
       try {
         const u = new URL(raw);
         const j = u.searchParams.get('join');
-        if (j && /^[A-Z2-9]{6}$/.test(j)) joinId = j;
+        if (j && /^[A-Z2-9]{6}$/.test(j)) { joinId = j; joinKey = u.hash.replace('#','') || null; }
       } catch(e) {
         if (/^[A-Z2-9]{6}$/.test(raw.trim().toUpperCase())) joinId = raw.trim().toUpperCase();
       }
       if (!joinId) { renderCalSyncModal(); showToast('無効なQRコードです'); return; }
       renderCalSyncModal();
       _pendingJoinGroupId = joinId;
+      _pendingJoinKey = joinKey;
       const desc = document.getElementById('cal-join-desc');
       if (desc) desc.innerHTML = `グループ <strong>${joinId}</strong> に参加しますか？<br><br>現在の予定データと統合されます。`;
       document.getElementById('cal-join-overlay').classList.add('visible');
@@ -7668,6 +7740,7 @@
       const joinId = sp.get('join');
       if (!joinId || !/^[A-Z2-9]{6}$/.test(joinId)) return;
       _pendingJoinGroupId = joinId;
+      _pendingJoinKey = window.location.hash.replace('#', '') || null;
       const desc = document.getElementById('cal-join-desc');
       if (desc) {
         desc.innerHTML = `グループ <strong>${joinId}</strong> に参加しますか？<br><br>現在の予定データと統合されます。`;
@@ -7681,25 +7754,52 @@
       document.getElementById('cal-join-overlay').classList.remove('visible');
       document.getElementById('cal-join-modal').classList.remove('visible');
       _pendingJoinGroupId = null;
+      _pendingJoinKey = null;
     }
 
     async function doJoinGroup() {
       if (!_pendingJoinGroupId) return;
       const gid = _pendingJoinGroupId;
+      const key = _pendingJoinKey;
       try {
-        const r = await fetch(`/api/calendar/${gid}/join`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customPlans: JSON.parse(localStorage.getItem(getCity()+'_custom_plans')||'[]'),
-            eventPlans:  JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]')
-          })
-        });
+        const r = await fetch(`/api/calendar/${gid}`);
         if (!r.ok) throw new Error();
-        const d = await r.json();
+        const serverData = await r.json();
+
+        let serverCustom = [], serverEvent = [];
+        if (serverData.encryptedData) {
+          if (!key) { showToast('リンクから参加してください（暗号化キーが必要です）'); return; }
+          try {
+            const dec = await _decryptPlans(key, serverData.encryptedData);
+            serverCustom = dec.customPlans || [];
+            serverEvent  = dec.eventPlans  || [];
+          } catch(e) { showToast('暗号化キーが正しくありません'); return; }
+        } else {
+          serverCustom = serverData.customPlans || [];
+          serverEvent  = serverData.eventPlans  || [];
+        }
+
+        const localCustom = JSON.parse(localStorage.getItem(getCity()+'_custom_plans')||'[]');
+        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const mergeArr = (a, b) => { const m={}; [...a,...b].forEach(p=>{ if(p&&p.id) m[p.id]=p; }); return Object.values(m); };
+        const merged = { customPlans: mergeArr(serverCustom, localCustom), eventPlans: mergeArr(serverEvent, localEvent) };
+
+        let putBody;
+        if (key) {
+          putBody = { encryptedData: await _encryptPlans(key, merged) };
+        } else {
+          putBody = merged;
+        }
+        await fetch(`/api/calendar/${gid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(putBody)
+        });
+
+        if (key) setCalKey(key);
         _calSyncFromServer = true;
-        saveCustomPlans(d.customPlans || []);
-        saveEventPlans(d.eventPlans  || []);
+        saveCustomPlans(merged.customPlans);
+        saveEventPlans(merged.eventPlans);
         _calSyncFromServer = false;
         setSharedGroupId(gid);
         if (_pushSubscription) await _registerGroupPush(gid);
@@ -7707,6 +7807,10 @@
         renderScheduleTab();
         closeJoinPrompt();
         showToast('グループに参加しました！');
+        if (!_pushSubscription && 'PushManager' in window && Notification.permission !== 'denied') {
+          renderCalSyncModal();
+          document.getElementById('cal-sync-modal').classList.add('visible');
+        }
       } catch(e) {
         showToast('参加に失敗しました。グループIDをご確認ください。');
       }
