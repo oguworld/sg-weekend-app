@@ -72,7 +72,7 @@ async function fetchOgpImage(url) {
 }
 
 // ─── バッチ処理 ──────────────────────────────────────────────────
-async function processBatch(batch, cityKey = 'sg') {
+async function processBatch(batch, cityKey = 'sg', categoryStats = null) {
   const today = new Date().toISOString().slice(0, 10);
   const twoWeeksLater = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
 
@@ -95,13 +95,30 @@ async function processBatch(batch, cityKey = 'sg') {
   const cityLocation = CITY_LOCATIONS[cityKey] || 'Singapore';
   const cityAreas = CITY_AREAS[cityKey] || CITY_AREAS.sg;
 
-  const scoreThreshold = 6;
+  const scoreThreshold = 5;
+
+  // カテゴリ補完指示: 薄いカテゴリ（gourmet/sale）は採用閾値を5に緩和
+  let categoryBalanceNote = '';
+  if (categoryStats) {
+    const total = Object.values(categoryStats).reduce((s, n) => s + n, 0);
+    const thinCategories = [];
+    const targets = { event: 0.30, show: 0.20, gourmet: 0.30, sale: 0.10 };
+    for (const [type, target] of Object.entries(targets)) {
+      const ratio = total > 0 ? (categoryStats[type] || 0) / total : 0;
+      // 目標の70%を下回ったら「薄い」と判断
+      if (ratio < target * 0.70) thinCategories.push(type);
+    }
+    const dist = Object.entries(categoryStats).map(([t, n]) => `${t}:${n}件`).join(', ');
+    if (thinCategories.length > 0) {
+      categoryBalanceNote = `\n【カテゴリ補完】現在のDB分布: ${dist}。${thinCategories.join('・')}が目標比率を下回っています。これらカテゴリの記事はscore 4以上で採用してよい（品質は維持、具体性・期間限定性の基準は変えない）。他カテゴリは引き続きscore 5以上。`;
+    }
+  }
 
   const scoringCriteria = `採用基準（score ${scoreThreshold}以上のみ採用）：
 - 日本文化・日本ブランドとの関連で加点
 - ファミリー・子連れ対応で加点
 - 発見感・意外性で加点（major_scoreが低いほど加点）
-- 情報が具体的（日時・場所・価格）で加点`;
+- 情報が具体的（日時・場所・価格）で加点${categoryBalanceNote}`;
 
   // キャッシュ対象: 記事JSON以外の命令テンプレート全体（同一runで内容が変わらない）
   const instructionText = `あなたは${cityName}在住の日本人向けおでかけアプリのコンテンツ編集者です。
@@ -157,7 +174,7 @@ ${scoringCriteria}
 - 不動産・金融・求人・保険・ビザ関連は採用しない
 - storeが「Various」「TBC」「Multiple locations」「${cityLocation}」など場所が不特定・具体的でないものは採用しない
 - 具体的な店名・施設名・イベント名が明記されていないものは採用しない
-- 複数店舗・複数スポットを紹介するまとめ記事（listicle）は採用しない。1つのお店・1つの施設・1つのイベントを対象とした記事のみ採用する
+- まとめ記事（複数スポット・複数イベントを紹介するlisticle）の場合は、各スポット・イベントを個別エントリとして抽出して採用してよい（最大5エントリまで）。各エントリに具体的な store（施設名・店名・イベント名）が特定できることが条件。同じ記事から複数エントリを生成する場合は、それぞれに同じ index を使うこと。
 - 【重要】常設・通年営業のレストラン/カフェ/ホーカー/飲食店の通常メニュー紹介・グルメレビューは採用しない。「新メニュー」でも開催期間が明記されていなければ不採用とする（ただし新規オープン記事はopeningとして採用する）
 - openingの場合、end_dateは記事に終了日がなければstart_dateの1ヶ月後とすること
 - 【日本人フィルタ】以下は不採用とする：
@@ -217,9 +234,9 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
   // 外部リンクのある記事コンテンツを事前取得してdescriptionを補強
   const itemsWithExternalLink = items.filter(item => {
     if (!item.link) return false;
-    if (item.source?.startsWith('X /') && !item.link.includes('x.com')) return true;
-    if (item.source?.startsWith('Instagram /') && !item.link.includes('instagram.com')) return true;
-    return false;
+    if (item.link.includes('x.com') || item.link.includes('twitter.com')) return false;
+    if (item.link.includes('instagram.com')) return false;
+    return true; // すべての外部URLを対象に
   });
   if (itemsWithExternalLink.length > 0) {
     console.log(`\n  🔗 外部リンク記事を取得中... (${itemsWithExternalLink.length}件)`);
@@ -232,6 +249,13 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
         }
       })
     );
+  }
+
+  // 現在のカテゴリ分布を取得してバランス補正に使用
+  const existingEvents = fs.existsSync(eventsPath) ? JSON.parse(fs.readFileSync(eventsPath, 'utf8')) : [];
+  const categoryStats = { event: 0, show: 0, gourmet: 0, sale: 0, opening: 0 };
+  for (const e of existingEvents) {
+    if (categoryStats[e.type] !== undefined) categoryStats[e.type]++;
   }
 
   let totalAccepted = 0;
@@ -254,7 +278,7 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
         sourceStats[src].sent++;
       }
 
-      const results = await processBatch(batch, cityKey);
+      const results = await processBatch(batch, cityKey, categoryStats);
       totalAccepted += results.length;
       totalRejected += batch.length - results.length;
 

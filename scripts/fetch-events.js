@@ -138,9 +138,9 @@ function purgeExpiredData(eventsPath) {
 
 // ─── ステップ2: RSS取得 ─────────────────────────────────────────
 async function fetchRssItems(feeds, cityKey = 'sg') {
-  const daysBack        = 4;
-  const maxPerFeed      = 20;
-  const globalMinDescLen = cityKey === 'bkk' ? 50 : 100;
+  const daysBack        = 7;
+  const maxPerFeed      = 30;
+  const globalMinDescLen = cityKey === 'bkk' ? 30 : 50;
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
@@ -211,7 +211,7 @@ function deduplicateItems(newItems, eventsPath) {
     if (wordsA.size === 0 || wordsB.size === 0) return false;
     const intersection = [...wordsA].filter(w => wordsB.has(w));
     const ratio = intersection.length / Math.min(wordsA.size, wordsB.size);
-    return ratio >= 0.5;
+    return ratio >= 0.7;
   }
 
   const deduplicated = newItems.filter(item => {
@@ -318,13 +318,15 @@ function deduplicateSaved(eventsPath) {
     const wb = new Set(normalizeTitle(b));
     if (wa.size === 0 || wb.size === 0) return false;
     const common = [...wa].filter(w => wb.has(w)).length;
-    return common / Math.min(wa.size, wb.size) >= 0.6;
+    return common / Math.min(wa.size, wb.size) >= 0.75;
   }
 
   const seen = [];
   const deduped = events.filter(e => {
-    // URL完全一致
-    if (e.url && seen.some(s => s.url && s.url === e.url)) return false;
+    // URL重複チェック（まとめ記事分割で同一URLから複数エントリが生成される場合はURL+storeの複合チェック）
+    if (e.url && e.store && seen.some(s => s.url === e.url && isSimilar(s.store, e.store))) return false;
+    // store が空なら URL だけで重複チェック
+    if (e.url && !e.store && seen.some(s => s.url === e.url && !s.store)) return false;
     // 店名・タイトル類似
     if (seen.some(s => isSimilar(s.store, e.store))) return false;
     seen.push(e);
