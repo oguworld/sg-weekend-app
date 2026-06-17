@@ -10,9 +10,9 @@ const axios = require('axios');
 
 // ─── 閾値設定 ─────────────────────────────────────────────────────
 const THRESHOLDS = {
-  minRuns:          1,     // 最低このラン数のデータがあれば判定対象（1=即時判定可）
-  minTotalSent:     10,    // ウィンドウ内の最低送信件数（少なすぎるソースは判定保留）
-  poorAdoptionRate: 0.08,  // 採用率8%未満を「不良」とみなす
+  minRuns:          3,     // 最低このラン数のデータがあれば判定対象（3=3回以上で判定）
+  minTotalSent:     15,    // ウィンドウ内の最低送信件数（少なすぎるソースは判定保留）
+  poorAdoptionRate: 0.05,  // 採用率5%未満を「不良」とみなす（8%から緩和: 有益な総合メディアを保護）
   targetRawMin:     80,    // rawTotal がこれを下回ったら候補から追加
   minActiveTotal:   5,     // 都市あたりの最低アクティブソース数
   historyWindow:    4,     // 採用率計算に使う直近ラン数
@@ -28,14 +28,16 @@ const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シド
 const TYPE_LABELS = { event: 'イベント', show: '展示・公演', gourmet: 'グルメ・フェア', sale: 'セール・プロモ' };
 
 const PATHS = {
-  history:    path.join(__dirname, '..', 'data', 'source-history.json'),
-  sources:    path.join(__dirname, '..', 'data', 'sources.json'),
-  candidates: path.join(__dirname, '..', 'data', 'source-candidates.json'),
-  log:        path.join(__dirname, '..', 'logs', 'source-analysis.log'),
+  history:         path.join(__dirname, '..', 'data', 'source-history.json'),
+  sources:         path.join(__dirname, '..', 'data', 'sources.json'),
+  candidates:      path.join(__dirname, '..', 'data', 'source-candidates.json'),
+  log:             path.join(__dirname, '..', 'logs', 'source-analysis.log'),
+  analysisResult:  path.join(__dirname, '..', 'logs', 'source-analysis-result.json'),
 };
 
 // ─── ユーティリティ ───────────────────────────────────────────────
-const isDryRun = process.argv.includes('--dry-run');
+const isDryRun  = process.argv.includes('--dry-run');
+const isNoNotify = process.argv.includes('--no-notify');
 
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
@@ -353,10 +355,37 @@ async function main() {
   saveJson(PATHS.history, history);
   saveJson(PATHS.sources,  sources);
 
-  // レポート & LINE 通知
+  // レポート & LINE 通知（または JSON 書き出し）
   const report = buildReport(results);
   log('\n' + report);
-  await notifyLINE(report);
+
+  if (isNoNotify) {
+    // --no-notify: LINE通知を送らず分析結果をJSONに書き出す
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' });
+    const analysisResult = { date: today, cities: {} };
+    for (const [cityKey, r] of Object.entries(results)) {
+      const activeFeeds = (sources[cityKey]?.feeds || []).filter(f => f.status === 'active').length;
+      const activeIG    = (sources[cityKey]?.instagramAccounts || []).filter(a => a.status === 'active').length;
+      analysisResult.cities[cityKey] = {
+        changed:     r.paused.length > 0 || r.activated.length > 0,
+        added:       r.activated.map(a => a.label),
+        removed:     r.paused.map(p => p.label),
+        activeCount: activeFeeds + activeIG,
+      };
+    }
+    // logs/ ディレクトリが存在することを確認してから書き込む
+    const logsDir = path.dirname(PATHS.analysisResult);
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+    if (!isDryRun) {
+      fs.writeFileSync(PATHS.analysisResult, JSON.stringify(analysisResult, null, 2), 'utf8');
+      log(`分析結果を書き出し: ${PATHS.analysisResult}`);
+    } else {
+      console.log(`[dry-run] 書き込みをスキップ: ${PATHS.analysisResult}`);
+    }
+  } else {
+    // 通常実行: LINE通知を送る
+    await notifyLINE(report);
+  }
 
   log('===== analyze-sources.js 完了 =====\n');
 }

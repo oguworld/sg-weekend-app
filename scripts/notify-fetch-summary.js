@@ -11,6 +11,9 @@ const path = require('path');
 const CITIES   = ['sg', 'bkk', 'syd'];
 const LOGS_DIR = path.join(__dirname, '../logs');
 
+const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
+const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
+
 async function pushToLine(text) {
   const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   const userId = process.env.LINE_USER_ID;
@@ -79,13 +82,43 @@ async function main() {
 
   lines.push(`合計 ${totalAccepted}件採用`);
 
-  const message = lines.join('\n');
+  // ソース分析セクションを追記（当日のJSONが存在する場合のみ）
+  try {
+    if (fs.existsSync(SOURCE_ANALYSIS_PATH)) {
+      const analysisData = JSON.parse(fs.readFileSync(SOURCE_ANALYSIS_PATH, 'utf8'));
+      if (analysisData.date === today) {
+        lines.push('');
+        lines.push('━━ ソース分析 ━━');
+        for (const cityKey of CITIES) {
+          const cityName = CITY_NAMES[cityKey] || cityKey;
+          const cityData = analysisData.cities?.[cityKey];
+          if (!cityData) continue;
+          if (!cityData.changed) {
+            lines.push(`✅ ${cityName}: 変更なし（アクティブ${cityData.activeCount}ソース）`);
+          } else {
+            lines.push(`【${cityName}】`);
+            for (const label of (cityData.removed || [])) lines.push(`❌ 停止: ${label}`);
+            for (const label of (cityData.added   || [])) lines.push(`➕ 追加: ${label}`);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('ソース分析結果の読み込みに失敗:', e.message);
+  }
+
+  // LINE 5000文字制限対応
+  let message = lines.join('\n');
+  if (message.length > 4900) {
+    message = message.slice(0, 4900) + '\n…（文字数制限のため省略）';
+  }
+
   console.log(message);
 
   await pushToLine(message);
   console.log('📱 LINE通知送信完了');
 
-  if (totalAccepted > 0) {
+  if (totalAccepted > 0 && !process.argv.includes('--skip-push')) {
     const port = process.env.PORT || 3000;
     fetch(`http://localhost:${port}/api/notify-events-updated`, { method: 'POST' })
       .then(() => console.log('🔔 Webプッシュ通知送信完了'))
