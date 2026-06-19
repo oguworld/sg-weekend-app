@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/post-to-x.js
 // X (Twitter) への自動投稿スクリプト
-// 使い方: node post-to-x.js --type=event|feature [--city=sg|bkk|syd|all]
+// 使い方: node post-to-x.js --type=event|life [--city=sg|bkk|syd|all]
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const Anthropic = require('@anthropic-ai/sdk');
@@ -18,42 +18,62 @@ const CITY_CONFIG = {
   syd: { nameJa: 'シドニー',     flag: '🇦🇺', code: 'SYD', appUrl: 'https://dosuru.app/syd', eventsPath: path.join(__dirname, '../data/syd/events.json') },
 };
 
-const LIFE_THEMES = [
-  'ホーカーセンターでのランチ（今日何食べようか問題）',
-  'チキンライスへの愛と飽きのなさ',
-  '夕方のスコールとその後の涼しさ',
-  '冷房が効きすぎている屋内（カーディガン必携）',
-  'コピティアムのコピと朝の過ごし方',
-  'スーパーで日本食材を見つけたときの嬉しさと値段のギャップ',
-  'MRTの清潔さと時刻どおりに来る安心感',
-  'ラクサ・チャークイティオ・ナシレマなど現地グルメの発見',
-  'ドリアン解禁エリアとその匂いとの戦い',
-  '常夏で季節感がない中でのクリスマスや年末年始',
-  'GrabFoodでデリバリーが当たり前になった生活',
-  'ウェットマーケットで買い物する週末の朝',
-  '近所のフードコートがもはやホームグラウンド化している件',
-  '多民族の街でいろんな言語が飛び交う日常',
-  '帰国したとき日本のコンビニで感動する話',
-  'プロウンミー・ロジャックなどSGならではのローカルフード',
-  'HDBやコンドのプールで夕涼みする日常',
-  '雨のない週が続くと逆に不安になる件',
-  'イサタン・ドンドンドンキで日本を補給する話',
-  '日本から送ってもらうと嬉しいものリスト',
-  'シンガポールの祝日の多さとカレンダーの見方',
-  'バスに乗ってふらっと知らない街に降りる休日',
-  'ローカルの友人から教わった穴場フードや食べ方',
-  '英語とシングリッシュの間で揺れる日々',
-];
+const PERSONA = `【人物設定】
+シンガポール在住歴が長く、「行くところが尽きてきた感」が出てきた30〜40代の日本人男性。
+平日は仕事が忙しく、通勤の行き帰りに週末の予定を考える。
+「今週末どうしよう」といつも悩んでいる週末探し人。
+シンガポールの生活には慣れているが、達観しすぎず、まだ新しい発見に素直に反応する。
+つぶやきは「週末何しようか悩む人の独り言」スタイル。`;
 
-const APP_FEATURES = [
-  { name: 'AIチャット',           description: '右下のAIボタンをタップすると、「子連れで行けるところ教えて」「雨の日におすすめは？」など自然な言葉でおでかけ先を相談できる。登録済みイベントの中からぴったりの情報を提案してくれる。' },
-  { name: 'ピン留め機能',         description: '気になるイベントやスポットをピン留めしておける。📌タブからいつでもまとめて確認できるので、家族に共有するときも便利。' },
-  { name: 'カレンダー表示',       description: '📅タブを開くと12ヶ月分のカレンダーが縦スクロールで見られる。イベントの開催期間がカレンダー上に表示されるので、予定が立てやすい。' },
-  { name: 'フィルター機能',       description: '設定で「誰と行く（ファミリー・カップル・ひとりなど）」「子どもの年齢」を設定しておくと、自分にぴったりの情報だけに絞り込める。' },
-  { name: '英語表示切り替え',     description: '設定から表示言語を英語に切り替えられる。外国人の配偶者やお子さんと一緒に使うときも安心。イベント内容もすべて英語で表示される。' },
-  { name: '今週末・来週末・連休タブ', description: 'トップのタブで「今週末」「来週末」「次の連休（夏休みなど）」を切り替えられる。連休は自動で名前が変わり、少し先の計画も立てやすい。' },
-  { name: 'ホーム画面に追加（PWA）', description: 'ブラウザのメニューから「ホーム画面に追加」するとアプリアイコンが作られ、ネイティブアプリのように使える。インストール不要でいつでもすぐ起動できる。' },
-  { name: '非表示機能',           description: '興味のないイベントは右上の✕ボタンで非表示にできる。次回以降は表示されなくなり、自分に合った情報だけがすっきり並ぶ。設定から非表示のリセットも可能。' },
+const LIFE_THEMES = [
+  // 週末探し
+  '週末どこ行こうか迷って結局いつものホーカーになる件',
+  '金曜の夜、明日何しようか考えながら帰る電車の気持ちよさ',
+  '土曜の朝、起きた瞬間に「今日どこ行こう」と思う習慣',
+  '行き先を決めずに出かけて、結局ホーカーでのんびりしてしまう週末',
+  '「今週末こそ行こう」と思っていたのに月曜になっていた件',
+  '子連れでどこ行けばいいか悩む週末の朝',
+  '週末イベントの情報収集に気づいたら30分使っていた木曜夜',
+  'ネットで「SG 週末」と検索しても出てくる情報が同じになってきた',
+  'チャンギ空港に用もないのにふらっと行く週末はアリなのかどうか',
+
+  // SG生活の観察
+  '同じホーカーセンターばかりになってくる（行ったことないところが減ってきた）',
+  'スコールの直後だけ外が涼しくなる。その5分間のために傘を持ち歩いている',
+  'MRTが定時通りなのに2年経つと「遅延している」と感じるようになった。基準が上がりすぎ',
+  'チキンライスを「また食べた」と言える状態になると、SG生活が板についてきたサインらしい',
+  'ホーカーランチ、毎日選ぶだけで小さい意思決定が一つ増える話',
+  'スーパーで日本食材を見つけたときの嬉しさと値段のギャップ',
+  'ドンキのだし醤油が切れると気づいたときのあの焦り',
+
+  // 仕事・日常
+  '通勤中に週末のことを考えるのが唯一の息抜きになっている件',
+  '平日忙しいと週末への期待値が上がりすぎて、実際の土曜がちょっと負けてしまう',
+  '新しいフードスポットを見つけると、週末の計画がそこから始まる',
+
+  // 家族・子ども
+  '子どもが「どこ行くの？」と聞いてくる前に答えを用意できていない罪悪感',
+  '「前も行ったよ」と言われるまで同じ場所に連れて行ってしまうパターン',
+  '家族を連れてきて良かったと思う瞬間と、申し訳ないと思う瞬間',
+  '子どもがシングリッシュを覚えてくるのが誇らしいような心配なような',
+
+  // 将来・転勤
+  '赴任が終わったあとどこに住むかを本気で考え始めた',
+  'SGで働いていると「次はどこに行く？」という会話が普通に出てくる不思議',
+  'アジア拠点を渡り歩く人たちを見ていると自分の将来も揺れる',
+  '現地ノリに慣れてきたら逆に日本帰国が怖くなってきた話',
+
+  // 日本との比較・一時帰国
+  '帰国したとき日本のコンビニで毎回感動する',
+  '日本に一時帰国するたびに「あ、これ当たり前じゃなかったんだ」と気づく',
+  '日本のスーパーの安さに毎回驚く',
+
+  // 海外生活一般
+  'GrabFoodでデリバリーが当たり前になった生活',
+  'SGは英語で生活できるのが楽な一方、ふとした瞬間に孤独を感じることがある',
+  '海外に長くいると「これってどこの国の感覚だっけ」となる瞬間がある',
+  'シングリッシュが少しずつ染みついてきた自覚',
+  '在住者目線でSGを案内するとき、観光客と全然違う場所に連れて行きたくなる',
 ];
 
 const anthropic = new Anthropic();
@@ -71,12 +91,12 @@ function parseArgs() {
 // ─── 履歴管理 ─────────────────────────────────────────────────────
 function loadHistory() {
   try { return JSON.parse(fs.readFileSync(HISTORY_PATH, 'utf8')); }
-  catch { return { eventIds: [], lastFeatureIndex: -1, lastType: 'feature' }; }
+  catch { return { eventIds: [], lastType: 'event' }; }
 }
 
 function resolveType(type, history) {
   if (type !== 'auto') return type;
-  const types = ['event', 'feature', 'life'];
+  const types = ['event', 'life'];
   const available = types.filter(t => t !== history.lastType);
   return available[Math.floor(Math.random() * available.length)];
 }
@@ -123,24 +143,20 @@ function buildHashtags(city) {
     bkk: '#バンコク #バンコク生活',
     syd: '#シドニー #シドニー生活',
   };
-  return `${cityTags[city] || ''} #週末おでかけ #おでかけNavi`.trim();
+  return `${cityTags[city] || ''} #週末おでかけ`.trim();
 }
 
 // ─── テキスト生成 ─────────────────────────────────────────────────
-const CTA_LABELS = [
-  '気になる方はこちら↓',
-  '週末の参考に→',
-  'もっと詳しくはここで↓',
-  'チェックしてみてください👇',
-  'アプリで詳細確認→',
-  '詳しくはおでかけNaviで↓',
-  'おでかけNaviで詳細をチェック👇',
-  '行く前にここで確認→',
-];
 
-function appendUrl(text, url) {
-  const label = CTA_LABELS[Math.floor(Math.random() * CTA_LABELS.length)];
-  return `${text}\n\n${label}\n${url}`;
+// X の無料アカウントは 280 ウェイト文字。日本語1文字=2、ASCII=1、URL=23 固定。
+// ハッシュタグ（SG最大 ~61 ウェイト）を除くと本文は ~219 ウェイト ≒ 109 日本語文字が上限。
+function weightedLength(text) {
+  let count = 0;
+  for (const char of text) {
+    const cp = char.codePointAt(0);
+    count += (cp > 0x2E7F) ? 2 : 1;
+  }
+  return count;
 }
 
 async function generateEventPost(event) {
@@ -151,12 +167,14 @@ async function generateEventPost(event) {
 
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 500,
+    max_tokens: 300,
     messages: [{
       role: 'user',
-      content: `${conf.nameJa}在住の日本人が、気になるお出かけ情報を個人的にシェアするX投稿文を書いてください。
+      content: `以下の人物として、イベントを見かけてふと思った独り言をX投稿として書いてください。
 
-【情報】
+${PERSONA}
+
+【イベント情報】
 都市: ${conf.nameJa}
 種別: ${typeLabel}
 施設/店名: ${event.store}
@@ -165,92 +183,51 @@ ${periodText}
 ${tipsText ? `ポイント: ${tipsText}` : ''}
 
 【要件】
-- 現地在住者が個人として書いたような一人称・主観的なトーン
-- 「行ってみたい」「これは行かないと」「子連れにおすすめ」など個人の感想や反応を自然に含める
-- 書き出しのパターンを多様に（都市名から始める／質問形式／感想から始める／情報紹介から始めるなど）
+- 情報共有・アナウンス的な書き方は禁止（「〜開催中です」「ぜひご参加を」などはNG）
+- 「行ってみたいな」「これ気になる」「また値段上がったのか」など個人の反応として書く
+- 書き出しのパターンを多様に（気になる感じ／迷っている感じ／発見した感じ等）
 - 毎回違う書き方になるよう意識する
 - 絵文字を1〜2個（国旗絵文字🇸🇬🇹🇭🇦🇺は使わない）
 - URLとハッシュタグは含めない（別途追加します）
-- 本文は130〜190文字の範囲で、毎回自然に長さを変えること
+- 本文は80〜100文字で（X無料アカウントの文字制限のため短めに厳守）
+- 内容の区切りで適度に改行を入れる（1〜2回）
 - 日本語のみ。SNS投稿として完成した文章のみ出力（前置き・説明不要）`,
     }],
   });
 
   const body = res.content[0].text.trim();
-  const base = appendUrl(body, 'https://dosuru.app');
-  return `${base}\n\n${buildHashtags(event.city)}`;
+  return `${body}\n\n${buildHashtags(event.city)}`;
 }
 
-async function generateFeaturePost(feature) {
-  const appUrl = 'https://dosuru.app';
+async function generateLifePost(theme) {
 
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 500,
-    messages: [{
-      role: 'user',
-      content: `東南アジア在住の日本人が、よく使っているアプリの便利な機能を友人に教えるようなX投稿文を書いてください。
-
-【紹介する機能】
-機能名: ${feature.name}
-説明: ${feature.description}
-
-【要件】
-- 友人に話しかけるような自然な口語トーン
-- 「これ使ってみたら〜」「知らなかった人に教えたい」「地味に便利」など体験・感想として伝える
-- 書き出しのパターンを多様に（質問形式／発見した感じ／おすすめする感じ等）
-- 毎回違う書き方になるよう意識する
-- 絵文字を1〜2個
-- URLとハッシュタグは含めない（別途追加します）
-- 本文は130〜190文字の範囲で、毎回自然に長さを変えること
-- 日本語のみ。SNS投稿として完成した文章のみ出力（前置き・説明不要）`,
-    }],
-  });
-
-  const body = res.content[0].text.trim();
-  const base = appendUrl(body, appUrl);
-  return `${base}\n\n#週末おでかけ #おでかけNavi #海外生活`;
-}
-
-async function generateLifePost() {
-  const theme = LIFE_THEMES[Math.floor(Math.random() * LIFE_THEMES.length)];
-
-  const lifeCtas = [
-    '週末の予定はここで→',
-    '現地のお出かけ情報はこちら→',
-    '週末どこ行く？情報はここ→',
-    'おでかけ情報はここで↓',
-  ];
-
-  const res = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 500,
+    max_tokens: 300,
     messages: [{
       role: 'user',
       content: `以下の人物としてX投稿を書いてください。
 
-【人物設定】
-シンガポールに10年住んでいる日本人エンジニア。現地の生活にどっぷり馴染んでいて、ホーカーでの飯もMRTも当たり前。でも日本への郷愁もある。シンガポールの変化も見てきた。いい意味で達観しているが、たまにローカルあるあるに新鮮に感動したり苦笑したりする。
+${PERSONA}
 
 【テーマ】
 ${theme}
 
 【要件】
-- 10年住んでいるからこその視点・深み・慣れ感を出す
-- 「〜だよね」「〜あるある」「〜になってきた」など自然な口語
 - アプリの宣伝は一切しない。純粋なシンガポール日常のつぶやき
 - 書き出しのパターンを多様に（気づき／あるある／感動／ぼやき／懐かしさ等）
+- 「〜だよね」「〜あるある」「〜になってきた」など自然な口語
 - 絵文字を1〜2個
 - URLとハッシュタグは含めない
-- 本文は80〜160文字の範囲で（短くてもOK）
+- 本文は90〜110文字で（X無料アカウントの文字制限のため厳守）
+- 内容の区切りで適度に改行を入れる（1〜2回）
 - 日本語のみ
 - 複数案・区切り線は不要。1つだけ完成した投稿文を出力（前置き・説明不要）`,
     }],
   });
 
   const body = res.content[0].text.trim();
-  const cta = lifeCtas[Math.floor(Math.random() * lifeCtas.length)];
-  return `${body}\n\n${cta}\nhttps://dosuru.app\n\n#海外生活 #東南アジア生活 #駐在`;
+  return `${body}\n\n#海外生活 #東南アジア生活 #海外在住`;
 }
 
 // ─── X投稿 ────────────────────────────────────────────────────────
@@ -334,37 +311,36 @@ async function main() {
     text = await generateEventPost(event);
     history.eventIds = [event.id, ...history.eventIds].slice(0, HISTORY_MAX);
 
-  } else if (type === 'feature') {
-    const nextIndex = (history.lastFeatureIndex + 1) % APP_FEATURES.length;
-    const feature = APP_FEATURES[nextIndex];
-    console.log(`[post-to-x] 機能紹介: ${feature.name}`);
-    text = await generateFeaturePost(feature);
-    history.lastFeatureIndex = nextIndex;
-
   } else {
     const theme = LIFE_THEMES[Math.floor(Math.random() * LIFE_THEMES.length)];
     console.log(`[post-to-x] 生活つぶやき: ${theme}`);
-    text = await generateLifePost();
+    text = await generateLifePost(theme);
   }
 
   history.lastType = type;
 
   console.log(`[post-to-x] 投稿内容:\n${'─'.repeat(40)}\n${text}\n${'─'.repeat(40)}`);
-  console.log(`文字数: ${text.length}`);
+  console.log(`文字数: ${text.length}文字 / ウェイト: ${weightedLength(text)}/280`);
 
   if (dryRun) {
     console.log('[post-to-x] --dry-run のため投稿スキップ');
     return;
   }
 
-  const tweetId = await postToX(text);
-  if (tweetId) {
-    const tweetUrl = `https://x.com/i/web/status/${tweetId}`;
-    console.log(`[post-to-x] ✅ 投稿完了: ${tweetUrl}`);
-    await notifyLine(`【X投稿】\n${text}\n\n${tweetUrl}`);
+  try {
+    const tweetId = await postToX(text);
+    if (tweetId) {
+      const tweetUrl = `https://x.com/i/web/status/${tweetId}`;
+      console.log(`[post-to-x] ✅ 投稿完了: ${tweetUrl}`);
+      await notifyLine(`【X投稿】\n${text}\n\n${tweetUrl}`);
+    }
+  } catch (err) {
+    console.error('[post-to-x] エラー:', err.message);
+    await notifyLine(`【X投稿失敗】${err.message}\n\n投稿しようとした内容:\n${text}`);
+    throw err;
+  } finally {
+    saveHistory(history);
   }
-
-  saveHistory(history);
 }
 
 main().catch(err => {
