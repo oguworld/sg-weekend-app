@@ -4680,10 +4680,12 @@
         return tabMatch && ageMatch && whoMatch && catMatch;
       });
 
+      const CATEGORY_ORDER = { event: 0, show: 1, gourmet: 2, opening: 3, sale: 4 };
       filtered.sort((a, b) => {
-        const da = a.start_date ? new Date(a.start_date) : new Date(0);
-        const db = b.start_date ? new Date(b.start_date) : new Date(0);
-        return eventSortOrder === 'desc' ? db - da : da - db;
+        const fa = a.fetched_at || '0000-00-00';
+        const fb = b.fetched_at || '0000-00-00';
+        if (fb !== fa) return fb.localeCompare(fa);
+        return (CATEGORY_ORDER[a.type] ?? 99) - (CATEGORY_ORDER[b.type] ?? 99);
       });
       grid.innerHTML = filtered.map((e, i) => renderEventCard(e, i)).join('');
       resultCount.textContent = filtered.length + t('countSuffix');
