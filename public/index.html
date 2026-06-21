@@ -7834,6 +7834,10 @@
           const banner = document.getElementById('update-banner');
           if (banner) banner.classList.add('show');
         }
+        // 新SWにバージョン確認を再送
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
+        }
       });
 
       // SW_UPDATED メッセージも念のため残す（controllerchange の補完）
@@ -7853,10 +7857,13 @@
         }
       });
 
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
+      window.addEventListener('load', async () => {
+        let reg;
+        try {
+          reg = await navigator.serviceWorker.register('/sw.js');
+        } catch (err) {
           console.warn('SW registration failed:', err);
-        });
+        }
         if (navigator.serviceWorker.controller) {
           navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
         }
@@ -7864,7 +7871,12 @@
 
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-          navigator.serviceWorker.getRegistration().then(reg => reg?.update());
+          navigator.serviceWorker.getRegistration().then(reg => {
+            reg?.update();
+            if (navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
+            }
+          });
         }
       });
 
