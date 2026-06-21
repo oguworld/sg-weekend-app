@@ -3196,7 +3196,7 @@
       <div class="tabs-label" data-i18n="labelWhen">いつ行く？</div>
       <div class="tabs" id="tabs">
         <div class="tabs-weekend-group">
-          <button class="tab active" data-tab="weekend" id="tab-weekend">今週</button>
+          <button class="tab" data-tab="weekend" id="tab-weekend">今週</button>
           <button class="tab" data-tab="nextweekend" id="tab-nextweekend">来週</button>
           <button class="tab" data-tab="afterweekend" id="tab-afterweekend">2週後</button>
           <button class="tab" data-tab="threeweeks" id="tab-threeweeks">3週後</button>
@@ -4397,7 +4397,7 @@
     const emptyState = document.getElementById('empty-state');
     const resultCount = document.getElementById('result-count');
 
-    let currentTab = 'weekend';
+    let currentTab = '';
     let EVENT_DATA = [];
     let EVENT_REGISTRY = {};
     let eventSortOrder = 'desc'; // desc = 新しい開始日が上
