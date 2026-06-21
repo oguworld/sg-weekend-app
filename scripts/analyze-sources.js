@@ -93,8 +93,9 @@ function analyzeTypeDistribution(cityKey) {
     .sort((a, b) => b.gap - a.gap);
 
   const mostNeeded = gaps[0].gap >= TYPE_IMBALANCE_THRESHOLD ? gaps[0].type : null;
+  const overRepresented = gaps.find(g => g.gap < -TYPE_IMBALANCE_THRESHOLD)?.type ?? null;
 
-  return { counts, ratios, total, mostNeeded, gaps };
+  return { counts, ratios, total, mostNeeded, overRepresented, gaps };
 }
 
 // ─── ソース履歴の更新 ─────────────────────────────────────────────
@@ -155,6 +156,15 @@ function sortCandidatesByDiversity(candidates, mostNeededType) {
   });
 }
 
+// ─── 過多カテゴリのソースを先頭に移動（優先停止用） ─────────────
+function sortActiveByOverrepresented(activeList, overRepresented) {
+  if (!overRepresented) return activeList;
+  return [
+    ...activeList.filter(s => !s.obj.pinned && (s.obj.primaryType || 'mixed') === overRepresented),
+    ...activeList.filter(s => s.obj.pinned || (s.obj.primaryType || 'mixed') !== overRepresented),
+  ];
+}
+
 // ─── 都市ごとの分析と入れ替え処理 ────────────────────────────────
 function analyzeCity(cityKey, history, sources, candidates) {
   const cityName   = CITY_NAMES[cityKey];
@@ -172,7 +182,7 @@ function analyzeCity(cityKey, history, sources, candidates) {
 
   // コンテンツ種別分布の分析
   const typeDist = analyzeTypeDistribution(cityKey);
-  const { mostNeeded } = typeDist;
+  const { mostNeeded, overRepresented } = typeDist;
 
   log(`\n【${cityName}】アクティブ: feeds ${activeFeeds.length} / IG ${activeIG.length} / raw直近: ${latestRawTotal ?? '不明'}件`);
 
@@ -200,10 +210,12 @@ function analyzeCity(cityKey, history, sources, candidates) {
   );
 
   // ─ Step1: 不良ソースを特定して入れ替え ─
-  const allActive = [
+  const allActiveRaw = [
     ...activeFeeds.map(f => ({ type: 'feed', key: f.name, obj: f })),
     ...activeIG.map(a => ({ type: 'ig', key: `Instagram / @${a.username}`, obj: a })),
   ];
+  // 過多カテゴリのソースを先頭に移動（優先停止のため）
+  const allActive = sortActiveByOverrepresented(allActiveRaw, overRepresented);
 
   let currentActive = activeTotal;
 
@@ -283,7 +295,7 @@ function analyzeCity(cityKey, history, sources, candidates) {
     }
   }
 
-  return { paused, activated, warnings, latestRawTotal, activeTotal, typeDist, mostNeeded };
+  return { paused, activated, warnings, latestRawTotal, activeTotal, typeDist, mostNeeded, overRepresented };
 }
 
 // ─── LINE 通知用レポート生成 ──────────────────────────────────────
@@ -310,8 +322,11 @@ function buildReport(results) {
     for (const w of r.warnings) lines.push(`⚠️ 要確認: ${w}`);
 
     // コンテンツ構成の偏り
+    if (r.overRepresented) {
+      lines.push(`📊 ${TYPE_LABELS[r.overRepresented]}が過多 → ${TYPE_LABELS[r.overRepresented]}ソースを優先停止`);
+    }
     if (r.mostNeeded) {
-      lines.push(`📊 ${TYPE_LABELS[r.mostNeeded]}が不足（目標: event40%/show20%/gourmet30%/sale10%）`);
+      lines.push(`📊 ${TYPE_LABELS[r.mostNeeded]}が不足 → ${TYPE_LABELS[r.mostNeeded]}ソースを優先追加`);
     }
   }
 
