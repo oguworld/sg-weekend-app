@@ -3162,7 +3162,7 @@
 
     <!-- Section Header (moved from main) -->
     <div class="section-header">
-      <div class="tabs-label" data-i18n="labelWhat">なにを探す？</div>
+      <div class="tabs-label" data-i18n="labelWhat">どこ行く？</div>
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
         <button id="pin-filter-btn" class="sort-btn" title="ピン留めした項目のみ表示">📌</button>
         <button id="ending-filter-btn" class="sort-btn" title="今週末が見納め・ラストチャンスのものを表示">🔥 今週で終了</button>
@@ -3173,7 +3173,6 @@
 
     <!-- Category Filter (moved from main) -->
     <div class="category-filter-row" id="category-filter-row" style="margin-bottom:0;">
-      <button class="sale-filter-chip active" data-cat="all" onclick="setCategoryFilter('all')" data-i18n="catAll">✨ すべて</button>
       <button class="sale-filter-chip" data-cat="event"    data-i18n="catEvent">🗺 イベント</button>
       <button class="sale-filter-chip" data-cat="show"     data-i18n="catShow">🎭 展示・公演</button>
       <button class="sale-filter-chip" data-cat="gourmet"  data-i18n="catGourmet">🍽 グルメ・フェア</button>
@@ -3197,7 +3196,6 @@
       <div class="tabs-label" data-i18n="labelWhen">いつ行く？</div>
       <div class="tabs" id="tabs">
         <div class="tabs-weekend-group">
-          <button class="tab" data-tab="all" onclick="selectTab(this)" data-i18n="tabAll">指定なし</button>
           <button class="tab active" data-tab="weekend" id="tab-weekend">今週</button>
           <button class="tab" data-tab="nextweekend" id="tab-nextweekend">来週</button>
           <button class="tab" data-tab="afterweekend" id="tab-afterweekend">2週後</button>
@@ -3802,7 +3800,7 @@
         catStarting: '🆕 今週から',
         catEnding: '🔥 今週まで',
         labelWhen: 'いつ行く？',
-        labelWhat: 'なにを探す？',
+        labelWhat: 'どこ行く？',
         emptyTitle: 'まだスポット準備中！',
         emptyDesc: 'このカテゴリのおでかけ先は<br>近日公開予定です。<br>タブを切り替えて他の候補を見てみましょう。',
         pinScreenTitle: '📌 ピン留め',
@@ -3930,7 +3928,7 @@
         catStarting: '📅 This Week',
         catEnding: '⏰ Ending Soon',
         labelWhen: 'When?',
-        labelWhat: 'What are you looking for?',
+        labelWhat: 'Where to go?',
         emptyTitle: 'Coming soon!',
         emptyDesc: 'No spots in this category yet.<br>Check back soon or try another tab.',
         pinScreenTitle: '📌 Pinned',
@@ -4613,12 +4611,7 @@
     }
 
     function setCategoryFilter(cat) {
-      if (cat === 'all') {
-        activeCategoryFilters.clear();
-        showPinnedOnly = false;
-        const pinBtn = document.getElementById('pin-filter-btn');
-        if (pinBtn) pinBtn.classList.remove('active');
-      } else if (cat === 'ending') {
+      if (cat === 'ending') {
         if (activeCategoryFilters.has('ending')) activeCategoryFilters.delete('ending');
         else activeCategoryFilters.add('ending');
       } else {
@@ -4628,12 +4621,7 @@
         if (hadEnding) activeCategoryFilters.add('ending');
         if (!wasActive) activeCategoryFilters.add(cat);
       }
-      // 「すべて」チップの active 管理
-      // type フィルター（ending/starting 以外）が何も選ばれていない場合は「すべて」をアクティブに
-      const typeFiltersActive = [...activeCategoryFilters].filter(f => !['starting','ending'].includes(f));
-      const allChip = document.querySelector('#category-filter-row .sale-filter-chip[data-cat="all"]');
-      if (allChip) allChip.classList.toggle('active', typeFiltersActive.length === 0);
-      document.querySelectorAll('#category-filter-row .sale-filter-chip:not([data-cat="all"])').forEach(chip => {
+      document.querySelectorAll('#category-filter-row .sale-filter-chip').forEach(chip => {
         chip.classList.toggle('active', activeCategoryFilters.has(chip.dataset.cat));
       });
       const endingBtn = document.getElementById('ending-filter-btn');
@@ -4649,7 +4637,7 @@
       const filtered = EVENT_DATA.filter(e => {
         if (hidden.includes(String(e.id))) return false;
         if (showPinnedOnly && !getPins()[e.id]) return false;
-        const tabMatch = currentTab === 'all' || (e.tabs ? e.tabs.includes(currentTab) : e.tab === currentTab);
+        const tabMatch = currentTab === '' || (e.tabs ? e.tabs.includes(currentTab) : e.tab === currentTab);
 
         // age filter: e.age is an array
         const eAge = Array.isArray(e.age) ? e.age : (e.age ? [e.age] : ['all']);
@@ -4717,9 +4705,14 @@
     }
 
     function selectTab(tab) {
-      tabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      currentTab = tab.dataset.tab;
+      if (currentTab === tab.dataset.tab) {
+        tabs.forEach(t => t.classList.remove('active'));
+        currentTab = '';
+      } else {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentTab = tab.dataset.tab;
+      }
       showPinnedOnly = false;
       const pinBtn2 = document.getElementById('pin-filter-btn');
       if (pinBtn2) pinBtn2.classList.remove('active');
@@ -5831,7 +5824,7 @@
         document.getElementById('screen-home').style.display = 'block';
         if (appHeader) appHeader.style.display = 'block';
         if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
-        else setCategoryFilter('all');
+        else { activeCategoryFilters.clear(); renderEventCards(); }
       } else {
         document.getElementById('screen-home').style.display = 'none';
         if (appHeader) appHeader.style.display = 'none';
