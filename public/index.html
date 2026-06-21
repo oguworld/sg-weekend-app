@@ -148,7 +148,7 @@
       gap: 6px;
       padding-bottom: 2px;
     }
-    .tabs-weekend-group { display: inline-grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .tabs-weekend-group { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; }
     #tab-weekend, #tab-nextweekend, #tab-afterweekend, #tab-threeweeks { padding-left: 12px; padding-right: 12px; }
     .tab {
       flex-shrink: 0;
@@ -3160,17 +3160,27 @@
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs-section">
-      <div class="tabs-label" data-i18n="labelWhen">いつ行く？</div>
-      <div class="tabs" id="tabs">
-        <div class="tabs-weekend-group">
-          <button class="tab active" data-tab="weekend" id="tab-weekend">今週</button>
-          <button class="tab" data-tab="nextweekend" id="tab-nextweekend">来週</button>
-          <button class="tab" data-tab="afterweekend" id="tab-afterweekend">2週後</button>
-          <button class="tab" data-tab="threeweeks" id="tab-threeweeks">3週後</button>
-        </div>
+    <!-- Section Header (moved from main) -->
+    <div class="section-header">
+      <div class="tabs-label" data-i18n="labelWhat">なにを探す？</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+        <button id="pin-filter-btn" class="sort-btn" title="ピン留めした項目のみ表示">📌</button>
+        <button id="ending-filter-btn" class="sort-btn" title="今週末が見納め・ラストチャンスのものを表示">🔥 今週で終了</button>
+
+        <div id="result-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
       </div>
+    </div>
+
+    <!-- Category Filter (moved from main) -->
+    <div class="category-filter-row" id="category-filter-row" style="margin-bottom:0;">
+      <button class="sale-filter-chip active" data-cat="all" onclick="setCategoryFilter('all')" data-i18n="catAll">✨ すべて</button>
+      <button class="sale-filter-chip" data-cat="event"    data-i18n="catEvent">🗺 イベント</button>
+      <button class="sale-filter-chip" data-cat="show"     data-i18n="catShow">🎭 展示・公演</button>
+      <button class="sale-filter-chip" data-cat="gourmet"  data-i18n="catGourmet">🍽 グルメ・フェア</button>
+      <button class="sale-filter-chip" data-cat="sale"     data-i18n="catSale">🏷 プロモ・お得</button>
+      <button class="sale-filter-chip" data-cat="opening"  data-i18n="catOpening">🎊 新規オープン</button>
+      <!-- <button class="sale-filter-chip" data-cat="starting" onclick="setCategoryFilter('starting')" data-i18n="catStarting">🆕 今週から</button> -->
+      <!-- <button class="sale-filter-chip" data-cat="ending"   onclick="setCategoryFilter('ending')"   data-i18n="catEnding">🔥 今週まで</button> -->
     </div>
   </header>
 
@@ -3182,26 +3192,18 @@
     <div class="ptr-spinner"></div>
   </div>
 
-    <!-- Section Header -->
-    <div class="section-header">
-      <div class="tabs-label" data-i18n="labelWhat">なにを探す？</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-        <button id="pin-filter-btn" class="sort-btn" title="ピン留めした項目のみ表示">📌</button>
-        <button id="ending-filter-btn" class="sort-btn" title="今週末が見納め・ラストチャンスのものを表示">🔥 今週で終了</button>
-
-        <div id="result-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
+    <!-- Tabs (moved from header) -->
+    <div class="tabs-section" style="margin-bottom:18px;">
+      <div class="tabs-label" data-i18n="labelWhen">いつ行く？</div>
+      <div class="tabs" id="tabs">
+        <div class="tabs-weekend-group">
+          <button class="tab" data-tab="all" onclick="selectTab(this)" data-i18n="tabAll">指定なし</button>
+          <button class="tab active" data-tab="weekend" id="tab-weekend">今週</button>
+          <button class="tab" data-tab="nextweekend" id="tab-nextweekend">来週</button>
+          <button class="tab" data-tab="afterweekend" id="tab-afterweekend">2週後</button>
+          <button class="tab" data-tab="threeweeks" id="tab-threeweeks">3週後</button>
+        </div>
       </div>
-    </div>
-
-    <!-- Category Filter -->
-    <div class="category-filter-row" id="category-filter-row">
-      <button class="sale-filter-chip" data-cat="event"    data-i18n="catEvent">🗺 イベント</button>
-      <button class="sale-filter-chip" data-cat="show"     data-i18n="catShow">🎭 展示・公演</button>
-      <button class="sale-filter-chip" data-cat="gourmet"  data-i18n="catGourmet">🍽 グルメ・フェア</button>
-      <button class="sale-filter-chip" data-cat="sale"     data-i18n="catSale">🏷 プロモ・お得</button>
-      <button class="sale-filter-chip" data-cat="opening"  data-i18n="catOpening">🎊 新規オープン</button>
-      <!-- <button class="sale-filter-chip" data-cat="starting" onclick="setCategoryFilter('starting')" data-i18n="catStarting">🆕 今週から</button> -->
-      <!-- <button class="sale-filter-chip" data-cat="ending"   onclick="setCategoryFilter('ending')"   data-i18n="catEnding">🔥 今週まで</button> -->
     </div>
 
     <!-- Cards -->
@@ -3790,7 +3792,8 @@
         tabAfterWeekend: '2週後',
         tabThreeWeeks: '3週後',
         sectionTitle: '絞り込む',
-        catAll: '📋 すべて',
+        tabAll: '指定なし',
+        catAll: '✨ すべて',
         catEvent: '🗺 イベント',
         catShow: '🎭 展示・公演',
         catGourmet: '🍽 グルメ・フェア',
@@ -3917,7 +3920,8 @@
         tabAfterWeekend: 'In 2 Weeks',
         tabThreeWeeks: 'In 3 Weeks',
         sectionTitle: 'Filter',
-        catAll: '📋 All',
+        tabAll: 'All dates',
+        catAll: '✨ All',
         catEvent: '🗺 Events',
         catShow: '🎭 Shows & Exhibitions',
         catGourmet: '🍽 Food & Fairs',
@@ -4624,7 +4628,12 @@
         if (hadEnding) activeCategoryFilters.add('ending');
         if (!wasActive) activeCategoryFilters.add(cat);
       }
-      document.querySelectorAll('#category-filter-row .sale-filter-chip').forEach(chip => {
+      // 「すべて」チップの active 管理
+      // type フィルター（ending/starting 以外）が何も選ばれていない場合は「すべて」をアクティブに
+      const typeFiltersActive = [...activeCategoryFilters].filter(f => !['starting','ending'].includes(f));
+      const allChip = document.querySelector('#category-filter-row .sale-filter-chip[data-cat="all"]');
+      if (allChip) allChip.classList.toggle('active', typeFiltersActive.length === 0);
+      document.querySelectorAll('#category-filter-row .sale-filter-chip:not([data-cat="all"])').forEach(chip => {
         chip.classList.toggle('active', activeCategoryFilters.has(chip.dataset.cat));
       });
       const endingBtn = document.getElementById('ending-filter-btn');
@@ -4711,11 +4720,7 @@
       tabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       currentTab = tab.dataset.tab;
-      activeCategoryFilters.clear();
       showPinnedOnly = false;
-      document.querySelectorAll('#category-filter-row .sale-filter-chip').forEach(chip => chip.classList.remove('active'));
-      const endingBtn = document.getElementById('ending-filter-btn');
-      if (endingBtn) endingBtn.classList.remove('active');
       const pinBtn2 = document.getElementById('pin-filter-btn');
       if (pinBtn2) pinBtn2.classList.remove('active');
       updateEndingFilterLabel();
