@@ -6903,26 +6903,29 @@
             barEnd = c;
           }
 
+          const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const isPast = !isOtherMonth && date > 0 &&
+            new Date(year, month, date) < todayMidnight;
           const isToday = !isOtherMonth &&
             today.getFullYear() === year &&
             today.getMonth() === month &&
             today.getDate() === date;
-          const dayData = !isOtherMonth && date ? eventMap[date] : null;
+          const dayData = !isOtherMonth && !isPast && date ? eventMap[date] : null;
           const hasEvent = dayData && (dayData.events.length > 0 || dayData.sales.length > 0);
 
-          const isHoliday = !isOtherMonth && !!date && sgHolidaySet.has(date);
+          const isHoliday = !isOtherMonth && !isPast && !!date && sgHolidaySet.has(date);
 
           let classes = 'cal-cell';
-          if (isOtherMonth) classes += ' other-month';
+          if (isOtherMonth || isPast) classes += ' other-month';
           if (isToday) classes += ' today';
           if (hasEvent) classes += ' has-event';
           if (isHoliday) classes += ' sg-holiday';
 
-          const sunStyle = c === 0 && !isOtherMonth && !isHoliday ? 'color:var(--terracotta)' : '';
-          const satStyle = c === 6 && !isOtherMonth && !isHoliday ? 'color:var(--sky)' : '';
+          const sunStyle = c === 0 && !isOtherMonth && !isPast && !isHoliday ? 'color:var(--terracotta)' : '';
+          const satStyle = c === 6 && !isOtherMonth && !isPast && !isHoliday ? 'color:var(--sky)' : '';
           const dateStyle = isToday ? '' : (sunStyle || satStyle);
 
-          if (isOtherMonth) {
+          if (isOtherMonth || isPast) {
             cellsHtml += `<div class="${classes}"></div>`;
           } else {
             // 件数バッジ
