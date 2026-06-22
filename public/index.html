@@ -6068,9 +6068,28 @@
     ];
 
     // コース画面初期化
+    const COURSE_TABS = ['preset', 'community', 'mylist'];
+    let _courseSwipeStartX = 0;
+
     async function initCourseScreen() {
       await switchCourseTab('preset');
       loadPopularCourses();
+
+      // スワイプでタブ切り替え（初回のみ登録）
+      const sc = document.querySelector('#screen-course .screen-content');
+      if (sc && !sc._swipeInit) {
+        sc._swipeInit = true;
+        sc.addEventListener('touchstart', e => {
+          _courseSwipeStartX = e.touches[0].clientX;
+        }, { passive: true });
+        sc.addEventListener('touchend', e => {
+          const dx = e.changedTouches[0].clientX - _courseSwipeStartX;
+          if (Math.abs(dx) < 50) return;
+          const idx = COURSE_TABS.indexOf(currentCourseTab);
+          if (dx < 0 && idx < COURSE_TABS.length - 1) switchCourseTab(COURSE_TABS[idx + 1]);
+          if (dx > 0 && idx > 0) switchCourseTab(COURSE_TABS[idx - 1]);
+        }, { passive: true });
+      }
     }
 
     // タブ切り替え
