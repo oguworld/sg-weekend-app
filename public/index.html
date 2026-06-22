@@ -3178,6 +3178,13 @@
     html[data-theme="dark"] .update-banner { background: #2E241C; color: var(--midnight); }
     html[data-theme="dark"] .course-card { background: #252019; }
     html[data-theme="dark"] .course-chip:not(.selected) { background: #2E241C; border-color: var(--sand-dark); color: var(--warm-gray); }
+    #screen-course { padding: 0; }
+    #screen-course .screen-content {
+      height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 0 80px;
+    }
 
   </style>
 </head>
@@ -3312,7 +3319,7 @@
 
   <!-- ─── COURSE SCREEN ─── -->
   <div class="screen" id="screen-course" style="display:none;">
-    <div class="screen-content" style="padding-bottom: 80px;">
+    <div class="screen-content">
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
         <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin:16px 16px 8px;">人気コース</div>
@@ -3729,7 +3736,7 @@
   <div id="course-detail-overlay" class="plan-modal-overlay" onclick="closeCourseDetail()"></div>
   <div id="course-detail-sheet" class="plan-sheet">
     <div class="plan-sheet-handle"></div>
-    <div id="course-detail-content" style="overflow-y:auto;max-height:85vh;"></div>
+    <div id="course-detail-content" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom,0px);"></div>
   </div>
 
   <!-- AI Chat Sheet -->
