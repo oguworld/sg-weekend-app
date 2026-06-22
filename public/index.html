@@ -2052,11 +2052,14 @@
       border-radius: 14px; overflow: hidden;
       background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       cursor: pointer;
+      height: 228px; display: flex; flex-direction: column;
     }
-    .course-card-img { width: 100%; height: 110px; object-fit: cover; background: var(--sand); }
-    .course-card-body { padding: 10px; }
-    .course-card-title { font-size: 14px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
-    .course-card-tagline { font-size: 13px; color: var(--warm-gray); line-height: 1.4; }
+    .course-card-img { width: 100%; height: 110px; object-fit: cover; background: var(--sand); flex-shrink: 0; }
+    .course-card-body { flex: 1; overflow: hidden; padding: 10px; }
+    .course-card-title { font-size: 14px; font-weight: 700; line-height: 1.3; margin-bottom: 4px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .course-card-tagline { font-size: 13px; color: var(--warm-gray); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .course-card-meta { font-size: 12px; color: var(--warm-gray); margin-top: 6px; }
 
     .course-condition-group { margin-bottom: 16px; }
@@ -3192,7 +3195,7 @@
       min-height: 0;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      padding: 0 0 80px;
+      padding: 0 0 160px;
     }
 
   </style>
