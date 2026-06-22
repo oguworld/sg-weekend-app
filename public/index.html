@@ -3836,6 +3836,24 @@
     <button class="update-banner-btn" onclick="location.reload()">反映する</button>
   </div>
 
+  <!-- ─── COURSE DATE MODAL ─── -->
+  <div class="plan-modal-overlay" id="course-date-overlay" onclick="closeCourseDateModal()" style="display:none;"></div>
+  <div class="plan-modal" id="course-date-modal" style="display:none;">
+    <div class="plan-modal-handle"></div>
+    <div class="plan-modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div class="plan-modal-title">📅 予定表に追加</div>
+        <div class="plan-modal-subtitle" id="course-date-modal-subtitle"></div>
+      </div>
+      <button onclick="closeCourseDateModal()" style="background:none;border:none;font-size:22px;color:var(--light-gray);cursor:pointer;padding:0 0 0 12px;line-height:1;flex-shrink:0;">✕</button>
+    </div>
+    <div class="plan-modal-body">
+      <div class="plan-modal-section-label">日付を選ぶ <span style="color:var(--terracotta)">*</span></div>
+      <div class="plan-date-chips" id="course-date-chips"></div>
+      <button class="plan-modal-add-btn" id="course-date-add-btn" disabled onclick="confirmCourseDate()">追加する</button>
+    </div>
+  </div>
+
   <!-- ─── PLAN MODALS ─── -->
   <div class="plan-modal-overlay" id="plan-modal-overlay" onclick="closePlanModal()"></div>
 
@@ -6394,13 +6412,47 @@
       addCourseToScheduleWithDate(course);
     }
 
+    let _courseDatePendingCourse = null;
+    let _courseDateSelectedKey = null;
+
     function addCourseToScheduleWithDate(course) {
-      const dateStr = prompt('追加する日付を入力（YYYY-MM-DD）:', new Date().toISOString().slice(0,10));
-      if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+      _courseDatePendingCourse = course;
+      _courseDateSelectedKey = null;
+      const subtitle = course.title || 'コース';
+      document.getElementById('course-date-modal-subtitle').textContent = subtitle;
+      document.getElementById('course-date-chips').innerHTML = buildDateChipsHtml(null).replace(
+        /onclick="selectPlanDate\('([^']+)'\)"/g,
+        "onclick=\"selectCourseDate('$1')\""
+      );
+      document.getElementById('course-date-add-btn').disabled = true;
+      document.getElementById('course-date-overlay').style.display = '';
+      document.getElementById('course-date-modal').style.display = '';
+      lockScroll();
+    }
+
+    function selectCourseDate(key) {
+      _courseDateSelectedKey = key;
+      document.querySelectorAll('#course-date-chips .plan-date-chip').forEach(b => {
+        b.classList.toggle('selected', b.dataset.date === key);
+      });
+      document.getElementById('course-date-add-btn').disabled = false;
+    }
+
+    function closeCourseDateModal() {
+      document.getElementById('course-date-overlay').style.display = 'none';
+      document.getElementById('course-date-modal').style.display = 'none';
+      unlockScroll();
+      _courseDatePendingCourse = null;
+      _courseDateSelectedKey = null;
+    }
+
+    function confirmCourseDate() {
+      const course = _courseDatePendingCourse;
+      const dateStr = _courseDateSelectedKey;
+      if (!course || !dateStr) return;
 
       const city = getCity();
       const existing = JSON.parse(localStorage.getItem(city + '_custom_plans') || '[]');
-
       const newPlans = (course.spots || []).map((s, i) => ({
         id: `cp_${Date.now()}_course_${i}`,
         emoji: s.emoji || '✨',
@@ -6410,14 +6462,14 @@
         memo: s.description || '',
         member: [],
       }));
-
       const updated = [...existing, ...newPlans];
       localStorage.setItem(city + '_custom_plans', JSON.stringify(updated));
       if (typeof saveCustomPlans === 'function') saveCustomPlans(updated);
 
-      alert(`${course.spots.length}件のスポットを${dateStr}の予定に追加しました！`);
+      closeCourseDateModal();
       closeCourseSheet();
       closeCourseDetail();
+      showToast(`${course.spots.length}件のスポットを予定に追加しました`);
     }
 
     // いいね
