@@ -172,6 +172,7 @@ typeの定義（厳密に守ること）：
 - area: ${cityAreas}
 - emoji: 内容に合った絵文字1つ
 - image: 記事のサムネイルURL（ない場合はnull）
+- imageSearch: English keyword for Unsplash image search (2-4 words, e.g. "singapore food festival night market")
 
 ${scoringCriteria}
 - 不動産・金融・求人・保険・ビザ関連は採用しない
@@ -342,6 +343,7 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
           type:        validType,
           emoji:       r.emoji || '📌',
           image:       r.image || original.image || null,
+          imageSearch: r.imageSearch || null,
           store:       r.store || '',
           who:         Array.isArray(r.who) ? r.who : ['family', 'couple', 'solo', 'group'],
           age:         Array.isArray(r.age) ? r.age : ['all'],
@@ -391,6 +393,18 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
         }
       })
     );
+  }
+
+  // Unsplash画像補完（imageがまだnullで imageSearch があるもの）
+  const stillNoImage = newItems.filter(item => !item.image && item.imageSearch);
+  if (stillNoImage.length > 0) {
+    console.log(`\n  🖼 Unsplash画像補完中... (${stillNoImage.length}件)`);
+    const { fetchUnsplashImage } = require('./lib/unsplash');
+    for (const item of stillNoImage) {
+      const url = await fetchUnsplashImage(item.imageSearch);
+      if (url) item.image = url;
+      await new Promise(r => setTimeout(r, 300));
+    }
   }
 
   if (newItems.length > 0) {

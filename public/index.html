@@ -2040,6 +2040,56 @@
       font-size: 13px;
     }
 
+    /* ─── COURSE FEATURE ─── */
+    .course-tab {
+      flex: 1; padding: 10px; background: none; border: none;
+      border-bottom: 2px solid transparent; font-size: 14px;
+      font-weight: 500; color: var(--warm-gray); cursor: pointer;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .course-tab.active { border-bottom-color: var(--caramel); color: var(--caramel); font-weight: 700; }
+
+    .course-card {
+      border-radius: 14px; overflow: hidden;
+      background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      cursor: pointer;
+    }
+    .course-card-img { width: 100%; height: 110px; object-fit: cover; background: var(--sand); }
+    .course-card-body { padding: 10px; }
+    .course-card-title { font-size: 13px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
+    .course-card-tagline { font-size: 11px; color: var(--warm-gray); }
+    .course-card-meta { font-size: 11px; color: var(--warm-gray); margin-top: 6px; }
+
+    .course-condition-group { margin-bottom: 16px; }
+    .course-condition-label { font-size: 12px; font-weight: 700; color: var(--warm-gray); margin-bottom: 8px; }
+    .course-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .course-chip {
+      padding: 7px 14px; border-radius: 20px; font-size: 13px;
+      border: 1.5px solid var(--sand-dark); background: white;
+      color: var(--warm-gray); cursor: pointer; transition: all 0.15s;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .course-chip.selected { background: var(--caramel); color: white; border-color: var(--caramel); }
+
+    .course-loading-dots { display: flex; gap: 8px; justify-content: center; }
+    .course-loading-dots span {
+      width: 10px; height: 10px; border-radius: 50%; background: var(--caramel);
+      animation: courseBouce 1.2s infinite ease-in-out;
+    }
+    .course-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .course-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes courseBouce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    .course-timeline-item { display: flex; gap: 12px; margin-bottom: 16px; }
+    .course-timeline-time { font-size: 12px; font-weight: 700; color: var(--caramel); min-width: 40px; margin-top: 2px; }
+    .course-timeline-body { flex: 1; }
+    .course-timeline-name { font-size: 14px; font-weight: 700; }
+    .course-timeline-desc { font-size: 12px; color: var(--warm-gray); margin-top: 2px; }
+    .course-timeline-meta { font-size: 11px; color: var(--light-gray); margin-top: 2px; }
+
     /* ─── BOTTOM NAV ─── */
     .bottom-nav {
       position: fixed;
@@ -3258,6 +3308,33 @@
     </div>
   </div>
 
+  <!-- ─── COURSE SCREEN ─── -->
+  <div class="screen" id="screen-course" style="display:none;">
+    <div class="screen-content" style="padding-bottom: 80px;">
+      <!-- 人気コースセクション -->
+      <div id="popular-courses-section" style="margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin:16px 16px 8px;">人気コース</div>
+        <div id="popular-courses-list" style="display:flex;gap:12px;overflow-x:auto;padding:0 16px 4px;scrollbar-width:none;"></div>
+      </div>
+
+      <!-- タブ -->
+      <div style="display:flex;border-bottom:1.5px solid var(--sand);margin:0 0 12px;">
+        <button class="course-tab active" data-tab="preset" onclick="switchCourseTab('preset')">AIコース</button>
+        <button class="course-tab" data-tab="community" onclick="switchCourseTab('community')">みんなの</button>
+        <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')">マイコース</button>
+      </div>
+
+      <!-- コース一覧 -->
+      <div id="course-list" style="padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+    </div>
+
+    <!-- FAB -->
+    <button id="course-fab" onclick="openCourseGenerator()"
+      style="position:fixed;bottom:80px;right:16px;width:52px;height:52px;border-radius:50%;
+             background:var(--caramel);color:white;font-size:24px;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.2);
+             cursor:pointer;z-index:50;">✨</button>
+  </div>
+
   <!-- ─── PLAN SCREEN ─── -->
   <div class="screen" id="screen-plan">
     <div class="plan-title-header">
@@ -3521,6 +3598,10 @@
       <span class="nav-icon">🔍</span>
       <span class="nav-label" data-i18n="navHome">探す</span>
     </div>
+    <div class="nav-item" id="nav-course">
+      <span class="nav-icon">✨</span>
+      <span class="nav-label">コース</span>
+    </div>
     <div class="nav-item" id="nav-plan">
       <span class="nav-icon">📅</span>
       <span class="nav-label" data-i18n="navPlan">予定表</span>
@@ -3537,6 +3618,116 @@
   <!-- FAB Plan Speed Dial -->
   <div class="fab-plan-group" id="fab-plan-group">
     <button class="fab-plan" id="fab-plan" onclick="openCustomPlanModal()" aria-label="予定を追加">＋</button>
+  </div>
+
+  <!-- Course Generator Sheet -->
+  <div id="course-sheet-overlay" class="plan-modal-overlay" onclick="closeCourseSheet()"></div>
+  <div id="course-sheet" class="plan-sheet">
+    <div class="plan-sheet-handle"></div>
+    <div style="padding:0 20px 24px;overflow-y:auto;max-height:85vh;">
+
+      <!-- Step 1: 条件選択 -->
+      <div id="course-step-conditions">
+        <div style="font-size:17px;font-weight:700;margin:8px 0 16px;">コースを作る</div>
+
+        <!-- 誰と -->
+        <div class="course-condition-group">
+          <div class="course-condition-label">誰と</div>
+          <div class="course-chips" data-key="with">
+            <button class="course-chip" data-val="子連れ">👶 子連れ</button>
+            <button class="course-chip" data-val="カップル">💑 カップル</button>
+            <button class="course-chip" data-val="友人">👥 友人</button>
+            <button class="course-chip" data-val="ひとり">🧘 ひとり</button>
+          </div>
+        </div>
+
+        <!-- 使える時間 -->
+        <div class="course-condition-group">
+          <div class="course-condition-label">使える時間</div>
+          <div class="course-chips" data-key="time">
+            <button class="course-chip" data-val="午前のみ">☀️ 午前のみ</button>
+            <button class="course-chip" data-val="午後のみ">🌤 午後のみ</button>
+            <button class="course-chip" data-val="終日">🌞 終日</button>
+          </div>
+        </div>
+
+        <!-- 気分 -->
+        <div class="course-condition-group">
+          <div class="course-condition-label">気分</div>
+          <div class="course-chips" data-key="mood">
+            <button class="course-chip" data-val="のんびり">🌿 のんびり</button>
+            <button class="course-chip" data-val="アクティブ">🏃 アクティブ</button>
+            <button class="course-chip" data-val="グルメ">🍜 グルメ</button>
+            <button class="course-chip" data-val="ショッピング">🛍 ショッピング</button>
+          </div>
+        </div>
+
+        <!-- エリア -->
+        <div class="course-condition-group">
+          <div class="course-condition-label">エリア</div>
+          <div class="course-chips" data-key="area">
+            <button class="course-chip" data-val="中心部">🏙 中心部</button>
+            <button class="course-chip" data-val="東">→ 東</button>
+            <button class="course-chip" data-val="西">← 西</button>
+            <button class="course-chip" data-val="南">↓ 南</button>
+            <button class="course-chip" data-val="北">↑ 北</button>
+          </div>
+        </div>
+
+        <!-- ペース -->
+        <div class="course-condition-group">
+          <div class="course-condition-label">ペース</div>
+          <div class="course-chips" data-key="pace">
+            <button class="course-chip" data-val="ゆったり">🐢 ゆったり</button>
+            <button class="course-chip" data-val="ふつう">🚶 ふつう</button>
+            <button class="course-chip" data-val="めいっぱい">🚀 めいっぱい</button>
+          </div>
+        </div>
+
+        <button onclick="startCourseGeneration()"
+          style="width:100%;margin-top:20px;padding:14px;background:var(--caramel);color:white;
+                 border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+          ✨ コースを作る
+        </button>
+      </div>
+
+      <!-- Step 2: ローディング -->
+      <div id="course-step-loading" hidden>
+        <div style="text-align:center;padding:40px 0;">
+          <div class="course-loading-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <div id="course-loading-msg" style="margin-top:16px;font-size:15px;color:var(--warm-gray);"></div>
+        </div>
+      </div>
+
+      <!-- Step 3: 結果 -->
+      <div id="course-step-result" hidden>
+        <div id="course-result-content"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button onclick="addCourseToSchedule()"
+            style="flex:1;padding:12px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+            📅 予定表に追加
+          </button>
+          <button onclick="startCourseGeneration()"
+            style="flex:1;padding:12px;background:white;color:var(--warm-gray);border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+            🔄 作り直す
+          </button>
+        </div>
+        <button id="course-publish-btn" onclick="publishCourse()"
+          style="width:100%;margin-top:8px;padding:12px;background:white;color:var(--caramel);
+                 border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+          みんなに公開する
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Course Detail Sheet -->
+  <div id="course-detail-overlay" class="plan-modal-overlay" onclick="closeCourseDetail()"></div>
+  <div id="course-detail-sheet" class="plan-sheet">
+    <div class="plan-sheet-handle"></div>
+    <div id="course-detail-content" style="overflow-y:auto;max-height:85vh;"></div>
   </div>
 
   <!-- AI Chat Sheet -->
@@ -5791,16 +5982,19 @@
       if (detail) detail.classList.remove('visible');
     }
 
-    const FAB_HIDDEN_SCREENS = new Set(['plan', 'settings']);
+    const FAB_HIDDEN_SCREENS = new Set(['plan', 'settings', 'course']);
 
     let _loadedCity = getCity();
 
     function switchNav(screen) {
       closeAllPopups();
-      ['home','plan','settings'].forEach(s => {
+      ['home','course','plan','settings'].forEach(s => {
         document.getElementById('nav-' + s).classList.remove('active');
         const el = document.getElementById('screen-' + s);
-        if (el) el.classList.remove('visible');
+        if (el) {
+          el.classList.remove('visible');
+          if (s !== 'home') el.style.display = 'none';
+        }
       });
       document.getElementById('nav-' + screen).classList.add('active');
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -5829,11 +6023,432 @@
         document.getElementById('screen-home').style.display = 'none';
         if (appHeader) appHeader.style.display = 'none';
         const el = document.getElementById('screen-' + screen);
-        if (el) el.classList.add('visible');
+        if (el) {
+          el.style.display = 'block';
+          el.classList.add('visible');
+        }
         if (screen === 'plan') {
           renderScheduleTab();
           if (getSharedGroupId()) fetchFromServer().then(ok => { if (ok) renderScheduleTab(); });
         }
+        if (screen === 'course') {
+          initCourseScreen();
+        }
+      }
+    }
+
+    // ─── COURSE FEATURE ───
+
+    let currentCourseTab = 'preset';
+    let currentGeneratedCourse = null;
+    let courseConditions = {};
+    const LOADING_MSGS = [
+      'スポットを探しています...',
+      'ルートを組み立てています...',
+      'グルメ情報をチェック中...',
+      'コースが完成しました！'
+    ];
+
+    // コース画面初期化
+    async function initCourseScreen() {
+      await switchCourseTab('preset');
+      loadPopularCourses();
+    }
+
+    // タブ切り替え
+    async function switchCourseTab(tab) {
+      currentCourseTab = tab;
+      document.querySelectorAll('.course-tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.tab === tab));
+
+      const city = getCity();
+
+      if (tab === 'mylist') {
+        const courses = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
+        renderCourseList(courses);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/courses?city=${city}&tab=${tab}`);
+        const courses = await res.json();
+        renderCourseList(courses);
+      } catch(e) {
+        renderCourseList([]);
+      }
+    }
+
+    // コース一覧レンダリング
+    function renderCourseList(courses) {
+      const container = document.getElementById('course-list');
+      if (!courses.length) {
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--warm-gray);">コースがありません</div>';
+        return;
+      }
+      container.innerHTML = courses.map(c => renderCourseCard(c)).join('');
+    }
+
+    // コースカード HTML
+    function renderCourseCard(c) {
+      const liked = isLiked(c.id);
+      return `<div class="course-card" onclick="openCourseDetail('${c.id}')">
+        ${c.imageUrl
+          ? `<img class="course-card-img" src="${c.imageUrl}" alt="${c.title}" onerror="this.style.background='var(--sand)';this.style.display='block';">`
+          : `<div class="course-card-img" style="display:flex;align-items:center;justify-content:center;font-size:32px;">✨</div>`
+        }
+        <div class="course-card-body">
+          <div class="course-card-title">${c.title}</div>
+          <div class="course-card-tagline">${c.tagline || ''}</div>
+          <div class="course-card-meta">
+            ${c.spots?.length || 0}スポット · ${c.conditions?.pace || ''}
+            <span style="float:right">${liked ? '❤️' : '🤍'} ${c.likes || 0}</span>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // 人気コース（横スクロール）
+    async function loadPopularCourses() {
+      const city = getCity();
+      try {
+        const res = await fetch(`/api/courses?city=${city}&tab=popular`);
+        const courses = await res.json();
+        const container = document.getElementById('popular-courses-list');
+        if (!courses.length) {
+          document.getElementById('popular-courses-section').style.display = 'none';
+          return;
+        }
+        document.getElementById('popular-courses-section').style.display = '';
+        container.innerHTML = courses.map(c => `
+          <div onclick="openCourseDetail('${c.id}')" style="flex-shrink:0;width:200px;border-radius:12px;overflow:hidden;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.08);cursor:pointer;">
+            ${c.imageUrl ? `<img src="${c.imageUrl}" style="width:100%;height:90px;object-fit:cover;">` : `<div style="width:100%;height:90px;background:var(--sand);display:flex;align-items:center;justify-content:center;font-size:28px;">✨</div>`}
+            <div style="padding:8px;">
+              <div style="font-size:12px;font-weight:700;line-height:1.3;">${c.title}</div>
+              <div style="font-size:11px;color:var(--warm-gray);margin-top:4px;">❤️ ${c.likes || 0}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch(e) {
+        document.getElementById('popular-courses-section').style.display = 'none';
+      }
+    }
+
+    // コース詳細を開く
+    let _allLoadedCourses = {};
+    async function openCourseDetail(courseId) {
+      const city = getCity();
+      let course = null;
+
+      // マイリストから探す
+      const myList = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
+      course = myList.find(c => c.id === courseId);
+
+      if (!course) {
+        try {
+          const [presets, community] = await Promise.all([
+            fetch(`/api/courses?city=${city}&tab=preset`).then(r => r.json()),
+            fetch(`/api/courses?city=${city}&tab=community`).then(r => r.json()),
+          ]);
+          course = [...presets, ...community].find(c => c.id === courseId);
+        } catch(e) {}
+      }
+
+      if (!course) return;
+      _allLoadedCourses[courseId] = course;
+      renderCourseDetail(course);
+
+      document.getElementById('course-detail-overlay').classList.add('visible');
+      document.getElementById('course-detail-sheet').classList.add('visible');
+    }
+
+    function renderCourseDetail(course) {
+      const liked = isLiked(course.id);
+      const isOwn = course.authorId === getUserId();
+
+      const html = `
+        ${course.imageUrl
+          ? `<img src="${course.imageUrl}" style="width:100%;height:200px;object-fit:cover;">`
+          : `<div style="width:100%;height:160px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:48px;">✨</div>`
+        }
+        <div style="padding:20px;">
+          <div style="font-size:19px;font-weight:700;margin-bottom:4px;">${course.title}</div>
+          <div style="font-size:13px;color:var(--warm-gray);margin-bottom:12px;">${course.tagline || ''}</div>
+
+          ${course.description ? `
+            <div style="background:var(--cream);border-radius:10px;padding:12px;margin-bottom:16px;">
+              <div style="font-size:12px;font-weight:700;color:var(--caramel);margin-bottom:6px;">📝 このコースの魅力</div>
+              <div style="font-size:13px;line-height:1.6;">${course.description}</div>
+            </div>
+          ` : ''}
+
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+            ${course.conditions ? Object.values(course.conditions).filter(Boolean).map(v =>
+              `<span style="padding:4px 10px;background:var(--sand);border-radius:20px;font-size:11px;">${v}</span>`
+            ).join('') : ''}
+          </div>
+
+          <div style="font-size:13px;font-weight:700;margin-bottom:12px;">🗺️ コース</div>
+          ${(course.spots || []).map(s => `
+            <div class="course-timeline-item">
+              <div class="course-timeline-time">${s.time}</div>
+              <div class="course-timeline-body">
+                <div class="course-timeline-name">${s.emoji || ''} ${s.name} <span style="font-size:11px;color:var(--light-gray);">[${s.duration}]</span></div>
+                <div class="course-timeline-desc">${s.description || ''}</div>
+                <div class="course-timeline-meta">${s.address || ''}</div>
+              </div>
+            </div>
+          `).join('')}
+
+          <div style="font-size:12px;color:var(--light-gray);margin:12px 0;">
+            ❤️ ${course.likes || 0}&nbsp;&nbsp;作者: ${course.authorName || 'AI'}&nbsp;&nbsp;${(course.createdAt||'').slice(0,10)}
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="addCourseToScheduleById('${course.id}')"
+              style="flex:1;padding:12px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+              📅 予定表に追加
+            </button>
+            <button onclick="toggleLike('${course.id}')" id="like-btn-${course.id}"
+              style="padding:12px 16px;background:white;border:1.5px solid var(--sand-dark);border-radius:12px;font-size:18px;cursor:pointer;">
+              ${liked ? '❤️' : '🤍'}
+            </button>
+          </div>
+
+          ${isOwn && !course.isPublic ? `
+            <button onclick="publishCourseById('${course.id}')"
+              style="width:100%;margin-top:8px;padding:12px;background:white;color:var(--caramel);
+                     border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+              みんなに公開する
+            </button>
+          ` : ''}
+        </div>
+      `;
+
+      document.getElementById('course-detail-content').innerHTML = html;
+    }
+
+    function closeCourseDetail() {
+      document.getElementById('course-detail-overlay').classList.remove('visible');
+      document.getElementById('course-detail-sheet').classList.remove('visible');
+    }
+
+    // コース生成シート
+    function openCourseGenerator() {
+      courseConditions = {};
+      document.querySelectorAll('.course-chip').forEach(c => c.classList.remove('selected'));
+      showCourseStep('conditions');
+      document.getElementById('course-sheet-overlay').classList.add('visible');
+      document.getElementById('course-sheet').classList.add('visible');
+    }
+
+    function closeCourseSheet() {
+      document.getElementById('course-sheet-overlay').classList.remove('visible');
+      document.getElementById('course-sheet').classList.remove('visible');
+    }
+
+    function showCourseStep(step) {
+      ['conditions','loading','result'].forEach(s => {
+        document.getElementById(`course-step-${s}`).hidden = s !== step;
+      });
+    }
+
+    // チップ選択（再タップで解除）
+    document.addEventListener('click', e => {
+      const chip = e.target.closest('.course-chip');
+      if (!chip) return;
+      const group = chip.closest('.course-chips');
+      const key = group?.dataset.key;
+      if (!key) return;
+      const wasSelected = chip.classList.contains('selected');
+      group.querySelectorAll('.course-chip').forEach(c => c.classList.remove('selected'));
+      if (!wasSelected) {
+        chip.classList.add('selected');
+        courseConditions[key] = chip.dataset.val;
+      } else {
+        delete courseConditions[key];
+      }
+    });
+
+    // コース生成実行
+    async function startCourseGeneration() {
+      showCourseStep('loading');
+
+      let msgIdx = 0;
+      const msgEl = document.getElementById('course-loading-msg');
+      msgEl.textContent = LOADING_MSGS[0];
+      const msgInterval = setInterval(() => {
+        msgIdx = (msgIdx + 1) % (LOADING_MSGS.length - 1);
+        msgEl.textContent = LOADING_MSGS[msgIdx];
+      }, 1500);
+
+      try {
+        const city = getCity();
+        const res = await fetch('/api/courses/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            city,
+            ...courseConditions,
+            userId: getUserId(),
+            userName: getUserName(),
+          })
+        });
+
+        clearInterval(msgInterval);
+        msgEl.textContent = LOADING_MSGS[LOADING_MSGS.length - 1];
+
+        await new Promise(r => setTimeout(r, 600));
+
+        const course = await res.json();
+        currentGeneratedCourse = course;
+
+        // ローカル保存
+        saveMyCourse(course);
+
+        // 結果表示
+        document.getElementById('course-result-content').innerHTML = `
+          ${course.imageUrl ? `<img src="${course.imageUrl}" style="width:100%;height:180px;object-fit:cover;border-radius:12px;margin-bottom:12px;">` : ''}
+          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">${course.title}</div>
+          <div style="font-size:13px;color:var(--warm-gray);margin-bottom:12px;">${course.tagline || ''}</div>
+          ${course.description ? `<div style="font-size:13px;line-height:1.6;margin-bottom:16px;color:var(--warm-gray);">${course.description}</div>` : ''}
+          ${(course.spots || []).map(s => `
+            <div class="course-timeline-item">
+              <div class="course-timeline-time">${s.time}</div>
+              <div class="course-timeline-body">
+                <div class="course-timeline-name">${s.emoji || ''} ${s.name} <span style="font-size:11px;color:var(--light-gray);">[${s.duration}]</span></div>
+                <div class="course-timeline-desc">${s.description || ''}</div>
+              </div>
+            </div>
+          `).join('')}
+        `;
+        showCourseStep('result');
+
+      } catch(e) {
+        clearInterval(msgInterval);
+        alert('コース生成に失敗しました。もう一度お試しください。');
+        showCourseStep('conditions');
+      }
+    }
+
+    // 予定表に追加
+    function addCourseToSchedule() {
+      if (!currentGeneratedCourse) return;
+      addCourseToScheduleWithDate(currentGeneratedCourse);
+    }
+
+    function addCourseToScheduleById(courseId) {
+      const course = _allLoadedCourses[courseId] || currentGeneratedCourse;
+      if (!course) return;
+      addCourseToScheduleWithDate(course);
+    }
+
+    function addCourseToScheduleWithDate(course) {
+      const dateStr = prompt('追加する日付を入力（YYYY-MM-DD）:', new Date().toISOString().slice(0,10));
+      if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return;
+
+      const city = getCity();
+      const existing = JSON.parse(localStorage.getItem(city + '_custom_plans') || '[]');
+
+      const newPlans = (course.spots || []).map((s, i) => ({
+        id: `cp_${Date.now()}_course_${i}`,
+        emoji: s.emoji || '✨',
+        name: s.name,
+        dateKey: dateStr,
+        startTime: s.time,
+        memo: s.description || '',
+        member: [],
+      }));
+
+      const updated = [...existing, ...newPlans];
+      localStorage.setItem(city + '_custom_plans', JSON.stringify(updated));
+      if (typeof saveCustomPlans === 'function') saveCustomPlans(updated);
+
+      alert(`${course.spots.length}件のスポットを${dateStr}の予定に追加しました！`);
+      closeCourseSheet();
+      closeCourseDetail();
+    }
+
+    // いいね
+    function isLiked(courseId) {
+      const liked = JSON.parse(localStorage.getItem('liked_courses') || '[]');
+      return liked.includes(courseId);
+    }
+
+    async function toggleLike(courseId) {
+      const liked = JSON.parse(localStorage.getItem('liked_courses') || '[]');
+      const alreadyLiked = liked.includes(courseId);
+      const action = alreadyLiked ? 'unlike' : 'like';
+
+      if (alreadyLiked) {
+        localStorage.setItem('liked_courses', JSON.stringify(liked.filter(id => id !== courseId)));
+      } else {
+        localStorage.setItem('liked_courses', JSON.stringify([...liked, courseId]));
+      }
+
+      try {
+        await fetch(`/api/courses/${courseId}/like`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ city: getCity(), action })
+        });
+      } catch(e) {}
+
+      // ボタンのテキスト更新
+      const btn = document.getElementById(`like-btn-${courseId}`);
+      if (btn) btn.textContent = alreadyLiked ? '🤍' : '❤️';
+    }
+
+    // 公開
+    async function publishCourse() {
+      if (!currentGeneratedCourse) return;
+      await publishCourseById(currentGeneratedCourse.id);
+    }
+
+    async function publishCourseById(courseId) {
+      const city = getCity();
+      const myList = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
+      const course = myList.find(c => c.id === courseId);
+      if (!course) return;
+
+      try {
+        await fetch('/api/courses/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...course, isPublic: true })
+        });
+
+        // ローカルも更新
+        const updated = myList.map(c => c.id === courseId ? {...c, isPublic: true} : c);
+        localStorage.setItem(city + '_my_courses', JSON.stringify(updated));
+
+        alert('コースを公開しました！');
+        closeCourseSheet();
+        closeCourseDetail();
+      } catch(e) {
+        alert('公開に失敗しました。');
+      }
+    }
+
+    // ユーティリティ
+    function getUserId() {
+      let id = localStorage.getItem('user_id');
+      if (!id) { id = 'user_' + Math.random().toString(36).slice(2,10); localStorage.setItem('user_id', id); }
+      return id;
+    }
+
+    function getUserName() {
+      return localStorage.getItem('user_name') || '匿名';
+    }
+
+    function saveMyCourse(course) {
+      const city = getCity();
+      const key = city + '_my_courses';
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      // 重複チェック
+      if (!list.find(c => c.id === course.id)) {
+        list.unshift(course);
+        if (list.length > 10) list.pop();
+        localStorage.setItem(key, JSON.stringify(list));
       }
     }
 

@@ -29,13 +29,22 @@ pm2 status
 ## フォルダ構成
 sg-weekend-app/
 ├── server.js
-├── fetch-events.js
-├── filter-events.js
-├── events.json
-├── sales.json
+├── scripts/
+│   ├── fetch-events.js
+│   ├── filter-events.js
+│   ├── generate-model-courses.js  ← モデルコース生成（Claude API + Unsplash）
+│   ├── fill-images.js             ← 既存イベントへの画像補完
+│   └── lib/
+│       └── unsplash.js            ← Unsplash API ユーティリティ
+├── data/
+│   ├── sg/
+│   │   ├── events.json
+│   │   ├── model-courses.json     ← AIプリセットコース
+│   │   └── community-courses.json ← ユーザー公開コース
+│   ├── bkk/ (同様)
+│   └── syd/ (同様)
 ├── public/
 │   ├── index.html
-│   ├── app.js
 │   └── sw.js
 └── .claude/
     ├── plan.md
@@ -45,6 +54,15 @@ sg-weekend-app/
 ## データ構造
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
+
+## コース機能（2026-06-22実装）
+- ナビ: 探す / コース / 予定表 / 設定 の4タブ
+- AIプリセットコース: `data/{city}/model-courses.json`
+- ユーザー公開コース: `data/{city}/community-courses.json`
+- マイコース: localStorage `{city}_my_courses`
+- API: GET /api/courses, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like
+- 初期データ生成: `node scripts/generate-model-courses.js --city=sg`
+- 画像補完: `node scripts/fill-images.js --city=sg`
 
 ## アーキテクチャルール
 - ビジネスロジックはサーバーサイドに置く

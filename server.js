@@ -191,6 +191,17 @@ app.get('/api/subscription-status', async (req, res) => {
 */
 
 // ─────────────────────────────────────────────
+// FILE LOCK UTILITY
+// ─────────────────────────────────────────────
+const fileLocks = {};
+async function withFileLock(filePath, fn) {
+  while (fileLocks[filePath]) await new Promise(r => setTimeout(r, 10));
+  fileLocks[filePath] = true;
+  try { return await fn(); }
+  finally { fileLocks[filePath] = false; }
+}
+
+// ─────────────────────────────────────────────
 // MIDDLEWARE
 // ─────────────────────────────────────────────
 app.use(express.json());
@@ -1306,24 +1317,19 @@ function getCalFilePath(groupId) {
 
 app.post('/api/calendar/create', async (req, res) => {
   try {
-    const { city = 'sg', customPlans = [], eventPlans = [] } = req.body;
+    const { city = 'sg', encryptedData } = req.body;
     let groupId;
     do { groupId = generateGroupId(); }
     while (fs.existsSync(path.join(SHARED_CAL_DIR, `${groupId}.json`)));
 
-    const joinUrl = `https://dosuru.app/?join=${groupId}&city=${city}`;
-    const qrDataUrl = await QRCode.toDataURL(joinUrl, {
-      width: 220, margin: 2,
-      color: { dark: '#2C2420', light: '#FFF9F2' }
-    });
-
-    fs.writeFileSync(getCalFilePath(groupId), JSON.stringify({
+    const calData = {
       groupId, city,
       createdAt: new Date().toISOString(),
       lastSyncAt: new Date().toISOString(),
-      customPlans, eventPlans, qrDataUrl
-    }, null, 2));
-    res.json({ groupId, qrDataUrl });
+      encryptedData: encryptedData || null,
+    };
+    fs.writeFileSync(getCalFilePath(groupId), JSON.stringify(calData, null, 2));
+    res.json({ groupId });
   } catch (e) {
     console.error('calendar create:', e);
     res.status(500).json({ error: 'failed' });
@@ -1342,33 +1348,28 @@ app.put('/api/calendar/:groupId', (req, res) => {
   if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
   try {
     const existing = JSON.parse(fs.readFileSync(fp, 'utf8'));
-    const { customPlans = [], eventPlans = [] } = req.body;
-    const updated = { ...existing, customPlans, eventPlans, lastSyncAt: new Date().toISOString() };
+    const { encryptedData, customPlans, eventPlans } = req.body;
+    const updated = { ...existing, lastSyncAt: new Date().toISOString() };
+    if (encryptedData !== undefined) {
+      updated.encryptedData = encryptedData;
+      delete updated.customPlans;
+      delete updated.eventPlans;
+      delete updated.qrDataUrl;
+    } else {
+      updated.customPlans = customPlans || [];
+      updated.eventPlans = eventPlans || [];
+    }
     fs.writeFileSync(fp, JSON.stringify(updated, null, 2));
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'write failed' }); }
 });
 
 app.post('/api/calendar/:groupId/join', (req, res) => {
+  // Merge now happens client-side; this endpoint just returns current data
   const fp = getCalFilePath(req.params.groupId);
   if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
-  try {
-    const existing = JSON.parse(fs.readFileSync(fp, 'utf8'));
-    const { customPlans = [], eventPlans = [] } = req.body;
-    const mergeArr = (a, b) => {
-      const map = {};
-      [...a, ...b].forEach(p => { if (p && p.id) map[p.id] = p; });
-      return Object.values(map);
-    };
-    const merged = {
-      ...existing,
-      customPlans: mergeArr(existing.customPlans || [], customPlans),
-      eventPlans:  mergeArr(existing.eventPlans  || [], eventPlans),
-      lastSyncAt: new Date().toISOString()
-    };
-    fs.writeFileSync(fp, JSON.stringify(merged, null, 2));
-    res.json({ customPlans: merged.customPlans, eventPlans: merged.eventPlans });
-  } catch (e) { res.status(500).json({ error: 'join failed' }); }
+  try { res.json(JSON.parse(fs.readFileSync(fp, 'utf8'))); }
+  catch (e) { res.status(500).json({ error: 'join failed' }); }
 });
 
 app.post('/api/calendar/:groupId/push-subscribe', (req, res) => {
@@ -1431,6 +1432,160 @@ app.post('/api/calendar/:groupId/notify', async (req, res) => {
     }
     res.json({ ok: true, sent: subs.length - expired.size });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// COURSE API
+// ─────────────────────────────────────────────
+
+// GET /api/courses
+app.get('/api/courses', (req, res) => {
+  const city = req.query.city || 'sg';
+  const tab = req.query.tab || 'preset';
+
+  const modelPath = path.join(__dirname, 'data', city, 'model-courses.json');
+  const communityPath = path.join(__dirname, 'data', city, 'community-courses.json');
+
+  const presets = fs.existsSync(modelPath) ? JSON.parse(fs.readFileSync(modelPath)) : [];
+  const community = fs.existsSync(communityPath) ? JSON.parse(fs.readFileSync(communityPath)) : [];
+
+  if (tab === 'preset') return res.json(presets);
+  if (tab === 'community') return res.json([...community].sort((a, b) => b.likes - a.likes));
+  if (tab === 'popular') {
+    const all = [...presets, ...community].sort((a, b) => b.likes - a.likes);
+    return res.json(all.slice(0, 5));
+  }
+  res.json([]);
+});
+
+// POST /api/courses/generate
+app.post('/api/courses/generate', async (req, res) => {
+  const { city = 'sg', with: who, time, mood, area, pace = 'ふつう' } = req.body;
+
+  // 登録イベントから候補を取得
+  const ep = eventsPath(city);
+  const events = fs.existsSync(ep) ? JSON.parse(fs.readFileSync(ep)) : [];
+  const upcomingEvents = events.filter(e => e.end_date >= new Date().toISOString().slice(0, 10)).slice(0, 5);
+
+  const spotCount = pace === 'ゆったり' ? '2〜3' : pace === 'めいっぱい' ? '6〜8' : '4〜5';
+
+  const Anthropic = require('@anthropic-ai/sdk');
+  const client = new Anthropic();
+
+  const prompt = `シンガポール在住日本人向けに、以下の条件で週末1日コースを提案してください。
+
+条件:
+- 誰と: ${who || '誰でも'}
+- 時間帯: ${time || '終日'}
+- 気分: ${mood || 'アクティブ'}
+- エリア: ${area || '中心部'}
+- ペース: ${pace}（スポット数の目安: ${spotCount}件）
+
+参考にできる登録イベント（任意で1件組み込んでよい）:
+${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜${e.end_date}）`).join('\n') || 'なし'}
+
+以下のJSON形式で返してください（余分な説明不要、JSONのみ）:
+{
+  "title": "コースタイトル（20文字以内）",
+  "tagline": "キャッチコピー（30文字以内）",
+  "description": "このコースの魅力（2〜3文、なぜおすすめか具体的に）",
+  "imageSearch": "英語キーワード2〜4語",
+  "spots": [
+    {
+      "time": "09:00",
+      "name": "スポット名",
+      "type": "観光|グルメ|ショッピング|公園|文化",
+      "duration": "90分",
+      "description": "おすすめポイント（40〜60文字）",
+      "address": "エリア・場所",
+      "emoji": "🌿"
+    }
+  ]
+}`;
+
+  try {
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = message.content[0].text;
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return res.status(500).json({ error: 'コース生成失敗' });
+
+    const course = JSON.parse(jsonMatch[0]);
+
+    // Unsplash画像取得
+    const { fetchUnsplashImage } = require('./scripts/lib/unsplash');
+    const imageUrl = await fetchUnsplashImage(course.imageSearch || 'singapore weekend');
+
+    const result = {
+      id: `course_${city}_${Date.now()}`,
+      city,
+      type: 'ai',
+      ...course,
+      imageUrl,
+      conditions: { with: who, time, mood, area, pace },
+      authorId: req.body.userId || 'anonymous',
+      authorName: req.body.userName || '匿名',
+      isPublic: false,
+      likes: 0,
+      views: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    res.json(result);
+  } catch (e) {
+    console.error('Course generation error:', e);
+    res.status(500).json({ error: 'コース生成に失敗しました' });
+  }
+});
+
+// POST /api/courses/publish
+app.post('/api/courses/publish', async (req, res) => {
+  const course = req.body;
+  if (!course?.id || !course?.city) return res.status(400).json({ error: 'invalid' });
+
+  const filePath = path.join(__dirname, 'data', course.city, 'community-courses.json');
+
+  await withFileLock(filePath, async () => {
+    const courses = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath)) : [];
+    // 重複チェック
+    if (courses.find(c => c.id === course.id)) return;
+    courses.unshift({ ...course, isPublic: true, publishedAt: new Date().toISOString() });
+    fs.writeFileSync(filePath, JSON.stringify(courses, null, 2));
+  });
+
+  res.json({ ok: true });
+});
+
+// POST /api/courses/:id/like
+app.post('/api/courses/:id/like', async (req, res) => {
+  const { id } = req.params;
+  const { city = 'sg', action = 'like' } = req.body;
+
+  const paths = [
+    path.join(__dirname, 'data', city, 'community-courses.json'),
+    path.join(__dirname, 'data', city, 'model-courses.json'),
+  ];
+
+  let updated = false;
+  for (const filePath of paths) {
+    if (!fs.existsSync(filePath)) continue;
+    await withFileLock(filePath, async () => {
+      const courses = JSON.parse(fs.readFileSync(filePath));
+      const course = courses.find(c => c.id === id);
+      if (course) {
+        course.likes = Math.max(0, (course.likes || 0) + (action === 'like' ? 1 : -1));
+        fs.writeFileSync(filePath, JSON.stringify(courses, null, 2));
+        updated = true;
+      }
+    });
+    if (updated) break;
+  }
+
+  res.json({ ok: true });
 });
 
 // ─────────────────────────────────────────────
