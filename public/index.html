@@ -2539,7 +2539,7 @@
       background: var(--cream);
       border-radius: 24px 24px 0 0;
       box-shadow: 0 -6px 32px rgba(44,36,32,0.16);
-      z-index: 501;
+      z-index: 2001;
       display: flex;
       flex-direction: column;
       transform: translateY(100%);
@@ -3339,9 +3339,9 @@
 
     <!-- FAB -->
     <button id="course-fab" onclick="openCourseGenerator()"
-      style="position:fixed;bottom:80px;right:16px;width:52px;height:52px;border-radius:50%;
+      style="position:fixed;bottom:calc(100px + env(safe-area-inset-bottom,0px));right:20px;width:52px;height:52px;border-radius:50%;
              background:var(--caramel);color:white;font-size:24px;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.2);
-             cursor:pointer;z-index:50;">✨</button>
+             cursor:pointer;z-index:200;">✨</button>
   </div>
 
   <!-- ─── PLAN SCREEN ─── -->
@@ -3633,7 +3633,7 @@
   <div id="course-sheet-overlay" class="plan-modal-overlay" onclick="closeCourseSheet()"></div>
   <div id="course-sheet" class="plan-sheet">
     <div class="plan-sheet-handle"></div>
-    <div style="padding:0 20px 24px;overflow-y:auto;max-height:85vh;">
+    <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 24px;">
 
       <!-- Step 1: 条件選択 -->
       <div id="course-step-conditions">
@@ -6144,6 +6144,15 @@
 
     // コース詳細を開く
     let _allLoadedCourses = {};
+    function _lockCourseScroll() {
+      const sc = document.querySelector('#screen-course .screen-content');
+      if (sc) sc.style.overflow = 'hidden';
+    }
+    function _unlockCourseScroll() {
+      const sc = document.querySelector('#screen-course .screen-content');
+      if (sc) { sc.style.overflowY = 'auto'; sc.style.overflow = ''; }
+    }
+
     async function openCourseDetail(courseId) {
       const city = getCity();
       let course = null;
@@ -6166,6 +6175,7 @@
       _allLoadedCourses[courseId] = course;
       renderCourseDetail(course);
 
+      _lockCourseScroll();
       document.getElementById('course-detail-overlay').classList.add('visible');
       document.getElementById('course-detail-sheet').classList.add('visible');
     }
@@ -6237,6 +6247,7 @@
     }
 
     function closeCourseDetail() {
+      _unlockCourseScroll();
       document.getElementById('course-detail-overlay').classList.remove('visible');
       document.getElementById('course-detail-sheet').classList.remove('visible');
     }
@@ -6246,11 +6257,13 @@
       courseConditions = {};
       document.querySelectorAll('.course-chip').forEach(c => c.classList.remove('selected'));
       showCourseStep('conditions');
+      _lockCourseScroll();
       document.getElementById('course-sheet-overlay').classList.add('visible');
       document.getElementById('course-sheet').classList.add('visible');
     }
 
     function closeCourseSheet() {
+      _unlockCourseScroll();
       document.getElementById('course-sheet-overlay').classList.remove('visible');
       document.getElementById('course-sheet').classList.remove('visible');
     }
