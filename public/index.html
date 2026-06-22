@@ -3178,9 +3178,19 @@
     html[data-theme="dark"] .update-banner { background: #2E241C; color: var(--midnight); }
     html[data-theme="dark"] .course-card { background: #252019; }
     html[data-theme="dark"] .course-chip:not(.selected) { background: #2E241C; border-color: var(--sand-dark); color: var(--warm-gray); }
-    #screen-course { padding: 0; }
-    #screen-course .screen-content {
+    #screen-course {
+      padding: 0;
+      display: flex;
+      flex-direction: column;
       height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
+    }
+    #screen-course .course-screen-header {
+      flex-shrink: 0;
+      padding: 20px 20px 0;
+    }
+    #screen-course .screen-content {
+      flex: 1;
+      min-height: 0;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       padding: 0 0 80px;
@@ -3319,11 +3329,14 @@
 
   <!-- ─── COURSE SCREEN ─── -->
   <div class="screen" id="screen-course" style="display:none;">
+    <div class="course-screen-header plan-title-header">
+      <span class="screen-title">コース</span>
+    </div>
     <div class="screen-content">
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin:16px 16px 8px;">人気コース</div>
-        <div id="popular-courses-list" style="display:flex;gap:12px;overflow-x:auto;padding:0 16px 4px;scrollbar-width:none;"></div>
+        <div class="plan-section-title" style="margin:0 16px 8px;">🔥 人気コース</div>
+        <div id="popular-courses-list" style="display:flex;gap:12px;overflow-x:auto;padding:4px 16px 4px;scrollbar-width:none;"></div>
       </div>
 
       <!-- タブ -->
@@ -3338,10 +3351,8 @@
     </div>
 
     <!-- FAB -->
-    <button id="course-fab" onclick="openCourseGenerator()"
-      style="position:fixed;bottom:calc(100px + env(safe-area-inset-bottom,0px));right:20px;width:52px;height:52px;border-radius:50%;
-             background:var(--caramel);color:white;font-size:24px;border:none;box-shadow:0 4px 16px rgba(0,0,0,0.2);
-             cursor:pointer;z-index:200;">✨</button>
+    <button id="course-fab" onclick="openCourseGenerator()" class="fab-plan"
+      style="position:fixed;bottom:calc(100px + env(safe-area-inset-bottom,0px));right:20px;z-index:200;">＋</button>
   </div>
 
   <!-- ─── PLAN SCREEN ─── -->
