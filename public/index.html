@@ -6082,10 +6082,13 @@
       const sc = document.querySelector('#screen-course .screen-content');
       if (sc && !sc._swipeInit) {
         sc._swipeInit = true;
+        let _courseSwipeOnHScroll = false;
         sc.addEventListener('touchstart', e => {
           _courseSwipeStartX = e.touches[0].clientX;
+          _courseSwipeOnHScroll = !!e.target.closest('#popular-courses-list');
         }, { passive: true });
         sc.addEventListener('touchend', e => {
+          if (_courseSwipeOnHScroll) return;
           const dx = e.changedTouches[0].clientX - _courseSwipeStartX;
           if (Math.abs(dx) < 50) return;
           const idx = COURSE_TABS.indexOf(currentCourseTab);
