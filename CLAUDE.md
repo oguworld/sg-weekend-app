@@ -55,14 +55,15 @@ sg-weekend-app/
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
 
-## コース機能（2026-06-22実装）
+## コース機能（2026-06-22実装・2026-06-23 v3更新）
 - ナビ: 探す / コース / 予定表 / 設定 の4タブ
-- AIプリセットコース: `data/{city}/model-courses.json`
+- コース画面タブ: みんなの（community） / マイコース（mylist）の2タブ（AIプリセットは廃止）
+- コース作成: FABタップ → AIチャットシート（POST /api/courses/chat）で条件を会話形式で収集
 - ユーザー公開コース: `data/{city}/community-courses.json`
-- マイコース: localStorage `{city}_my_courses`
-- API: GET /api/courses, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like
-- 初期データ生成: `node scripts/generate-model-courses.js --city=sg`
-- 画像補完: `node scripts/fill-images.js --city=sg`
+- マイコース: localStorage `{city}_my_courses`（published フィールドで公開管理）
+- API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like
+- プロフィール連携: sg_who（おでかけスタイル）/ sg_age（子どもの年齢）をチャット・生成プロンプトに反映
+- 画像補完: `node scripts/fill-images.js --city=sg`（generate-model-courses.jsは参照なし）
 
 ## アーキテクチャルール
 - ビジネスロジックはサーバーサイドに置く

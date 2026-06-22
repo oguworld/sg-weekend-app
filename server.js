@@ -1441,33 +1441,51 @@ app.post('/api/calendar/:groupId/notify', async (req, res) => {
 // GET /api/courses
 app.get('/api/courses', (req, res) => {
   const city = req.query.city || 'sg';
-  const tab = req.query.tab || 'preset';
+  const tab = req.query.tab || 'community';
 
-  const modelPath = path.join(__dirname, 'data', city, 'model-courses.json');
   const communityPath = path.join(__dirname, 'data', city, 'community-courses.json');
-
-  const presets = fs.existsSync(modelPath) ? JSON.parse(fs.readFileSync(modelPath)) : [];
   const community = fs.existsSync(communityPath) ? JSON.parse(fs.readFileSync(communityPath)) : [];
 
-  if (tab === 'preset') return res.json(presets);
+  if (tab === 'preset') return res.json([]);
   if (tab === 'community') return res.json([...community].sort((a, b) => b.likes - a.likes));
   if (tab === 'popular') {
-    const all = [...presets, ...community].sort((a, b) => b.likes - a.likes);
-    return res.json(all.slice(0, 5));
+    // communityのみからlikes降順上位5件
+    const sorted = [...community].sort((a, b) => b.likes - a.likes);
+    return res.json(sorted.slice(0, 5));
   }
   res.json([]);
 });
 
 // POST /api/courses/generate
 app.post('/api/courses/generate', async (req, res) => {
-  const { city = 'sg', with: who, time, mood, area, pace = 'ふつう' } = req.body;
+  const { city = 'sg', with: who, time, mood, area, pace = 'ふつう', style, conditions, profile } = req.body;
+
+  // conditions オブジェクトが渡された場合はそちらを優先
+  const cond = conditions || {};
+  const resolvedWho = cond.with || who;
+  const resolvedTime = cond.time || time;
+  const resolvedMood = cond.mood || mood;
+  const resolvedArea = cond.area || area;
+  const resolvedPace = cond.pace || pace;
+  const resolvedStyle = cond.style || style;
+  const resolvedAge = profile?.age;
 
   // 登録イベントから候補を取得
   const ep = eventsPath(city);
   const events = fs.existsSync(ep) ? JSON.parse(fs.readFileSync(ep)) : [];
   const upcomingEvents = events.filter(e => e.end_date >= new Date().toISOString().slice(0, 10)).slice(0, 5);
 
-  const spotCount = pace === 'ゆったり' ? '2〜3' : pace === 'めいっぱい' ? '6〜8' : '4〜5';
+  const spotCount = resolvedPace === 'ゆったり' ? '2〜3' : resolvedPace === 'めいっぱい' ? '6〜8' : '4〜5';
+
+  // 年齢情報の日本語表現
+  const ageLabels = { baby: '0〜2歳の赤ちゃん', preschool: '幼稚園児（3〜6歳）', school: '小学生以上' };
+  const ageNote = resolvedAge && resolvedAge !== 'all' ? `\n- 子どもの年齢: ${ageLabels[resolvedAge] || resolvedAge}` : '';
+
+  // スタイルの説明
+  let styleNote = '';
+  if (resolvedStyle === '定番') styleNote = '\n- スタイル: 定番（人気スポット・観光地定番コース。誰でも楽しめる王道プラン）';
+  else if (resolvedStyle === 'ニッチ') styleNote = '\n- スタイル: ニッチ（ローカルに愛される穴場・あまり知られていないスポット中心のプラン）';
+  else styleNote = '\n- スタイル: バランス良く（定番・穴場を適切に組み合わせる）';
 
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic();
@@ -1475,11 +1493,11 @@ app.post('/api/courses/generate', async (req, res) => {
   const prompt = `シンガポール在住日本人向けに、以下の条件で週末1日コースを提案してください。
 
 条件:
-- 誰と: ${who || '誰でも'}
-- 時間帯: ${time || '終日'}
-- 気分: ${mood || 'アクティブ'}
-- エリア: ${area || '中心部'}
-- ペース: ${pace}（スポット数の目安: ${spotCount}件）
+- 誰と: ${resolvedWho || '誰でも'}
+- 時間帯: ${resolvedTime || '終日'}
+- 気分: ${resolvedMood || 'アクティブ'}
+- エリア: ${resolvedArea || 'Central（中心部）'}
+- ペース: ${resolvedPace}（スポット数の目安: ${spotCount}件）${ageNote}${styleNote}
 
 参考にできる登録イベント（任意で1件組み込んでよい）:
 ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜${e.end_date}）`).join('\n') || 'なし'}
@@ -1526,7 +1544,7 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
       type: 'ai',
       ...course,
       imageUrl,
-      conditions: { with: who, time, mood, area, pace },
+      conditions: { with: resolvedWho, time: resolvedTime, mood: resolvedMood, area: resolvedArea, pace: resolvedPace, style: resolvedStyle },
       authorId: req.body.userId || 'anonymous',
       authorName: req.body.userName || '匿名',
       isPublic: false,
@@ -1539,6 +1557,132 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
   } catch (e) {
     console.error('Course generation error:', e);
     res.status(500).json({ error: 'コース生成に失敗しました' });
+  }
+});
+
+// POST /api/courses/chat — AIチャットで条件収集
+app.post('/api/courses/chat', async (req, res) => {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not set' });
+
+  const { city = 'sg', message = '', history = [], profile = {} } = req.body;
+  const cityConf = CITIES[city] || CITIES.sg;
+
+  // プロフィール情報の日本語変換
+  const whoMap = { family: 'ファミリー（子連れ）', couple: 'カップル', group: '友人グループ', solo: 'ひとり' };
+  const ageLabels = { baby: '0〜2歳の赤ちゃん', preschool: '幼稚園児（3〜6歳）', school: '小学生以上' };
+  const whoList = Array.isArray(profile.who) ? profile.who : [];
+  const whoText = whoList.length > 0 ? whoMap[whoList[0]] || whoList[0] : '未設定';
+  const ageText = profile.age && profile.age !== 'all' ? ageLabels[profile.age] || profile.age : null;
+
+  let profileDesc = `おでかけスタイル: ${whoText}`;
+  if (ageText) profileDesc += `（子ども: ${ageText}）`;
+
+  const collectTool = {
+    name: 'collect_conditions',
+    description: 'ユーザーから収集した条件と、AIからユーザーへの返答を記録する',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'ユーザーへの返答メッセージ' },
+        conditions: {
+          type: 'object',
+          properties: {
+            with: { type: ['string', 'null'] },
+            time: { type: ['string', 'null'] },
+            mood: { type: ['string', 'null'] },
+            area: { type: ['string', 'null'] },
+            pace: { type: ['string', 'null'] },
+            style: { type: ['string', 'null'] }
+          }
+        },
+        ready: { type: 'boolean', description: '全条件揃ったらtrue' }
+      },
+      required: ['message', 'conditions', 'ready']
+    }
+  };
+
+  // withはプロフィールから補完
+  const withFromProfile = whoList.length > 0 ? whoText : null;
+
+  const systemPrompt = `あなたは${cityConf.nameJa}在住日本人向け週末コース作成の聞き取り担当AIです。
+日本語で自然な会話形式でコース作成に必要な条件を聞き取ってください。
+
+ユーザーのプロフィール:
+- ${profileDesc}
+
+収集する条件（全6項目）:
+1. with（誰と）: ${withFromProfile ? `プロフィールから「${withFromProfile}」と判断済み` : '子連れ / カップル / 友人 / ひとり から聞き取る'}
+2. time（使える時間）: 午前のみ / 午後のみ / 終日
+3. mood（気分）: のんびり / アクティブ / グルメ / ショッピング
+4. area（エリア）: Central / East / West / North / North-East / Island-wide（英語値で記録、表示は日本語OK）
+5. pace（ペース）: ゆったり / ふつう / めいっぱい
+6. style（スタイル）: 定番（人気スポット中心） / ニッチ（穴場・ローカル中心）
+
+ルール:
+- withはプロフィールから補完済みの場合は確認だけして次に進む
+- 3〜5往復で自然にまとめる
+- 複数の条件を1回で聞いても良い
+- 全6項目が揃ったら ready: true にし、収集した条件の概要をmessageに含める
+- 空メッセージ（初回）の場合はプロフィールを参照した挨拶と最初の質問を返す
+- collect_conditions ツールを必ず使って返答すること`;
+
+  // 最大6往復（12メッセージ）に制限
+  const limitedHistory = history.slice(-12);
+  const messages = message.trim()
+    ? [...limitedHistory, { role: 'user', content: message.trim() }]
+    : limitedHistory;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: messages.length > 0 ? messages : [{ role: 'user', content: '（初回）' }],
+        tools: [collectTool],
+        tool_choice: { type: 'tool', name: 'collect_conditions' },
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Anthropic API error (courses/chat):', err);
+      return res.status(500).json({ error: 'AI response failed' });
+    }
+
+    const data = await response.json();
+    const toolUse = data.content?.find(b => b.type === 'tool_use' && b.name === 'collect_conditions');
+
+    if (toolUse) {
+      const input = toolUse.input;
+      // withをプロフィールから補完
+      if (withFromProfile && !input.conditions?.with) {
+        if (input.conditions) input.conditions.with = withFromProfile;
+      }
+      return res.json({
+        message: input.message || '',
+        conditions: input.conditions || {},
+        ready: input.ready || false,
+      });
+    }
+
+    // fallback
+    const textBlock = data.content?.find(b => b.type === 'text');
+    res.json({
+      message: textBlock?.text || 'すみません、もう一度お試しください。',
+      conditions: {},
+      ready: false,
+    });
+  } catch (e) {
+    console.error('courses/chat error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -1565,24 +1709,17 @@ app.post('/api/courses/:id/like', async (req, res) => {
   const { id } = req.params;
   const { city = 'sg', action = 'like' } = req.body;
 
-  const paths = [
-    path.join(__dirname, 'data', city, 'community-courses.json'),
-    path.join(__dirname, 'data', city, 'model-courses.json'),
-  ];
+  const filePath = path.join(__dirname, 'data', city, 'community-courses.json');
 
-  let updated = false;
-  for (const filePath of paths) {
-    if (!fs.existsSync(filePath)) continue;
+  if (fs.existsSync(filePath)) {
     await withFileLock(filePath, async () => {
       const courses = JSON.parse(fs.readFileSync(filePath));
       const course = courses.find(c => c.id === id);
       if (course) {
         course.likes = Math.max(0, (course.likes || 0) + (action === 'like' ? 1 : -1));
         fs.writeFileSync(filePath, JSON.stringify(courses, null, 2));
-        updated = true;
       }
     });
-    if (updated) break;
   }
 
   res.json({ ok: true });
