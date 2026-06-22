@@ -1561,11 +1561,10 @@
       margin-bottom: 28px;
     }
     .settings-section-title {
-      font-size: 13px;
+      font-family: 'Kaisei Opti', serif;
+      font-size: 18px;
       font-weight: 700;
-      letter-spacing: 0.08em;
-      color: var(--warm-gray);
-      text-transform: uppercase;
+      color: var(--midnight);
       margin-bottom: 12px;
     }
     .settings-item {
@@ -2217,7 +2216,7 @@
     .pin-detail-overlay.visible { display: block; }
 
     /* ─── 共有カレンダー ─── */
-    .plan-title-header { display:flex;align-items:center;margin-bottom:20px; }
+    .plan-title-header { display:flex;align-items:center;margin-bottom:20px;min-height:52px; }
     .plan-title-header .screen-title { margin-bottom:0;flex:1; }
     .header-cal-sync-btn { display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:10px;transition:background 0.15s;-webkit-tap-highlight-color:transparent; }
     .header-cal-sync-btn:active { background:var(--sand); }
@@ -3335,7 +3334,7 @@
     <div class="screen-content">
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
-        <div class="plan-section-title" style="margin:0 16px 8px;">🔥 人気コース</div>
+        <div class="plan-section-title" style="margin:0 16px 8px;">人気コース</div>
         <div id="popular-courses-list" style="display:flex;gap:12px;overflow-x:auto;padding:4px 16px 4px;scrollbar-width:none;"></div>
       </div>
 
@@ -3615,7 +3614,7 @@
   <nav class="bottom-nav">
     <div class="nav-item active" id="nav-home">
       <span class="nav-icon">🔍</span>
-      <span class="nav-label" data-i18n="navHome">探す</span>
+      <span class="nav-label" data-i18n="navHome">スポット</span>
     </div>
     <div class="nav-item" id="nav-course">
       <span class="nav-icon">✨</span>
@@ -4043,7 +4042,7 @@
         secAbout: 'アプリ情報',
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
-        navHome: '探す',
+        navHome: 'スポット',
         navPlan: '予定表',
         navSettings: '設定',
         pinBtn: 'ピン留め',
