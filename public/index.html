@@ -2041,12 +2041,19 @@
 
     /* ─── COURSE FEATURE ─── */
     .course-tab {
-      flex: 1; padding: 10px; background: none; border: none;
-      border-bottom: 2px solid transparent; font-size: 14px;
-      font-weight: 500; color: var(--warm-gray); cursor: pointer;
-      font-family: 'Noto Sans JP', sans-serif;
+      flex: 1; padding: 8px 4px; background: transparent; border: none;
+      border-radius: 14px; font-size: 13px; font-weight: 500;
+      color: var(--warm-gray); cursor: pointer;
+      font-family: 'Noto Sans JP', sans-serif; transition: all 0.18s;
     }
-    .course-tab.active { border-bottom-color: var(--caramel); color: var(--caramel); font-weight: 700; }
+    .course-tab.active {
+      background: white; color: var(--caramel); font-weight: 700;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    }
+    .course-tab-bar {
+      display: flex; background: var(--sand); border-radius: 16px;
+      padding: 3px; margin: 0 16px 16px; gap: 2px;
+    }
 
     .course-card {
       border-radius: 14px; overflow: hidden;
@@ -3344,20 +3351,16 @@
         <span class="ptr-label"></span>
         <div class="ptr-spinner"></div>
       </div>
-      <!-- 人気コースセクション -->
-      <div id="popular-courses-section" style="margin-bottom:16px;">
-        <div class="plan-section-title" style="margin:0 16px 8px;">人気のコース</div>
-        <div id="popular-courses-list" style="display:flex;gap:10px;overflow-x:auto;padding:4px 16px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-padding-left:16px;"></div>
-      </div>
 
-      <!-- タブ -->
-      <div style="display:flex;border-bottom:1.5px solid var(--sand);margin:0 0 12px;">
-        <button class="course-tab active" data-tab="community" onclick="switchCourseTab('community')">みんなの</button>
+      <!-- ピルタブ -->
+      <div class="course-tab-bar">
+        <button class="course-tab active" data-tab="popular" onclick="switchCourseTab('popular')">人気</button>
+        <button class="course-tab" data-tab="community" onclick="switchCourseTab('community')">公開コース</button>
         <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')">マイコース</button>
       </div>
 
       <!-- コース一覧 -->
-      <div id="course-list" style="padding:0 16px;display:flex;flex-direction:column;gap:10px;"></div>
+      <div id="course-list" style="padding:0 16px;display:flex;flex-direction:column;gap:10px;padding-bottom:120px;"></div>
     </div>
 
     <!-- FAB -->
@@ -3657,7 +3660,10 @@
 
       <!-- Step 1: 条件選択 -->
       <div id="course-step-conditions">
-        <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);margin:8px 0 20px;">コースを作る</div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin:8px 0 20px;">
+          <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);">コースを作る</div>
+          <div id="course-sheet-profile-display" style="font-size:11px;color:var(--light-gray);"></div>
+        </div>
 
         <!-- ピン留めイベント選択 -->
         <div id="course-sheet-pins" style="display:none;background:var(--cream);border-radius:12px;padding:12px 14px;margin-bottom:20px;border-left:3px solid var(--caramel);">
@@ -6107,7 +6113,7 @@
 
     // ─── COURSE FEATURE ───
 
-    let currentCourseTab = 'community';
+    let currentCourseTab = 'popular';
     let currentGeneratedCourse = null;
     const LOADING_MSGS = [
       'スポットを探しています...',
@@ -6117,12 +6123,11 @@
     ];
 
     // コース画面初期化
-    const COURSE_TABS = ['community', 'mylist'];
+    const COURSE_TABS = ['popular', 'community', 'mylist'];
     let _courseSwipeStartX = 0;
 
     async function initCourseScreen() {
-      await switchCourseTab('community');
-      loadPopularCourses();
+      await switchCourseTab('popular');
 
       // スワイプでタブ切り替え & プルリフレッシュ（初回のみ登録）
       const sc = document.querySelector('#screen-course .screen-content');
@@ -6175,7 +6180,7 @@
           if (dy >= PTR_TRIGGER && !_ptrRefreshing) {
             _ptrRefreshing = true;
             if (ptrInd) { ptrInd.style.transition = 'height 0.2s ease'; ptrInd.style.height = PTR_MAX_H + 'px'; ptrInd.classList.add('ptr-loading'); }
-            Promise.all([loadPopularCourses(), switchCourseTab(currentCourseTab)]).finally(() => {
+            Promise.resolve(switchCourseTab(currentCourseTab)).finally(() => {
               _ptrRefreshing = false;
               setTimeout(_ptrReset, 300);
             });
@@ -6203,30 +6208,37 @@
       try {
         const res = await fetch(`/api/courses?city=${city}&tab=${tab}`);
         const courses = await res.json();
-        renderCourseList(courses);
+        if (tab === 'popular') {
+          renderCourseList(courses, true);
+        } else {
+          renderCourseList(courses);
+        }
       } catch(e) {
         renderCourseList([]);
       }
     }
 
     // コース一覧レンダリング
-    function renderCourseList(courses) {
+    const _rankLineColor = ['#C0903A','#9BA5B0','#B07040','var(--sand-dark)','var(--sand-dark)'];
+    function renderCourseList(courses, withRank = false) {
       const container = document.getElementById('course-list');
       if (!courses.length) {
-        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--warm-gray);">コースがありません</div>';
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--warm-gray);">コースがありません</div>';
         return;
       }
-      container.innerHTML = courses.map(c => renderCourseCard(c)).join('');
+      container.innerHTML = courses.map((c, i) => renderCourseCard(c, withRank ? i : null)).join('');
     }
 
     // コースカード HTML
-    function renderCourseCard(c) {
+    function renderCourseCard(c, rank = null) {
       const liked = isLiked(c.id);
       const cond = c.conditions || {};
       const tag = cond.with || cond.area || cond.style || '';
-      return `<div onclick="openCourseDetail('${c.id}')" style="display:flex;gap:10px;align-items:flex-start;
-        background:var(--warm-white);border-radius:12px;padding:10px;cursor:pointer;
-        box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+      const lineColor = rank !== null ? (_rankLineColor[rank] || 'var(--sand-dark)') : null;
+      const rankLine = lineColor ? `<div style="position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px;background:${lineColor};"></div>` : '';
+      return `<div onclick="openCourseDetail('${c.id}')" style="position:relative;display:flex;gap:10px;align-items:flex-start;
+        background:var(--warm-white);border-radius:12px;padding:10px;${rank !== null ? 'padding-left:14px;' : ''}cursor:pointer;
+        box-shadow:0 1px 3px rgba(0,0,0,0.06);">${rankLine}
         ${c.imageUrl
           ? `<img src="${c.imageUrl}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
           : `<div style="width:64px;height:64px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:22px;">✨</div>`
@@ -6400,7 +6412,9 @@
         </div>
       `;
 
-      document.getElementById('course-detail-content').innerHTML = html;
+      const detailContent = document.getElementById('course-detail-content');
+      detailContent.innerHTML = html;
+      detailContent.scrollTop = 0;
     }
 
     function closeCourseDetail() {
@@ -6417,6 +6431,18 @@
       document.querySelectorAll('#course-sheet .course-chip').forEach(b => b.classList.remove('selected'));
       const noteEl = document.getElementById('course-note');
       if (noteEl) noteEl.value = '';
+
+      // プロファイル表示
+      const profileEl = document.getElementById('course-sheet-profile-display');
+      if (profileEl) {
+        const whoMap = { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
+        const ageMap = { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
+        const who = getWhoList();
+        const age = localStorage.getItem('sg_age') || 'all';
+        let txt = who.map(v => whoMap[v]).filter(Boolean).join('・');
+        if (who.includes('family') && age !== 'all' && ageMap[age]) txt += `・${ageMap[age]}`;
+        profileEl.textContent = txt ? `設定: ${txt}` : '設定: 指定なし';
+      }
 
       // ピン留めイベントを選択チップとして表示
       const pins = Object.values(getPins());
