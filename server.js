@@ -1449,9 +1449,9 @@ app.get('/api/courses', (req, res) => {
   if (tab === 'preset') return res.json([]);
   if (tab === 'community') return res.json([...community].sort((a, b) => b.likes - a.likes));
   if (tab === 'popular') {
-    // communityのみからlikes降順上位3件
+    // communityのみからlikes降順上位5件
     const sorted = [...community].sort((a, b) => b.likes - a.likes);
-    return res.json(sorted.slice(0, 3));
+    return res.json(sorted.slice(0, 5));
   }
   res.json([]);
 });
