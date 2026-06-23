@@ -1458,7 +1458,7 @@ app.get('/api/courses', (req, res) => {
 
 // POST /api/courses/generate
 app.post('/api/courses/generate', async (req, res) => {
-  const { city = 'sg', with: who, time, mood, area, pace = 'ふつう', style, conditions, profile } = req.body;
+  const { city = 'sg', with: who, time, mood, area, pace = 'ふつう', style, conditions, profile, pinnedEvents = [] } = req.body;
 
   // conditions オブジェクトが渡された場合はそちらを優先
   const cond = conditions || {};
@@ -1499,7 +1499,10 @@ app.post('/api/courses/generate', async (req, res) => {
 - エリア: ${resolvedArea || 'Central（中心部）'}
 - ペース: ${resolvedPace}（スポット数の目安: ${spotCount}件）${ageNote}${styleNote}
 
-参考にできる登録イベント（任意で1件組み込んでよい）:
+${pinnedEvents.length > 0 ? `ユーザーがピン留めしたイベント（必ずメインスポットとして組み込む）:
+${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}
+
+` : ''}参考にできるその他のイベント（任意で1件組み込んでよい）:
 ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜${e.end_date}）`).join('\n') || 'なし'}
 
 以下のJSON形式で返してください（余分な説明不要、JSONのみ）:

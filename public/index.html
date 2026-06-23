@@ -3339,7 +3339,7 @@
     <div class="screen-content">
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
-        <div class="plan-section-title" style="margin:0 16px 8px;">人気コース</div>
+        <div class="plan-section-title" style="margin:0 16px 8px;">話題のコース</div>
         <div id="popular-courses-list" style="display:flex;flex-direction:column;gap:12px;padding:4px 16px;"></div>
       </div>
 
@@ -3651,6 +3651,12 @@
       <!-- Step 1: 条件選択 -->
       <div id="course-step-conditions">
         <div style="font-size:17px;font-weight:700;margin:8px 0 16px;">コースを作る</div>
+
+        <!-- ピン留めイベント表示 -->
+        <div id="course-sheet-pins" style="display:none;background:var(--cream);border-radius:10px;padding:10px 12px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:700;color:var(--caramel);margin-bottom:6px;">📌 ピン留め中（メインスポットに組み込みます）</div>
+          <div id="course-sheet-pins-list" style="font-size:12px;color:var(--warm-gray);line-height:1.8;"></div>
+        </div>
 
         <div class="course-condition-group">
           <div class="course-condition-label">誰と</div>
@@ -6153,6 +6159,8 @@
     // コースカード HTML
     function renderCourseCard(c) {
       const liked = isLiked(c.id);
+      const cond = c.conditions || {};
+      const tags = [cond.with, cond.area, cond.style].filter(Boolean);
       return `<div class="course-card" onclick="openCourseDetail('${c.id}')">
         ${c.imageUrl
           ? `<img class="course-card-img" src="${c.imageUrl}" alt="${c.title}" onerror="this.style.background='var(--sand)';this.style.display='block';">`
@@ -6161,8 +6169,11 @@
         <div class="course-card-body">
           <div class="course-card-title">${c.title}</div>
           <div class="course-card-tagline">${c.tagline || ''}</div>
+          ${tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0;">
+            ${tags.map(t => `<span style="padding:2px 8px;background:var(--sand);border-radius:20px;font-size:10px;color:var(--warm-gray);">${t}</span>`).join('')}
+          </div>` : ''}
           <div class="course-card-meta">
-            <span>${c.spots?.length || 0}スポット · ${c.conditions?.pace || ''}</span>
+            <span style="color:var(--light-gray);font-size:11px;">${c.authorName || 'AI'} · ${c.spots?.length || 0}スポット</span>
             <span>${liked ? '❤️' : '🤍'} ${c.likes || 0}</span>
           </div>
         </div>
@@ -6314,6 +6325,18 @@
     function openCourseSheet() {
       // 全チップをリセット（未選択 = どれでもいい）
       document.querySelectorAll('#course-sheet .course-chip').forEach(b => b.classList.remove('selected'));
+
+      // ピン留めイベントを表示
+      const pins = Object.values(getPins());
+      const pinsArea = document.getElementById('course-sheet-pins');
+      const pinsList = document.getElementById('course-sheet-pins-list');
+      if (pins.length > 0) {
+        pinsList.innerHTML = pins.map(p => `${p.emoji || '📌'} ${p.title}`).join('<br>');
+        pinsArea.style.display = '';
+      } else {
+        pinsArea.style.display = 'none';
+      }
+
       document.getElementById('course-step-conditions').hidden = false;
       document.getElementById('course-step-loading').hidden = true;
       document.getElementById('course-step-result').hidden = true;
@@ -6356,12 +6379,15 @@
       showCourseStep('loading');
       const city = getCity();
       const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
+      const pinnedEvents = Object.values(getPins()).map(p => ({
+        title: p.title, area: p.area, type: p.type, emoji: p.emoji, location: p.location
+      }));
 
       try {
         const res = await fetch('/api/courses/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, conditions, profile, userId: getUserId(), userName: getUserName() })
+          body: JSON.stringify({ city, conditions, profile, pinnedEvents, userId: getUserId(), userName: getUserName() })
         });
         const course = await res.json();
         if (!course || course.error) throw new Error(course?.error || 'generation failed');
