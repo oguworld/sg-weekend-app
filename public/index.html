@@ -6312,17 +6312,8 @@
 
 
     function openCourseSheet() {
-      // プロフィールから「誰と」を自動選択
-      const whoMap = { family: '子連れ', couple: 'カップル', group: '友人', solo: 'ひとり' };
-      const who = getWhoList();
-      if (who.length > 0) {
-        const val = whoMap[who[0]];
-        if (val) {
-          document.querySelectorAll('#course-sheet [data-key="with"] .course-chip').forEach(b => {
-            b.classList.toggle('selected', b.dataset.val === val);
-          });
-        }
-      }
+      // 全チップをリセット（未選択 = どれでもいい）
+      document.querySelectorAll('#course-sheet .course-chip').forEach(b => b.classList.remove('selected'));
       document.getElementById('course-step-conditions').hidden = false;
       document.getElementById('course-step-loading').hidden = true;
       document.getElementById('course-step-result').hidden = true;
@@ -6348,8 +6339,10 @@
       if (!chip) return;
       const group = chip.closest('.course-chips');
       if (!group) return;
+      const wasSelected = chip.classList.contains('selected');
       group.querySelectorAll('.course-chip').forEach(b => b.classList.remove('selected'));
-      chip.classList.add('selected');
+      if (!wasSelected) chip.classList.add('selected');
+      // 未選択 = どれでもいい（何もしない）
     });
 
     async function startCourseGeneration() {
