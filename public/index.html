@@ -3347,7 +3347,7 @@
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
         <div class="plan-section-title" style="margin:0 16px 8px;">人気のコース</div>
-        <div id="popular-courses-list" style="display:flex;gap:12px;overflow-x:auto;padding:4px 16px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;"></div>
+        <div id="popular-courses-list" style="display:flex;gap:10px;overflow-x:auto;padding:4px 16px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-padding-left:16px;"></div>
       </div>
 
       <!-- タブ -->
@@ -3667,22 +3667,23 @@
         </div>
 
         <!-- メイン条件 -->
-        <div class="course-condition-group">
-          <div class="course-condition-label">誰と</div>
-          <div class="course-chips" data-key="with">
-            <button class="course-chip" data-val="子連れ">👶 子連れ</button>
-            <button class="course-chip" data-val="カップル">💑 カップル</button>
-            <button class="course-chip" data-val="友人">👥 友人</button>
-            <button class="course-chip" data-val="ひとり">🧘 ひとり</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;">
+          <div class="course-condition-group">
+            <div class="course-condition-label">誰と</div>
+            <div class="course-chips" data-key="with" style="flex-wrap:wrap;">
+              <button class="course-chip" data-val="子連れ">👶 子連れ</button>
+              <button class="course-chip" data-val="カップル">💑 カップル</button>
+              <button class="course-chip" data-val="友人">👥 友人</button>
+              <button class="course-chip" data-val="ひとり">🧘 ひとり</button>
+            </div>
           </div>
-        </div>
-
-        <div class="course-condition-group">
-          <div class="course-condition-label">時間帯</div>
-          <div class="course-chips" data-key="time">
-            <button class="course-chip" data-val="午前のみ">☀️ 午前のみ</button>
-            <button class="course-chip" data-val="午後のみ">🌤 午後のみ</button>
-            <button class="course-chip" data-val="終日">🌞 終日</button>
+          <div class="course-condition-group">
+            <div class="course-condition-label">時間帯</div>
+            <div class="course-chips" data-key="time" style="flex-wrap:wrap;">
+              <button class="course-chip" data-val="午前のみ">☀️ 午前</button>
+              <button class="course-chip" data-val="午後のみ">🌤 午後</button>
+              <button class="course-chip" data-val="終日">🌞 終日</button>
+            </div>
           </div>
         </div>
 
@@ -3690,32 +3691,30 @@
           <div class="course-condition-label">ひとこと <span style="font-weight:400;color:var(--light-gray);">（任意）</span></div>
           <textarea id="course-note" placeholder="例）記念日なので特別感がほしい、穴場スポットで行きたい…"
             style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;font-family:'Noto Sans JP',sans-serif;
-                   border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:72px;
+                   border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:80px;
                    background:var(--warm-white);color:var(--text);line-height:1.5;outline:none;"
             onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'"></textarea>
         </div>
 
-        <!-- スポット数 -->
-        <div class="course-condition-group">
-          <div class="course-condition-label">スポット数</div>
-          <div class="course-chips" data-key="spots">
-            <button class="course-chip" data-val="2">2</button>
-            <button class="course-chip" data-val="3">3</button>
-            <button class="course-chip" data-val="4">4</button>
-            <button class="course-chip" data-val="5">5</button>
-            <button class="course-chip" data-val="6">6</button>
-          </div>
-        </div>
-
-        <!-- オプション条件（折りたたみ） -->
+        <!-- こだわる（折りたたみ） -->
         <button onclick="toggleCourseOptions()" id="course-options-toggle"
           style="display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;
                  color:var(--light-gray);font-size:11px;font-weight:700;letter-spacing:0.06em;
                  font-family:'Noto Sans JP',sans-serif;padding:4px 0;margin-bottom:4px;">
           <span id="course-options-arrow" style="font-size:10px;transition:transform 0.2s;">▶</span>
-          こだわる（エリア・気分・スタイル）
+          こだわる（スポット数・エリア・気分・スタイル）
         </button>
         <div id="course-options-panel" style="display:none;">
+          <div class="course-condition-group">
+            <div class="course-condition-label">スポット数</div>
+            <div class="course-chips" data-key="spots">
+              <button class="course-chip" data-val="2">2</button>
+              <button class="course-chip" data-val="3">3</button>
+              <button class="course-chip" data-val="4">4</button>
+              <button class="course-chip" data-val="5">5</button>
+              <button class="course-chip" data-val="6">6</button>
+            </div>
+          </div>
           <div class="course-condition-group">
             <div class="course-condition-label">エリア</div>
             <div class="course-chips" data-key="area">
@@ -3876,8 +3875,8 @@
   </div>
 
   <!-- ─── COURSE DATE MODAL ─── -->
-  <div class="plan-modal-overlay" id="course-date-overlay" onclick="closeCourseDateModal()" style="display:none;"></div>
-  <div class="plan-modal" id="course-date-modal" style="display:none;">
+  <div class="plan-modal-overlay" id="course-date-overlay" onclick="closeCourseDateModal()"></div>
+  <div class="plan-modal" id="course-date-modal">
     <div class="plan-modal-handle"></div>
     <div class="plan-modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
       <div>
@@ -6261,7 +6260,7 @@
       const tags = [cond.with, cond.area, cond.style].filter(Boolean);
       const barColor = _rankBarColor[rank] || 'var(--sand-dark)';
       return `
-        <div onclick="openCourseDetail('${c.id}')" style="flex-shrink:0;width:calc(100vw - 48px);
+        <div onclick="openCourseDetail('${c.id}')" style="flex-shrink:0;width:calc(100vw - 40px);
           background:var(--warm-white);border-radius:14px;overflow:hidden;cursor:pointer;
           box-shadow:0 1px 4px rgba(0,0,0,0.07);scroll-snap-align:start;">
           <div style="height:4px;background:${barColor};"></div>
@@ -6631,8 +6630,8 @@
         "onclick=\"selectCourseDate('$1')\""
       );
       document.getElementById('course-date-add-btn').disabled = true;
-      document.getElementById('course-date-overlay').style.display = '';
-      document.getElementById('course-date-modal').style.display = '';
+      document.getElementById('course-date-overlay').classList.add('visible');
+      document.getElementById('course-date-modal').classList.add('visible');
       lockScroll();
     }
 
@@ -6645,8 +6644,8 @@
     }
 
     function closeCourseDateModal() {
-      document.getElementById('course-date-overlay').style.display = 'none';
-      document.getElementById('course-date-modal').style.display = 'none';
+      document.getElementById('course-date-overlay').classList.remove('visible');
+      document.getElementById('course-date-modal').classList.remove('visible');
       unlockScroll();
       _courseDatePendingCourse = null;
       _courseDateSelectedKey = null;
