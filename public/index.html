@@ -6264,7 +6264,9 @@
       const isAi = role === 'ai';
       const div = document.createElement('div');
       div.className = isAi ? 'chat-bubble ai' : 'chat-bubble user';
-      div.textContent = text;
+      // **text** → <b>text</b> に変換（マークダウンが漏れてきた場合の保険）
+      const safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      div.innerHTML = safe.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
       msgs.appendChild(div);
       msgs.scrollTop = msgs.scrollHeight;
     }
