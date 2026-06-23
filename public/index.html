@@ -2568,6 +2568,7 @@
     .plan-sheet-scroll {
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
       padding: 0 20px 8px;
       flex: 1;
       min-height: 0;
@@ -2956,7 +2957,7 @@
     .plan-modal-header { padding: 6px 20px 12px; flex-shrink: 0; border-bottom: 1px solid var(--sand); }
     .plan-modal-title { font-family: 'Kaisei Opti', serif; font-size: 17px; font-weight: 700; color: var(--midnight); margin-bottom: 2px; }
     .plan-modal-subtitle { font-size: 12px; color: var(--warm-gray); }
-    .plan-modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 20px calc(24px + env(safe-area-inset-bottom, 0px)); flex: 1; }
+    .plan-modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 20px calc(24px + env(safe-area-inset-bottom, 0px)); flex: 1; }
     .plan-modal-section-label { font-size: 13px; font-weight: 700; color: var(--warm-gray); text-transform: uppercase; letter-spacing: 0.08em; margin: 14px 0 6px; }
     .plan-date-chips { display: flex; flex-direction: column; gap: 8px; margin-bottom: 2px; }
     .plan-date-week-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
@@ -3652,7 +3653,7 @@
   <div id="course-sheet-overlay" class="plan-modal-overlay" onclick="closeCourseSheet()"></div>
   <div id="course-sheet" class="plan-sheet">
     <div class="plan-sheet-handle"></div>
-    <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 24px;">
+    <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 20px 24px;">
 
       <!-- Step 1: 条件選択 -->
       <div id="course-step-conditions">
@@ -3776,7 +3777,7 @@
     <div style="display:flex;align-items:center;justify-content:flex-end;padding:4px 16px 8px;flex-shrink:0;">
       <button onclick="closeCourseDetail()" style="background:none;border:none;font-size:22px;color:var(--light-gray);cursor:pointer;line-height:1;padding:4px;">✕</button>
     </div>
-    <div id="course-detail-content" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom,0px);"></div>
+    <div id="course-detail-content" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom,0px);"></div>
   </div>
 
   <!-- AI Chat Sheet -->
@@ -6148,7 +6149,7 @@
         }, { passive: true });
 
         sc.addEventListener('touchmove', e => {
-          if (_ptrRefreshing || sc.scrollTop > 5) return;
+          if (_ptrRefreshing || sc._ptrLocked || sc.scrollTop > 5) return;
           _ptrLastY = e.touches[0].clientY;
           const dy = _ptrLastY - _ptrStartY;
           if (dy <= 0) { if (_ptrPulling) _ptrReset(); return; }
@@ -6291,11 +6292,11 @@
     let _allLoadedCourses = {};
     function _lockCourseScroll() {
       const sc = document.querySelector('#screen-course .screen-content');
-      if (sc) sc.style.overflow = 'hidden';
+      if (sc) { sc.style.overflow = 'hidden'; sc._ptrLocked = true; }
     }
     function _unlockCourseScroll() {
       const sc = document.querySelector('#screen-course .screen-content');
-      if (sc) { sc.style.overflowY = 'auto'; sc.style.overflow = ''; }
+      if (sc) { sc.style.overflowY = 'auto'; sc.style.overflow = ''; sc._ptrLocked = false; }
     }
 
     async function openCourseDetail(courseId) {
