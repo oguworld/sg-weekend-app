@@ -3652,11 +3652,11 @@
       <div id="course-step-conditions">
         <div style="font-size:17px;font-weight:700;margin:8px 0 16px;">コースを作る</div>
 
-        <!-- ピン留めイベント表示 -->
+        <!-- ピン留めイベント選択 -->
         <div id="course-sheet-pins" style="display:none;background:var(--cream);border-radius:12px;padding:12px 14px;margin-bottom:20px;border-left:3px solid var(--caramel);">
-          <div style="font-size:12px;font-weight:700;color:var(--caramel);margin-bottom:8px;">📌 ピン留めを軸にコースを作ります</div>
-          <div id="course-sheet-pins-list" style="font-size:13px;color:var(--warm-gray);line-height:1.9;"></div>
-          <div style="font-size:11px;color:var(--light-gray);margin-top:6px;">エリア・テーマはピン留め内容に合わせて提案します</div>
+          <div style="font-size:12px;font-weight:700;color:var(--caramel);margin-bottom:8px;">📌 軸にするイベントを選ぶ</div>
+          <div id="course-sheet-pins-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          <div style="font-size:11px;color:var(--light-gray);margin-top:8px;">タップで選択・解除。選んだイベントを中心にコースを組みます。</div>
         </div>
 
         <!-- メイン条件 -->
@@ -6368,12 +6368,19 @@
       const noteEl = document.getElementById('course-note');
       if (noteEl) noteEl.value = '';
 
-      // ピン留めイベントを表示
+      // ピン留めイベントを選択チップとして表示
       const pins = Object.values(getPins());
       const pinsArea = document.getElementById('course-sheet-pins');
       const pinsList = document.getElementById('course-sheet-pins-list');
       if (pins.length > 0) {
-        pinsList.innerHTML = pins.map(p => `${p.emoji || '📌'} ${p.title}`).join('<br>');
+        pinsList.innerHTML = pins.map(p => `
+          <button class="pin-chip selected" data-pin-id="${p.id || p.title}"
+            style="display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:20px;
+                   font-size:12px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;
+                   border:1.5px solid var(--caramel);background:var(--caramel);color:white;
+                   max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${p.emoji || '📌'} <span style="overflow:hidden;text-overflow:ellipsis;">${p.title}</span>
+          </button>`).join('');
         pinsArea.style.display = '';
       } else {
         pinsArea.style.display = 'none';
@@ -6414,14 +6421,30 @@
     }
 
     document.addEventListener('click', e => {
+      // 条件チップ（単一選択）
       const chip = e.target.closest('#course-sheet .course-chip');
-      if (!chip) return;
-      const group = chip.closest('.course-chips');
-      if (!group) return;
-      const wasSelected = chip.classList.contains('selected');
-      group.querySelectorAll('.course-chip').forEach(b => b.classList.remove('selected'));
-      if (!wasSelected) chip.classList.add('selected');
-      // 未選択 = どれでもいい（何もしない）
+      if (chip) {
+        const group = chip.closest('.course-chips');
+        if (!group) return;
+        const wasSelected = chip.classList.contains('selected');
+        group.querySelectorAll('.course-chip').forEach(b => b.classList.remove('selected'));
+        if (!wasSelected) chip.classList.add('selected');
+        return;
+      }
+      // ピンチップ（多重選択トグル）
+      const pinChip = e.target.closest('#course-sheet-pins-list .pin-chip');
+      if (pinChip) {
+        const sel = pinChip.classList.contains('selected');
+        if (sel) {
+          pinChip.classList.remove('selected');
+          pinChip.style.background = 'transparent';
+          pinChip.style.color = 'var(--caramel)';
+        } else {
+          pinChip.classList.add('selected');
+          pinChip.style.background = 'var(--caramel)';
+          pinChip.style.color = 'white';
+        }
+      }
     });
 
     async function startCourseGeneration() {
@@ -6437,12 +6460,18 @@
       showCourseStep('loading');
       const city = getCity();
       const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
-      const pins = getPins();
-      const pinnedEvents = Object.values(pins).map(p => ({
-        title: p.title, area: p.area, type: p.type, emoji: p.emoji, location: p.location
-      }));
 
-      // ピンがあればエリアを自動セット（未選択の場合）
+      // 選択されたピンのみを軸として収集
+      const allPins = getPins();
+      const selectedPinIds = new Set(
+        [...document.querySelectorAll('#course-sheet-pins-list .pin-chip.selected')]
+          .map(el => el.dataset.pinId)
+      );
+      const pinnedEvents = Object.values(allPins)
+        .filter(p => selectedPinIds.has(p.id || p.title))
+        .map(p => ({ title: p.title, area: p.area, type: p.type, emoji: p.emoji, location: p.location }));
+
+      // 選択ピンがあればエリアを自動セット（未選択の場合）
       if (!conditions.area && pinnedEvents.length > 0) {
         const pinArea = pinnedEvents[0].area;
         if (pinArea) conditions.area = pinArea;
