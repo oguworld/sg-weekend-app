@@ -1488,7 +1488,7 @@ app.post('/api/courses/generate', async (req, res) => {
 
 条件:
 - 誰と: ${resolvedWho || '誰でも'}
-- 時間帯: ${resolvedTime || '終日'}${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${resolvedMood ? `\n- 気分: ${resolvedMood}` : ''}${resolvedStyle ? `\n- スタイル: ${resolvedStyle}` : ''}${ageNote}${noteStr}
+- 時間帯: ${resolvedTime || '終日'}${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${resolvedMood ? `\n- 気分: ${resolvedMood}` : ''}${resolvedStyle === '定番' ? '\n- スタイル: 定番（誰もが知る人気スポット中心の王道コース）' : resolvedStyle === 'ニッチ' ? '\n- スタイル: ニッチ（地元好きだけが知る穴場・あまり知られていないスポット中心）' : resolvedStyle === 'ローカル' ? '\n- スタイル: ローカル（観光客向けではなく在住者が日常で使うエリア・食堂・マーケットなど、生活感ある地元体験）' : ''}${ageNote}${noteStr}
 
 ${pinnedEvents.length > 0 ? `【重要】ユーザーがピン留めしたイベント（これらを軸・メインスポットとして必ず組み込む）:
 ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}
