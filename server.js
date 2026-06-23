@@ -1539,7 +1539,7 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
       type: 'ai',
       ...course,
       imageUrl,
-      conditions: { with: resolvedWho, time: resolvedTime, mood: resolvedMood, area: resolvedArea, pace: resolvedPace, style: resolvedStyle },
+      conditions: { with: resolvedWho, time: resolvedTime, mood: resolvedMood, area: resolvedArea, style: resolvedStyle },
       authorId: req.body.userId || 'anonymous',
       authorName: req.body.userName || '匿名',
       isPublic: false,
