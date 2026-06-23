@@ -1458,34 +1458,26 @@ app.get('/api/courses', (req, res) => {
 
 // POST /api/courses/generate
 app.post('/api/courses/generate', async (req, res) => {
-  const { city = 'sg', with: who, time, mood, area, pace = 'ふつう', style, conditions, profile, pinnedEvents = [] } = req.body;
+  const { city = 'sg', with: who, time, mood, area, pace, style, conditions, profile, pinnedEvents = [] } = req.body;
 
   // conditions オブジェクトが渡された場合はそちらを優先
   const cond = conditions || {};
-  const resolvedWho = cond.with || who;
-  const resolvedTime = cond.time || time;
-  const resolvedMood = cond.mood || mood;
-  const resolvedArea = cond.area || area;
-  const resolvedPace = cond.pace || pace;
-  const resolvedStyle = cond.style || style;
-  const resolvedAge = profile?.age;
+  const resolvedWho  = cond.with  || who;
+  const resolvedTime = cond.time  || time;
+  const resolvedArea = cond.area  || area;
+  const resolvedNote = cond.note  || '';   // ひとこと
+  const resolvedAge  = profile?.age;
 
   // 登録イベントから候補を取得
   const ep = eventsPath(city);
   const events = fs.existsSync(ep) ? JSON.parse(fs.readFileSync(ep)) : [];
   const upcomingEvents = events.filter(e => e.end_date >= new Date().toISOString().slice(0, 10)).slice(0, 5);
 
-  const spotCount = resolvedPace === 'ゆったり' ? '2〜3' : resolvedPace === 'めいっぱい' ? '6〜8' : '4〜5';
 
   // 年齢情報の日本語表現
   const ageLabels = { baby: '0〜2歳の赤ちゃん', preschool: '幼稚園児（3〜6歳）', school: '小学生以上' };
   const ageNote = resolvedAge && resolvedAge !== 'all' ? `\n- 子どもの年齢: ${ageLabels[resolvedAge] || resolvedAge}` : '';
-
-  // スタイルの説明
-  let styleNote = '';
-  if (resolvedStyle === '定番') styleNote = '\n- スタイル: 定番（人気スポット・観光地定番コース。誰でも楽しめる王道プラン）';
-  else if (resolvedStyle === 'ニッチ') styleNote = '\n- スタイル: ニッチ（ローカルに愛される穴場・あまり知られていないスポット中心のプラン）';
-  else styleNote = '\n- スタイル: バランス良く（定番・穴場を適切に組み合わせる）';
+  const noteStr = resolvedNote ? `\n- リクエスト: ${resolvedNote}` : '';
 
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic();
@@ -1495,12 +1487,11 @@ app.post('/api/courses/generate', async (req, res) => {
 条件:
 - 誰と: ${resolvedWho || '誰でも'}
 - 時間帯: ${resolvedTime || '終日'}
-- 気分: ${resolvedMood || 'アクティブ'}
-- エリア: ${resolvedArea || 'Central（中心部）'}
-- ペース: ${resolvedPace}（スポット数の目安: ${spotCount}件）${ageNote}${styleNote}
+- エリア: ${resolvedArea || '指定なし（最適なエリアを選ぶ）'}${ageNote}${noteStr}
 
-${pinnedEvents.length > 0 ? `ユーザーがピン留めしたイベント（必ずメインスポットとして組み込む）:
+${pinnedEvents.length > 0 ? `【重要】ユーザーがピン留めしたイベント（これらを軸・メインスポットとして必ず組み込む）:
 ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}
+上記ピン留めイベントを中心に、他のスポットで補完するコースを作ること。
 
 ` : ''}参考にできるその他のイベント（任意で1件組み込んでよい）:
 ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜${e.end_date}）`).join('\n') || 'なし'}

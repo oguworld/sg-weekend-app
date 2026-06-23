@@ -3653,9 +3653,10 @@
         <div style="font-size:17px;font-weight:700;margin:8px 0 16px;">コースを作る</div>
 
         <!-- ピン留めイベント表示 -->
-        <div id="course-sheet-pins" style="display:none;background:var(--cream);border-radius:10px;padding:10px 12px;margin-bottom:16px;">
-          <div style="font-size:11px;font-weight:700;color:var(--caramel);margin-bottom:6px;">📌 ピン留め中（メインスポットに組み込みます）</div>
-          <div id="course-sheet-pins-list" style="font-size:12px;color:var(--warm-gray);line-height:1.8;"></div>
+        <div id="course-sheet-pins" style="display:none;background:var(--cream);border-radius:12px;padding:12px 14px;margin-bottom:20px;border-left:3px solid var(--caramel);">
+          <div style="font-size:12px;font-weight:700;color:var(--caramel);margin-bottom:8px;">📌 ピン留めを軸にコースを作ります</div>
+          <div id="course-sheet-pins-list" style="font-size:13px;color:var(--warm-gray);line-height:1.9;"></div>
+          <div style="font-size:11px;color:var(--light-gray);margin-top:6px;">エリア・テーマはピン留め内容に合わせて提案します</div>
         </div>
 
         <div class="course-condition-group">
@@ -3669,21 +3670,11 @@
         </div>
 
         <div class="course-condition-group">
-          <div class="course-condition-label">使える時間</div>
+          <div class="course-condition-label">時間帯</div>
           <div class="course-chips" data-key="time">
             <button class="course-chip" data-val="午前のみ">☀️ 午前のみ</button>
             <button class="course-chip" data-val="午後のみ">🌤 午後のみ</button>
             <button class="course-chip" data-val="終日">🌞 終日</button>
-          </div>
-        </div>
-
-        <div class="course-condition-group">
-          <div class="course-condition-label">気分</div>
-          <div class="course-chips" data-key="mood">
-            <button class="course-chip" data-val="のんびり">🌿 のんびり</button>
-            <button class="course-chip" data-val="アクティブ">🏃 アクティブ</button>
-            <button class="course-chip" data-val="グルメ">🍜 グルメ</button>
-            <button class="course-chip" data-val="ショッピング">🛍 ショッピング</button>
           </div>
         </div>
 
@@ -3700,24 +3691,16 @@
         </div>
 
         <div class="course-condition-group">
-          <div class="course-condition-label">ペース</div>
-          <div class="course-chips" data-key="pace">
-            <button class="course-chip" data-val="ゆったり">🐢 ゆったり</button>
-            <button class="course-chip" data-val="ふつう">🚶 ふつう</button>
-            <button class="course-chip" data-val="めいっぱい">🚀 めいっぱい</button>
-          </div>
-        </div>
-
-        <div class="course-condition-group">
-          <div class="course-condition-label">スタイル</div>
-          <div class="course-chips" data-key="style">
-            <button class="course-chip" data-val="定番">🗺️ 定番</button>
-            <button class="course-chip" data-val="ニッチ">🔍 ニッチ</button>
-          </div>
+          <div class="course-condition-label">ひとこと <span style="font-weight:400;color:var(--light-gray);">（任意）</span></div>
+          <textarea id="course-note" placeholder="例）記念日なので特別感がほしい、子どもが海を見たい、穴場スポットで行きたい…"
+            style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:13px;font-family:'Noto Sans JP',sans-serif;
+                   border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:72px;
+                   background:var(--warm-white);color:var(--text);line-height:1.5;outline:none;"
+            onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'"></textarea>
         </div>
 
         <button onclick="startCourseGeneration()"
-          style="width:100%;margin-top:8px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+          style="width:100%;margin-top:4px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
           コースを作る ✨
         </button>
       </div>
@@ -6353,8 +6336,10 @@
 
 
     function openCourseSheet() {
-      // 全チップをリセット（未選択 = どれでもいい）
+      // 全チップ・テキストをリセット
       document.querySelectorAll('#course-sheet .course-chip').forEach(b => b.classList.remove('selected'));
+      const noteEl = document.getElementById('course-note');
+      if (noteEl) noteEl.value = '';
 
       // ピン留めイベントを表示
       const pins = Object.values(getPins());
@@ -6405,13 +6390,22 @@
         const sel = group.querySelector('.course-chip.selected');
         if (sel) conditions[key] = sel.dataset.val;
       });
+      const note = (document.getElementById('course-note')?.value || '').trim();
+      if (note) conditions.note = note;
 
       showCourseStep('loading');
       const city = getCity();
       const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
-      const pinnedEvents = Object.values(getPins()).map(p => ({
+      const pins = getPins();
+      const pinnedEvents = Object.values(pins).map(p => ({
         title: p.title, area: p.area, type: p.type, emoji: p.emoji, location: p.location
       }));
+
+      // ピンがあればエリアを自動セット（未選択の場合）
+      if (!conditions.area && pinnedEvents.length > 0) {
+        const pinArea = pinnedEvents[0].area;
+        if (pinArea) conditions.area = pinArea;
+      }
 
       try {
         const res = await fetch('/api/courses/generate', {
