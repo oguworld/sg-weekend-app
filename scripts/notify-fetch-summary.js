@@ -69,12 +69,7 @@ async function main() {
       lines.push(`  📡 ${srcParts.join(' / ')}`);
     }
 
-    // 採用イベント一覧
-    if (s.newItems && s.newItems.length > 0) {
-      for (const item of s.newItems) {
-        lines.push(`  ${item.emoji} ${item.store}${item.period ? `（${item.period}）` : ''}`);
-      }
-    } else {
+    if (!s.newItems || s.newItems.length === 0) {
       lines.push('  （新着なし）');
     }
 
