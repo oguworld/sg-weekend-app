@@ -13,6 +13,7 @@ const LOGS_DIR = path.join(__dirname, '../logs');
 
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
 const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
+const DISCOVER_RESULT_PATH = path.join(LOGS_DIR, 'discover-sources-result.json');
 
 async function pushToLine(text) {
   const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -105,6 +106,30 @@ async function main() {
     }
   } catch (e) {
     console.warn('ソース分析結果の読み込みに失敗:', e.message);
+  }
+
+  // ソース候補探索セクション（discover-sources-result.json が当日のものなら追記）
+  try {
+    if (fs.existsSync(DISCOVER_RESULT_PATH)) {
+      const discoverData = JSON.parse(fs.readFileSync(DISCOVER_RESULT_PATH, 'utf8'));
+      if (discoverData.date === today) {
+        lines.push('');
+        lines.push('━━ ソース候補 ━━');
+        for (const cityKey of CITIES) {
+          const cityName = CITY_NAMES[cityKey] || cityKey;
+          const d = discoverData.cities?.[cityKey];
+          if (!d) continue;
+          const parts = [...(d.topIG || []), ...(d.topFeed || [])];
+          if (parts.length > 0) {
+            lines.push(`🔎 ${cityName}: ${parts.join(' / ')}`);
+          } else {
+            lines.push(`🔎 ${cityName}: 新候補なし`);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('ソース候補探索結果の読み込みに失敗:', e.message);
   }
 
   // LINE 5000文字制限対応

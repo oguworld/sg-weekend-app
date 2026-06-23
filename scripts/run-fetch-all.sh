@@ -1,5 +1,5 @@
 #!/bin/bash
-# fetch-events（全都市）→ analyze-sources → notify-fetch-summary を直列実行
+# fetch-events（全都市）→ discover-sources → analyze-sources → notify-fetch-summary を直列実行
 
 NODE=/home/masahiko/.nvm/versions/node/v22.22.3/bin/node
 SCRIPTS=/home/masahiko/sg-weekend-app/scripts
@@ -10,6 +10,7 @@ $NODE $SCRIPTS/fetch-events.js --city=sg  || echo "[WARN] sg fetch failed"
 $NODE $SCRIPTS/fetch-events.js --city=bkk || echo "[WARN] bkk fetch failed"
 $NODE $SCRIPTS/fetch-events.js --city=syd || echo "[WARN] syd fetch failed"
 
+$NODE $SCRIPTS/discover-sources.js --city=all --no-notify || echo "[WARN] discover-sources failed"
 $NODE $SCRIPTS/analyze-sources.js --city=all --no-notify
 $NODE $SCRIPTS/notify-fetch-summary.js
 

@@ -25,15 +25,17 @@ const SCORE_BATCH_SIZE   = 10;  // Claude に一度に渡す投稿数
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
 
 const PATHS = {
-  pool:       path.join(__dirname, '..', 'data', 'source-pool.json'),
-  sources:    path.join(__dirname, '..', 'data', 'sources.json'),
-  candidates: path.join(__dirname, '..', 'data', 'source-candidates.json'),
-  log:        path.join(__dirname, '..', 'logs', 'discover-sources.log'),
+  pool:            path.join(__dirname, '..', 'data', 'source-pool.json'),
+  sources:         path.join(__dirname, '..', 'data', 'sources.json'),
+  candidates:      path.join(__dirname, '..', 'data', 'source-candidates.json'),
+  log:             path.join(__dirname, '..', 'logs', 'discover-sources.log'),
+  discoverResult:  path.join(__dirname, '..', 'logs', 'discover-sources-result.json'),
 };
 
 // ─── ユーティリティ ────────────────────────────────────────────────
-const isDryRun = process.argv.includes('--dry-run');
-const isForce  = process.argv.includes('--force');
+const isDryRun  = process.argv.includes('--dry-run');
+const isForce   = process.argv.includes('--force');
+const isNoNotify = process.argv.includes('--no-notify');
 
 function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}`;
@@ -369,7 +371,28 @@ async function main() {
 
   const report = buildReport(candidates, cities);
   log('\n' + report);
-  await notifyLINE(report);
+
+  if (isNoNotify) {
+    // --no-notify: notify-fetch-summary.js に渡す用のJSONを書き出す
+    const todayStr = today();
+    const result = { date: todayStr, cities: {} };
+    for (const cityKey of cities) {
+      const cands = candidates[cityKey];
+      if (!cands) continue;
+      result.cities[cityKey] = {
+        topIG:   cands.instagramAccounts.filter(a => a.potentialYield != null).slice(0, 3)
+                   .map(a => `@${a.username}(${a.potentialYield}件)`),
+        topFeed: cands.feeds.filter(f => f.potentialYield != null).slice(0, 2)
+                   .map(f => `${f.name}(${f.potentialYield}件)`),
+      };
+    }
+    if (!isDryRun) {
+      fs.writeFileSync(PATHS.discoverResult, JSON.stringify(result, null, 2), 'utf8');
+      log(`候補探索結果を書き出し: ${PATHS.discoverResult}`);
+    }
+  } else {
+    await notifyLINE(report);
+  }
 
   log('===== discover-sources.js 完了 =====\n');
 }
