@@ -1462,11 +1462,13 @@ app.post('/api/courses/generate', async (req, res) => {
 
   // conditions オブジェクトが渡された場合はそちらを優先
   const cond = conditions || {};
-  const resolvedWho  = cond.with  || who;
-  const resolvedTime = cond.time  || time;
-  const resolvedArea = cond.area  || area;
-  const resolvedNote = cond.note  || '';   // ひとこと
-  const resolvedAge  = profile?.age;
+  const resolvedWho   = cond.with  || who;
+  const resolvedTime  = cond.time  || time;
+  const resolvedArea  = cond.area  || area;
+  const resolvedMood  = cond.mood  || mood;
+  const resolvedStyle = cond.style || style;
+  const resolvedNote  = cond.note  || '';   // ひとこと
+  const resolvedAge   = profile?.age;
 
   // 登録イベントから候補を取得
   const ep = eventsPath(city);
@@ -1486,8 +1488,7 @@ app.post('/api/courses/generate', async (req, res) => {
 
 条件:
 - 誰と: ${resolvedWho || '誰でも'}
-- 時間帯: ${resolvedTime || '終日'}
-- エリア: ${resolvedArea || '指定なし（最適なエリアを選ぶ）'}${ageNote}${noteStr}
+- 時間帯: ${resolvedTime || '終日'}${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${resolvedMood ? `\n- 気分: ${resolvedMood}` : ''}${resolvedStyle ? `\n- スタイル: ${resolvedStyle}` : ''}${ageNote}${noteStr}
 
 ${pinnedEvents.length > 0 ? `【重要】ユーザーがピン留めしたイベント（これらを軸・メインスポットとして必ず組み込む）:
 ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}

@@ -3659,6 +3659,7 @@
           <div style="font-size:11px;color:var(--light-gray);margin-top:6px;">エリア・テーマはピン留め内容に合わせて提案します</div>
         </div>
 
+        <!-- メイン条件 -->
         <div class="course-condition-group">
           <div class="course-condition-label">誰と</div>
           <div class="course-chips" data-key="with">
@@ -3679,28 +3680,53 @@
         </div>
 
         <div class="course-condition-group">
-          <div class="course-condition-label">エリア</div>
-          <div class="course-chips" data-key="area">
-            <button class="course-chip" data-val="Central">🏙 中心部</button>
-            <button class="course-chip" data-val="East">🌅 東部</button>
-            <button class="course-chip" data-val="West">🌇 西部</button>
-            <button class="course-chip" data-val="North">🌿 北部</button>
-            <button class="course-chip" data-val="North-East">🌳 北東部</button>
-            <button class="course-chip" data-val="Island-wide">🗺️ 全島</button>
-          </div>
-        </div>
-
-        <div class="course-condition-group">
           <div class="course-condition-label">ひとこと <span style="font-weight:400;color:var(--light-gray);">（任意）</span></div>
-          <textarea id="course-note" placeholder="例）記念日なので特別感がほしい、子どもが海を見たい、穴場スポットで行きたい…"
-            style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:13px;font-family:'Noto Sans JP',sans-serif;
+          <textarea id="course-note" placeholder="例）記念日なので特別感がほしい、穴場スポットで行きたい…"
+            style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;font-family:'Noto Sans JP',sans-serif;
                    border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:72px;
                    background:var(--warm-white);color:var(--text);line-height:1.5;outline:none;"
             onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'"></textarea>
         </div>
 
+        <!-- オプション条件（折りたたみ） -->
+        <button onclick="toggleCourseOptions()" id="course-options-toggle"
+          style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;
+                 color:var(--warm-gray);font-size:13px;font-family:'Noto Sans JP',sans-serif;padding:4px 0;margin-bottom:4px;">
+          <span id="course-options-arrow" style="font-size:11px;transition:transform 0.2s;">▶</span>
+          絞り込む（エリア・気分・スタイル）
+        </button>
+        <div id="course-options-panel" style="display:none;">
+          <div class="course-condition-group">
+            <div class="course-condition-label">エリア</div>
+            <div class="course-chips" data-key="area">
+              <button class="course-chip" data-val="Central">🏙 中心部</button>
+              <button class="course-chip" data-val="East">🌅 東部</button>
+              <button class="course-chip" data-val="West">🌇 西部</button>
+              <button class="course-chip" data-val="North">🌿 北部</button>
+              <button class="course-chip" data-val="North-East">🌳 北東部</button>
+              <button class="course-chip" data-val="Island-wide">🗺️ 全島</button>
+            </div>
+          </div>
+          <div class="course-condition-group">
+            <div class="course-condition-label">気分</div>
+            <div class="course-chips" data-key="mood">
+              <button class="course-chip" data-val="のんびり">🌿 のんびり</button>
+              <button class="course-chip" data-val="アクティブ">🏃 アクティブ</button>
+              <button class="course-chip" data-val="グルメ">🍜 グルメ</button>
+              <button class="course-chip" data-val="ショッピング">🛍 ショッピング</button>
+            </div>
+          </div>
+          <div class="course-condition-group">
+            <div class="course-condition-label">スタイル</div>
+            <div class="course-chips" data-key="style">
+              <button class="course-chip" data-val="定番">🗺️ 定番</button>
+              <button class="course-chip" data-val="ニッチ">🔍 ニッチ</button>
+            </div>
+          </div>
+        </div>
+
         <button onclick="startCourseGeneration()"
-          style="width:100%;margin-top:4px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+          style="width:100%;margin-top:8px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
           コースを作る ✨
         </button>
       </div>
@@ -6352,12 +6378,26 @@
         pinsArea.style.display = 'none';
       }
 
+      // オプションパネルを閉じた状態にリセット
+      const optPanel = document.getElementById('course-options-panel');
+      const optArrow = document.getElementById('course-options-arrow');
+      if (optPanel) optPanel.style.display = 'none';
+      if (optArrow) optArrow.style.transform = '';
+
       document.getElementById('course-step-conditions').hidden = false;
       document.getElementById('course-step-loading').hidden = true;
       document.getElementById('course-step-result').hidden = true;
       _lockCourseScroll();
       document.getElementById('course-sheet-overlay').classList.add('visible');
       document.getElementById('course-sheet').classList.add('visible');
+    }
+
+    function toggleCourseOptions() {
+      const panel = document.getElementById('course-options-panel');
+      const arrow = document.getElementById('course-options-arrow');
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'block';
+      arrow.style.transform = isOpen ? '' : 'rotate(90deg)';
     }
 
     function closeCourseSheet() {
