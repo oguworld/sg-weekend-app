@@ -3354,7 +3354,7 @@
     </div>
 
     <!-- FAB -->
-    <button id="course-fab" onclick="openCourseChatSheet()" class="fab-plan"
+    <button id="course-fab" onclick="openCourseSheet()" class="fab-plan"
       style="position:fixed;bottom:calc(100px + env(safe-area-inset-bottom,0px));right:20px;z-index:200;">＋</button>
   </div>
 
@@ -3643,24 +3643,106 @@
   </div>
 
   <!-- Course Generator Sheet -->
-  <!-- Course Chat Sheet -->
-  <div id="course-chat-overlay" class="plan-modal-overlay" onclick="closeCourseChatSheet()"></div>
-  <div id="course-chat-sheet" class="plan-sheet">
+  <div id="course-sheet-overlay" class="plan-modal-overlay" onclick="closeCourseSheet()"></div>
+  <div id="course-sheet" class="plan-sheet">
     <div class="plan-sheet-handle"></div>
-    <div style="display:flex;align-items:center;padding:0 20px 12px;flex-shrink:0;">
-      <span style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;flex:1;">AIとコースを作る</span>
-      <button onclick="closeCourseChatSheet()" style="background:none;border:none;font-size:22px;color:var(--light-gray);cursor:pointer;line-height:1;">✕</button>
-    </div>
-    <div id="course-chat-messages" class="chat-messages" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px;"></div>
-    <div id="course-chat-confirm-area" style="display:none;padding:12px 20px;flex-shrink:0;">
-      <button onclick="confirmCourseFromChat()"
-        style="width:100%;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-        このコースで決定する
-      </button>
-    </div>
-    <div class="chat-input-area" style="flex-shrink:0;">
-      <textarea id="course-chat-input" class="chat-input" placeholder="メッセージを入力…" rows="1"></textarea>
-      <button id="course-chat-send-btn" class="chat-send-btn visible" onclick="courseChatSend()">送信</button>
+    <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 20px 24px;">
+
+      <!-- Step 1: 条件選択 -->
+      <div id="course-step-conditions">
+        <div style="font-size:17px;font-weight:700;margin:8px 0 16px;">コースを作る</div>
+
+        <div class="course-condition-group">
+          <div class="course-condition-label">誰と</div>
+          <div class="course-chips" data-key="with">
+            <button class="course-chip" data-val="子連れ">👶 子連れ</button>
+            <button class="course-chip" data-val="カップル">💑 カップル</button>
+            <button class="course-chip" data-val="友人">👥 友人</button>
+            <button class="course-chip" data-val="ひとり">🧘 ひとり</button>
+          </div>
+        </div>
+
+        <div class="course-condition-group">
+          <div class="course-condition-label">使える時間</div>
+          <div class="course-chips" data-key="time">
+            <button class="course-chip" data-val="午前のみ">☀️ 午前のみ</button>
+            <button class="course-chip" data-val="午後のみ">🌤 午後のみ</button>
+            <button class="course-chip" data-val="終日">🌞 終日</button>
+          </div>
+        </div>
+
+        <div class="course-condition-group">
+          <div class="course-condition-label">気分</div>
+          <div class="course-chips" data-key="mood">
+            <button class="course-chip" data-val="のんびり">🌿 のんびり</button>
+            <button class="course-chip" data-val="アクティブ">🏃 アクティブ</button>
+            <button class="course-chip" data-val="グルメ">🍜 グルメ</button>
+            <button class="course-chip" data-val="ショッピング">🛍 ショッピング</button>
+          </div>
+        </div>
+
+        <div class="course-condition-group">
+          <div class="course-condition-label">エリア</div>
+          <div class="course-chips" data-key="area">
+            <button class="course-chip" data-val="Central">🏙 中心部</button>
+            <button class="course-chip" data-val="East">🌅 東部</button>
+            <button class="course-chip" data-val="West">🌇 西部</button>
+            <button class="course-chip" data-val="North">🌿 北部</button>
+            <button class="course-chip" data-val="North-East">🌳 北東部</button>
+            <button class="course-chip" data-val="Island-wide">🗺️ 全島</button>
+          </div>
+        </div>
+
+        <div class="course-condition-group">
+          <div class="course-condition-label">ペース</div>
+          <div class="course-chips" data-key="pace">
+            <button class="course-chip" data-val="ゆったり">🐢 ゆったり</button>
+            <button class="course-chip" data-val="ふつう">🚶 ふつう</button>
+            <button class="course-chip" data-val="めいっぱい">🚀 めいっぱい</button>
+          </div>
+        </div>
+
+        <div class="course-condition-group">
+          <div class="course-condition-label">スタイル</div>
+          <div class="course-chips" data-key="style">
+            <button class="course-chip" data-val="定番">🗺️ 定番</button>
+            <button class="course-chip" data-val="ニッチ">🔍 ニッチ</button>
+          </div>
+        </div>
+
+        <button onclick="startCourseGeneration()"
+          style="width:100%;margin-top:8px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+          コースを作る ✨
+        </button>
+      </div>
+
+      <!-- Step 2: 生成中 -->
+      <div id="course-step-loading" hidden>
+        <div style="text-align:center;padding:40px 0;">
+          <div class="course-loading-dots"><span></span><span></span><span></span></div>
+          <div style="margin-top:16px;color:var(--warm-gray);font-size:14px;">コースを考えています…</div>
+        </div>
+      </div>
+
+      <!-- Step 3: 結果 -->
+      <div id="course-step-result" hidden>
+        <div id="course-result-content"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button onclick="saveGeneratedCourse()"
+            style="flex:1;padding:12px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+            マイコースに保存
+          </button>
+          <button onclick="startCourseGeneration()"
+            style="flex:1;padding:12px;background:var(--warm-white);color:var(--warm-gray);border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+            🔄 作り直す
+          </button>
+        </div>
+        <button onclick="saveAndPublishGeneratedCourse()"
+          style="width:100%;margin-top:8px;padding:12px;background:var(--warm-white);color:var(--caramel);
+                 border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+          みんなに公開する
+        </button>
+      </div>
     </div>
   </div>
 
@@ -6206,6 +6288,14 @@
               公開済み ✓
             </div>
           ` : '')}
+
+          ${isOwn ? `
+            <button onclick="deleteMyCourse('${course.id}')"
+              style="width:100%;margin-top:8px;padding:12px;background:none;color:var(--terracotta);
+                     border:1.5px solid var(--terracotta);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+              🗑️ このコースを削除する
+            </button>
+          ` : ''}
         </div>
       `;
 
@@ -6218,100 +6308,60 @@
       document.getElementById('course-detail-sheet').classList.remove('visible');
     }
 
-    // ─── AI チャットシート ───
+    // ─── コース生成シート ───
 
-    let _courseChatHistory = [];
-    let _courseChatConditions = {};
+    let currentGeneratedCourse = null;
 
-    async function openCourseChatSheet() {
-      _courseChatHistory = [];
-      _courseChatConditions = {};
-      document.getElementById('course-chat-messages').innerHTML = '';
-      document.getElementById('course-chat-confirm-area').style.display = 'none';
-      document.getElementById('course-chat-input').value = '';
-      document.getElementById('course-chat-overlay').classList.add('visible');
-      document.getElementById('course-chat-sheet').classList.add('visible');
+    function openCourseSheet() {
+      // プロフィールから「誰と」を自動選択
+      const whoMap = { family: '子連れ', couple: 'カップル', group: '友人', solo: 'ひとり' };
+      const who = getWhoList();
+      if (who.length > 0) {
+        const val = whoMap[who[0]];
+        if (val) {
+          document.querySelectorAll('#course-sheet [data-key="with"] .course-chip').forEach(b => {
+            b.classList.toggle('selected', b.dataset.val === val);
+          });
+        }
+      }
+      document.getElementById('course-step-conditions').hidden = false;
+      document.getElementById('course-step-loading').hidden = true;
+      document.getElementById('course-step-result').hidden = true;
       _lockCourseScroll();
-
-      const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
-      const city = getCity();
-      try {
-        const res = await fetch('/api/courses/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, message: '', history: [], profile })
-        });
-        const data = await res.json();
-        _appendCourseChatMessage('ai', data.message);
-        _courseChatHistory.push({ role: 'assistant', content: data.message });
-        _courseChatConditions = data.conditions || {};
-        if (data.ready) _showCourseChatConfirm();
-      } catch(e) {
-        _appendCourseChatMessage('ai', 'すみません、接続エラーが発生しました。もう一度お試しください。');
-      }
+      document.getElementById('course-sheet-overlay').classList.add('visible');
+      document.getElementById('course-sheet').classList.add('visible');
     }
 
-    function closeCourseChatSheet() {
-      document.getElementById('course-chat-overlay').classList.remove('visible');
-      document.getElementById('course-chat-sheet').classList.remove('visible');
+    function closeCourseSheet() {
+      document.getElementById('course-sheet-overlay').classList.remove('visible');
+      document.getElementById('course-sheet').classList.remove('visible');
       _unlockCourseScroll();
-      _courseChatHistory = [];
-      _courseChatConditions = {};
     }
 
-    function _appendCourseChatMessage(role, text) {
-      const msgs = document.getElementById('course-chat-messages');
-      const isAi = role === 'ai';
-      const div = document.createElement('div');
-      div.className = isAi ? 'chat-bubble ai' : 'chat-bubble user';
-      // **text** → <b>text</b> に変換（マークダウンが漏れてきた場合の保険）
-      const safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      div.innerHTML = safe.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-      msgs.appendChild(div);
-      msgs.scrollTop = msgs.scrollHeight;
+    function showCourseStep(step) {
+      ['conditions','loading','result'].forEach(s => {
+        document.getElementById('course-step-' + s).hidden = s !== step;
+      });
     }
 
-    function _showCourseChatConfirm() {
-      document.getElementById('course-chat-confirm-area').style.display = '';
-    }
+    document.addEventListener('click', e => {
+      const chip = e.target.closest('#course-sheet .course-chip');
+      if (!chip) return;
+      const group = chip.closest('.course-chips');
+      if (!group) return;
+      group.querySelectorAll('.course-chip').forEach(b => b.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
 
-    async function courseChatSend() {
-      const input = document.getElementById('course-chat-input');
-      const msg = input.value.trim();
-      if (!msg) return;
-      input.value = '';
+    async function startCourseGeneration() {
+      const conditions = {};
+      document.querySelectorAll('#course-sheet .course-chips').forEach(group => {
+        const key = group.dataset.key;
+        const sel = group.querySelector('.course-chip.selected');
+        if (sel) conditions[key] = sel.dataset.val;
+      });
 
-      _appendCourseChatMessage('user', msg);
-      _courseChatHistory.push({ role: 'user', content: msg });
-
-      const sendBtn = document.getElementById('course-chat-send-btn');
-      sendBtn.disabled = true;
-
-      const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
-      const city = getCity();
-
-      try {
-        const res = await fetch('/api/courses/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, message: msg, history: _courseChatHistory, profile })
-        });
-        const data = await res.json();
-        _appendCourseChatMessage('ai', data.message);
-        _courseChatHistory.push({ role: 'assistant', content: data.message });
-        _courseChatConditions = data.conditions || _courseChatConditions;
-        if (data.ready) _showCourseChatConfirm();
-      } catch(e) {
-        _appendCourseChatMessage('ai', 'エラーが発生しました。もう一度試してください。');
-      } finally {
-        sendBtn.disabled = false;
-      }
-    }
-
-    async function confirmCourseFromChat() {
-      const confirmBtn = document.querySelector('#course-chat-confirm-area button');
-      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = '生成中…'; }
-
+      showCourseStep('loading');
       const city = getCity();
       const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
 
@@ -6319,26 +6369,73 @@
         const res = await fetch('/api/courses/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            city,
-            conditions: _courseChatConditions,
-            profile,
-            ..._courseChatConditions,
-            userId: getUserId(),
-            userName: getUserName(),
-          })
+          body: JSON.stringify({ city, conditions, profile, userId: getUserId(), userName: getUserName() })
         });
         const course = await res.json();
         if (!course || course.error) throw new Error(course?.error || 'generation failed');
-
-        saveMyCourse(course);
-        closeCourseChatSheet();
-        await switchCourseTab('mylist');
-        showToast('マイコースに保存しました');
+        currentGeneratedCourse = course;
+        document.getElementById('course-result-content').innerHTML = renderCourseResultHtml(course);
+        showCourseStep('result');
       } catch(e) {
-        _appendCourseChatMessage('ai', 'コースの生成に失敗しました。もう一度「このコースで決定する」を押してください。');
-        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'このコースで決定する'; }
+        showCourseStep('conditions');
+        showToast('生成に失敗しました。もう一度お試しください。');
       }
+    }
+
+    function renderCourseResultHtml(course) {
+      return `
+        <div style="font-size:17px;font-weight:700;margin:8px 0 4px;">${course.title || ''}</div>
+        <div style="font-size:13px;color:var(--warm-gray);margin-bottom:12px;">${course.tagline || ''}</div>
+        ${(course.spots || []).map(s => `
+          <div class="course-timeline-item">
+            <div class="course-timeline-time">${s.time || ''}</div>
+            <div class="course-timeline-body">
+              <div class="course-timeline-name">${s.emoji || ''} ${s.name} <span style="font-size:11px;color:var(--light-gray);">[${s.duration || ''}]</span></div>
+              <div class="course-timeline-desc">${s.description || ''}</div>
+            </div>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    function saveGeneratedCourse() {
+      if (!currentGeneratedCourse) return;
+      saveMyCourse(currentGeneratedCourse);
+      closeCourseSheet();
+      switchCourseTab('mylist');
+      showToast('マイコースに保存しました');
+    }
+
+    async function saveAndPublishGeneratedCourse() {
+      if (!currentGeneratedCourse) return;
+      saveMyCourse(currentGeneratedCourse);
+      await publishCourseById(currentGeneratedCourse.id);
+      closeCourseSheet();
+      switchCourseTab('mylist');
+      showToast('みんなに公開しました');
+    }
+
+    // ─── マイコース削除 ───
+
+    async function deleteMyCourse(courseId) {
+      const city = getCity();
+      const key = city + '_my_courses';
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      const target = list.find(c => c.id === courseId);
+
+      // localStorageから削除
+      localStorage.setItem(key, JSON.stringify(list.filter(c => c.id !== courseId)));
+
+      // 公開済みならサーバーからも削除
+      if (target?.published) {
+        try {
+          await fetch(`/api/courses/${courseId}?city=${city}`, { method: 'DELETE' });
+        } catch(e) {}
+      }
+
+      closeCourseDetail();
+      switchCourseTab('mylist');
+      showToast('コースを削除しました');
     }
 
     function addCourseToScheduleById(courseId) {

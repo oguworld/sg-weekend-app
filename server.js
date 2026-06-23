@@ -1708,6 +1708,19 @@ app.post('/api/courses/publish', async (req, res) => {
 });
 
 // POST /api/courses/:id/like
+app.delete('/api/courses/:id', async (req, res) => {
+  const { id } = req.params;
+  const city = req.query.city || 'sg';
+  const filePath = path.join(__dirname, 'data', city, 'community-courses.json');
+  if (fs.existsSync(filePath)) {
+    await withFileLock(filePath, async () => {
+      const courses = JSON.parse(fs.readFileSync(filePath));
+      fs.writeFileSync(filePath, JSON.stringify(courses.filter(c => c.id !== id), null, 2));
+    });
+  }
+  res.json({ ok: true });
+});
+
 app.post('/api/courses/:id/like', async (req, res) => {
   const { id } = req.params;
   const { city = 'sg', action = 'like' } = req.body;
