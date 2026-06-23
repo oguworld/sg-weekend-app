@@ -3644,8 +3644,8 @@
 
   <!-- Course Generator Sheet -->
   <!-- Course Chat Sheet -->
-  <div id="course-chat-overlay" class="plan-modal-overlay" onclick="closeCourseChatSheet()" style="display:none;"></div>
-  <div id="course-chat-sheet" class="plan-sheet" style="display:none;">
+  <div id="course-chat-overlay" class="plan-modal-overlay" onclick="closeCourseChatSheet()"></div>
+  <div id="course-chat-sheet" class="plan-sheet">
     <div class="plan-sheet-handle"></div>
     <div style="display:flex;align-items:center;padding:0 20px 12px;flex-shrink:0;">
       <span style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;flex:1;">AIとコースを作る</span>
@@ -6229,8 +6229,8 @@
       document.getElementById('course-chat-messages').innerHTML = '';
       document.getElementById('course-chat-confirm-area').style.display = 'none';
       document.getElementById('course-chat-input').value = '';
-      document.getElementById('course-chat-overlay').style.display = '';
-      document.getElementById('course-chat-sheet').style.display = '';
+      document.getElementById('course-chat-overlay').classList.add('visible');
+      document.getElementById('course-chat-sheet').classList.add('visible');
       _lockCourseScroll();
 
       const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
@@ -6252,8 +6252,8 @@
     }
 
     function closeCourseChatSheet() {
-      document.getElementById('course-chat-overlay').style.display = 'none';
-      document.getElementById('course-chat-sheet').style.display = 'none';
+      document.getElementById('course-chat-overlay').classList.remove('visible');
+      document.getElementById('course-chat-sheet').classList.remove('visible');
       _unlockCourseScroll();
       _courseChatHistory = [];
       _courseChatConditions = {};
