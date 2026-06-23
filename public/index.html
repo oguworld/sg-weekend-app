@@ -3334,7 +3334,7 @@
   <!-- ─── COURSE SCREEN ─── -->
   <div class="screen" id="screen-course" style="display:none;">
     <div class="course-screen-header plan-title-header">
-      <span class="screen-title">おでかけコース</span>
+      <span class="screen-title">コース</span>
     </div>
     <div class="screen-content" id="course-screen-content">
       <!-- PTR インジケーター -->
@@ -3345,7 +3345,7 @@
       </div>
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
-        <div class="plan-section-title" style="margin:0 16px 8px;">話題のコース</div>
+        <div class="plan-section-title" style="margin:0 16px 8px;">人気のコース</div>
         <div id="popular-courses-list" style="display:flex;gap:12px;overflow-x:auto;padding:4px 16px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;"></div>
       </div>
 
@@ -6240,7 +6240,7 @@
       </div>`;
     }
 
-    // 話題のコース専用カード（フルワイドカルーセル・左バーランク）
+    // 人気のコース専用カード（フルワイドカルーセル・左バーランク）
     const _rankBarColor = ['#C0903A','#9BA5B0','#B07040','#C8A97A','#C8A97A'];
     function renderPopularCourseCard(c, rank) {
       const cond = c.conditions || {};
@@ -6268,7 +6268,7 @@
         </div>`;
     }
 
-    // 話題のコース（縦並び上位3件）
+    // 人気のコース（縦並び上位3件）
     async function loadPopularCourses() {
       const city = getCity();
       try {
