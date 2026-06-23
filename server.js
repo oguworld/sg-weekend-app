@@ -1449,9 +1449,9 @@ app.get('/api/courses', (req, res) => {
   if (tab === 'preset') return res.json([]);
   if (tab === 'community') return res.json([...community].sort((a, b) => b.likes - a.likes));
   if (tab === 'popular') {
-    // communityのみからlikes降順上位5件
+    // communityのみからlikes降順上位3件
     const sorted = [...community].sort((a, b) => b.likes - a.likes);
-    return res.json(sorted.slice(0, 5));
+    return res.json(sorted.slice(0, 3));
   }
   res.json([]);
 });
@@ -1738,6 +1738,19 @@ app.post('/api/courses/:id/like', async (req, res) => {
     });
   }
 
+  res.json({ ok: true });
+});
+
+app.post('/api/courses/:id/unpublish', async (req, res) => {
+  const { id } = req.params;
+  const city = req.body.city || 'sg';
+  const filePath = path.join(__dirname, 'data', city, 'community-courses.json');
+  if (fs.existsSync(filePath)) {
+    await withFileLock(filePath, async () => {
+      const courses = JSON.parse(fs.readFileSync(filePath));
+      fs.writeFileSync(filePath, JSON.stringify(courses.filter(c => c.id !== id), null, 2));
+    });
+  }
   res.json({ ok: true });
 });
 

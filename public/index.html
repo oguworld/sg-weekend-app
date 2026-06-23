@@ -3340,7 +3340,7 @@
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
         <div class="plan-section-title" style="margin:0 16px 8px;">人気コース</div>
-        <div id="popular-courses-list" style="display:flex;gap:12px;overflow-x:auto;padding:4px 16px 4px;scrollbar-width:none;"></div>
+        <div id="popular-courses-list" style="display:flex;flex-direction:column;gap:12px;padding:4px 16px;"></div>
       </div>
 
       <!-- タブ -->
@@ -6104,7 +6104,7 @@
         let _courseSwipeOnHScroll = false;
         sc.addEventListener('touchstart', e => {
           _courseSwipeStartX = e.touches[0].clientX;
-          _courseSwipeOnHScroll = !!e.target.closest('#popular-courses-list');
+          _courseSwipeOnHScroll = false;
         }, { passive: true });
         sc.addEventListener('touchend', e => {
           if (_courseSwipeOnHScroll) return;
@@ -6169,7 +6169,7 @@
       </div>`;
     }
 
-    // 人気コース（横スクロール）
+    // 人気コース（縦並び上位3件）
     async function loadPopularCourses() {
       const city = getCity();
       try {
@@ -6181,9 +6181,7 @@
           return;
         }
         document.getElementById('popular-courses-section').style.display = '';
-        container.innerHTML = courses.map(c =>
-          `<div style="flex-shrink:0;width:160px;">${renderCourseCard(c)}</div>`
-        ).join('');
+        container.innerHTML = courses.map(c => renderCourseCard(c)).join('');
       } catch(e) {
         document.getElementById('popular-courses-section').style.display = 'none';
       }
@@ -6284,9 +6282,11 @@
               みんなに公開する
             </button>
           ` : (isOwn && course.published === true ? `
-            <div style="width:100%;margin-top:8px;padding:12px;text-align:center;color:var(--sage);font-weight:700;font-size:14px;">
-              公開済み ✓
-            </div>
+            <button onclick="unpublishCourseById('${course.id}')" id="unpublish-btn-${course.id}"
+              style="width:100%;margin-top:8px;padding:12px;background:var(--warm-white);color:var(--sage);
+                     border:1.5px solid var(--sage);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+              公開済み ✓ &nbsp;（非公開にする）
+            </button>
           ` : '')}
 
           ${isOwn ? `
@@ -6561,6 +6561,27 @@
         closeCourseDetail();
       } catch(e) {
         showToast('公開に失敗しました。');
+      }
+    }
+
+    async function unpublishCourseById(courseId) {
+      const city = getCity();
+      try {
+        await fetch(`/api/courses/${courseId}/unpublish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ city })
+        });
+        const key = city + '_my_courses';
+        const myList = JSON.parse(localStorage.getItem(key) || '[]');
+        localStorage.setItem(key, JSON.stringify(
+          myList.map(c => c.id === courseId ? { ...c, published: false, isPublic: false } : c)
+        ));
+        showToast('非公開にしました');
+        closeCourseDetail();
+        switchCourseTab('mylist');
+      } catch(e) {
+        showToast('失敗しました。もう一度お試しください。');
       }
     }
 
