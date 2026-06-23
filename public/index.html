@@ -2064,8 +2064,8 @@
     .course-card-meta { font-size: 12px; color: var(--warm-gray); margin-top: 6px;
       display: flex; justify-content: space-between; align-items: center; gap: 4px; }
 
-    .course-condition-group { margin-bottom: 16px; }
-    .course-condition-label { font-size: 12px; font-weight: 700; color: var(--warm-gray); margin-bottom: 8px; }
+    .course-condition-group { margin-bottom: 20px; }
+    .course-condition-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--light-gray); margin-bottom: 8px; }
     .course-chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .course-chip {
       padding: 7px 14px; border-radius: 20px; font-size: 13px;
@@ -3656,11 +3656,11 @@
 
       <!-- Step 1: 条件選択 -->
       <div id="course-step-conditions">
-        <div style="font-size:17px;font-weight:700;margin:8px 0 16px;">コースを作る</div>
+        <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);margin:8px 0 20px;">コースを作る</div>
 
         <!-- ピン留めイベント選択 -->
         <div id="course-sheet-pins" style="display:none;background:var(--cream);border-radius:12px;padding:12px 14px;margin-bottom:20px;border-left:3px solid var(--caramel);">
-          <div style="font-size:12px;font-weight:700;color:var(--caramel);margin-bottom:8px;">📌 軸にするイベントを選ぶ</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--light-gray);margin-bottom:8px;">📌 軸にするイベント</div>
           <div id="course-sheet-pins-list" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
           <div style="font-size:11px;color:var(--light-gray);margin-top:8px;">軸にするイベントをタップして選んでください</div>
         </div>
@@ -3696,9 +3696,10 @@
 
         <!-- オプション条件（折りたたみ） -->
         <button onclick="toggleCourseOptions()" id="course-options-toggle"
-          style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;
-                 color:var(--warm-gray);font-size:13px;font-family:'Noto Sans JP',sans-serif;padding:4px 0;margin-bottom:4px;">
-          <span id="course-options-arrow" style="font-size:11px;transition:transform 0.2s;">▶</span>
+          style="display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;
+                 color:var(--light-gray);font-size:11px;font-weight:700;letter-spacing:0.06em;
+                 font-family:'Noto Sans JP',sans-serif;padding:4px 0;margin-bottom:4px;">
+          <span id="course-options-arrow" style="font-size:10px;transition:transform 0.2s;">▶</span>
           絞り込む（エリア・気分・スタイル）
         </button>
         <div id="course-options-panel" style="display:none;">
