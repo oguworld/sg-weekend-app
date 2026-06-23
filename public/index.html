@@ -3695,13 +3695,25 @@
             onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'"></textarea>
         </div>
 
+        <!-- スポット数 -->
+        <div class="course-condition-group">
+          <div class="course-condition-label">スポット数</div>
+          <div class="course-chips" data-key="spots">
+            <button class="course-chip" data-val="2">2</button>
+            <button class="course-chip" data-val="3">3</button>
+            <button class="course-chip" data-val="4">4</button>
+            <button class="course-chip" data-val="5">5</button>
+            <button class="course-chip" data-val="6">6</button>
+          </div>
+        </div>
+
         <!-- オプション条件（折りたたみ） -->
         <button onclick="toggleCourseOptions()" id="course-options-toggle"
           style="display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;
                  color:var(--light-gray);font-size:11px;font-weight:700;letter-spacing:0.06em;
                  font-family:'Noto Sans JP',sans-serif;padding:4px 0;margin-bottom:4px;">
           <span id="course-options-arrow" style="font-size:10px;transition:transform 0.2s;">▶</span>
-          絞り込む（エリア・気分・スタイル）
+          こだわる（エリア・気分・スタイル）
         </button>
         <div id="course-options-panel" style="display:none;">
           <div class="course-condition-group">
