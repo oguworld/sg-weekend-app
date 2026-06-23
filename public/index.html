@@ -3334,9 +3334,15 @@
   <!-- ─── COURSE SCREEN ─── -->
   <div class="screen" id="screen-course" style="display:none;">
     <div class="course-screen-header plan-title-header">
-      <span class="screen-title">コース</span>
+      <span class="screen-title">おでかけコース</span>
     </div>
-    <div class="screen-content">
+    <div class="screen-content" id="course-screen-content">
+      <!-- PTR インジケーター -->
+      <div id="ptr-indicator-course" style="height:0;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--warm-white);">
+        <span class="ptr-arrow">↓</span>
+        <span class="ptr-label"></span>
+        <div class="ptr-spinner"></div>
+      </div>
       <!-- 人気コースセクション -->
       <div id="popular-courses-section" style="margin-bottom:16px;">
         <div class="plan-section-title" style="margin:0 16px 8px;">話題のコース</div>
@@ -6116,22 +6122,64 @@
       await switchCourseTab('community');
       loadPopularCourses();
 
-      // スワイプでタブ切り替え（初回のみ登録）
+      // スワイプでタブ切り替え & プルリフレッシュ（初回のみ登録）
       const sc = document.querySelector('#screen-course .screen-content');
       if (sc && !sc._swipeInit) {
         sc._swipeInit = true;
         let _courseSwipeOnHScroll = false;
+        let _ptrStartY = 0, _ptrLastY = 0, _ptrPulling = false, _ptrRefreshing = false;
+        const PTR_TRIGGER = 80, PTR_MAX_H = 52;
+        const ptrInd   = document.getElementById('ptr-indicator-course');
+        const ptrArrow = ptrInd?.querySelector('.ptr-arrow');
+        const ptrLabel = ptrInd?.querySelector('.ptr-label');
+        function _ptrReset() {
+          _ptrPulling = false;
+          if (ptrInd) { ptrInd.style.transition = 'height 0.3s ease'; ptrInd.style.height = '0px'; ptrInd.classList.remove('ptr-loading'); }
+          if (ptrArrow) ptrArrow.style.transform = '';
+          if (ptrLabel) ptrLabel.textContent = '';
+        }
+
         sc.addEventListener('touchstart', e => {
           _courseSwipeStartX = e.touches[0].clientX;
           _courseSwipeOnHScroll = !!e.target.closest('#popular-courses-list');
+          _ptrStartY = _ptrLastY = e.touches[0].clientY;
+          _ptrPulling = false;
         }, { passive: true });
+
+        sc.addEventListener('touchmove', e => {
+          if (_ptrRefreshing || sc.scrollTop > 5) return;
+          _ptrLastY = e.touches[0].clientY;
+          const dy = _ptrLastY - _ptrStartY;
+          if (dy <= 0) { if (_ptrPulling) _ptrReset(); return; }
+          _ptrPulling = true;
+          const h = Math.min(dy * 0.55, PTR_MAX_H);
+          if (ptrInd) { ptrInd.style.transition = 'none'; ptrInd.style.height = h + 'px'; }
+          if (ptrArrow) ptrArrow.style.transform = dy >= PTR_TRIGGER ? 'rotate(180deg)' : 'rotate(0deg)';
+          if (ptrLabel) ptrLabel.textContent = dy >= PTR_TRIGGER ? '離して更新' : '';
+        }, { passive: true });
+
         sc.addEventListener('touchend', e => {
-          if (_courseSwipeOnHScroll) return;
           const dx = e.changedTouches[0].clientX - _courseSwipeStartX;
-          if (Math.abs(dx) < 50) return;
-          const idx = COURSE_TABS.indexOf(currentCourseTab);
-          if (dx < 0 && idx < COURSE_TABS.length - 1) switchCourseTab(COURSE_TABS[idx + 1]);
-          if (dx > 0 && idx > 0) switchCourseTab(COURSE_TABS[idx - 1]);
+          // スワイプ（水平）
+          if (!_courseSwipeOnHScroll && Math.abs(dx) >= 50) {
+            const idx = COURSE_TABS.indexOf(currentCourseTab);
+            if (dx < 0 && idx < COURSE_TABS.length - 1) switchCourseTab(COURSE_TABS[idx + 1]);
+            if (dx > 0 && idx > 0) switchCourseTab(COURSE_TABS[idx - 1]);
+          }
+          // プルリフレッシュ（垂直）
+          if (!_ptrPulling) return;
+          const dy = _ptrLastY - _ptrStartY;
+          _ptrPulling = false;
+          if (dy >= PTR_TRIGGER && !_ptrRefreshing) {
+            _ptrRefreshing = true;
+            if (ptrInd) { ptrInd.style.transition = 'height 0.2s ease'; ptrInd.style.height = PTR_MAX_H + 'px'; ptrInd.classList.add('ptr-loading'); }
+            Promise.all([loadPopularCourses(), switchCourseTab(currentCourseTab)]).finally(() => {
+              _ptrRefreshing = false;
+              setTimeout(_ptrReset, 300);
+            });
+          } else {
+            _ptrReset();
+          }
         }, { passive: true });
       }
     }
