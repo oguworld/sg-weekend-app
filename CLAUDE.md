@@ -55,15 +55,32 @@ sg-weekend-app/
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
 
-## コース機能（2026-06-22実装・2026-06-23 v3更新）
+## コース機能（2026-06-22実装・2026-06-24 v4更新）
 - ナビ: 探す / コース / 予定表 / 設定 の4タブ
-- コース画面タブ: みんなの（community） / マイコース（mylist）の2タブ（AIプリセットは廃止）
-- コース作成: FABタップ → AIチャットシート（POST /api/courses/chat）で条件を会話形式で収集
+- コース画面タブ: 人気（popular） / 公開コース（community） / マイコース（mylist）の3タブ
+  - 人気: いいね数降順 上位5件
+  - 公開コース: 登録日降順（新しい順）
+  - マイコース: 作成日昇順（作った順）
+- コース作成: FABタップ → 条件選択シート（POST /api/courses/generate）でAI生成
 - ユーザー公開コース: `data/{city}/community-courses.json`
 - マイコース: localStorage `{city}_my_courses`（published フィールドで公開管理）
-- API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like
+- API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like, GET /api/courses/image
 - プロフィール連携: sg_who（おでかけスタイル）/ sg_age（子どもの年齢）をチャット・生成プロンプトに反映
 - 画像補完: `node scripts/fill-images.js --city=sg`（generate-model-courses.jsは参照なし）
+- コース生成プロンプト: ホーカーセンター・フードコート優先、閉店リスク低減ルール入り
+- コース詳細ボタン: 予定表追加（メイン）/ 公開+タイトル変更（横2列）/ 削除（テキストリンク）
+- マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
+
+## i18n対応（2026-06-24実装）
+- 言語切り替え: STRINGS オブジェクト（ja/en）+ `t(key)` 関数 + `applyI18n()`
+- 対応済み: 探すタブ・コース機能全体・設定画面・予定表モーダル・ボトムナビ
+- 未対応（スコープ外）: 共有カレンダー機能・AIチャットシート・インストールモーダル
+
+## X自動投稿（scripts/post-to-x.js）
+- ペルソナ: 日本・SG両方フラットに見る30-40代男性。構造・逆説・気づきを提示するスタイル
+- 投稿タイプ: event（イベント紹介）/ life（生活つぶやき）を交互に自動選択
+- 文字数: 本文日本語90文字以内（X上限280ウェイト）
+- 実行: `node scripts/post-to-x.js [--type=event|life] [--city=sg|bkk|syd|all] [--dry-run]`
 
 ## アーキテクチャルール
 - ビジネスロジックはサーバーサイドに置く
