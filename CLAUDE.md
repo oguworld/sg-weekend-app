@@ -55,19 +55,22 @@ sg-weekend-app/
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
 
-## コース機能（2026-06-22実装・2026-06-24 v4更新）
+## コース機能（2026-06-22実装・2026-06-25 BKK/SYD対応）
 - ナビ: 探す / コース / 予定表 / 設定 の4タブ
 - コース画面タブ: 人気（popular） / 公開コース（community） / マイコース（mylist）の3タブ
   - 人気: いいね数降順 上位5件
   - 公開コース: 登録日降順（新しい順）
   - マイコース: 作成日昇順（作った順）
 - コース作成: FABタップ → 条件選択シート（POST /api/courses/generate）でAI生成
-- ユーザー公開コース: `data/{city}/community-courses.json`
+- ユーザー公開コース: `data/{city}/community-courses.json`（sg/bkk/syd 全都市対応）
 - マイコース: localStorage `{city}_my_courses`（published フィールドで公開管理）
 - API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like, GET /api/courses/image
-- プロフィール連携: sg_who（おでかけスタイル）/ sg_age（子どもの年齢）をチャット・生成プロンプトに反映
+- プロフィール連携: app_who（おでかけスタイル）/ app_age（子どもの年齢）をチャット・生成プロンプトに反映
+  - 旧キー sg_who / sg_age は読み取り時にフォールバック
 - 画像補完: `node scripts/fill-images.js --city=sg`（generate-model-courses.jsは参照なし）
-- コース生成プロンプト: ホーカーセンター・フードコート優先、閉店リスク低減ルール入り
+- コース生成プロンプト: 都市別食スポット選定ルール（sg: ホーカーセンター / bkk: タラート / syd: フードホール）
+- エリアチップ: CITY_COURSE_AREAS 定数で都市別に動的生成（sg/bkk/syd 各6エリア）
+- transportチップ: data-val=公共交通・バス（表示ラベルは都市別: SG=MRT・バス, BKK=BTS・MRT・バス, SYD=電車・バス）
 - コース詳細ボタン: 予定表追加（メイン）/ 公開+タイトル変更（横2列）/ 削除（テキストリンク）
 - マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
 

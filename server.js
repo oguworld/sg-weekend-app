@@ -1472,6 +1472,7 @@ app.get('/api/courses/image', async (req, res) => {
 // POST /api/courses/generate
 app.post('/api/courses/generate', async (req, res) => {
   const { city = 'sg', with: who, time, area, style, conditions, profile, pinnedEvents = [] } = req.body;
+  const cityConf = CITIES[city] || CITIES.sg;
 
   // conditions オブジェクトが渡された場合はそちらを優先
   const cond = conditions || {};
@@ -1523,12 +1524,14 @@ app.post('/api/courses/generate', async (req, res) => {
     ? '\n- 特別感: 普段使い（気軽にふらっと行けるカジュアルなスポット。気負わない・リラックスできる）'
     : '';
 
+  const transitName = { sg: 'MRT・バス', bkk: 'BTS・MRT・バス', syd: '電車・バス' }[city] || '公共交通・バス';
+  const transitFreeLabel = { sg: 'MRTや徒歩の制約なし', bkk: 'BTSや徒歩の制約なし', syd: '公共交通や徒歩の制約なし' }[city] || '移動の制約なし';
   const transportNote = resolvedTransport === '歩き中心'
     ? '\n- 移動スタイル: 歩き中心（スポットは近場に密集・徒歩で回れる範囲に絞る）'
-    : resolvedTransport === 'MRT・バス'
-    ? '\n- 移動スタイル: MRT・バス活用（公共交通でエリアをまたいで広範囲に回る）'
+    : resolvedTransport === '公共交通・バス'
+    ? `\n- 移動スタイル: ${transitName}活用（公共交通でエリアをまたいで広範囲に回る）`
     : resolvedTransport === '車・タクシー移動'
-    ? '\n- 移動スタイル: 車・タクシー移動（MRTや徒歩の制約なし。離れたエリアのスポットも組み合わせやすい）'
+    ? `\n- 移動スタイル: 車・タクシー移動（${transitFreeLabel}。離れたエリアのスポットも組み合わせやすい）`
     : '';
 
   const foodNote = resolvedFood === '食べ歩きメイン'
@@ -1542,7 +1545,13 @@ app.post('/api/courses/generate', async (req, res) => {
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic();
 
-  const prompt = `シンガポール在住日本人向けに、以下の条件で週末1日コースを提案してください。
+  const foodSpotRule = {
+    sg:  'ホーカーセンター・フードコート・モール内飲食エリアを最優先とする（閉店リスクが低く、シンガポールらしさもある）。特定のレストランや小規模カフェを名指しで入れる場合は開業10年以上の著名店のみ（例：ジャンボシーフード、Ya Kun）',
+    bkk: 'タラート（市場）・フードコート・デパ地下飲食エリアを最優先とする（閉店リスクが低く、バンコクらしさもある）。特定の店を名指しする場合は著名な老舗のみ（例：Or Tor Kor市場、Emquartierフードホール）',
+    syd: 'フードホール・マーケット・ショッピングセンター内飲食エリアを最優先とする（安定感があり、シドニーらしさもある）。特定の店を名指しする場合は著名な老舗のみ（例：Paddy\'s Market、Queen Victoria Building）',
+  }[city] || 'フードコート・マーケットを最優先とする';
+
+  const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末1日コースを提案してください。
 
 条件:
 - 誰と: ${resolvedWho || '誰でも'}
@@ -1557,8 +1566,8 @@ ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`
 ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜${e.end_date}）`).join('\n') || 'なし'}
 
 【スポット選定ルール】
-- 食事スポットはホーカーセンター・フードコート・モール内飲食エリアを最優先とする（閉店リスクが低く、シンガポールらしさもある）
-- 特定のレストランや小規模カフェを名指しで入れる場合は、上記イベントデータに掲載されているか、開業10年以上の著名店（例：ジャンボシーフード、Ya Kun等）のみに限定する
+- 食事スポットは${foodSpotRule}
+- 食事スポットは上記イベントデータに掲載されているか、著名な老舗のみに限定する
 - ショッピングは特定の小規模ショップより、モール・マーケット・エリア全体を推奨する形にする
 
 以下のJSON形式で返してください（余分な説明不要、JSONのみ）:
@@ -1596,7 +1605,7 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
     // Unsplash画像取得（失敗時はフォールバックキーワードでリトライ）
     const { fetchUnsplashImage } = require('./scripts/lib/unsplash');
     const cityFallbacks = { sg: 'singapore city', bkk: 'bangkok thailand', syd: 'sydney australia' };
-    const imageUrl = await fetchUnsplashImage(course.imageSearch || 'singapore weekend')
+    const imageUrl = await fetchUnsplashImage(course.imageSearch || cityFallbacks[city] || 'singapore weekend')
       || await fetchUnsplashImage(cityFallbacks[city] || 'singapore weekend');
 
     const result = {
@@ -1666,6 +1675,12 @@ app.post('/api/courses/chat', async (req, res) => {
   // withはプロフィールから補完
   const withFromProfile = whoList.length > 0 ? whoText : null;
 
+  const areaGuide = {
+    sg:  'Central / East / West / North / North-East / Island-wide',
+    bkk: 'Sukhumvit / Silom / Siam / Riverside / Old Town / City-wide',
+    syd: 'CBD / Inner West / Eastern Suburbs / North Shore / Western Sydney / City-wide',
+  }[city] || 'Central / City-wide';
+
   const systemPrompt = `あなたは${cityConf.nameJa}在住日本人向け週末コース作成の聞き取り担当AIです。
 日本語で自然な会話形式でコース作成に必要な条件を聞き取ってください。
 
@@ -1674,7 +1689,7 @@ app.post('/api/courses/chat', async (req, res) => {
 
 収集する条件（全4項目）:
 1. with（誰と）: ${withFromProfile ? `プロフィールから「${withFromProfile}」と判断済み` : '子連れ / カップル / 友人 / ひとり から聞き取る'}
-2. area（エリア）: Central / East / West / North / North-East / Island-wide（英語値で記録、表示は日本語OK）
+2. area（エリア）: ${areaGuide}（英語値で記録、表示は日本語OK）
 3. style（スタイル）: 定番（王道・誰もが知る人気スポット） / ローカル（在住者目線の地元体験） / ニッチ（穴場・あまり知られていないスポット）
 4. occasion（特別感）: 普段使い（気軽にふらっと） / ちょっと特別（記念日・ご褒美感）
 5. foodFocus（食の比重）: 食べ歩きメイン / バランス / 見どころメイン

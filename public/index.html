@@ -3715,7 +3715,7 @@
       <div id="course-step-conditions">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin:8px 0 20px;">
           <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);" data-i18n="courseSheetTitle">コースを作る</div>
-          <div id="course-sheet-profile-display" style="font-size:12px;color:var(--caramel);background:var(--cream);padding:3px 8px;border-radius:20px;"></div>
+          <div id="course-sheet-profile-display" onclick="closeCourseSheet();switchNav('settings');" style="font-size:12px;color:var(--caramel);background:var(--cream);padding:3px 8px;border-radius:20px;cursor:pointer;"></div>
         </div>
 
         <!-- ピン留めイベント選択 -->
@@ -3790,6 +3790,13 @@
           <span id="course-options-arrow" style="font-size:10px;transition:transform 0.2s;transform:rotate(90deg);">▶</span>
         </button>
         <div id="course-options-panel" style="display:block;">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+            <button onclick="randomizeCourseConditions()"
+              style="padding:5px 12px;background:none;border:1.5px solid var(--sand-dark);border-radius:20px;
+                     font-size:11px;font-weight:700;color:var(--warm-gray);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+              🎲 ランダム
+            </button>
+          </div>
           <div class="course-condition-group">
             <div class="course-condition-label" data-i18n="coursePurposeLabel">おでかけの目的</div>
             <div class="course-chips" data-key="purpose">
@@ -3802,13 +3809,7 @@
           </div>
           <div class="course-condition-group">
             <div class="course-condition-label" data-i18n="courseAreaLabel">エリア</div>
-            <div class="course-chips" data-key="area">
-              <button class="course-chip" data-val="Central">🏙 Central</button>
-              <button class="course-chip" data-val="East">🌅 East</button>
-              <button class="course-chip" data-val="West">🌇 West</button>
-              <button class="course-chip" data-val="North">🌿 North</button>
-              <button class="course-chip" data-val="North-East">🌳 North-East</button>
-              <button class="course-chip" data-val="Island-wide">🗺️ Island-wide</button>
+            <div class="course-chips" data-key="area" id="course-area-chips">
             </div>
           </div>
           <div class="course-condition-group">
@@ -3838,7 +3839,7 @@
             <div class="course-condition-label" data-i18n="courseTransportLabel">移動スタイル</div>
             <div class="course-chips" data-key="transport">
               <button class="course-chip" data-val="歩き中心">🚶 歩き中心</button>
-              <button class="course-chip" data-val="MRT・バス">🚇 MRT・バス</button>
+              <button class="course-chip" data-val="公共交通・バス" id="course-transit-chip">🚇 MRT・バス</button>
               <button class="course-chip" data-val="車・タクシー移動">🚗 車・タクシー</button>
             </div>
           </div>
@@ -4598,6 +4599,33 @@
       sg: { code: 'SG', flag: '🇸🇬', nameJa: 'シンガポール', nameEn: 'Singapore', subtitleJa: 'シンガポール在住者の週末おでかけガイド', subtitleEn: 'Weekend guide for Japanese in Singapore' },
       bkk: { code: 'BKK', flag: '🇹🇭', nameJa: 'バンコク',         nameEn: 'Bangkok',       subtitleJa: 'バンコク在住者の週末おでかけガイド',         subtitleEn: 'Weekend guide for Japanese in Bangkok' },
       syd: { code: 'SYD', flag: '🇦🇺', nameJa: 'シドニー',         nameEn: 'Sydney',        subtitleJa: 'シドニー在住者の週末おでかけガイド',         subtitleEn: 'Weekend guide for Japanese in Sydney' },
+    };
+
+    const CITY_COURSE_AREAS = {
+      sg: [
+        { val: 'Central',     label: '🏙 Central' },
+        { val: 'East',        label: '🌅 East' },
+        { val: 'West',        label: '🌇 West' },
+        { val: 'North',       label: '🌿 North' },
+        { val: 'North-East',  label: '🌳 North-East' },
+        { val: 'Island-wide', label: '🗺️ Island-wide' },
+      ],
+      bkk: [
+        { val: 'Sukhumvit',   label: '🌆 Sukhumvit' },
+        { val: 'Silom',       label: '🏢 Silom' },
+        { val: 'Siam',        label: '🛍️ Siam' },
+        { val: 'Riverside',   label: '🌊 Riverside' },
+        { val: 'Old Town',    label: '🛕 Old Town' },
+        { val: 'City-wide',   label: '🗺️ City-wide' },
+      ],
+      syd: [
+        { val: 'CBD',              label: '🏙 CBD' },
+        { val: 'Inner West',       label: '🌿 Inner West' },
+        { val: 'Eastern Suburbs',  label: '🌅 Eastern Suburbs' },
+        { val: 'North Shore',      label: '🌉 North Shore' },
+        { val: 'Western Sydney',   label: '🏘️ Western Sydney' },
+        { val: 'City-wide',        label: '🗺️ City-wide' },
+      ],
     };
 
     function buildCitySelect() {
@@ -5876,13 +5904,13 @@
 
     // ─── PROFILE SETTINGS ───
     function getWhoList() {
-      try { return JSON.parse(localStorage.getItem('sg_who') || '[]'); } catch { return []; }
+      try { return JSON.parse(localStorage.getItem('app_who') || localStorage.getItem('sg_who') || '[]'); } catch { return []; }
     }
 
     function getProfile() {
       return {
         who: getWhoList(),
-        age: localStorage.getItem('sg_age') || 'all',
+        age: localStorage.getItem('app_age') || localStorage.getItem('sg_age') || 'all',
       };
     }
 
@@ -5905,7 +5933,7 @@
 
     function updateProfileDropdownDisplay() {
       const who = getWhoList();
-      const age = localStorage.getItem('sg_age') || 'all';
+      const age = localStorage.getItem('app_age') || localStorage.getItem('sg_age') || 'all';
       const isEn = getLang() === 'en';
       const whoMap = isEn
         ? { solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Friends' }
@@ -5940,7 +5968,7 @@
       } else {
         who.push(val);
       }
-      localStorage.setItem('sg_who', JSON.stringify(who));
+      localStorage.setItem('app_who', JSON.stringify(who));
       document.querySelectorAll('[data-pref="who"]').forEach(chip => {
         chip.classList.toggle('selected', who.includes(chip.dataset.val));
       });
@@ -5955,9 +5983,9 @@
     function selectProfile(pref, val) {
       if (pref === 'who') { selectWho(val); return; }
       // age: 選択済みをもう一度タップで「指定なし（all）」に戻す
-      const current = localStorage.getItem('sg_age') || 'all';
+      const current = localStorage.getItem('app_age') || localStorage.getItem('sg_age') || 'all';
       const next = current === val ? 'all' : val;
-      localStorage.setItem('sg_age', next);
+      localStorage.setItem('app_age', next);
       const ageLabels = { baby: t('ageBaby'), preschool: t('agePreschool'), school: t('ageSchool'), all: t('profileLabelAll') };
       showToast(t('toastProfileSet').replace('{label}', ageLabels[next]));
       updateProfileDropdownDisplay();
@@ -6762,10 +6790,27 @@
         const whoMap = { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
         const ageMap = { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
         const who = getWhoList();
-        const age = localStorage.getItem('sg_age') || 'all';
+        const age = localStorage.getItem('app_age') || localStorage.getItem('sg_age') || 'all';
         let txt = who.map(v => whoMap[v]).filter(Boolean).join('・');
         if (who.includes('family') && age !== 'all' && ageMap[age]) txt += `・${ageMap[age]}`;
         profileEl.textContent = txt ? `設定: ${txt}` : '設定: 指定なし';
+      }
+
+      // エリアチップを都市別に動的生成
+      const city = getCity();
+      const areaChipsEl = document.getElementById('course-area-chips');
+      if (areaChipsEl) {
+        const areas = CITY_COURSE_AREAS[city] || CITY_COURSE_AREAS.sg;
+        areaChipsEl.innerHTML = areas.map(a =>
+          `<button class="course-chip" data-val="${a.val}">${a.label}</button>`
+        ).join('');
+      }
+
+      // transportチップのラベルを都市別に動的変更
+      const transitChip = document.getElementById('course-transit-chip');
+      if (transitChip) {
+        const transitLabel = { sg: '🚇 MRT・バス', bkk: '🚇 BTS・MRT・バス', syd: '🚃 電車・バス' }[city] || '🚇 公共交通・バス';
+        transitChip.textContent = transitLabel;
       }
 
       // ピン留めイベントを選択チップとして表示
@@ -6820,15 +6865,21 @@
       });
     }
 
+    const MULTI_SELECT_KEYS = new Set(['purpose', 'area']);
+
     document.addEventListener('click', e => {
-      // 条件チップ（単一選択）
+      // 条件チップ（purpose/area は複数選択、その他は単一選択）
       const chip = e.target.closest('#course-sheet .course-chip');
       if (chip) {
         const group = chip.closest('.course-chips');
         if (!group) return;
-        const wasSelected = chip.classList.contains('selected');
-        group.querySelectorAll('.course-chip').forEach(b => b.classList.remove('selected'));
-        if (!wasSelected) chip.classList.add('selected');
+        if (MULTI_SELECT_KEYS.has(group.dataset.key)) {
+          chip.classList.toggle('selected');
+        } else {
+          const wasSelected = chip.classList.contains('selected');
+          group.querySelectorAll('.course-chip').forEach(b => b.classList.remove('selected'));
+          if (!wasSelected) chip.classList.add('selected');
+        }
         return;
       }
       // ピンチップ（多重選択トグル）
@@ -6847,12 +6898,36 @@
       }
     });
 
+    function randomizeCourseConditions() {
+      document.querySelectorAll('#course-sheet .course-chips').forEach(group => {
+        const chips = [...group.querySelectorAll('.course-chip')];
+        if (!chips.length) return;
+        chips.forEach(b => b.classList.remove('selected'));
+        if (MULTI_SELECT_KEYS.has(group.dataset.key)) {
+          // 複数選択グループ: 0〜2個をランダム選択
+          const count = Math.floor(Math.random() * Math.min(3, chips.length));
+          const shuffled = [...chips].sort(() => Math.random() - 0.5);
+          shuffled.slice(0, count).forEach(b => b.classList.add('selected'));
+        } else {
+          // 単一選択グループ: 50%の確率で1個選択
+          if (Math.random() > 0.4) {
+            chips[Math.floor(Math.random() * chips.length)].classList.add('selected');
+          }
+        }
+      });
+    }
+
     async function startCourseGeneration() {
       const conditions = {};
       document.querySelectorAll('#course-sheet .course-chips').forEach(group => {
         const key = group.dataset.key;
-        const sel = group.querySelector('.course-chip.selected');
-        if (sel) conditions[key] = sel.dataset.val;
+        if (MULTI_SELECT_KEYS.has(key)) {
+          const vals = [...group.querySelectorAll('.course-chip.selected')].map(b => b.dataset.val);
+          if (vals.length) conditions[key] = vals.join('・');
+        } else {
+          const sel = group.querySelector('.course-chip.selected');
+          if (sel) conditions[key] = sel.dataset.val;
+        }
       });
       const note = (document.getElementById('course-note')?.value || '').trim();
       if (note) conditions.note = note;
@@ -6864,7 +6939,7 @@
 
       showCourseStep('loading');
       const city = getCity();
-      const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
+      const profile = { who: getWhoList(), age: localStorage.getItem('app_age') || localStorage.getItem('sg_age') || 'all' };
 
       // 選択されたピンのみを軸として収集
       const allPins = getPins();
