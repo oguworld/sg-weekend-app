@@ -385,6 +385,10 @@ async function main() {
   console.log('\n🧹 全体重複チェック中...');
   deduplicateSaved(conf.eventsPath);
 
+  console.log('\n🖼 画像なしイベントを Unsplash で補完中...');
+  const { fillImages } = require('./fill-images');
+  await fillImages(cityKey);
+
   console.log('\n🎉 fetch-events.js 完了\n');
 
   saveFetchSummary({

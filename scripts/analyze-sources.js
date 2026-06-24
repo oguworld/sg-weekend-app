@@ -196,15 +196,45 @@ function analyzeCity(cityKey, history, sources, candidates) {
   const paused    = [];  // { label, reason }
   const activated = [];  // { label, reason, contentFocus }
   const warnings  = [];
+  const rejected  = [];  // { label, reason }
 
-  // 候補リスト（まだ未使用のもの）、多様性を考慮してソート
+  // ─ Step0: 停止済みソースのうち条件を満たすものを永久除外(rejected)へ昇格 ─
+  const REJECT_PAUSED_DAYS = 7;  // 停止後この日数を超えたら昇格判定
+  const today = new Date().toISOString().slice(0, 10);
+  const pausedFeeds = cityConf.feeds.filter(f => f.status === 'paused');
+  const pausedIG    = cityConf.instagramAccounts.filter(a => a.status === 'paused');
+  for (const obj of [...pausedFeeds, ...pausedIG]) {
+    const key = obj.username ? `Instagram / @${obj.username}` : obj.name;
+    const runs = cityHist[key] || [];
+    if (runs.length < THRESHOLDS.minRuns) continue;
+    const daysSincePause = obj.pausedAt
+      ? Math.floor((new Date(today) - new Date(obj.pausedAt)) / 86400000)
+      : 999;
+    if (daysSincePause < REJECT_PAUSED_DAYS) continue;
+    const totalSent = runs.reduce((s, r) => s + (r.sent || 0), 0);
+    const totalAcc  = runs.reduce((s, r) => s + (r.accepted || 0), 0);
+    if (totalAcc === 0 && totalSent >= THRESHOLDS.minTotalSent) {
+      obj.status       = 'rejected';
+      obj.rejectedAt   = today;
+      obj.rejectedReason = `停止後${daysSincePause}日・通算採用0件（${totalSent}件送信）`;
+      rejected.push({ label: key, reason: obj.rejectedReason });
+      log(`  🚫 永久除外: ${key}（${obj.rejectedReason}）`);
+    }
+  }
+
+  // 候補リスト（まだ未使用かつ rejected でないもの）、多様性を考慮してソート
+  const rejectedUrls     = new Set(cityConf.feeds.filter(f => f.status === 'rejected').map(f => f.url));
+  const rejectedUsernames = new Set(cityConf.instagramAccounts.filter(a => a.status === 'rejected').map(a => a.username));
   let unusedFeedCands = sortCandidatesByDiversity(
-    (cityCands.feeds || []).filter(c => !cityConf.feeds.some(f => f.url === c.url)),
+    (cityCands.feeds || []).filter(c =>
+      !cityConf.feeds.some(f => f.url === c.url) && !rejectedUrls.has(c.url)
+    ),
     mostNeeded
   );
   let unusedIGCands = sortCandidatesByDiversity(
     (cityCands.instagramAccounts || []).filter(c =>
-      !cityConf.instagramAccounts.some(a => a.username === c.username)
+      !cityConf.instagramAccounts.some(a => a.username === c.username) &&
+      !rejectedUsernames.has(c.username)
     ),
     mostNeeded
   );
@@ -295,7 +325,7 @@ function analyzeCity(cityKey, history, sources, candidates) {
     }
   }
 
-  return { paused, activated, warnings, latestRawTotal, activeTotal, typeDist, mostNeeded, overRepresented };
+  return { paused, activated, warnings, rejected, latestRawTotal, activeTotal, typeDist, mostNeeded, overRepresented };
 }
 
 // ─── LINE 通知用レポート生成 ──────────────────────────────────────
@@ -306,7 +336,7 @@ function buildReport(results) {
     const cityName = CITY_NAMES[cityKey] || cityKey;
     const rawLabel = r.latestRawTotal != null ? `raw ${r.latestRawTotal}件` : 'rawデータなし';
 
-    if (r.paused.length === 0 && r.activated.length === 0 && r.warnings.length === 0) {
+    if (r.paused.length === 0 && r.activated.length === 0 && r.warnings.length === 0 && r.rejected.length === 0) {
       lines.push(`✅ ${cityName}: 変更なし（${rawLabel} / アクティブ${r.activeTotal}ソース）`);
       continue;
     }
@@ -314,6 +344,7 @@ function buildReport(results) {
     lines.push(`\n【${cityName}】${rawLabel}`);
 
     // 変更内容
+    for (const { label, reason } of r.rejected)   lines.push(`🚫 永久除外: ${label}（${reason}）`);
     for (const { label, reason } of r.paused)     lines.push(`❌ 停止: ${label}（${reason}）`);
     for (const { label, reason, contentFocus } of r.activated) {
       const focus = contentFocus && contentFocus !== 'mixed' ? ` [${TYPE_LABELS[contentFocus] || contentFocus}]` : '';
@@ -382,9 +413,9 @@ async function main() {
       const activeFeeds = (sources[cityKey]?.feeds || []).filter(f => f.status === 'active').length;
       const activeIG    = (sources[cityKey]?.instagramAccounts || []).filter(a => a.status === 'active').length;
       analysisResult.cities[cityKey] = {
-        changed:     r.paused.length > 0 || r.activated.length > 0,
+        changed:     r.paused.length > 0 || r.activated.length > 0 || r.rejected.length > 0,
         added:       r.activated.map(a => a.label),
-        removed:     r.paused.map(p => p.label),
+        removed:     [...r.paused.map(p => p.label), ...r.rejected.map(r => r.label)],
         activeCount: activeFeeds + activeIG,
       };
     }

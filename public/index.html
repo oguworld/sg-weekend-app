@@ -4335,7 +4335,7 @@
         courseAddToPlanBtn: '📅 予定表に追加',
         coursePublishAction: 'みんなに公開する',
         courseUnpublishAction: '公開済み ✓ &nbsp;（非公開にする）',
-        courseEditTitleBtn: '✏️ タイトルを変更する',
+        courseEditTitleBtn: 'タイトルを変更する',
         courseDeleteBtn: '🗑️ このコースを削除する',
         courseEmpty: 'コースがありません',
         courseSpotsCount: '{n}スポット',
@@ -4524,7 +4524,7 @@
         courseAddToPlanBtn: '📅 Add to Schedule',
         coursePublishAction: 'Share with everyone',
         courseUnpublishAction: 'Published ✓ &nbsp;(Make private)',
-        courseEditTitleBtn: '✏️ Edit title',
+        courseEditTitleBtn: 'Edit title',
         courseDeleteBtn: '🗑️ Delete course',
         courseEmpty: 'No courses yet',
         courseSpotsCount: '{n} spots',
@@ -6535,10 +6535,16 @@
             overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.tagline || ''}</div>
           <div style="font-size:10px;color:var(--light-gray);">${tag ? tag + ' · ' : ''}${t('courseSpotsCount').replace('{n}', c.spots?.length||0)}</div>
         </div>
-        <button onclick="event.stopPropagation();toggleLike('${c.id}')" data-like-id="${c.id}" data-likes="${c.likes||0}"
-          style="font-size:12px;flex-shrink:0;padding:4px 6px;background:none;border:none;cursor:pointer;
-                 border-radius:8px;font-family:inherit;line-height:1;transition:transform 0.1s;align-self:center;"
-          ontouchstart="this.style.transform='scale(0.85)'" ontouchend="this.style.transform='scale(1)'">${liked ? '❤️' : '🤍'} ${c.likes||0}</button>
+        ${isOwn
+          ? `<div style="flex-shrink:0;align-self:center;padding:4px 8px;border-radius:20px;font-size:10px;font-weight:700;
+               ${c.published ? 'background:#e8f5e9;color:#4caf50;' : 'background:#f5f5f5;color:#aaa;'}">
+               ${c.published ? '🌐 公開中' : '🔒 非公開'}
+             </div>`
+          : `<button onclick="event.stopPropagation();toggleLike('${c.id}')" data-like-id="${c.id}" data-likes="${c.likes||0}"
+               style="font-size:12px;flex-shrink:0;padding:4px 6px;background:none;border:none;cursor:pointer;
+                      border-radius:8px;font-family:inherit;line-height:1;transition:transform 0.1s;align-self:center;"
+               ontouchstart="this.style.transform='scale(0.85)'" ontouchend="this.style.transform='scale(1)'">${liked ? '❤️' : '🤍'} ${c.likes||0}</button>`
+        }
       </div>`;
     }
 
@@ -6671,7 +6677,8 @@
             ).join('') : ''}
           </div>
 
-          <div style="font-size:13px;font-weight:700;margin-bottom:12px;">${t('courseDetailRoute')}</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;">${t('courseDetailRoute')}</div>
+          <div style="font-size:12px;color:#9a6c2e;background:#fef3dc;border-radius:8px;padding:8px 12px;margin-bottom:14px;text-align:center;">📍 ${getLang()==='en' ? 'Please check opening hours before visiting.' : '訪問前に営業状況をご確認ください。'}</div>
           ${(course.spots || []).map(s => `
             <div class="course-timeline-item">
               <div class="course-timeline-time">${s.time}</div>
@@ -6698,31 +6705,33 @@
             </button>
           </div>
 
-          ${isOwn && course.published !== true ? `
-            <button onclick="publishCourseById('${course.id}')" id="publish-btn-${course.id}"
-              style="width:100%;margin-top:8px;padding:14px;background:var(--warm-white);color:var(--caramel);font-size:13px;
-                     border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              ${t('coursePublishAction')}
-            </button>
-          ` : (isOwn && course.published === true ? `
-            <button onclick="unpublishCourseById('${course.id}')" id="unpublish-btn-${course.id}"
-              style="width:100%;margin-top:8px;padding:14px;background:var(--warm-white);color:var(--sage);font-size:13px;
-                     border:1.5px solid var(--sage);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              ${t('courseUnpublishAction')}
-            </button>
-          ` : '')}
-
           ${isOwn ? `
-            <button onclick="openTitleEdit('${course.id}')"
-              style="width:100%;margin-top:8px;padding:14px;background:none;color:var(--warm-gray);font-size:13px;
-                     border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              ${t('courseEditTitleBtn')}
-            </button>
-            <button onclick="deleteMyCourse('${course.id}')"
-              style="width:100%;margin-top:8px;padding:14px;background:none;color:var(--terracotta);font-size:13px;
-                     border:1.5px solid var(--terracotta);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              ${t('courseDeleteBtn')}
-            </button>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              ${course.published !== true ? `
+                <button onclick="publishCourseById('${course.id}')" id="publish-btn-${course.id}"
+                  style="flex:1;padding:11px 8px;background:var(--warm-white);color:var(--caramel);font-size:12px;
+                         border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+                  ${t('coursePublishAction')}
+                </button>
+              ` : `
+                <button onclick="unpublishCourseById('${course.id}')" id="unpublish-btn-${course.id}"
+                  style="flex:1;padding:11px 8px;background:var(--warm-white);color:var(--sage);font-size:12px;
+                         border:1.5px solid var(--sage);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+                  ${t('courseUnpublishAction')}
+                </button>
+              `}
+              <button onclick="openTitleEdit('${course.id}')"
+                style="flex:1;padding:11px 8px;background:var(--warm-white);color:var(--warm-gray);font-size:12px;
+                       border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+                ${t('courseEditTitleBtn')}
+              </button>
+            </div>
+            <div style="text-align:center;margin-top:16px;">
+              <button onclick="deleteMyCourse('${course.id}')"
+                style="background:none;border:none;color:var(--light-gray);font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+                ${t('courseDeleteBtn')}
+              </button>
+            </div>
           ` : ''}
         </div>
       `;
@@ -6892,6 +6901,9 @@
 
     function renderCourseResultHtml(course) {
       return `
+        ${course.imageUrl
+          ? `<img src="${course.imageUrl}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:12px;display:block;">`
+          : ''}
         <div style="font-size:17px;font-weight:700;margin:8px 0 4px;">${course.title || ''}</div>
         <div style="font-size:13px;color:var(--warm-gray);margin-bottom:12px;">${course.tagline || ''}</div>
         ${(course.spots || []).map(s => `

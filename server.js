@@ -1447,40 +1447,97 @@ app.get('/api/courses', (req, res) => {
   const community = fs.existsSync(communityPath) ? JSON.parse(fs.readFileSync(communityPath)) : [];
 
   if (tab === 'preset') return res.json([]);
-  if (tab === 'community') return res.json([...community].sort((a, b) => b.likes - a.likes));
+  if (tab === 'community') {
+    // 登録日が新しい順
+    return res.json([...community].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+  }
   if (tab === 'popular') {
-    // communityのみからlikes降順上位5件
+    // いいね数降順上位5件
     const sorted = [...community].sort((a, b) => b.likes - a.likes);
     return res.json(sorted.slice(0, 5));
   }
   res.json([]);
 });
 
+// GET /api/courses/image — 画像なしコース向け画像取得
+app.get('/api/courses/image', async (req, res) => {
+  const { query, city = 'sg' } = req.query;
+  const { fetchUnsplashImage } = require('./scripts/lib/unsplash');
+  const cityFallbacks = { sg: 'singapore city', bkk: 'bangkok thailand', syd: 'sydney australia' };
+  const imageUrl = (query ? await fetchUnsplashImage(query) : null)
+    || await fetchUnsplashImage(cityFallbacks[city] || 'singapore weekend');
+  res.json({ imageUrl: imageUrl || null });
+});
+
 // POST /api/courses/generate
 app.post('/api/courses/generate', async (req, res) => {
-  const { city = 'sg', with: who, time, mood, area, pace, style, conditions, profile, pinnedEvents = [] } = req.body;
+  const { city = 'sg', with: who, time, area, style, conditions, profile, pinnedEvents = [] } = req.body;
 
   // conditions オブジェクトが渡された場合はそちらを優先
   const cond = conditions || {};
-  const resolvedWho   = cond.with  || who;
-  const resolvedTime  = cond.time  || time;
-  const resolvedArea  = cond.area  || area;
-  const resolvedMood  = cond.mood  || mood;
-  const resolvedStyle = cond.style || style;
-  const resolvedNote  = cond.note  || '';
-  const resolvedSpots = parseInt(cond.spots) || null;  // スポット数（null=AI任せ）
-  const resolvedAge   = profile?.age;
+  const resolvedWho      = cond.with     || who;
+  const resolvedArea     = cond.area     || area;
+  const resolvedStyle    = cond.style    || style;
+  const resolvedPurpose   = cond.purpose   || null;  // おでかけの目的
+  const resolvedOccasion  = cond.occasion  || null;  // 特別感
+  const resolvedFood      = cond.foodFocus || null;  // 食の比重
+  const resolvedTransport = cond.transport || null;  // 移動スタイル
+  const resolvedNote     = cond.note     || '';
+  const resolvedAge      = profile?.age;
+  const resolvedDeparture = cond.departure || null;
+  const resolvedReturn    = cond.return    || null;
 
-  // 登録イベントから候補を取得
+  // 登録イベントから候補を取得（常に含める）
   const ep = eventsPath(city);
   const events = fs.existsSync(ep) ? JSON.parse(fs.readFileSync(ep)) : [];
   const upcomingEvents = events.filter(e => e.end_date >= new Date().toISOString().slice(0, 10)).slice(0, 5);
-
 
   // 年齢情報の日本語表現
   const ageLabels = { baby: '0〜2歳の赤ちゃん', preschool: '幼稚園児（3〜6歳）', school: '小学生以上' };
   const ageNote = resolvedAge && resolvedAge !== 'all' ? `\n- 子どもの年齢: ${ageLabels[resolvedAge] || resolvedAge}` : '';
   const noteStr = resolvedNote ? `\n- リクエスト: ${resolvedNote}` : '';
+
+  const styleNote = resolvedStyle === '定番'
+    ? '\n- スタイル: 王道（誰もが知る人気スポット中心、初めてでも安心のコース）'
+    : resolvedStyle === 'ニッチ'
+    ? '\n- スタイル: 穴場（地元好きだけが知る隠れスポット中心、混まない・知られていない）'
+    : resolvedStyle === 'ローカル'
+    ? '\n- スタイル: 地元流（観光客向けではなく在住者が日常で使う食堂・マーケット・エリアなど）'
+    : '';
+
+  const purposeNote = resolvedPurpose === 'ぶらぶら散歩'
+    ? '\n- 目的: ぶらぶら散歩（目的なく歩いて発見できる街歩き。歩いて楽しいエリア・路地・公園を組み込む）'
+    : resolvedPurpose === '雑貨・お土産'
+    ? '\n- 目的: 雑貨・お土産（マーケット・クラフトショップ・セレクトショップ・デザイン雑貨店を中心に組む）'
+    : resolvedPurpose === 'アート・文化'
+    ? '\n- 目的: アート・文化（ギャラリー・博物館・壁画・文化地区・歴史スポットを積極的に取り入れる）'
+    : resolvedPurpose === 'フォトスポット'
+    ? '\n- 目的: フォトスポット（写真映えする場所・壁画・景観・インスタ映えスポットを中心に選ぶ）'
+    : resolvedPurpose === '自然・公園'
+    ? '\n- 目的: 自然・公園（緑・水辺・公園・ガーデンでリフレッシュ。自然の中で過ごせるスポットを優先する）'
+    : '';
+
+  const occasionNote = resolvedOccasion === 'ちょっと特別'
+    ? '\n- 特別感: ちょっと特別な日（記念日・ご褒美感のある格上げスポット・体験を選ぶ。雰囲気・サービス・非日常感を重視）'
+    : resolvedOccasion === '普段使い'
+    ? '\n- 特別感: 普段使い（気軽にふらっと行けるカジュアルなスポット。気負わない・リラックスできる）'
+    : '';
+
+  const transportNote = resolvedTransport === '歩き中心'
+    ? '\n- 移動スタイル: 歩き中心（スポットは近場に密集・徒歩で回れる範囲に絞る）'
+    : resolvedTransport === 'MRT・バス'
+    ? '\n- 移動スタイル: MRT・バス活用（公共交通でエリアをまたいで広範囲に回る）'
+    : resolvedTransport === '車・タクシー移動'
+    ? '\n- 移動スタイル: 車・タクシー移動（MRTや徒歩の制約なし。離れたエリアのスポットも組み合わせやすい）'
+    : '';
+
+  const foodNote = resolvedFood === '食べ歩きメイン'
+    ? '\n- 食の比重: 食べ歩きメイン（飲食スポットを3〜4割以上、グルメ体験が軸になるコース）'
+    : resolvedFood === '見どころメイン'
+    ? '\n- 食の比重: 見どころメイン（観光・体験・アクティビティ中心。食事は軽め・1箇所程度）'
+    : resolvedFood === 'バランス'
+    ? '\n- 食の比重: バランス（飲食と観光・体験をバランスよく組み合わせる）'
+    : '';
 
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic();
@@ -1489,8 +1546,8 @@ app.post('/api/courses/generate', async (req, res) => {
 
 条件:
 - 誰と: ${resolvedWho || '誰でも'}
-- 時間帯: ${resolvedTime || '終日'}
-- スポット数: ${resolvedSpots ? `${resolvedSpots}件（ちょうどこの数にすること）` : '3〜4件（時間帯に合わせて調整）'}${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${resolvedMood ? `\n- 気分: ${resolvedMood}` : ''}${resolvedStyle === '定番' ? '\n- スタイル: 定番（誰もが知る人気スポット中心の王道コース）' : resolvedStyle === 'ニッチ' ? '\n- スタイル: ニッチ（地元好きだけが知る穴場・あまり知られていないスポット中心）' : resolvedStyle === 'ローカル' ? '\n- スタイル: ローカル（観光客向けではなく在住者が日常で使うエリア・食堂・マーケットなど、生活感ある地元体験）' : ''}${ageNote}${noteStr}
+- 時間帯: ${resolvedDeparture && resolvedReturn ? `${resolvedDeparture}〜${resolvedReturn}` : resolvedDeparture ? `${resolvedDeparture}出発` : resolvedReturn ? `〜${resolvedReturn}帰宅` : '指定なし（終日）'}
+- スポット数: 時間帯に合わせてAIが最適な数を決める（通常3〜4件）${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}
 
 ${pinnedEvents.length > 0 ? `【重要】ユーザーがピン留めしたイベント（これらを軸・メインスポットとして必ず組み込む）:
 ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}
@@ -1499,10 +1556,15 @@ ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`
 ` : ''}参考にできるその他のイベント（任意で1件組み込んでよい）:
 ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜${e.end_date}）`).join('\n') || 'なし'}
 
+【スポット選定ルール】
+- 食事スポットはホーカーセンター・フードコート・モール内飲食エリアを最優先とする（閉店リスクが低く、シンガポールらしさもある）
+- 特定のレストランや小規模カフェを名指しで入れる場合は、上記イベントデータに掲載されているか、開業10年以上の著名店（例：ジャンボシーフード、Ya Kun等）のみに限定する
+- ショッピングは特定の小規模ショップより、モール・マーケット・エリア全体を推奨する形にする
+
 以下のJSON形式で返してください（余分な説明不要、JSONのみ）:
 {
-  "title": "コースタイトル（20文字以内）",
-  "tagline": "キャッチコピー（30文字以内）",
+  "title": "コースタイトル（20文字以内）。このコースで実際に訪れるスポット名・エリア名・イベント名を必ず1つ以上含めること。旅行雑誌のキャプション風。「静かな午後」「週末の正解」のような抽象的フレーズだけのタイトルは禁止。エリア名＋時間帯＋活動の羅列（例：「East朝ランチ散策」）も禁止。良い例：「ハジレーンと、知られざる壁画の裏道」「Jewel滝を横目に、週末を遊び尽くす」「Clarke Quayから始まる、大人の夜散歩」「セントーサで子どもが全力で走り回る日」",
+  "tagline": "キャッチコピー（30文字以内）。タイトルと違う角度から魅力を補足する一言",
   "description": "このコースの魅力（2〜3文、なぜおすすめか具体的に）",
   "imageSearch": "英語キーワード2〜4語",
   "spots": [
@@ -1531,9 +1593,11 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
 
     const course = JSON.parse(jsonMatch[0]);
 
-    // Unsplash画像取得
+    // Unsplash画像取得（失敗時はフォールバックキーワードでリトライ）
     const { fetchUnsplashImage } = require('./scripts/lib/unsplash');
-    const imageUrl = await fetchUnsplashImage(course.imageSearch || 'singapore weekend');
+    const cityFallbacks = { sg: 'singapore city', bkk: 'bangkok thailand', syd: 'sydney australia' };
+    const imageUrl = await fetchUnsplashImage(course.imageSearch || 'singapore weekend')
+      || await fetchUnsplashImage(cityFallbacks[city] || 'singapore weekend');
 
     const result = {
       id: `course_${city}_${Date.now()}`,
@@ -1541,9 +1605,10 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
       type: 'ai',
       ...course,
       imageUrl,
-      conditions: { with: resolvedWho, time: resolvedTime, mood: resolvedMood, area: resolvedArea, style: resolvedStyle },
+      conditions: { with: resolvedWho, area: resolvedArea, purpose: resolvedPurpose, style: resolvedStyle, occasion: resolvedOccasion, foodFocus: resolvedFood, transport: resolvedTransport, departure: resolvedDeparture, return: resolvedReturn },
       authorId: req.body.userId || 'anonymous',
       authorName: req.body.userName || '匿名',
+      authorAvatar: req.body.userAvatar || '',
       isPublic: false,
       likes: 0,
       views: 0,
@@ -1585,12 +1650,11 @@ app.post('/api/courses/chat', async (req, res) => {
         conditions: {
           type: 'object',
           properties: {
-            with: { type: ['string', 'null'] },
-            time: { type: ['string', 'null'] },
-            mood: { type: ['string', 'null'] },
-            area: { type: ['string', 'null'] },
-            pace: { type: ['string', 'null'] },
-            style: { type: ['string', 'null'] }
+            with:      { type: ['string', 'null'] },
+            area:      { type: ['string', 'null'] },
+            style:     { type: ['string', 'null'] },
+            occasion:  { type: ['string', 'null'] },
+            foodFocus: { type: ['string', 'null'] }
           }
         },
         ready: { type: 'boolean', description: '全条件揃ったらtrue' }
@@ -1608,19 +1672,18 @@ app.post('/api/courses/chat', async (req, res) => {
 ユーザーのプロフィール:
 - ${profileDesc}
 
-収集する条件（全6項目）:
+収集する条件（全4項目）:
 1. with（誰と）: ${withFromProfile ? `プロフィールから「${withFromProfile}」と判断済み` : '子連れ / カップル / 友人 / ひとり から聞き取る'}
-2. time（使える時間）: 午前のみ / 午後のみ / 終日
-3. mood（気分）: のんびり / アクティブ / グルメ / ショッピング
-4. area（エリア）: Central / East / West / North / North-East / Island-wide（英語値で記録、表示は日本語OK）
-5. pace（ペース）: ゆったり / ふつう / めいっぱい
-6. style（スタイル）: 定番（人気スポット中心） / ニッチ（穴場・ローカル中心）
+2. area（エリア）: Central / East / West / North / North-East / Island-wide（英語値で記録、表示は日本語OK）
+3. style（スタイル）: 定番（王道・誰もが知る人気スポット） / ローカル（在住者目線の地元体験） / ニッチ（穴場・あまり知られていないスポット）
+4. occasion（特別感）: 普段使い（気軽にふらっと） / ちょっと特別（記念日・ご褒美感）
+5. foodFocus（食の比重）: 食べ歩きメイン / バランス / 見どころメイン
 
 ルール:
 - withはプロフィールから補完済みの場合は確認だけして次に進む
-- 3〜5往復で自然にまとめる
+- 2〜4往復で自然にまとめる
 - 複数の条件を1回で聞いても良い
-- 全6項目が揃ったら ready: true にし、収集した条件の概要をmessageに含める
+- 全項目が揃ったら ready: true にし、収集した条件の概要をmessageに含める
 - 空メッセージ（初回）の場合はプロフィールを参照した挨拶と最初の質問を返す
 - collect_conditions ツールを必ず使って返答すること
 - messageはプレーンテキストのみ。**マークダウン記法（**, *, # 等）は一切使わない**

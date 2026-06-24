@@ -99,7 +99,11 @@ async function fillImages(city) {
   console.log(`\n[fill-images] 完了: ${updated}件の画像を補完しました`);
 }
 
-fillImages(cityArg).catch(e => {
-  console.error('[fill-images] エラー:', e.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  fillImages(cityArg).catch(e => {
+    console.error('[fill-images] エラー:', e.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { fillImages };
