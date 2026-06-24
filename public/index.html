@@ -2074,6 +2074,20 @@
     .course-condition-group { margin-bottom: 20px; }
     .course-condition-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--light-gray); margin-bottom: 8px; }
     .course-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .avatar-chip {
+      width:30px;height:30px;border-radius:50%;border:2px solid var(--sand-dark);
+      background:var(--warm-white);font-size:15px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;transition:all 0.15s;padding:0;
+    }
+    .avatar-chip.selected { border-color:var(--caramel);background:var(--caramel-pale); }
+    .course-time-select {
+      width: 100%; padding: 9px 12px; font-size: 14px;
+      font-family: 'Noto Sans JP', sans-serif;
+      border: 1.5px solid var(--sand-dark); border-radius: 10px;
+      background: var(--warm-white); color: var(--text);
+      outline: none; cursor: pointer; appearance: auto;
+    }
+    .course-time-select:focus { border-color: var(--caramel); }
     .course-chip {
       padding: 7px 14px; border-radius: 20px; font-size: 13px;
       border: 1.5px solid var(--sand-dark); background: white;
@@ -2097,9 +2111,9 @@
     .course-timeline-item { display: flex; gap: 12px; margin-bottom: 16px; }
     .course-timeline-time { font-size: 13px; font-weight: 700; color: var(--caramel); min-width: 44px; margin-top: 2px; }
     .course-timeline-body { flex: 1; }
-    .course-timeline-name { font-size: 14px; font-weight: 700; }
-    .course-timeline-desc { font-size: 13px; color: var(--warm-gray); margin-top: 3px; line-height: 1.5; }
-    .course-timeline-meta { font-size: 12px; color: var(--light-gray); margin-top: 2px; }
+    .course-timeline-name { font-family: 'Kaisei Opti', serif; font-size: 15px; font-weight: 700; }
+    .course-timeline-desc { font-size: 14px; color: var(--warm-gray); margin-top: 3px; line-height: 1.65; }
+    .course-timeline-meta { font-size: 13px; color: var(--light-gray); margin-top: 2px; }
 
     /* ─── BOTTOM NAV ─── */
     .bottom-nav {
@@ -3342,7 +3356,7 @@
   <!-- ─── COURSE SCREEN ─── -->
   <div class="screen" id="screen-course" style="display:none;">
     <div class="course-screen-header plan-title-header">
-      <span class="screen-title">おでかけコース</span>
+      <span class="screen-title" data-i18n="courseScreenTitle">おでかけコース</span>
     </div>
     <div class="screen-content" id="course-screen-content">
       <!-- PTR インジケーター -->
@@ -3354,9 +3368,9 @@
 
       <!-- ピルタブ -->
       <div class="course-tab-bar">
-        <button class="course-tab active" data-tab="popular" onclick="switchCourseTab('popular')">人気</button>
-        <button class="course-tab" data-tab="community" onclick="switchCourseTab('community')">公開コース</button>
-        <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')">マイコース</button>
+        <button class="course-tab active" data-tab="popular" onclick="switchCourseTab('popular')" data-i18n="courseTabPopular">人気</button>
+        <button class="course-tab" data-tab="community" onclick="switchCourseTab('community')" data-i18n="courseTabCommunity">公開コース</button>
+        <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')" data-i18n="courseTabMylist">マイコース</button>
       </div>
 
       <!-- コース一覧 -->
@@ -3389,6 +3403,45 @@
     <!-- 1. プロフィール -->
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secProfile">プロフィール</div>
+
+      <!-- ニックネーム＋アバター -->
+      <div class="settings-item" style="padding:12px 18px;gap:10px;">
+        <span class="settings-item-label" style="white-space:nowrap;" data-i18n="labelNickname">ニックネーム</span>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+          <input id="nickname-input" type="text" maxlength="20" data-i18n-ph="nicknamePlaceholder" placeholder="匿名"
+            style="width:90px;text-align:right;border:none;background:transparent;font-size:16px;
+                   color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
+            oninput="localStorage.setItem('user_name', this.value.trim() || t('nicknamePlaceholder'))"
+            onblur="if(!this.value.trim()) this.value=''">
+          <button id="avatar-preview" onclick="toggleAvatarPicker()"
+            style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--sand-dark);
+                   background:var(--sand);font-size:16px;cursor:pointer;flex-shrink:0;
+                   display:flex;align-items:center;justify-content:center;padding:0;">🙂</button>
+        </div>
+      </div>
+      <!-- アバター選択パネル（タップで表示） -->
+      <div id="avatar-picker" style="display:none;padding:10px 18px 14px;border-top:1px solid var(--sand);">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+          <button class="avatar-chip" data-emoji="🙂" onclick="selectAvatar('🙂')">🙂</button>
+          <button class="avatar-chip" data-emoji="😎" onclick="selectAvatar('😎')">😎</button>
+          <button class="avatar-chip" data-emoji="🤩" onclick="selectAvatar('🤩')">🤩</button>
+          <button class="avatar-chip" data-emoji="🥳" onclick="selectAvatar('🥳')">🥳</button>
+          <button class="avatar-chip" data-emoji="🐼" onclick="selectAvatar('🐼')">🐼</button>
+          <button class="avatar-chip" data-emoji="🦊" onclick="selectAvatar('🦊')">🦊</button>
+          <button class="avatar-chip" data-emoji="🐨" onclick="selectAvatar('🐨')">🐨</button>
+          <button class="avatar-chip" data-emoji="🐸" onclick="selectAvatar('🐸')">🐸</button>
+          <button class="avatar-chip" data-emoji="🐶" onclick="selectAvatar('🐶')">🐶</button>
+          <button class="avatar-chip" data-emoji="🐱" onclick="selectAvatar('🐱')">🐱</button>
+          <button class="avatar-chip" data-emoji="🦄" onclick="selectAvatar('🦄')">🦄</button>
+          <button class="avatar-chip" data-emoji="🐧" onclick="selectAvatar('🐧')">🐧</button>
+          <button class="avatar-chip" data-emoji="🌸" onclick="selectAvatar('🌸')">🌸</button>
+          <button class="avatar-chip" data-emoji="🌴" onclick="selectAvatar('🌴')">🌴</button>
+          <button class="avatar-chip" data-emoji="⭐" onclick="selectAvatar('⭐')">⭐</button>
+          <button class="avatar-chip" data-emoji="🍜" onclick="selectAvatar('🍜')">🍜</button>
+          <button class="avatar-chip" data-emoji="🍣" onclick="selectAvatar('🍣')">🍣</button>
+          <button class="avatar-chip" data-emoji="✈️" onclick="selectAvatar('✈️')">✈️</button>
+        </div>
+      </div>
 
       <div class="settings-item" style="padding:10px 18px;">
         <span class="settings-item-label" data-i18n="labelCity">都市</span>
@@ -3447,7 +3500,7 @@
       <div class="settings-section-title" data-i18n="secAppSettings">アプリ設定</div>
 
       <div class="settings-item" style="padding:10px 18px;">
-        <span class="settings-item-label">ダークモード</span>
+        <span class="settings-item-label" data-i18n="labelDarkMode">ダークモード</span>
         <button id="dark-mode-toggle-btn" onclick="toggleDarkMode()"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
           <span id="dark-mode-label">自動</span>
@@ -3628,11 +3681,11 @@
   <nav class="bottom-nav">
     <div class="nav-item active" id="nav-home">
       <span class="nav-icon">🔍</span>
-      <span class="nav-label" data-i18n="navHome">スポット</span>
+      <span class="nav-label" data-i18n="navHome">イベント</span>
     </div>
     <div class="nav-item" id="nav-course">
       <span class="nav-icon">🗺️</span>
-      <span class="nav-label">コース</span>
+      <span class="nav-label" data-i18n="navCourse">コース</span>
     </div>
     <div class="nav-item" id="nav-plan">
       <span class="nav-icon">🗓️</span>
@@ -3661,30 +3714,66 @@
       <!-- Step 1: 条件選択 -->
       <div id="course-step-conditions">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin:8px 0 20px;">
-          <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);">コースを作る</div>
+          <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);" data-i18n="courseSheetTitle">コースを作る</div>
           <div id="course-sheet-profile-display" style="font-size:12px;color:var(--caramel);background:var(--cream);padding:3px 8px;border-radius:20px;"></div>
         </div>
 
         <!-- ピン留めイベント選択 -->
         <div id="course-sheet-pins" style="display:none;background:var(--cream);border-radius:12px;padding:12px 14px;margin-bottom:20px;border-left:3px solid var(--caramel);">
-          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--light-gray);margin-bottom:8px;">📌 軸にするイベント</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;color:var(--light-gray);margin-bottom:8px;" data-i18n="coursePinsLabel">📌 軸にするイベント</div>
           <div id="course-sheet-pins-list" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch;"></div>
-          <div style="font-size:11px;color:var(--light-gray);margin-top:8px;">軸にするイベントをタップして選んでください</div>
+          <div style="font-size:11px;color:var(--light-gray);margin-top:8px;" data-i18n="coursePinsHint">軸にするイベントをタップして選んでください</div>
         </div>
 
         <!-- メイン条件 -->
         <div class="course-condition-group">
-          <div class="course-condition-label">時間帯</div>
-          <div class="course-chips" data-key="time">
-            <button class="course-chip" data-val="午前のみ">☀️ 午前のみ</button>
-            <button class="course-chip" data-val="午後のみ">🌤 午後のみ</button>
-            <button class="course-chip" data-val="終日">🌞 終日</button>
+          <div style="display:flex;gap:12px;">
+            <div style="flex:1;">
+              <div class="course-condition-label" data-i18n="courseDepartLabel">出発時間</div>
+              <select id="course-departure-time" class="course-time-select">
+                <option value="" data-i18n="courseTimeAny">指定なし</option>
+                <option value="7:00">7:00</option>
+                <option value="8:00">8:00</option>
+                <option value="9:00">9:00</option>
+                <option value="10:00">10:00</option>
+                <option value="11:00">11:00</option>
+                <option value="12:00">12:00</option>
+                <option value="13:00">13:00</option>
+                <option value="14:00">14:00</option>
+                <option value="15:00">15:00</option>
+                <option value="16:00">16:00</option>
+                <option value="17:00">17:00</option>
+                <option value="18:00">18:00</option>
+                <option value="19:00">19:00</option>
+                <option value="20:00">20:00</option>
+              </select>
+            </div>
+            <div style="flex:1;">
+              <div class="course-condition-label" data-i18n="courseReturnLabel">帰宅時間</div>
+              <select id="course-return-time" class="course-time-select">
+                <option value="" data-i18n="courseTimeAny">指定なし</option>
+                <option value="10:00">10:00</option>
+                <option value="11:00">11:00</option>
+                <option value="12:00">12:00</option>
+                <option value="13:00">13:00</option>
+                <option value="14:00">14:00</option>
+                <option value="15:00">15:00</option>
+                <option value="16:00">16:00</option>
+                <option value="17:00">17:00</option>
+                <option value="18:00">18:00</option>
+                <option value="19:00">19:00</option>
+                <option value="20:00">20:00</option>
+                <option value="21:00">21:00</option>
+                <option value="22:00">22:00</option>
+                <option value="23:00">23:00</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <div class="course-condition-group">
-          <div class="course-condition-label">ひとこと <span style="font-weight:400;color:var(--light-gray);">（任意）</span></div>
-          <textarea id="course-note" placeholder="例）記念日なので特別感がほしい、穴場スポットで行きたい…"
+          <div class="course-condition-label"><span data-i18n="courseNoteLabel">ひとこと</span> <span style="font-weight:400;color:var(--light-gray);" data-i18n="courseNoteOptional">（任意）</span></div>
+          <textarea id="course-note" data-i18n-ph="courseNotePlaceholder" placeholder="例）記念日なので特別感がほしい、穴場スポットで行きたい…"
             style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;font-family:'Noto Sans JP',sans-serif;
                    border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:80px;
                    background:var(--warm-white);color:var(--text);line-height:1.5;outline:none;"
@@ -3693,25 +3782,26 @@
 
         <!-- こだわる（折りたたみ） -->
         <button onclick="toggleCourseOptions()" id="course-options-toggle"
-          style="display:flex;align-items:center;gap:5px;background:none;border:none;cursor:pointer;
-                 color:var(--light-gray);font-size:11px;font-weight:700;letter-spacing:0.06em;
-                 font-family:'Noto Sans JP',sans-serif;padding:4px 0;margin-bottom:4px;">
-          <span id="course-options-arrow" style="font-size:10px;transition:transform 0.2s;">▶</span>
-          こだわる（スポット数・エリア・気分・スタイル）
+          style="display:flex;align-items:center;justify-content:space-between;width:100%;
+                 background:var(--sand);border:none;border-radius:10px;cursor:pointer;
+                 color:var(--warm-gray);font-size:12px;font-weight:700;
+                 font-family:'Noto Sans JP',sans-serif;padding:10px 14px;margin-bottom:10px;">
+          <span data-i18n="courseOptionsToggle">🎛 こだわり設定</span>
+          <span id="course-options-arrow" style="font-size:10px;transition:transform 0.2s;transform:rotate(90deg);">▶</span>
         </button>
-        <div id="course-options-panel" style="display:none;">
+        <div id="course-options-panel" style="display:block;">
           <div class="course-condition-group">
-            <div class="course-condition-label">スポット数</div>
-            <div class="course-chips" data-key="spots">
-              <button class="course-chip" data-val="2">2</button>
-              <button class="course-chip" data-val="3">3</button>
-              <button class="course-chip" data-val="4">4</button>
-              <button class="course-chip" data-val="5">5</button>
-              <button class="course-chip" data-val="6">6</button>
+            <div class="course-condition-label" data-i18n="coursePurposeLabel">おでかけの目的</div>
+            <div class="course-chips" data-key="purpose">
+              <button class="course-chip" data-val="ぶらぶら散歩">🚶 ぶらぶら散歩</button>
+              <button class="course-chip" data-val="自然・公園">🌿 自然・公園</button>
+              <button class="course-chip" data-val="アート・文化">🎨 アート・文化</button>
+              <button class="course-chip" data-val="雑貨・お土産">🛍️ 雑貨・お土産</button>
+              <button class="course-chip" data-val="フォトスポット">📸 フォトスポット</button>
             </div>
           </div>
           <div class="course-condition-group">
-            <div class="course-condition-label">エリア</div>
+            <div class="course-condition-label" data-i18n="courseAreaLabel">エリア</div>
             <div class="course-chips" data-key="area">
               <button class="course-chip" data-val="Central">🏙 Central</button>
               <button class="course-chip" data-val="East">🌅 East</button>
@@ -3722,26 +3812,41 @@
             </div>
           </div>
           <div class="course-condition-group">
-            <div class="course-condition-label">気分</div>
-            <div class="course-chips" data-key="mood">
-              <button class="course-chip" data-val="のんびり">🌿 のんびり</button>
-              <button class="course-chip" data-val="アクティブ">🏃 アクティブ</button>
-              <button class="course-chip" data-val="グルメ">🍜 グルメ</button>
-              <button class="course-chip" data-val="ショッピング">🛍 ショッピング</button>
+            <div class="course-condition-label" data-i18n="courseOccasionLabel">特別感</div>
+            <div class="course-chips" data-key="occasion">
+              <button class="course-chip" data-val="普段使い">☕ 普段使い</button>
+              <button class="course-chip" data-val="ちょっと特別">✨ ちょっと特別</button>
             </div>
           </div>
           <div class="course-condition-group">
-            <div class="course-condition-label">スタイル</div>
+            <div class="course-condition-label" data-i18n="courseStyleLabel">スタイル</div>
             <div class="course-chips" data-key="style">
-              <button class="course-chip" data-val="定番">🗺️ 王道</button>
+              <button class="course-chip" data-val="定番">🗺️ 定番</button>
               <button class="course-chip" data-val="ローカル">🏘️ 地元流</button>
               <button class="course-chip" data-val="ニッチ">🔍 穴場</button>
+            </div>
+          </div>
+          <div class="course-condition-group">
+            <div class="course-condition-label" data-i18n="courseFoodLabel">食の比重</div>
+            <div class="course-chips" data-key="foodFocus">
+              <button class="course-chip" data-val="食べ歩きメイン">🍜 食べ歩きメイン</button>
+              <button class="course-chip" data-val="バランス">⚖️ バランス</button>
+              <button class="course-chip" data-val="見どころメイン">📍 見どころメイン</button>
+            </div>
+          </div>
+          <div class="course-condition-group">
+            <div class="course-condition-label" data-i18n="courseTransportLabel">移動スタイル</div>
+            <div class="course-chips" data-key="transport">
+              <button class="course-chip" data-val="歩き中心">🚶 歩き中心</button>
+              <button class="course-chip" data-val="MRT・バス">🚇 MRT・バス</button>
+              <button class="course-chip" data-val="車・タクシー移動">🚗 車・タクシー</button>
             </div>
           </div>
         </div>
 
         <button onclick="startCourseGeneration()"
-          style="width:100%;margin-top:8px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+          style="width:100%;margin-top:8px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
+          data-i18n="courseGenerateBtn">
           コースを作る ✨
         </button>
       </div>
@@ -3750,7 +3855,7 @@
       <div id="course-step-loading" hidden>
         <div style="text-align:center;padding:40px 0;">
           <div class="course-loading-dots"><span></span><span></span><span></span></div>
-          <div style="margin-top:16px;color:var(--warm-gray);font-size:14px;">コースを考えています…</div>
+          <div style="margin-top:16px;color:var(--warm-gray);font-size:14px;" data-i18n="courseLoadingMsg">コースを考えています…</div>
         </div>
       </div>
 
@@ -3759,17 +3864,20 @@
         <div id="course-result-content"></div>
         <div style="display:flex;gap:8px;margin-top:16px;">
           <button onclick="saveGeneratedCourse()"
-            style="flex:1;padding:12px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+            style="flex:1;padding:12px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
+            data-i18n="courseSaveBtn">
             マイコースに保存
           </button>
           <button onclick="startCourseGeneration()"
-            style="flex:1;padding:12px;background:var(--warm-white);color:var(--warm-gray);border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+            style="flex:1;padding:12px;background:var(--warm-white);color:var(--warm-gray);border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
+            data-i18n="courseRegenerateBtn">
             🔄 作り直す
           </button>
         </div>
         <button onclick="saveAndPublishGeneratedCourse()"
           style="width:100%;margin-top:8px;padding:12px;background:var(--warm-white);color:var(--caramel);
-                 border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+                 border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
+          data-i18n="coursePublishBtn">
           みんなに公開する
         </button>
       </div>
@@ -3778,6 +3886,29 @@
 
   <!-- Course Detail Sheet -->
   <div id="course-detail-overlay" class="plan-modal-overlay" onclick="closeCourseDetail()"></div>
+  <!-- タイトル編集シート -->
+  <div class="chat-overlay" id="title-edit-overlay" onclick="closeTitleEdit()" style="display:none;z-index:2100;"></div>
+  <div id="title-edit-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2101;
+    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
+    <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin-bottom:10px;" data-i18n="titleEditLabel">タイトルを編集</div>
+    <input id="title-edit-input" type="text" maxlength="30"
+      style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
+             border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
+             color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
+      onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button onclick="closeTitleEdit()"
+        style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
+               font-size:14px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
+        data-i18n="titleEditCancel">キャンセル</button>
+      <button onclick="saveCourseTitle()"
+        style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
+               font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
+        data-i18n="titleEditSave">保存</button>
+    </div>
+  </div>
+
   <div id="course-detail-sheet" class="plan-sheet">
     <div class="plan-sheet-handle"></div>
     <div style="display:flex;align-items:center;justify-content:flex-end;padding:4px 16px 8px;flex-shrink:0;">
@@ -3903,12 +4034,12 @@
     <div class="plan-modal-body">
       <div class="plan-modal-section-label" data-i18n="planModalDateLabel">日付を選ぶ</div>
       <div class="plan-date-chips" id="plan-event-date-chips"></div>
-      <div class="plan-modal-section-label">開始時刻</div>
+      <div class="plan-modal-section-label" data-i18n="labelStartTime">開始時刻</div>
       <div class="plan-time-row" id="plan-event-time-row">
         <input type="time" class="plan-time-input" id="plan-event-time-input" onfocus="onPlanTimeFocus('event')" oninput="onPlanTimeInput('event')">
-        <button class="plan-slot-chip" id="plan-event-allday-btn" onclick="toggleAlldayPlan('event')">終日</button>
+        <button class="plan-slot-chip" id="plan-event-allday-btn" onclick="toggleAlldayPlan('event')" data-i18n="labelAllday">終日</button>
       </div>
-      <div class="plan-modal-section-label">参加メンバー</div>
+      <div class="plan-modal-section-label" data-i18n="labelMembers">参加メンバー</div>
       <div class="plan-member-chips" id="plan-event-member-chips">
         <button class="plan-member-chip" data-member="papa" onclick="selectPlanMember('papa')"><span class="member-emoji">👨</span></button>
         <button class="plan-member-chip" data-member="mama" onclick="selectPlanMember('mama')"><span class="member-emoji">👩</span></button>
@@ -3922,11 +4053,11 @@
       <div class="plan-flag-row">
         <label class="plan-important-label" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-event-important-cb">
-          <span>⭐ 重要イベント</span>
+          <span data-i18n="labelImportant">⭐ 重要イベント</span>
         </label>
         <label class="plan-notify-row" id="plan-event-notify-row" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-event-notify-cb">
-          <span>🔔 メンバー通知</span>
+          <span data-i18n="labelNotify">🔔 メンバー通知</span>
         </label>
       </div>
       <button class="plan-modal-add-btn" id="plan-event-add-btn" disabled onclick="saveEventPlan()" data-i18n="planModalAddBtn">追加する</button>
@@ -3941,7 +4072,7 @@
       <button onclick="closePlanModal()" style="background:none;border:none;font-size:22px;color:var(--light-gray);cursor:pointer;padding:0 0 0 12px;line-height:1;flex-shrink:0;">✕</button>
     </div>
     <div class="plan-modal-body">
-      <div class="plan-modal-section-label">タイトル <span style="color:var(--terracotta)">*</span></div>
+      <div class="plan-modal-section-label"><span data-i18n="labelTitle">タイトル</span> <span style="color:var(--terracotta)">*</span></div>
       <div class="plan-title-row">
         <button class="plan-emoji-selector-btn" id="plan-custom-emoji-selector" onclick="openEmojiPicker('custom')">
           <span class="pes-emoji" id="plan-custom-selected-emoji">📝</span>
@@ -3952,12 +4083,12 @@
       <div class="plan-pin-dropdown" id="plan-pin-dropdown"></div>
       <div class="plan-modal-section-label" data-i18n="planModalDateLabelReq">日付を選ぶ <span style="color:var(--terracotta)">*</span></div>
       <div class="plan-date-chips" id="plan-custom-date-chips"></div>
-      <div class="plan-modal-section-label">開始時刻</div>
+      <div class="plan-modal-section-label" data-i18n="labelStartTime">開始時刻</div>
       <div class="plan-time-row" id="plan-custom-time-row">
         <input type="time" class="plan-time-input" id="plan-custom-time-input" onfocus="onPlanTimeFocus('custom')" oninput="onPlanTimeInput('custom')">
-        <button class="plan-slot-chip" id="plan-custom-allday-btn" onclick="toggleAlldayPlan('custom')">終日</button>
+        <button class="plan-slot-chip" id="plan-custom-allday-btn" onclick="toggleAlldayPlan('custom')" data-i18n="labelAllday">終日</button>
       </div>
-      <div class="plan-modal-section-label">参加メンバー</div>
+      <div class="plan-modal-section-label" data-i18n="labelMembers">参加メンバー</div>
       <div class="plan-member-chips" id="plan-custom-member-chips">
         <button class="plan-member-chip" data-member="papa" onclick="selectPlanMember('papa')"><span class="member-emoji">👨</span></button>
         <button class="plan-member-chip" data-member="mama" onclick="selectPlanMember('mama')"><span class="member-emoji">👩</span></button>
@@ -3971,16 +4102,16 @@
       <div class="plan-flag-row">
         <label class="plan-important-label" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-custom-important-cb">
-          <span>⭐ 重要イベント</span>
+          <span data-i18n="labelImportant">⭐ 重要イベント</span>
         </label>
         <label class="plan-notify-row" id="plan-custom-notify-row" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-custom-notify-cb">
-          <span>🔔 メンバー通知</span>
+          <span data-i18n="labelNotify">🔔 メンバー通知</span>
         </label>
       </div>
       <button class="plan-modal-add-btn" id="plan-custom-add-btn" disabled onclick="saveCustomPlan()" data-i18n="planModalAddBtn">追加する</button>
       <div class="plan-modal-footer" id="plan-custom-edit-footer" style="display:none;">
-        <button class="plan-modal-save-btn" id="plan-custom-save-btn" onclick="saveCustomPlan()">保存する</button>
+        <button class="plan-modal-save-btn" id="plan-custom-save-btn" onclick="saveCustomPlan()" data-i18n="planModalSaveBtn">保存する</button>
       </div>
     </div>
   </div>
@@ -3997,7 +4128,7 @@
     </div>
     <div class="plan-modal-body">
       <div id="plan-detail-emoji-wrap" style="display:none;">
-        <div class="plan-modal-section-label">タイトル <span style="color:var(--terracotta)">*</span></div>
+        <div class="plan-modal-section-label"><span data-i18n="labelTitle">タイトル</span> <span style="color:var(--terracotta)">*</span></div>
         <div class="plan-title-row">
           <button class="plan-emoji-selector-btn" id="plan-detail-emoji-selector" onclick="openEmojiPicker('detail')">
             <span class="pes-emoji" id="plan-detail-selected-emoji">📝</span>
@@ -4007,12 +4138,12 @@
       </div>
       <div class="plan-modal-section-label" data-i18n="planModalDateLabel">日付を選ぶ</div>
       <div class="plan-date-chips" id="plan-detail-date-chips"></div>
-      <div class="plan-modal-section-label">開始時刻</div>
+      <div class="plan-modal-section-label" data-i18n="labelStartTime">開始時刻</div>
       <div class="plan-time-row" id="plan-detail-time-row">
         <input type="time" class="plan-time-input" id="plan-detail-time-input" onfocus="onPlanTimeFocus('detail')" oninput="onPlanTimeInput('detail')">
-        <button class="plan-slot-chip" id="plan-detail-allday-btn" onclick="toggleAlldayPlan('detail')">終日</button>
+        <button class="plan-slot-chip" id="plan-detail-allday-btn" onclick="toggleAlldayPlan('detail')" data-i18n="labelAllday">終日</button>
       </div>
-      <div class="plan-modal-section-label">参加メンバー</div>
+      <div class="plan-modal-section-label" data-i18n="labelMembers">参加メンバー</div>
       <div class="plan-member-chips" id="plan-detail-member-chips">
         <button class="plan-member-chip" data-member="papa" onclick="selectPlanMember('papa')"><span class="member-emoji">👨</span></button>
         <button class="plan-member-chip" data-member="mama" onclick="selectPlanMember('mama')"><span class="member-emoji">👩</span></button>
@@ -4027,11 +4158,11 @@
         <div class="plan-flag-row" style="margin-bottom:10px;">
           <label class="plan-important-label" onclick="event.stopPropagation()">
             <input type="checkbox" id="plan-detail-important-cb">
-            <span>⭐ 重要イベント</span>
+            <span data-i18n="labelImportant">⭐ 重要イベント</span>
           </label>
           <label class="plan-notify-row" id="plan-detail-notify-row" style="margin:0;" onclick="event.stopPropagation()">
             <input type="checkbox" id="plan-detail-notify-cb">
-            <span>🔔 メンバー通知</span>
+            <span data-i18n="labelNotify">🔔 メンバー通知</span>
           </label>
         </div>
         <button class="plan-modal-save-btn" onclick="savePlanDetail()" data-i18n="planModalSaveBtn">保存する</button>
@@ -4098,7 +4229,7 @@
         secAbout: 'アプリ情報',
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
-        navHome: 'スポット',
+        navHome: 'イベント',
         navPlan: '予定表',
         navSettings: '設定',
         pinBtn: 'ピン留め',
@@ -4172,6 +4303,67 @@
         toastPlanUpdated: '✅ 保存しました',
         scheduleNoPlans: '予定なし',
         customPlanTitlePlaceholder: 'タイトルを入力',
+        navCourse: 'コース',
+        courseScreenTitle: 'おでかけコース',
+        courseTabPopular: '人気',
+        courseTabCommunity: '公開コース',
+        courseTabMylist: 'マイコース',
+        courseSheetTitle: 'コースを作る',
+        coursePinsLabel: '📌 軸にするイベント',
+        coursePinsHint: '軸にするイベントをタップして選んでください',
+        courseDepartLabel: '出発時間',
+        courseReturnLabel: '帰宅時間',
+        courseTimeAny: '指定なし',
+        courseNoteLabel: 'ひとこと',
+        courseNoteOptional: '（任意）',
+        courseNotePlaceholder: '例）記念日なので特別感がほしい、穴場スポットで行きたい…',
+        courseOptionsToggle: '🎛 こだわり設定',
+        coursePurposeLabel: 'おでかけの目的',
+        courseAreaLabel: 'エリア',
+        courseOccasionLabel: '特別感',
+        courseStyleLabel: 'スタイル',
+        courseFoodLabel: '食の比重',
+        courseTransportLabel: '移動スタイル',
+        courseGenerateBtn: 'コースを作る ✨',
+        courseLoadingMsg: 'コースを考えています…',
+        courseSaveBtn: 'マイコースに保存',
+        courseRegenerateBtn: '🔄 作り直す',
+        coursePublishBtn: 'みんなに公開する',
+        courseDetailAttraction: '📝 このコースの魅力',
+        courseDetailRoute: '🗺️ コース',
+        courseDetailAuthor: '作者:',
+        courseAddToPlanBtn: '📅 予定表に追加',
+        coursePublishAction: 'みんなに公開する',
+        courseUnpublishAction: '公開済み ✓ &nbsp;（非公開にする）',
+        courseEditTitleBtn: '✏️ タイトルを変更する',
+        courseDeleteBtn: '🗑️ このコースを削除する',
+        courseEmpty: 'コースがありません',
+        courseSpotsCount: '{n}スポット',
+        titleEditLabel: 'タイトルを編集',
+        titleEditCancel: 'キャンセル',
+        titleEditSave: '保存',
+        toastCourseSaved: 'マイコースに保存しました',
+        toastCoursePublished2: 'みんなに公開しました',
+        toastCourseTitleSaved: 'タイトルを変更しました',
+        toastCourseDeleted: 'コースを削除しました',
+        toastCoursePublished: 'コースを公開しました！',
+        toastCoursePublishErr: '公開に失敗しました。',
+        toastCourseUnpublish: '非公開にしました',
+        toastCourseFailed: '失敗しました。もう一度お試しください。',
+        toastCourseGenFailed: '生成に失敗しました。もう一度お試しください。',
+        toastCourseAddPlan: '{n}件のスポットを予定に追加しました',
+        labelNickname: 'ニックネーム',
+        labelDarkMode: 'ダークモード',
+        nicknamePlaceholder: '匿名',
+        labelStartTime: '開始時刻',
+        labelMembers: '参加メンバー',
+        labelImportant: '⭐ 重要イベント',
+        labelNotify: '🔔 メンバー通知',
+        labelAllday: '終日',
+        labelTitle: 'タイトル',
+        toastHidden: '🙈 非表示にしました',
+        scheduleDayCount: '{n}件',
+        scheduleHolidayBadge: '🎌 連休',
       },
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
@@ -4300,6 +4492,67 @@
         toastPlanUpdated: '✅ Saved',
         scheduleNoPlans: 'No plans',
         customPlanTitlePlaceholder: 'Enter title',
+        navCourse: 'Courses',
+        courseScreenTitle: 'Outing Courses',
+        courseTabPopular: 'Popular',
+        courseTabCommunity: 'Community',
+        courseTabMylist: 'My Courses',
+        courseSheetTitle: 'Create Course',
+        coursePinsLabel: '📌 Base events',
+        coursePinsHint: 'Tap to select',
+        courseDepartLabel: 'Departure',
+        courseReturnLabel: 'Return',
+        courseTimeAny: 'Any',
+        courseNoteLabel: 'Note',
+        courseNoteOptional: '(optional)',
+        courseNotePlaceholder: 'e.g. Special occasion, prefer hidden gems…',
+        courseOptionsToggle: '🎛 More options',
+        coursePurposeLabel: 'Purpose',
+        courseAreaLabel: 'Area',
+        courseOccasionLabel: 'Occasion',
+        courseStyleLabel: 'Style',
+        courseFoodLabel: 'Food focus',
+        courseTransportLabel: 'Getting around',
+        courseGenerateBtn: 'Create Course ✨',
+        courseLoadingMsg: 'Planning your course…',
+        courseSaveBtn: 'Save to My Courses',
+        courseRegenerateBtn: '🔄 Try again',
+        coursePublishBtn: 'Share with everyone',
+        courseDetailAttraction: '📝 Highlights',
+        courseDetailRoute: '🗺️ Route',
+        courseDetailAuthor: 'By:',
+        courseAddToPlanBtn: '📅 Add to Schedule',
+        coursePublishAction: 'Share with everyone',
+        courseUnpublishAction: 'Published ✓ &nbsp;(Make private)',
+        courseEditTitleBtn: '✏️ Edit title',
+        courseDeleteBtn: '🗑️ Delete course',
+        courseEmpty: 'No courses yet',
+        courseSpotsCount: '{n} spots',
+        titleEditLabel: 'Edit title',
+        titleEditCancel: 'Cancel',
+        titleEditSave: 'Save',
+        toastCourseSaved: 'Saved to My Courses',
+        toastCoursePublished2: 'Published!',
+        toastCourseTitleSaved: 'Title updated',
+        toastCourseDeleted: 'Course deleted',
+        toastCoursePublished: 'Course published!',
+        toastCoursePublishErr: 'Failed to publish.',
+        toastCourseUnpublish: 'Made private',
+        toastCourseFailed: 'Failed. Please try again.',
+        toastCourseGenFailed: 'Generation failed. Please try again.',
+        toastCourseAddPlan: 'Added {n} spots to schedule',
+        labelNickname: 'Nickname',
+        labelDarkMode: 'Dark Mode',
+        nicknamePlaceholder: 'Anonymous',
+        labelStartTime: 'Start time',
+        labelMembers: 'Members',
+        labelImportant: '⭐ Important',
+        labelNotify: '🔔 Notify members',
+        labelAllday: 'All day',
+        labelTitle: 'Title',
+        toastHidden: '🙈 Hidden',
+        scheduleDayCount: '{n}',
+        scheduleHolidayBadge: '🎌 Long Weekend',
       }
     };
 
@@ -4860,7 +5113,8 @@
 
     function toggleCalSort() {
       calSortOrder = calSortOrder === 'desc' ? 'asc' : 'desc';
-      document.getElementById('cal-sort-btn').textContent = calSortOrder === 'desc' ? '開始日↓' : '開始日↑';
+      const isEn = getLang() === 'en';
+      document.getElementById('cal-sort-btn').textContent = isEn ? (calSortOrder === 'desc' ? 'Start↓' : 'Start↑') : (calSortOrder === 'desc' ? '開始日↓' : '開始日↑');
       renderCalPopupEvents();
     }
 
@@ -5331,7 +5585,7 @@
       const pins = getPins();
       if (pins[id]) {
         delete pins[id];
-        showToast('📌 ピン留めを外しました');
+        showToast(t('toastUnpinned'));
       } else {
         const e = EVENT_REGISTRY[id] || {};
         pins[id] = {
@@ -5710,9 +5964,36 @@
       applyProfileSort();
     }
 
+    function toggleAvatarPicker() {
+      const picker = document.getElementById('avatar-picker');
+      picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function selectAvatar(emoji) {
+      localStorage.setItem('user_avatar', emoji);
+      document.getElementById('avatar-preview').textContent = emoji;
+      document.querySelectorAll('.avatar-chip').forEach(b => {
+        b.classList.toggle('selected', b.dataset.emoji === emoji);
+      });
+      document.getElementById('avatar-picker').style.display = 'none';
+    }
+
+    function getUserAvatar() {
+      return localStorage.getItem('user_avatar') || '🙂';
+    }
+
     function initProfileChips() {
       updateProfileDropdownDisplay();
       updateAgeVisibility();
+      const savedName = localStorage.getItem('user_name');
+      const input = document.getElementById('nickname-input');
+      if (input && savedName) input.value = savedName;
+      const savedAvatar = getUserAvatar();
+      const preview = document.getElementById('avatar-preview');
+      if (preview) preview.textContent = savedAvatar;
+      document.querySelectorAll('.avatar-chip').forEach(b => {
+        b.classList.toggle('selected', b.dataset.emoji === savedAvatar);
+      });
     }
 
     // プロフィールに基づいてカードをソート
@@ -5769,7 +6050,7 @@
       if (!hidden.includes(id)) hidden.push(id);
       localStorage.setItem(hiddenSpotsKey(), JSON.stringify(hidden));
       applyHiddenSpots();
-      showToast('🙈 非表示にしました');
+      showToast(t('toastHidden'));
     }
     function clearHiddenAll() {
       if (!confirm(t('confirmClearHidden'))) return;
@@ -5807,7 +6088,7 @@
       const hidden = getHiddenEvents();
       if (!hidden.includes(id)) hidden.push(id);
       localStorage.setItem(hiddenEventsKey(), JSON.stringify(hidden));
-      showToast('🙈 非表示にしました');
+      showToast(t('toastHidden'));
     }
     function clearHiddenEvents() {
       localStorage.removeItem(hiddenEventsKey());
@@ -6201,7 +6482,9 @@
 
       if (tab === 'mylist') {
         const courses = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
-        renderCourseList(courses);
+        // 作成日が古い順（一番上が最初に作ったコース）
+        const sorted = [...courses].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        renderCourseList(sorted, false, true);
         return;
       }
 
@@ -6219,38 +6502,43 @@
     }
 
     // コース一覧レンダリング
-    const _rankLineColor = ['#C0903A','#9BA5B0','#B07040','var(--sand-dark)','var(--sand-dark)'];
-    function renderCourseList(courses, withRank = false) {
+    const _rankLineColor = ['#C0903A','#9BA5B0','#B07040',null,null];
+    function renderCourseList(courses, withRank = false, isOwn = false) {
       const container = document.getElementById('course-list');
       if (!courses.length) {
-        container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--warm-gray);">コースがありません</div>';
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warm-gray);">${t('courseEmpty')}</div>`;
         return;
       }
-      container.innerHTML = courses.map((c, i) => renderCourseCard(c, withRank ? i : null)).join('');
+      container.innerHTML = courses.map((c, i) => renderCourseCard(c, withRank ? i : null, isOwn)).join('');
     }
 
     // コースカード HTML
-    function renderCourseCard(c, rank = null) {
+    function renderCourseCard(c, rank = null, isOwn = false) {
       const liked = isLiked(c.id);
       const cond = c.conditions || {};
       const tag = cond.with || cond.area || cond.style || '';
-      const lineColor = rank !== null ? (_rankLineColor[rank] || 'var(--sand-dark)') : null;
+      const lineColor = rank !== null ? (_rankLineColor[rank] ?? null) : null;
       const rankLine = lineColor ? `<div style="position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px;background:${lineColor};"></div>` : '';
       return `<div onclick="openCourseDetail('${c.id}')" style="position:relative;display:flex;gap:10px;align-items:flex-start;
-        background:var(--warm-white);border-radius:12px;padding:10px;${rank !== null ? 'padding-left:14px;' : ''}cursor:pointer;
+        background:var(--warm-white);border-radius:12px;padding:10px;cursor:pointer;
         box-shadow:0 1px 3px rgba(0,0,0,0.06);">${rankLine}
         ${c.imageUrl
           ? `<img src="${c.imageUrl}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
           : `<div style="width:64px;height:64px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:22px;">✨</div>`
         }
         <div style="flex:1;min-width:0;overflow:hidden;">
-          <div style="font-size:13px;font-weight:700;line-height:1.4;margin-bottom:2px;
-            overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</div>
+          <div style="margin-bottom:2px;">
+            <div style="font-family:'Kaisei Opti',serif;font-size:15px;font-weight:700;line-height:1.35;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</div>
+          </div>
           <div style="font-size:11px;color:var(--warm-gray);margin-bottom:5px;
             overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.tagline || ''}</div>
-          <div style="font-size:10px;color:var(--light-gray);">${tag ? tag + ' · ' : ''}${c.spots?.length||0}スポット</div>
+          <div style="font-size:10px;color:var(--light-gray);">${tag ? tag + ' · ' : ''}${t('courseSpotsCount').replace('{n}', c.spots?.length||0)}</div>
         </div>
-        <div style="font-size:11px;flex-shrink:0;padding-top:2px;">${liked ? '❤️' : '🤍'} ${c.likes||0}</div>
+        <button onclick="event.stopPropagation();toggleLike('${c.id}')" data-like-id="${c.id}" data-likes="${c.likes||0}"
+          style="font-size:12px;flex-shrink:0;padding:4px 6px;background:none;border:none;cursor:pointer;
+                 border-radius:8px;font-family:inherit;line-height:1;transition:transform 0.1s;align-self:center;"
+          ontouchstart="this.style.transform='scale(0.85)'" ontouchend="this.style.transform='scale(1)'">${liked ? '❤️' : '🤍'} ${c.likes||0}</button>
       </div>`;
     }
 
@@ -6270,14 +6558,14 @@
             : `<div style="width:100%;height:110px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:36px;">✨</div>`
           }
           <div style="padding:12px 14px 14px;display:flex;flex-direction:column;gap:5px;">
-            <div style="font-size:14px;font-weight:700;line-height:1.4;
+            <div style="font-family:'Kaisei Opti',serif;font-size:15px;font-weight:700;line-height:1.35;
               overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.title}</div>
             <div style="font-size:12px;color:var(--warm-gray);
               overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;">${c.tagline || ''}</div>
             ${tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">
               ${tags.map(t=>`<span style="padding:2px 8px;background:var(--sand);border-radius:20px;font-size:10px;color:var(--warm-gray);">${t}</span>`).join('')}
             </div>` : ''}
-            <div style="font-size:11px;color:var(--light-gray);">❤️ ${c.likes||0} · ${c.spots?.length||0}スポット · ${c.authorName||'AI'}</div>
+            <div style="font-size:11px;color:var(--light-gray);">❤️ ${c.likes||0} · ${t('courseSpotsCount').replace('{n}', c.spots?.length||0)} · ${c.authorAvatar||''}${c.authorName||'AI'}</div>
           </div>
         </div>`;
     }
@@ -6327,6 +6615,28 @@
       }
 
       if (!course) return;
+
+      // 画像なしの場合はバックグラウンドで取得してlocalStorageを更新
+      if (!course.imageUrl) {
+        const query = course.imageSearch || '';
+        fetch(`/api/courses/image?query=${encodeURIComponent(query)}&city=${city}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.imageUrl) {
+              course.imageUrl = data.imageUrl;
+              _allLoadedCourses[courseId] = course;
+              // localStorageのマイコースも更新
+              const key = city + '_my_courses';
+              const list = JSON.parse(localStorage.getItem(key) || '[]');
+              const idx = list.findIndex(c => c.id === courseId);
+              if (idx !== -1) { list[idx].imageUrl = data.imageUrl; localStorage.setItem(key, JSON.stringify(list)); }
+              // 詳細画面の画像エリアだけ差し替え
+              const imgEl = document.getElementById(`course-detail-img-${courseId}`);
+              if (imgEl) imgEl.outerHTML = `<img src="${data.imageUrl}" style="width:100%;height:180px;object-fit:cover;display:block;">`;
+            }
+          }).catch(() => {});
+      }
+
       _allLoadedCourses[courseId] = course;
       renderCourseDetail(course);
 
@@ -6342,16 +6652,16 @@
       const html = `
         ${course.imageUrl
           ? `<img src="${course.imageUrl}" style="width:100%;height:200px;object-fit:cover;">`
-          : `<div style="width:100%;height:160px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:48px;">✨</div>`
+          : `<div id="course-detail-img-${course.id}" style="width:100%;height:160px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:48px;">✨</div>`
         }
         <div style="padding:20px;">
-          <div style="font-size:19px;font-weight:700;margin-bottom:4px;">${course.title}</div>
+          <div style="font-family:'Kaisei Opti',serif;font-size:19px;font-weight:700;margin-bottom:4px;">${course.title}</div>
           <div style="font-size:13px;color:var(--warm-gray);margin-bottom:12px;">${course.tagline || ''}</div>
 
           ${course.description ? `
             <div style="background:var(--cream);border-radius:10px;padding:12px;margin-bottom:16px;">
-              <div style="font-size:13px;font-weight:700;color:var(--caramel);margin-bottom:6px;">📝 このコースの魅力</div>
-              <div style="font-size:13px;line-height:1.6;">${course.description}</div>
+              <div style="font-size:13px;font-weight:700;color:var(--caramel);margin-bottom:6px;">${t('courseDetailAttraction')}</div>
+              <div style="font-size:14px;line-height:1.65;color:var(--warm-gray);">${course.description}</div>
             </div>
           ` : ''}
 
@@ -6361,7 +6671,7 @@
             ).join('') : ''}
           </div>
 
-          <div style="font-size:13px;font-weight:700;margin-bottom:12px;">🗺️ コース</div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:12px;">${t('courseDetailRoute')}</div>
           ${(course.spots || []).map(s => `
             <div class="course-timeline-item">
               <div class="course-timeline-time">${s.time}</div>
@@ -6374,39 +6684,44 @@
           `).join('')}
 
           <div style="font-size:13px;color:var(--light-gray);margin:12px 0;">
-            ❤️ ${course.likes || 0}&nbsp;&nbsp;作者: ${course.authorName || 'AI'}&nbsp;&nbsp;${(course.createdAt||'').slice(0,10)}
+            ❤️ ${course.likes || 0}&nbsp;&nbsp;${t('courseDetailAuthor')} ${course.authorName || 'AI'}&nbsp;&nbsp;${(course.createdAt||'').slice(0,10)}
           </div>
 
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button onclick="addCourseToScheduleById('${course.id}')"
-              style="flex:1;padding:12px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              📅 予定表に追加
+              style="flex:1;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+              ${t('courseAddToPlanBtn')}
             </button>
-            <button onclick="toggleLike('${course.id}')" id="like-btn-${course.id}"
-              style="padding:12px 16px;background:var(--warm-white);border:1.5px solid var(--sand-dark);border-radius:12px;font-size:18px;cursor:pointer;">
+            <button onclick="toggleLike('${course.id}')" id="like-btn-${course.id}" data-like-id="${course.id}" data-likes="${course.likes||0}"
+              style="padding:14px 18px;background:var(--warm-white);border:1.5px solid var(--sand-dark);border-radius:12px;font-size:20px;cursor:pointer;">
               ${liked ? '❤️' : '🤍'}
             </button>
           </div>
 
           ${isOwn && course.published !== true ? `
             <button onclick="publishCourseById('${course.id}')" id="publish-btn-${course.id}"
-              style="width:100%;margin-top:8px;padding:12px;background:var(--warm-white);color:var(--caramel);
+              style="width:100%;margin-top:8px;padding:14px;background:var(--warm-white);color:var(--caramel);font-size:13px;
                      border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              みんなに公開する
+              ${t('coursePublishAction')}
             </button>
           ` : (isOwn && course.published === true ? `
             <button onclick="unpublishCourseById('${course.id}')" id="unpublish-btn-${course.id}"
-              style="width:100%;margin-top:8px;padding:12px;background:var(--warm-white);color:var(--sage);
+              style="width:100%;margin-top:8px;padding:14px;background:var(--warm-white);color:var(--sage);font-size:13px;
                      border:1.5px solid var(--sage);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              公開済み ✓ &nbsp;（非公開にする）
+              ${t('courseUnpublishAction')}
             </button>
           ` : '')}
 
           ${isOwn ? `
+            <button onclick="openTitleEdit('${course.id}')"
+              style="width:100%;margin-top:8px;padding:14px;background:none;color:var(--warm-gray);font-size:13px;
+                     border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+              ${t('courseEditTitleBtn')}
+            </button>
             <button onclick="deleteMyCourse('${course.id}')"
-              style="width:100%;margin-top:8px;padding:12px;background:none;color:var(--terracotta);
+              style="width:100%;margin-top:8px;padding:14px;background:none;color:var(--terracotta);font-size:13px;
                      border:1.5px solid var(--terracotta);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              🗑️ このコースを削除する
+              ${t('courseDeleteBtn')}
             </button>
           ` : ''}
         </div>
@@ -6533,6 +6848,11 @@
       const note = (document.getElementById('course-note')?.value || '').trim();
       if (note) conditions.note = note;
 
+      const departure = document.getElementById('course-departure-time')?.value;
+      const returnTime = document.getElementById('course-return-time')?.value;
+      if (departure) conditions.departure = departure;
+      if (returnTime) conditions.return = returnTime;
+
       showCourseStep('loading');
       const city = getCity();
       const profile = { who: getWhoList(), age: localStorage.getItem('sg_age') || 'all' };
@@ -6557,7 +6877,7 @@
         const res = await fetch('/api/courses/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, conditions, profile, pinnedEvents, userId: getUserId(), userName: getUserName() })
+          body: JSON.stringify({ city, conditions, profile, pinnedEvents, userId: getUserId(), userName: getUserName(), userAvatar: getUserAvatar() })
         });
         const course = await res.json();
         if (!course || course.error) throw new Error(course?.error || 'generation failed');
@@ -6566,7 +6886,7 @@
         showCourseStep('result');
       } catch(e) {
         showCourseStep('conditions');
-        showToast('生成に失敗しました。もう一度お試しください。');
+        showToast(t('toastCourseGenFailed'));
       }
     }
 
@@ -6591,7 +6911,7 @@
       saveMyCourse(currentGeneratedCourse);
       closeCourseSheet();
       switchCourseTab('mylist');
-      showToast('マイコースに保存しました');
+      showToast(t('toastCourseSaved'));
     }
 
     async function saveAndPublishGeneratedCourse() {
@@ -6600,7 +6920,49 @@
       await publishCourseById(currentGeneratedCourse.id);
       closeCourseSheet();
       switchCourseTab('mylist');
-      showToast('みんなに公開しました');
+      showToast(t('toastCoursePublished2'));
+    }
+
+    // ─── マイコース タイトル編集 ───
+    let _editingCourseId = null;
+
+    function openTitleEdit(courseId) {
+      _editingCourseId = courseId;
+      const city = getCity();
+      const list = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
+      const course = list.find(c => c.id === courseId) || _allLoadedCourses[courseId] || {};
+      const input = document.getElementById('title-edit-input');
+      input.value = course.title || '';
+      document.getElementById('title-edit-overlay').style.display = 'block';
+      document.getElementById('title-edit-sheet').style.display = 'block';
+      setTimeout(() => input.focus(), 100);
+    }
+
+    function closeTitleEdit() {
+      _editingCourseId = null;
+      document.getElementById('title-edit-overlay').style.display = 'none';
+      document.getElementById('title-edit-sheet').style.display = 'none';
+      document.getElementById('title-edit-input').blur();
+    }
+
+    function saveCourseTitle() {
+      if (!_editingCourseId) return;
+      const newTitle = document.getElementById('title-edit-input').value.trim();
+      if (!newTitle) return;
+      const city = getCity();
+      const key = city + '_my_courses';
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      const idx = list.findIndex(c => c.id === _editingCourseId);
+      if (idx !== -1) {
+        list[idx].title = newTitle;
+        localStorage.setItem(key, JSON.stringify(list));
+        if (_allLoadedCourses[_editingCourseId]) _allLoadedCourses[_editingCourseId].title = newTitle;
+      }
+      closeTitleEdit();
+      // 詳細画面が開いていればタイトルを即更新
+      const detailTitle = document.querySelector('#course-detail-content [style*="font-size:19px"]');
+      if (detailTitle) detailTitle.textContent = newTitle;
+      showToast(t('toastCourseTitleSaved'));
     }
 
     // ─── マイコース削除 ───
@@ -6623,7 +6985,7 @@
 
       closeCourseDetail();
       switchCourseTab('mylist');
-      showToast('コースを削除しました');
+      showToast(t('toastCourseDeleted'));
     }
 
     function addCourseToScheduleById(courseId) {
@@ -6688,7 +7050,7 @@
 
       closeCourseDateModal();
       closeCourseDetail();
-      showToast(`${course.spots.length}件のスポットを予定に追加しました`);
+      showToast(t('toastCourseAddPlan').replace('{n}', course.spots.length));
     }
 
     // いいね
@@ -6716,9 +7078,15 @@
         });
       } catch(e) {}
 
-      // ボタンのテキスト更新
-      const btn = document.getElementById(`like-btn-${courseId}`);
-      if (btn) btn.textContent = alreadyLiked ? '🤍' : '❤️';
+      // カード・詳細ビュー両方のボタンを更新
+      document.querySelectorAll(`[data-like-id="${courseId}"]`).forEach(btn => {
+        const count = parseInt(btn.dataset.likes || '0') + (alreadyLiked ? -1 : 1);
+        btn.dataset.likes = count;
+        const isDetailBtn = btn.id === `like-btn-${courseId}`;
+        btn.textContent = isDetailBtn
+          ? (alreadyLiked ? '🤍' : '❤️')
+          : `${alreadyLiked ? '🤍' : '❤️'} ${Math.max(0, count)}`;
+      });
     }
 
     async function publishCourseById(courseId) {
@@ -6746,10 +7114,10 @@
           publishBtn.style.color = 'var(--sage)';
           publishBtn.style.borderColor = 'var(--sage)';
         }
-        showToast('コースを公開しました！');
+        showToast(t('toastCoursePublished'));
         closeCourseDetail();
       } catch(e) {
-        showToast('公開に失敗しました。');
+        showToast(t('toastCoursePublishErr'));
       }
     }
 
@@ -6766,11 +7134,11 @@
         localStorage.setItem(key, JSON.stringify(
           myList.map(c => c.id === courseId ? { ...c, published: false, isPublic: false } : c)
         ));
-        showToast('非公開にしました');
+        showToast(t('toastCourseUnpublish'));
         closeCourseDetail();
         switchCourseTab('mylist');
       } catch(e) {
-        showToast('失敗しました。もう一度お試しください。');
+        showToast(t('toastCourseFailed'));
       }
     }
 
@@ -7673,7 +8041,7 @@
           if (dow === 0 || isHolidayDay) numCls += ' schedule-day-num--sun';
           else if (dow === 6) numCls += ' schedule-day-num--sat';
 
-          const countBadge = allItems.length > 0 ? `<span class="schedule-day-count">${allItems.length}件</span>` : '';
+          const countBadge = allItems.length > 0 ? `<span class="schedule-day-count">${t('scheduleDayCount').replace('{n}', allItems.length)}</span>` : '';
           const rowsHtml = allItems.length > 0
             ? allItems.map(item => {
                 const emojiCls = item.pType === 'event' ? 'schedule-row-emoji--event' : 'schedule-row-emoji--custom';
@@ -7737,7 +8105,7 @@
           <div class="schedule-week-header">
             ${g.label}
             <span style="font-size:13px;color:var(--warm-gray);font-family:'Noto Sans JP',sans-serif;font-weight:400;">${rangeStr}</span>
-            ${g.isLong?'<span class="schedule-holiday-badge">🎌 連休</span>':''}
+            ${g.isLong?`<span class="schedule-holiday-badge">${t('scheduleHolidayBadge')}</span>`:''}
           </div>
           ${daysHtml}
         </div>`;
