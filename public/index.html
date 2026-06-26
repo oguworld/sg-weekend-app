@@ -3368,13 +3368,12 @@
 
       <!-- ピルタブ -->
       <div class="course-tab-bar">
-        <button class="course-tab active" data-tab="popular" onclick="switchCourseTab('popular')" data-i18n="courseTabPopular">人気</button>
-        <button class="course-tab" data-tab="community" onclick="switchCourseTab('community')" data-i18n="courseTabCommunity">公開コース</button>
+        <button class="course-tab active" data-tab="everyone" onclick="switchCourseTab('everyone')" data-i18n="courseTabEveryone">みんなのコース</button>
         <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')" data-i18n="courseTabMylist">マイコース</button>
       </div>
 
       <!-- コース一覧 -->
-      <div id="course-list" style="padding:0 16px;display:flex;flex-direction:column;gap:10px;padding-bottom:120px;"></div>
+      <div id="course-list" style="padding:0 16px;display:flex;flex-direction:column;padding-bottom:120px;"></div>
     </div>
 
     <!-- FAB -->
@@ -3773,11 +3772,16 @@
 
         <div class="course-condition-group">
           <div class="course-condition-label"><span data-i18n="courseNoteLabel">ひとこと</span> <span style="font-weight:400;color:var(--light-gray);" data-i18n="courseNoteOptional">（任意）</span></div>
-          <textarea id="course-note" data-i18n-ph="courseNotePlaceholder" placeholder="例）記念日なので特別感がほしい、穴場スポットで行きたい…"
-            style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;font-family:'Noto Sans JP',sans-serif;
-                   border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:80px;
-                   background:var(--warm-white);color:var(--text);line-height:1.5;outline:none;"
-            onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'"></textarea>
+          <div style="position:relative;">
+            <textarea id="course-note" data-i18n-ph="courseNotePlaceholder" placeholder="例）記念日なので特別感がほしい、穴場スポットで行きたい…"
+              style="width:100%;box-sizing:border-box;padding:10px 44px 10px 12px;font-size:16px;font-family:'Noto Sans JP',sans-serif;
+                     border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:80px;
+                     background:var(--warm-white);color:var(--text);line-height:1.5;outline:none;"
+              onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'"></textarea>
+            <button id="course-note-mic-btn" class="chat-mic-btn" onclick="toggleCourseNoteVoice()"
+              style="position:absolute;top:50%;right:8px;transform:translateY(-50%);width:34px;height:34px;font-size:15px;"
+              title="音声入力" aria-label="音声入力">🎤</button>
+          </div>
         </div>
 
         <!-- こだわる（折りたたみ） -->
@@ -3857,6 +3861,19 @@
         <div style="text-align:center;padding:40px 0;">
           <div class="course-loading-dots"><span></span><span></span><span></span></div>
           <div style="margin-top:16px;color:var(--warm-gray);font-size:14px;" data-i18n="courseLoadingMsg">コースを考えています…</div>
+        </div>
+      </div>
+
+      <!-- Step 2b: 候補選択 -->
+      <div id="course-step-candidates" hidden>
+        <div style="padding:4px 0 16px;">
+          <div style="font-size:13px;color:var(--warm-gray);margin-bottom:16px;text-align:center;">どのコースにしますか？</div>
+          <div id="course-candidates-list"></div>
+          <button onclick="backToCourseConditions()"
+            style="width:100%;padding:12px;margin-top:4px;background:none;border:none;
+                   color:var(--warm-gray);font-size:13px;cursor:pointer;font-family:inherit;">
+            ← 条件に戻る
+          </button>
         </div>
       </div>
 
@@ -4306,8 +4323,7 @@
         customPlanTitlePlaceholder: 'タイトルを入力',
         navCourse: 'コース',
         courseScreenTitle: 'おでかけコース',
-        courseTabPopular: '人気',
-        courseTabCommunity: '公開コース',
+        courseTabEveryone: 'みんなのコース',
         courseTabMylist: 'マイコース',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '📌 軸にするイベント',
@@ -4495,8 +4511,7 @@
         customPlanTitlePlaceholder: 'Enter title',
         navCourse: 'Courses',
         courseScreenTitle: 'Outing Courses',
-        courseTabPopular: 'Popular',
-        courseTabCommunity: 'Community',
+        courseTabEveryone: 'Explore',
         courseTabMylist: 'My Courses',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: '📌 Base events',
@@ -5542,13 +5557,56 @@
 
     (function initVoiceMic() {
       if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
-        const btn = document.getElementById('chat-mic-btn');
-        if (btn) btn.style.display = 'none';
+        ['chat-mic-btn', 'course-note-mic-btn'].forEach(id => {
+          const btn = document.getElementById(id);
+          if (btn) btn.style.display = 'none';
+        });
       }
     })();
 
     function stopVoiceInput() {
       if (voiceRecognition) voiceRecognition.stop();
+    }
+
+    function toggleCourseNoteVoice() {
+      if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) return;
+      if (isVoiceRecording) { stopVoiceInput(); return; }
+
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      voiceRecognition = new SR();
+      voiceRecognition.lang = getLang() === 'en' ? 'en-US' : 'ja-JP';
+      voiceRecognition.continuous = false;
+      voiceRecognition.interimResults = true;
+
+      const micBtn  = document.getElementById('course-note-mic-btn');
+      const textarea = document.getElementById('course-note');
+      const origPlaceholder = textarea.placeholder;
+
+      voiceRecognition.onstart = () => {
+        isVoiceRecording = true;
+        micBtn.classList.add('recording');
+        textarea.placeholder = getLang() === 'en' ? 'Listening...' : '聴いています...';
+      };
+
+      voiceRecognition.onresult = (e) => {
+        textarea.value = Array.from(e.results).map(r => r[0].transcript).join('');
+      };
+
+      voiceRecognition.onend = () => {
+        isVoiceRecording = false;
+        micBtn.classList.remove('recording');
+        textarea.placeholder = origPlaceholder;
+        voiceRecognition = null;
+      };
+
+      voiceRecognition.onerror = () => {
+        isVoiceRecording = false;
+        micBtn.classList.remove('recording');
+        textarea.placeholder = origPlaceholder;
+        voiceRecognition = null;
+      };
+
+      voiceRecognition.start();
     }
 
     function toggleVoiceInput() {
@@ -6166,8 +6224,8 @@
           </div>
           <div style="font-size:13px;color:var(--warm-gray);line-height:1.9;">
             ${isEn
-              ? '• Switch tabs: <strong>This Weekend / Next Weekend / 2 Weeks / 3 Weeks</strong><br>• Tap a category chip to filter by type<br>• Tap <strong>🔥 Ending Soon</strong> to see what\'s closing this week<br>• Tap the <strong>AI button</strong> to ask things like <em>"Any good spots for families?"</em>'
-              : '• タブで切り替え：<strong>今週末 / 来週末 / 2週後 / 3週後</strong><br>• カテゴリチップでイベント・グルメ・プロモに絞り込み<br>• <strong>🔥 今週まで</strong> で終了間近のものだけ表示<br>• <strong>AI ボタン</strong> で「子連れでおすすめは？」など気軽に相談'
+              ? '• Switch tabs: <strong>This Weekend / Next Weekend / 2 Weeks / 3 Weeks</strong><br>• Tap a category chip to filter by type<br>• Tap <strong>🔥 Ending Soon</strong> to see what\'s closing this week<br>• <strong>📌 Pin</strong> events you like — they\'ll show up in your Schedule tab'
+              : '• タブで切り替え：<strong>今週末 / 来週末 / 2週後 / 3週後</strong><br>• カテゴリチップでイベント・グルメ・プロモに絞り込み<br>• <strong>🔥 今週まで</strong> で終了間近のものだけ表示<br>• <strong>📌 ピン留め</strong> した情報はコースの作成にも活用できます'
             }
           </div>
         </div>
@@ -6179,12 +6237,12 @@
         <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:12px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
             ${stepBadge(2)}
-            <div style="font-size:14px;font-weight:700;color:var(--midnight);">📌 ${isEn ? 'Save what looks good' : '気になるものをピン留め'}</div>
+            <div style="font-size:14px;font-weight:700;color:var(--midnight);">🗺 ${isEn ? 'Create a course' : 'コースを作る'}</div>
           </div>
           <div style="font-size:13px;color:var(--warm-gray);line-height:1.9;">
             ${isEn
-              ? '• Tap <strong>📌 Pin</strong> on any card — saved to your Schedule tab<br>• Tap <strong>✕</strong> to hide cards you\'re not interested in'
-              : '• カードの <strong>📌 ピン留め</strong> をタップ → 予定表タブに保存されます<br>• <strong>✕</strong> をタップすると気になるカードを非表示にできます'
+              ? '• Open the <strong>Course tab</strong> and tap the <strong>✏️ button</strong> to generate a custom day plan with AI<br>• Set conditions: who you\'re going with, area, and vibe<br>• Browse <strong>community courses</strong> for inspiration and ❤️ like your favorites<br>• Tap <strong>📅</strong> to add an entire course to your schedule at once'
+              : '• <strong>コースタブ</strong> を開き <strong>✏️ボタン</strong> をタップ → 条件を選ぶだけでAIが1日コースを提案<br>• 誰と・エリア・スタイルなどを指定するほど、ぴったりのプランが生まれます<br>• <strong>みんなのコース</strong> では他のユーザーのプランをヒントにできます<br>• 気に入ったコースは <strong>📅</strong> で予定表に一括追加'
             }
           </div>
         </div>
@@ -6432,11 +6490,11 @@
     ];
 
     // コース画面初期化
-    const COURSE_TABS = ['popular', 'community', 'mylist'];
+    const COURSE_TABS = ['everyone', 'mylist'];
     let _courseSwipeStartX = 0;
 
     async function initCourseScreen() {
-      await switchCourseTab('popular');
+      await switchCourseTab('everyone');
 
       // スワイプでタブ切り替え & プルリフレッシュ（初回のみ登録）
       const sc = document.querySelector('#screen-course .screen-content');
@@ -6457,7 +6515,7 @@
 
         sc.addEventListener('touchstart', e => {
           _courseSwipeStartX = e.touches[0].clientX;
-          _courseSwipeOnHScroll = !!e.target.closest('#popular-courses-list');
+          _courseSwipeOnHScroll = !!e.target.closest('#course-everyone-carousel');
           _ptrStartY = _ptrLastY = e.touches[0].clientY;
           _ptrPulling = false;
         }, { passive: true });
@@ -6517,15 +6575,17 @@
       }
 
       try {
-        const res = await fetch(`/api/courses?city=${city}&tab=${tab}`);
-        const courses = await res.json();
-        if (tab === 'popular') {
-          renderCourseList(courses, true);
-        } else {
-          renderCourseList(courses);
+        if (tab === 'everyone') {
+          const [popRes, comRes] = await Promise.all([
+            fetch(`/api/courses?city=${city}&tab=popular`),
+            fetch(`/api/courses?city=${city}&tab=community`)
+          ]);
+          const [popular, community] = await Promise.all([popRes.json(), comRes.json()]);
+          renderEveryoneTab(popular, community);
         }
       } catch(e) {
-        renderCourseList([]);
+        document.getElementById('course-list').innerHTML =
+          `<div style="text-align:center;padding:40px;color:var(--warm-gray);">${t('courseEmpty')}</div>`;
       }
     }
 
@@ -6538,6 +6598,125 @@
         return;
       }
       container.innerHTML = courses.map((c, i) => renderCourseCard(c, withRank ? i : null, isOwn)).join('');
+    }
+
+    // みんなのコースタブ レンダリング
+    function renderEveryoneTab(popular, community) {
+      const container = document.getElementById('course-list');
+      let html = '';
+
+      if (popular.length) {
+        html += `<div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;
+          color:var(--midnight);padding:4px 0 10px;">🏆 注目コース</div>
+          <div id="course-everyone-carousel"
+            style="display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;
+              scroll-padding-left:16px;padding-bottom:8px;margin:0 -16px;
+              scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+            <div style="flex-shrink:0;width:16px;"></div>
+            ${popular.slice(0, 3).map((c, i) => renderPopularCourseCard(c, i)).join('')}
+            <div style="flex-shrink:0;width:16px;"></div>
+          </div>`;
+      }
+
+      if (community.length) {
+        html += `<div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;
+          color:var(--midnight);padding:16px 0 10px;">✨ 新着コース</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${community.map(c => renderCompactCourseCard(c)).join('')}
+          </div>`;
+      }
+
+      if (!html) {
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warm-gray);">${t('courseEmpty')}</div>`;
+        return;
+      }
+      container.innerHTML = html;
+    }
+
+    // 2カラム用コンパクトカード（みんなのコース・新着）
+    function renderCompactCourseCard(c) {
+      const liked = isLiked(c.id);
+      const cond = c.conditions || {};
+      const areaTag = cond.area || cond.with || cond.style || '';
+      return `
+        <div onclick="openCourseDetail('${c.id}')"
+          style="border-radius:12px;overflow:hidden;cursor:pointer;
+                 box-shadow:0 2px 6px rgba(0,0,0,0.07);background:var(--warm-white);">
+          ${c.imageUrl
+            ? `<img src="${c.imageUrl}" style="width:100%;height:110px;object-fit:cover;display:block;">`
+            : `<div style="width:100%;height:110px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));
+                 display:flex;align-items:center;justify-content:center;font-size:28px;">✨</div>`
+          }
+          <div style="padding:8px 9px 10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="font-family:'Kaisei Opti',serif;font-size:13px;font-weight:700;
+              line-height:1.4;overflow:hidden;display:-webkit-box;
+              -webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.title}</div>
+            ${c.tagline ? `<div style="font-size:10px;color:var(--warm-gray);line-height:1.4;
+              overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+              ${c.tagline}</div>` : ''}
+            ${areaTag ? `<span style="display:inline-block;padding:1px 7px;background:var(--sand);
+              border-radius:20px;font-size:10px;color:var(--warm-gray);align-self:flex-start;">${areaTag}</span>` : ''}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1px;">
+              <div style="font-size:10px;color:var(--light-gray);">
+                ${t('courseSpotsCount').replace('{n}', c.spots?.length||0)}
+              </div>
+              <button onclick="event.stopPropagation();toggleLike('${c.id}')"
+                data-like-id="${c.id}" data-likes="${c.likes||0}"
+                style="font-size:11px;padding:2px 4px;background:none;border:none;
+                       cursor:pointer;border-radius:6px;font-family:inherit;line-height:1;"
+                ontouchstart="this.style.transform='scale(0.85)'"
+                ontouchend="this.style.transform='scale(1)'">
+                ${liked ? '❤️' : '🤍'} ${c.likes||0}
+              </button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    // マガジン型カード（みんなのコース・新着）
+    function renderMagazineCard(c) {
+      const liked = isLiked(c.id);
+      const cond = c.conditions || {};
+      const tags = [cond.with, cond.area, cond.style].filter(Boolean);
+      return `
+        <div onclick="openCourseDetail('${c.id}')"
+          style="border-radius:14px;overflow:hidden;cursor:pointer;
+                 box-shadow:0 2px 8px rgba(0,0,0,0.08);
+                 background:var(--warm-white);margin-bottom:12px;">
+          ${c.imageUrl
+            ? `<img src="${c.imageUrl}" style="width:100%;height:150px;object-fit:cover;display:block;">`
+            : `<div style="width:100%;height:150px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));
+                 display:flex;align-items:center;justify-content:center;font-size:40px;">✨</div>`
+          }
+          <div style="padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;">
+            <div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;
+              line-height:1.4;overflow:hidden;display:-webkit-box;
+              -webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.title}</div>
+            ${c.tagline
+              ? `<div style="font-size:12px;color:var(--warm-gray);line-height:1.5;">${c.tagline}</div>`
+              : ''}
+            ${tags.length
+              ? `<div style="display:flex;gap:4px;flex-wrap:wrap;">
+                  ${tags.map(tag => `<span style="padding:2px 8px;background:var(--sand);
+                    border-radius:20px;font-size:10px;color:var(--warm-gray);">${tag}</span>`).join('')}
+                 </div>`
+              : ''}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px;">
+              <div style="font-size:11px;color:var(--light-gray);">
+                ${t('courseSpotsCount').replace('{n}', c.spots?.length||0)}
+                ${c.authorName ? ' · ' + (c.authorAvatar||'') + c.authorName : ''}
+              </div>
+              <button onclick="event.stopPropagation();toggleLike('${c.id}')"
+                data-like-id="${c.id}" data-likes="${c.likes||0}"
+                style="font-size:12px;flex-shrink:0;padding:4px 8px;background:none;border:none;
+                       cursor:pointer;border-radius:8px;font-family:inherit;line-height:1;"
+                ontouchstart="this.style.transform='scale(0.85)'"
+                ontouchend="this.style.transform='scale(1)'">
+                ${liked ? '❤️' : '🤍'} ${c.likes||0}
+              </button>
+            </div>
+          </div>
+        </div>`;
     }
 
     // コースカード HTML
@@ -6839,6 +7018,7 @@
 
       document.getElementById('course-step-conditions').hidden = false;
       document.getElementById('course-step-loading').hidden = true;
+      document.getElementById('course-step-candidates').hidden = true;
       document.getElementById('course-step-result').hidden = true;
       _lockCourseScroll();
       document.getElementById('course-sheet-overlay').classList.add('visible');
@@ -6860,7 +7040,7 @@
     }
 
     function showCourseStep(step) {
-      ['conditions','loading','result'].forEach(s => {
+      ['conditions','loading','candidates','result'].forEach(s => {
         document.getElementById('course-step-' + s).hidden = s !== step;
       });
     }
@@ -6937,7 +7117,11 @@
       if (departure) conditions.departure = departure;
       if (returnTime) conditions.return = returnTime;
 
+      // ローディング表示（候補生成用メッセージ）
       showCourseStep('loading');
+      const loadingMsg = document.querySelector('#course-step-loading [data-i18n="courseLoadingMsg"]');
+      if (loadingMsg) loadingMsg.textContent = getLang() === 'en' ? 'Thinking of 3 ideas...' : '3つの方向性を考えています…';
+
       const city = getCity();
       const profile = { who: getWhoList(), age: localStorage.getItem('app_age') || localStorage.getItem('sg_age') || 'all' };
 
@@ -6958,10 +7142,100 @@
       }
 
       try {
+        const res = await fetch('/api/courses/candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ city, conditions, profile, pinnedEvents })
+        });
+        const candidates = await res.json();
+        if (!Array.isArray(candidates) || candidates.length === 0) throw new Error('no candidates');
+        renderCourseCandidates(candidates);
+        showCourseStep('candidates');
+      } catch(e) {
+        showCourseStep('conditions');
+        showToast(t('toastCourseGenFailed'));
+      }
+    }
+
+    function renderCourseCandidates(candidates) {
+      const container = document.getElementById('course-candidates-list');
+      container.innerHTML = candidates.map((c, i) => `
+        <div onclick="selectCourseCandidate(${i})" id="candidate-card-${i}"
+          style="border-radius:14px;border:2px solid var(--sand);background:var(--warm-white);
+                 padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s;">
+          <div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;
+                      line-height:1.4;margin-bottom:4px;">${c.title}</div>
+          <div style="font-size:12px;color:var(--warm-gray);margin-bottom:6px;">${c.tagline || ''}</div>
+          <div style="font-size:13px;color:var(--midnight);line-height:1.6;
+                      overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+            ${c.description || ''}
+          </div>
+        </div>
+      `).join('');
+      window._currentCandidates = candidates;
+    }
+
+    async function selectCourseCandidate(index) {
+      const candidate = window._currentCandidates?.[index];
+      if (!candidate) return;
+
+      // 選択ハイライト
+      document.querySelectorAll('[id^="candidate-card-"]').forEach((el, i) => {
+        el.style.borderColor = i === index ? 'var(--caramel)' : 'var(--sand)';
+      });
+
+      // 短いディレイ後にgenerate開始
+      await new Promise(r => setTimeout(r, 300));
+
+      // loadingに切り替え
+      showCourseStep('loading');
+      const loadingMsg = document.querySelector('#course-step-loading [data-i18n="courseLoadingMsg"]');
+      if (loadingMsg) loadingMsg.textContent = getLang() === 'en' ? 'Creating your course...' : 'コースを考えています…';
+
+      // 条件を再収集
+      const conditions = {};
+      document.querySelectorAll('#course-sheet .course-chips').forEach(group => {
+        const key = group.dataset.key;
+        if (MULTI_SELECT_KEYS.has(key)) {
+          const vals = [...group.querySelectorAll('.course-chip.selected')].map(b => b.dataset.val);
+          if (vals.length) conditions[key] = vals.join('・');
+        } else {
+          const sel = group.querySelector('.course-chip.selected');
+          if (sel) conditions[key] = sel.dataset.val;
+        }
+      });
+      const note = (document.getElementById('course-note')?.value || '').trim();
+      if (note) conditions.note = note;
+      const departure = document.getElementById('course-departure-time')?.value;
+      const returnTime = document.getElementById('course-return-time')?.value;
+      if (departure) conditions.departure = departure;
+      if (returnTime) conditions.return = returnTime;
+
+      const city = getCity();
+      const profile = { who: getWhoList(), age: localStorage.getItem('app_age') || localStorage.getItem('sg_age') || 'all' };
+      const allPins = getPins();
+      const selectedPinIds = new Set(
+        [...document.querySelectorAll('#course-sheet-pins-list .pin-chip.selected')]
+          .map(el => el.dataset.pinId)
+      );
+      const pinnedEvents = Object.values(allPins)
+        .filter(p => selectedPinIds.has(p.id || p.title))
+        .map(p => ({ title: p.title, area: p.area, type: p.type, emoji: p.emoji, location: p.location }));
+
+      if (!conditions.area && pinnedEvents.length > 0) {
+        const pinArea = pinnedEvents[0].area;
+        if (pinArea) conditions.area = pinArea;
+      }
+
+      try {
         const res = await fetch('/api/courses/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, conditions, profile, pinnedEvents, userId: getUserId(), userName: getUserName(), userAvatar: getUserAvatar() })
+          body: JSON.stringify({
+            city, conditions, profile, pinnedEvents,
+            selectedCandidate: candidate,
+            userId: getUserId(), userName: getUserName(), userAvatar: getUserAvatar()
+          })
         });
         const course = await res.json();
         if (!course || course.error) throw new Error(course?.error || 'generation failed');
@@ -6969,9 +7243,13 @@
         document.getElementById('course-result-content').innerHTML = renderCourseResultHtml(course);
         showCourseStep('result');
       } catch(e) {
-        showCourseStep('conditions');
+        showCourseStep('candidates');
         showToast(t('toastCourseGenFailed'));
       }
+    }
+
+    function backToCourseConditions() {
+      showCourseStep('conditions');
     }
 
     function renderCourseResultHtml(course) {

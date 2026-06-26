@@ -55,13 +55,15 @@ sg-weekend-app/
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
 
-## コース機能（2026-06-22実装・2026-06-25 BKK/SYD対応）
+## コース機能（2026-06-22実装・2026-06-25 BKK/SYD対応・2026-06-26 候補3択対応）
 - ナビ: 探す / コース / 予定表 / 設定 の4タブ
 - コース画面タブ: 人気（popular） / 公開コース（community） / マイコース（mylist）の3タブ
   - 人気: いいね数降順 上位5件
   - 公開コース: 登録日降順（新しい順）
   - マイコース: 作成日昇順（作った順）
-- コース作成: FABタップ → 条件選択シート（POST /api/courses/generate）でAI生成
+- コース作成フロー: FABタップ → 条件選択シート → [Haiku] POST /api/courses/candidates で候補3件生成 → カード選択 → [Sonnet] POST /api/courses/generate でフルコース生成
+  - 候補シート: `#course-step-candidates`。タイトル・タグライン・説明のみ。「← 条件に戻る」で戻れる
+  - selectedCandidate を generate エンドポイントに渡すと候補のコンセプトに沿って生成（後方互換: 未指定時は従来動作）
 - ユーザー公開コース: `data/{city}/community-courses.json`（sg/bkk/syd 全都市対応）
 - マイコース: localStorage `{city}_my_courses`（published フィールドで公開管理）
 - API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like, GET /api/courses/image

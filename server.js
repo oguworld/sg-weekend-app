@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const webpush = require('web-push');
+const rateLimit = require('express-rate-limit');
 
 webpush.setVapidDetails(
   'mailto:oguworld@gmail.com',
@@ -1469,9 +1470,102 @@ app.get('/api/courses/image', async (req, res) => {
   res.json({ imageUrl: imageUrl || null });
 });
 
+// POST /api/courses/generate と /api/courses/candidates で共用
+const courseGenerateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'リクエスト上限に達しました。1時間後にお試しください。' },
+});
+
+// POST /api/courses/candidates — 候補3件生成（Haiku）
+app.post('/api/courses/candidates', courseGenerateLimit, async (req, res) => {
+  const { city = 'sg', conditions = {}, profile, pinnedEvents = [] } = req.body;
+  const cityConf = CITIES[city] || CITIES.sg;
+
+  const resolvedWho      = conditions.with     || null;
+  const resolvedArea     = conditions.area     || null;
+  const resolvedStyle    = conditions.style    || null;
+  const resolvedPurpose   = conditions.purpose   || null;
+  const resolvedOccasion  = conditions.occasion  || null;
+  const resolvedFood      = conditions.foodFocus || null;
+  const resolvedTransport = conditions.transport || null;
+  const resolvedNote     = conditions.note     || '';
+  const resolvedAge      = profile?.age;
+  const resolvedDeparture = conditions.departure || null;
+  const resolvedReturn    = conditions.return    || null;
+
+  const ageLabels = { baby: '0〜2歳の赤ちゃん', preschool: '幼稚園児（3〜6歳）', school: '小学生以上' };
+  const ageNote = resolvedAge && resolvedAge !== 'all' ? `\n- 子どもの年齢: ${ageLabels[resolvedAge] || resolvedAge}` : '';
+  const noteStr = resolvedNote ? `\n- リクエスト: ${resolvedNote}` : '';
+
+  const styleNote = resolvedStyle === '定番'
+    ? '\n- スタイル: 王道'
+    : resolvedStyle === 'ニッチ'
+    ? '\n- スタイル: 穴場'
+    : resolvedStyle === 'ローカル'
+    ? '\n- スタイル: 地元流'
+    : '';
+
+  const purposeNote = resolvedPurpose ? `\n- 目的: ${resolvedPurpose}` : '';
+  const occasionNote = resolvedOccasion ? `\n- 特別感: ${resolvedOccasion}` : '';
+
+  const transitName = { sg: 'MRT・バス', bkk: 'BTS・MRT・バス', syd: '電車・バス' }[city] || '公共交通・バス';
+  const transportNote = resolvedTransport === '歩き中心'
+    ? '\n- 移動スタイル: 歩き中心'
+    : resolvedTransport === '公共交通・バス'
+    ? `\n- 移動スタイル: ${transitName}活用`
+    : resolvedTransport === '車・タクシー移動'
+    ? '\n- 移動スタイル: 車・タクシー移動'
+    : '';
+
+  const foodNote = resolvedFood ? `\n- 食の比重: ${resolvedFood}` : '';
+
+  const conditionsBlock = `- 誰と: ${resolvedWho || '誰でも'}
+- 時間帯: ${resolvedDeparture && resolvedReturn ? `${resolvedDeparture}〜${resolvedReturn}` : resolvedDeparture ? `${resolvedDeparture}出発` : resolvedReturn ? `〜${resolvedReturn}帰宅` : '指定なし（終日）'}${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}`;
+
+  const pinnedNote = pinnedEvents.length > 0
+    ? `\n\n【ユーザーが希望するスポット】\n${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}`
+    : '';
+
+  const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末1日コースの「方向性」を3つ提案してください。
+スポット詳細は不要。タイトル・キャッチコピー・概要のみ。
+3つは方向性・テーマ・雰囲気が互いに異なるものにすること。
+
+条件:
+${conditionsBlock}${pinnedNote}
+
+返却形式（JSONのみ、余分な説明不要）:
+[
+  { "title": "タイトル（20文字以内、スポット名・エリア名を含む）", "tagline": "キャッチコピー（30文字以内）", "description": "このコースの魅力（1〜2文）" },
+  { "title": "...", "tagline": "...", "description": "..." },
+  { "title": "...", "tagline": "...", "description": "..." }
+]`;
+
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic();
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 800,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const text = message.content[0].text;
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return res.status(500).json({ error: '候補生成に失敗しました' });
+    const candidates = JSON.parse(jsonMatch[0]);
+    res.json(candidates);
+  } catch (e) {
+    console.error('Course candidates error:', e);
+    res.status(500).json({ error: '候補生成に失敗しました' });
+  }
+});
+
 // POST /api/courses/generate
-app.post('/api/courses/generate', async (req, res) => {
+app.post('/api/courses/generate', courseGenerateLimit, async (req, res) => {
   const { city = 'sg', with: who, time, area, style, conditions, profile, pinnedEvents = [] } = req.body;
+  const selectedCandidate = req.body.selectedCandidate || null;
   const cityConf = CITIES[city] || CITIES.sg;
 
   // conditions オブジェクトが渡された場合はそちらを優先
@@ -1491,7 +1585,10 @@ app.post('/api/courses/generate', async (req, res) => {
   // 登録イベントから候補を取得（常に含める）
   const ep = eventsPath(city);
   const events = fs.existsSync(ep) ? JSON.parse(fs.readFileSync(ep)) : [];
-  const upcomingEvents = events.filter(e => e.end_date >= new Date().toISOString().slice(0, 10)).slice(0, 5);
+  const upcomingEvents = events.filter(e =>
+    e.end_date >= new Date().toISOString().slice(0, 10) &&
+    (e.type === 'event' || e.type === 'show')
+  ).slice(0, 5);
 
   // 年齢情報の日本語表現
   const ageLabels = { baby: '0〜2歳の赤ちゃん', preschool: '幼稚園児（3〜6歳）', school: '小学生以上' };
@@ -1551,12 +1648,16 @@ app.post('/api/courses/generate', async (req, res) => {
     syd: 'フードホール・マーケット・ショッピングセンター内飲食エリアを最優先とする（安定感があり、シドニーらしさもある）。特定の店を名指しする場合は著名な老舗のみ（例：Paddy\'s Market、Queen Victoria Building）',
   }[city] || 'フードコート・マーケットを最優先とする';
 
+  const candidateNote = selectedCandidate
+    ? `\n\n【コンセプト指定】\n以下のタイトルとコンセプトに沿ったコースを作成すること:\nタイトル: ${selectedCandidate.title}\nコンセプト: ${selectedCandidate.description}\n（タイトルは必ずそのまま使用すること）`
+    : '';
+
   const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末1日コースを提案してください。
 
 条件:
 - 誰と: ${resolvedWho || '誰でも'}
 - 時間帯: ${resolvedDeparture && resolvedReturn ? `${resolvedDeparture}〜${resolvedReturn}` : resolvedDeparture ? `${resolvedDeparture}出発` : resolvedReturn ? `〜${resolvedReturn}帰宅` : '指定なし（終日）'}
-- スポット数: 時間帯に合わせてAIが最適な数を決める（通常3〜4件）${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}
+- スポット数: 時間帯に合わせてAIが最適な数を決める（通常3〜4件）${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}${candidateNote}
 
 ${pinnedEvents.length > 0 ? `【重要】ユーザーがピン留めしたイベント（これらを軸・メインスポットとして必ず組み込む）:
 ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}
@@ -1602,6 +1703,48 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
 
     const course = JSON.parse(jsonMatch[0]);
 
+    // スポット・説明の整合性チェック＆修正（Haikuで軽量チェック）
+    try {
+      const spotList = (course.spots || []).map((s, i) =>
+        `${i+1}. ${s.name}（${s.time || ''}）: ${s.description || ''}`
+      ).join('\n');
+      const validatePrompt = `以下のコースの説明文とスポットに乖離がないかチェックしてください。
+
+タイトル: ${course.title}
+説明: ${course.description || ''}
+
+スポット:
+${spotList}
+
+【乖離の例】
+- 説明に「格式ある」「本格的な」「特別感」とあるのに、スポットがチェーン店・フードコート・カジュアル飲食
+- 説明に「穴場」「隠れた」とあるのに、スポットが有名観光地メイン
+- 説明に特定の体験（夜景・テラス等）を約束しているのに対応スポットがない
+
+乖離がなければ: {"ok":true}
+乖離があれば: 問題のスポットを適切なものに差し替えたspotsの全配列をJSONで返す。
+フィールドはtime,name,type,duration,description,address,emojiを維持。JSONのみ返すこと。`;
+
+      const checkMsg = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: validatePrompt }],
+      });
+      const checkText = checkMsg.content[0].text;
+      if (!checkText.includes('"ok":true') && !checkText.includes('"ok": true')) {
+        const spotsMatch = checkText.match(/\[[\s\S]*\]/);
+        if (spotsMatch) {
+          const fixedSpots = JSON.parse(spotsMatch[0]);
+          if (Array.isArray(fixedSpots) && fixedSpots.length > 0) {
+            console.log(`[course-validate] スポット修正: ${fixedSpots.length}件`);
+            course.spots = fixedSpots;
+          }
+        }
+      }
+    } catch(ve) {
+      console.warn('[course-validate] チェックスキップ:', ve.message);
+    }
+
     // Unsplash画像取得（失敗時はフォールバックキーワードでリトライ）
     const { fetchUnsplashImage } = require('./scripts/lib/unsplash');
     const cityFallbacks = { sg: 'singapore city', bkk: 'bangkok thailand', syd: 'sydney australia' };
@@ -1632,7 +1775,15 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
 });
 
 // POST /api/courses/chat — AIチャットで条件収集
-app.post('/api/courses/chat', async (req, res) => {
+const courseChatLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'リクエスト上限に達しました。1時間後にお試しください。' },
+});
+
+app.post('/api/courses/chat', courseChatLimit, async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not set' });
 
