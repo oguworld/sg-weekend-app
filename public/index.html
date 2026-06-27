@@ -3712,6 +3712,10 @@
 
       <!-- Step 1: 条件選択 -->
       <div id="course-step-conditions">
+        <div id="course-preset-date-banner" hidden
+          style="margin:0 0 12px;padding:8px 14px;background:var(--caramel-pale,#fdf5ec);
+                 border-radius:10px;font-size:13px;font-weight:700;color:var(--caramel);">
+        </div>
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin:8px 0 20px;">
           <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);" data-i18n="courseSheetTitle">コースを作る</div>
           <div id="course-sheet-profile-display" onclick="closeCourseSheet();switchNav('settings');" style="font-size:12px;color:var(--caramel);background:var(--cream);padding:3px 8px;border-radius:20px;cursor:pointer;"></div>
@@ -4018,21 +4022,21 @@
     <button class="update-banner-btn" onclick="location.reload()">反映する</button>
   </div>
 
-  <!-- ─── COURSE DATE MODAL ─── -->
-  <div class="plan-modal-overlay" id="course-date-overlay" onclick="closeCourseDateModal()"></div>
-  <div class="plan-modal" id="course-date-modal">
+  <!-- ─── DATE PICKER MODAL (共通) ─── -->
+  <div class="plan-modal-overlay" id="date-picker-overlay" onclick="closeDatePickerSheet()"></div>
+  <div class="plan-modal" id="date-picker-modal">
     <div class="plan-modal-handle"></div>
     <div class="plan-modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
       <div>
-        <div class="plan-modal-title">📅 予定表に追加</div>
-        <div class="plan-modal-subtitle" id="course-date-modal-subtitle"></div>
+        <div class="plan-modal-title">📅 日付を選ぶ</div>
+        <div class="plan-modal-subtitle" id="date-picker-subtitle"></div>
       </div>
-      <button onclick="closeCourseDateModal()" style="background:none;border:none;font-size:22px;color:var(--light-gray);cursor:pointer;padding:0 0 0 12px;line-height:1;flex-shrink:0;">✕</button>
+      <button onclick="closeDatePickerSheet()" style="background:none;border:none;font-size:22px;color:var(--light-gray);cursor:pointer;padding:0 0 0 12px;line-height:1;flex-shrink:0;">✕</button>
     </div>
     <div class="plan-modal-body">
       <div class="plan-modal-section-label">日付を選ぶ <span style="color:var(--terracotta)">*</span></div>
-      <div class="plan-date-chips" id="course-date-chips"></div>
-      <button class="plan-modal-add-btn" id="course-date-add-btn" disabled onclick="confirmCourseDate()">追加する</button>
+      <div class="plan-date-chips" id="date-picker-chips"></div>
+      <button class="plan-modal-add-btn" id="date-picker-add-btn" disabled onclick="_confirmDatePicker()">追加する</button>
     </div>
   </div>
 
@@ -4099,8 +4103,10 @@
         <button class="plan-pin-toggle-btn" id="plan-pin-toggle-btn" onclick="togglePinDropdown()">📌<span class="plan-pin-badge" id="plan-pin-badge"></span></button>
       </div>
       <div class="plan-pin-dropdown" id="plan-pin-dropdown"></div>
-      <div class="plan-modal-section-label" data-i18n="planModalDateLabelReq">日付を選ぶ <span style="color:var(--terracotta)">*</span></div>
-      <div class="plan-date-chips" id="plan-custom-date-chips"></div>
+      <div id="plan-custom-date-section" hidden>
+        <div class="plan-modal-section-label" data-i18n="planModalDateLabelReq">日付を選ぶ <span style="color:var(--terracotta)">*</span></div>
+        <div class="plan-date-chips" id="plan-custom-date-chips"></div>
+      </div>
       <div class="plan-modal-section-label" data-i18n="labelStartTime">開始時刻</div>
       <div class="plan-time-row" id="plan-custom-time-row">
         <input type="time" class="plan-time-input" id="plan-custom-time-input" onfocus="onPlanTimeFocus('custom')" oninput="onPlanTimeInput('custom')">
@@ -4127,7 +4133,7 @@
           <span data-i18n="labelNotify">🔔 メンバー通知</span>
         </label>
       </div>
-      <button class="plan-modal-add-btn" id="plan-custom-add-btn" disabled onclick="saveCustomPlan()" data-i18n="planModalAddBtn">追加する</button>
+      <button class="plan-modal-add-btn" id="plan-custom-add-btn" disabled onclick="_openCustomPlanDatePicker()" data-i18n="planModalAddBtn">追加する</button>
       <div class="plan-modal-footer" id="plan-custom-edit-footer" style="display:none;">
         <button class="plan-modal-save-btn" id="plan-custom-save-btn" onclick="saveCustomPlan()" data-i18n="planModalSaveBtn">保存する</button>
       </div>
@@ -5141,6 +5147,10 @@
               <button class="plan-add-card-btn" onclick="openEventPlanModal('${e.id}')">
                 ${t('addToPlanBtn')}
               </button>
+              <button onclick="openCourseSheetFromEvent('${e.id}')"
+                style="padding:7px 9px;background:none;border:1.5px solid var(--caramel);
+                       color:var(--caramel);border-radius:8px;font-size:14px;cursor:pointer;line-height:1;"
+                title="コースを作る">🗺</button>
             </div>
           </div>
         </article>`;
@@ -5793,7 +5803,7 @@
           </div>
           ${p.content ? `<p style="font-size:14px;color:var(--warm-gray);line-height:1.65;margin-bottom:12px;">${p.content}</p>` : ''}
           ${tipsList}
-          <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;">
+          <div style="display:flex;gap:8px;margin-top:12px;justify-content:center;flex-wrap:wrap;">
             <button class="sale-pin-btn pinned"
               onclick="removePin('${id}'); closePinDetail(); renderPinList();">
               📌 ピン留めを外す
@@ -5802,6 +5812,10 @@
               onclick="shareApp('${safeTitle}', '${safeUrl}')">
               ${t('shareBtn')}
             </button>` : ''}
+            <button onclick="openCourseSheetFromEvent('${id}'); closePinDetail();"
+              style="padding:7px 9px;background:none;border:1.5px solid var(--caramel);
+                     color:var(--caramel);border-radius:8px;font-size:14px;cursor:pointer;line-height:1;"
+              title="コースを作る">🗺</button>
           </div>
         </div>`;
 
@@ -6956,12 +6970,35 @@
 
     // ─── コース生成シート ───
 
+    function openCourseSheetFromEvent(eventId) {
+      if (!getPins()[eventId]) togglePinById(eventId);
+      openCourseSheet();
+      setTimeout(() => {
+        const chip = document.querySelector(
+          `#course-sheet-pins-list .pin-chip[data-pin-id="${eventId}"]`
+        );
+        if (chip && !chip.classList.contains('selected')) chip.click();
+      }, 150);
+    }
 
     function openCourseSheet() {
       // 全チップ・テキストをリセット
       document.querySelectorAll('#course-sheet .course-chip').forEach(b => b.classList.remove('selected'));
       const noteEl = document.getElementById('course-note');
       if (noteEl) noteEl.value = '';
+
+      // 日付プリセットバナー
+      const _cpBanner = document.getElementById('course-preset-date-banner');
+      if (_cpBanner) {
+        if (window._coursePresetDate) {
+          const _s = window._coursePresetDate;
+          const _d = new Date(_s.slice(0,4)+'-'+_s.slice(4,6)+'-'+_s.slice(6,8));
+          _cpBanner.textContent = `📅 ${_d.getMonth()+1}/${_d.getDate()}（${'日月火水木金土'[_d.getDay()]}）の予定を作ります`;
+          _cpBanner.hidden = false;
+        } else {
+          _cpBanner.hidden = true;
+        }
+      }
 
       // プロファイル表示
       const profileEl = document.getElementById('course-sheet-profile-display');
@@ -7037,6 +7074,7 @@
       document.getElementById('course-sheet-overlay').classList.remove('visible');
       document.getElementById('course-sheet').classList.remove('visible');
       _unlockCourseScroll();
+      window._coursePresetDate = null;
     }
 
     function showCourseStep(step) {
@@ -7281,8 +7319,14 @@
 
     async function saveAndPublishGeneratedCourse() {
       if (!currentGeneratedCourse) return;
+      const similar = await checkSimilarCourses(currentGeneratedCourse);
+      if (similar.length > 0) {
+        const names = similar.slice(0, 2).map(c => `「${c.title}」`).join('、');
+        const ok = window.confirm(`${names}と似たコースがすでに公開されています。\nこのまま公開しますか？`);
+        if (!ok) return;
+      }
       saveMyCourse(currentGeneratedCourse);
-      await publishCourseById(currentGeneratedCourse.id);
+      await publishCourseById(currentGeneratedCourse.id, { skipSimilarCheck: true });
       closeCourseSheet();
       switchCourseTab('mylist');
       showToast(t('toastCoursePublished2'));
@@ -7359,63 +7403,87 @@
       addCourseToScheduleWithDate(course);
     }
 
-    let _courseDatePendingCourse = null;
-    let _courseDateSelectedKey = null;
+    // ─── 共通日付ピッカー ───
+    let _datepickerCallback = null;
+    let _datepickerMulti    = false;
+    let _datepickerSelectedKeys = new Set();
 
-    function addCourseToScheduleWithDate(course) {
-      _courseDatePendingCourse = course;
-      _courseDateSelectedKey = null;
-      const subtitle = course.title || 'コース';
-      document.getElementById('course-date-modal-subtitle').textContent = subtitle;
-      document.getElementById('course-date-chips').innerHTML = buildDateChipsHtml(null).replace(
-        /onclick="selectPlanDate\('([^']+)'\)"/g,
-        "onclick=\"selectCourseDate('$1')\""
-      );
-      document.getElementById('course-date-add-btn').disabled = true;
-      document.getElementById('course-date-overlay').classList.add('visible');
-      document.getElementById('course-date-modal').classList.add('visible');
+    function openDatePickerSheet(opts) {
+      // opts: { subtitle, multi, presetKey, onConfirm }
+      if (opts.presetKey) {
+        opts.onConfirm([opts.presetKey]);
+        return;
+      }
+      _datepickerCallback = opts.onConfirm;
+      _datepickerMulti    = !!opts.multi;
+      _datepickerSelectedKeys = new Set();
+
+      document.getElementById('date-picker-subtitle').textContent = opts.subtitle || '';
+      document.getElementById('date-picker-chips').innerHTML =
+        buildDateChipsHtml(null)
+          .replace(/onclick="selectPlanDate\('([^']+)'\)"/g,
+                   "onclick=\"_selectPickerDate('$1')\"");
+      document.getElementById('date-picker-add-btn').disabled = true;
+
+      document.getElementById('date-picker-overlay').classList.add('visible');
+      document.getElementById('date-picker-modal').classList.add('visible');
       lockScroll();
     }
 
-    function selectCourseDate(key) {
-      _courseDateSelectedKey = key;
-      document.querySelectorAll('#course-date-chips .plan-date-chip').forEach(b => {
-        b.classList.toggle('selected', b.dataset.date === key);
-      });
-      document.getElementById('course-date-add-btn').disabled = false;
+    function _selectPickerDate(key) {
+      if (_datepickerMulti) {
+        _datepickerSelectedKeys.has(key)
+          ? _datepickerSelectedKeys.delete(key)
+          : _datepickerSelectedKeys.add(key);
+      } else {
+        _datepickerSelectedKeys = new Set([key]);
+      }
+      document.querySelectorAll('#date-picker-chips .plan-date-chip').forEach(b =>
+        b.classList.toggle('selected', _datepickerSelectedKeys.has(b.dataset.date))
+      );
+      document.getElementById('date-picker-add-btn').disabled = _datepickerSelectedKeys.size === 0;
     }
 
-    function closeCourseDateModal() {
-      document.getElementById('course-date-overlay').classList.remove('visible');
-      document.getElementById('course-date-modal').classList.remove('visible');
+    function _confirmDatePicker() {
+      const keys = [..._datepickerSelectedKeys];
+      closeDatePickerSheet();
+      if (_datepickerCallback) _datepickerCallback(keys);
+    }
+
+    function closeDatePickerSheet() {
+      document.getElementById('date-picker-overlay').classList.remove('visible');
+      document.getElementById('date-picker-modal').classList.remove('visible');
       unlockScroll();
-      _courseDatePendingCourse = null;
-      _courseDateSelectedKey = null;
+      _datepickerCallback = null;
     }
 
-    function confirmCourseDate() {
-      const course = _courseDatePendingCourse;
-      const dateStr = _courseDateSelectedKey;
-      if (!course || !dateStr) return;
-
-      const city = getCity();
-      const existing = JSON.parse(localStorage.getItem(city + '_custom_plans') || '[]');
-      const newPlans = (course.spots || []).map((s, i) => ({
-        id: `cp_${Date.now()}_course_${i}`,
-        emoji: s.emoji || '✨',
-        name: s.name,
-        dateKey: dateStr,
-        startTime: s.time,
-        memo: s.description || '',
-        member: [],
-      }));
-      const updated = [...existing, ...newPlans];
-      localStorage.setItem(city + '_custom_plans', JSON.stringify(updated));
-      if (typeof saveCustomPlans === 'function') saveCustomPlans(updated);
-
-      closeCourseDateModal();
-      closeCourseDetail();
-      showToast(t('toastCourseAddPlan').replace('{n}', course.spots.length));
+    function addCourseToScheduleWithDate(course) {
+      openDatePickerSheet({
+        subtitle:  course.title || 'コース',
+        multi:     false,
+        presetKey: window._coursePresetDate || null,
+        onConfirm: (keys) => {
+          const dateStr = keys[0];
+          const city = getCity();
+          const existing = JSON.parse(localStorage.getItem(city + '_custom_plans') || '[]');
+          const newPlans = (course.spots || []).map((s, i) => ({
+            id: `cp_${Date.now()}_course_${i}`,
+            emoji: s.emoji || '✨',
+            name: s.name,
+            dateKey: dateStr,
+            startTime: s.time,
+            memo: s.description || '',
+            member: [],
+          }));
+          const updated = [...existing, ...newPlans];
+          localStorage.setItem(city + '_custom_plans', JSON.stringify(updated));
+          if (typeof saveCustomPlans === 'function') saveCustomPlans(updated);
+          window._coursePresetDate = null;
+          closeCourseDetail();
+          showToast(t('toastCourseAddPlan').replace('{n}', course.spots.length));
+          renderScheduleTab();
+        }
+      });
     }
 
     // いいね
@@ -7454,11 +7522,41 @@
       });
     }
 
-    async function publishCourseById(courseId) {
+    async function checkSimilarCourses(course) {
+      try {
+        const city = getCity();
+        const res = await fetch(`/api/courses?city=${city}&tab=community`);
+        const existing = await res.json();
+        const title = course.title || '';
+        const newSpots = (course.spots || []).map(s => s.name || '').filter(Boolean);
+        const titleKeywords = (title.match(/[぀-龯゠-ヿ]{2,}|[A-Za-z]{4,}/g) || []).filter(w => w.length >= 3);
+        return existing.filter(c => {
+          if (c.id === course.id) return false;
+          // スポット名が2件以上一致
+          const existSpots = (c.spots || []).map(s => s.name || '').filter(Boolean);
+          if (newSpots.filter(s => existSpots.includes(s)).length >= 2) return true;
+          // タイトルキーワードが2語以上共通
+          const existKeywords = ((c.title || '').match(/[぀-龯゠-ヿ]{2,}|[A-Za-z]{4,}/g) || []).filter(w => w.length >= 3);
+          if (titleKeywords.filter(kw => existKeywords.includes(kw)).length >= 2) return true;
+          return false;
+        });
+      } catch { return []; }
+    }
+
+    async function publishCourseById(courseId, opts = {}) {
       const city = getCity();
       const myList = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
       const course = myList.find(c => c.id === courseId);
       if (!course) return;
+
+      if (!opts.skipSimilarCheck) {
+        const similar = await checkSimilarCourses(course);
+        if (similar.length > 0) {
+          const names = similar.slice(0, 2).map(c => `「${c.title}」`).join('、');
+          const ok = window.confirm(`${names}と似たコースがすでに公開されています。\nこのまま公開しますか？`);
+          if (!ok) return;
+        }
+      }
 
       try {
         await fetch('/api/courses/publish', {
@@ -7684,7 +7782,10 @@
       requestAnimationFrame(() => _syncTimeInputUI('event'));
     }
 
-    function openCustomPlanModal() {
+    let _customPlanPresetDateKey = null;
+
+    function openCustomPlanModal(presetDateKey = null) {
+      _customPlanPresetDateKey = presetDateKey || null;
       lockScroll();
       _planModalType = 'custom';
       _editingGroupIds = [];
@@ -7694,8 +7795,10 @@
       _selectedPlanEmoji = '📝';
       _updateEmojiSelectorDisplay('custom', '📝');
       document.getElementById('plan-custom-title').value = '';
-      document.getElementById('plan-custom-date-chips').innerHTML = buildDateChipsHtml(null);
       document.getElementById('plan-custom-memo').value = '';
+      // 新規追加モード: 日付チップセクションを非表示（日付は後から共通ピッカーで選ぶ）
+      const _addDateSection = document.getElementById('plan-custom-date-section');
+      if (_addDateSection) _addDateSection.hidden = true;
       _selectedPlanMembers = [];
       document.querySelectorAll('#plan-custom-member-chips .plan-member-chip').forEach(b => b.classList.remove('selected'));
       document.getElementById('plan-custom-modal-title').textContent = getLang() === 'en' ? 'Add to schedule' : '予定を追加';
@@ -7886,11 +7989,12 @@
 
     function updateCustomPlanAddBtn() {
       const title = document.getElementById('plan-custom-title')?.value?.trim();
-      const isReady = !!(title && _planModalSelectedDates.size > 0);
       const addBtn = document.getElementById('plan-custom-add-btn');
       const saveBtn = document.getElementById('plan-custom-save-btn');
-      if (addBtn) addBtn.disabled = !isReady;
-      if (saveBtn) saveBtn.disabled = !isReady;
+      // 追加モード: タイトルのみ必須（日付は後からピッカーで選ぶ）
+      if (addBtn) addBtn.disabled = !title;
+      // 編集モード: タイトル＋日付チップ選択が必須（既存の日付チップを使う）
+      if (saveBtn) saveBtn.disabled = !(title && _planModalSelectedDates.size > 0);
     }
 
     function saveEventPlan() {
@@ -7920,7 +8024,18 @@
       renderScheduleTab();
     }
 
-    function saveCustomPlan() {
+    function _openCustomPlanDatePicker() {
+      const title = document.getElementById('plan-custom-title')?.value?.trim();
+      if (!title) { showToast('タイトルを入力してください'); return; }
+      openDatePickerSheet({
+        subtitle:  title,
+        multi:     !_customPlanPresetDateKey,
+        presetKey: _customPlanPresetDateKey || null,
+        onConfirm: (keys) => saveCustomPlan(keys),
+      });
+    }
+
+    function saveCustomPlan(dateKeys) {
       const title = document.getElementById('plan-custom-title')?.value?.trim();
       if (!title) return;
       const memo = document.getElementById('plan-custom-memo')?.value?.trim() || '';
@@ -7932,8 +8047,17 @@
       }
       const important = document.getElementById('plan-custom-important-cb')?.checked || false;
       const now = Date.now();
-      [..._planModalSelectedDates].forEach((dateKey, i) => {
-        const entry = { id: 'cp_'+(now+i), emoji: _selectedPlanEmoji, name: title, dateKey, startTime: _planModalSelectedStartTime || null, memo };
+      // 編集モードは _planModalSelectedDates を使う（日付チップから選択済み）
+      const keys = (isEdit || !dateKeys) ? [..._planModalSelectedDates] : dateKeys;
+      keys.forEach((dateKey, i) => {
+        const entry = {
+          id: 'cp_'+(now+i),
+          emoji: _selectedPlanEmoji,
+          name: title,
+          dateKey,
+          startTime: _planModalSelectedStartTime || null,
+          memo
+        };
         if (_selectedPlanMembers.length) entry.member = [..._selectedPlanMembers];
         if (important) entry.important = true;
         plans.push(entry);
@@ -8028,6 +8152,9 @@
       _selectedPlanEmoji = first.emoji || '📝';
       _updateEmojiSelectorDisplay('custom', _selectedPlanEmoji);
       document.getElementById('plan-custom-title').value = first.name || '';
+      // 編集モードは日付チップセクションを表示する
+      const _editDateSection = document.getElementById('plan-custom-date-section');
+      if (_editDateSection) _editDateSection.hidden = false;
       document.getElementById('plan-custom-date-chips').innerHTML = buildDateChipsHtml(null);
       document.querySelectorAll('#plan-custom-date-chips .plan-date-chip').forEach(c => {
         c.classList.toggle('selected', _planModalSelectedDates.has(c.dataset.date));
@@ -8156,9 +8283,38 @@
           <div class="plan-card-actions" onclick="event.stopPropagation()">
             <button class="plan-to-plan-btn" onclick="openEventPlanModal('${p.id}')">📅 ${t('addToPlanBtn').replace('📅 ','')}</button>
             <button class="plan-unpin-btn" onclick="removePin('${p.id}')">📌 外す</button>
+            <button onclick="openCourseSheetFromEvent('${p.id}')"
+              style="padding:7px 9px;background:none;border:1.5px solid var(--caramel);
+                     color:var(--caramel);border-radius:8px;font-size:14px;cursor:pointer;line-height:1;"
+              title="コースを作る">🗺</button>
           </div>
         </div>`;
       }).join('');
+    }
+
+    // ─── SCHEDULE PLAN ACTION SHEET (空き週末日) ───
+    function openSchedulePlanActionSheet(dateKey) {
+      const d = new Date(dateKey.slice(0,4)+'-'+dateKey.slice(4,6)+'-'+dateKey.slice(6,8));
+      const label = `${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）の予定を立てる`;
+      document.getElementById('schedule-plan-action-label').textContent = label;
+      document.getElementById('schedule-plan-action-add-btn').onclick = () => {
+        closeSchedulePlanActionSheet();
+        openCustomPlanModal(dateKey);
+      };
+      document.getElementById('schedule-plan-action-course-btn').onclick = () => {
+        closeSchedulePlanActionSheet();
+        window._coursePresetDate = dateKey;
+        openCourseSheet();
+      };
+      document.getElementById('schedule-plan-action-overlay').style.display = 'block';
+      document.getElementById('schedule-plan-action-sheet').style.display = 'block';
+      lockScroll();
+    }
+
+    function closeSchedulePlanActionSheet() {
+      document.getElementById('schedule-plan-action-overlay').style.display = 'none';
+      document.getElementById('schedule-plan-action-sheet').style.display = 'none';
+      unlockScroll();
     }
 
     // ─── SCHEDULE ACTION SHEET ───
@@ -8407,6 +8563,7 @@
           else if (dow === 6) numCls += ' schedule-day-num--sat';
 
           const countBadge = allItems.length > 0 ? `<span class="schedule-day-count">${t('scheduleDayCount').replace('{n}', allItems.length)}</span>` : '';
+          const dateKey = key;
           const rowsHtml = allItems.length > 0
             ? allItems.map(item => {
                 const emojiCls = item.pType === 'event' ? 'schedule-row-emoji--event' : 'schedule-row-emoji--custom';
@@ -8447,7 +8604,15 @@
                   </div>
                 </div>`;
               }).join('')
-            : `<div class="schedule-empty-day">${t('scheduleNoPlans')}</div>`;
+            : isWeekday
+              ? `<div class="schedule-empty-day">${t('scheduleNoPlans')}</div>`
+              : `<div class="schedule-empty-day" style="cursor:pointer;display:flex;align-items:center;gap:8px;"
+                   onclick="openSchedulePlanActionSheet('${dateKey}')">
+                   <div style="width:26px;height:26px;border-radius:50%;background:var(--caramel);color:white;
+                               display:flex;align-items:center;justify-content:center;
+                               font-size:18px;font-weight:300;line-height:1;flex-shrink:0;">+</div>
+                   <span style="font-size:13px;color:var(--caramel);font-weight:600;">予定を立てる</span>
+                 </div>`;
 
           const cityHolidayName = getCityHolidayName(d);
           const jpEvent = cityHolidayName ? null : getJpEvent(d);
@@ -9585,5 +9750,29 @@
       }
     }
   </script>
+
+  <!-- ─── SCHEDULE PLAN ACTION SHEET ─── -->
+  <div id="schedule-plan-action-overlay"
+    style="display:none;position:fixed;inset:0;z-index:3099;"
+    onclick="closeSchedulePlanActionSheet()"></div>
+  <div id="schedule-plan-action-sheet"
+    style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:3100;
+           background:white;border-radius:20px 20px 0 0;padding:20px 20px 36px;
+           box-shadow:0 -4px 24px rgba(0,0,0,.12);">
+    <div id="schedule-plan-action-label"
+      style="font-size:13px;color:var(--warm-gray);margin-bottom:14px;text-align:center;font-family:'Noto Sans JP',sans-serif;"></div>
+    <button id="schedule-plan-action-add-btn"
+      style="width:100%;padding:14px;margin-bottom:10px;background:white;
+             border:1.5px solid var(--caramel);border-radius:12px;font-size:14px;
+             font-weight:700;color:var(--caramel);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+      📅 予定を追加
+    </button>
+    <button id="schedule-plan-action-course-btn"
+      style="width:100%;padding:14px;background:var(--caramel);border:none;
+             border-radius:12px;font-size:14px;font-weight:700;color:white;cursor:pointer;
+             font-family:'Noto Sans JP',sans-serif;">
+      🗺 コースを作る
+    </button>
+  </div>
 </body>
 </html>

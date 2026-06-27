@@ -55,7 +55,7 @@ sg-weekend-app/
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
 
-## コース機能（2026-06-22実装・2026-06-25 BKK/SYD対応・2026-06-26 候補3択対応）
+## コース機能（2026-06-22実装・2026-06-25 BKK/SYD対応・2026-06-26 候補3択対応・2026-06-27 予定表連携対応）
 - ナビ: 探す / コース / 予定表 / 設定 の4タブ
 - コース画面タブ: 人気（popular） / 公開コース（community） / マイコース（mylist）の3タブ
   - 人気: いいね数降順 上位5件
@@ -66,7 +66,10 @@ sg-weekend-app/
   - selectedCandidate を generate エンドポイントに渡すと候補のコンセプトに沿って生成（後方互換: 未指定時は従来動作）
 - ユーザー公開コース: `data/{city}/community-courses.json`（sg/bkk/syd 全都市対応）
 - マイコース: localStorage `{city}_my_courses`（published フィールドで公開管理）
-- API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/publish, POST /api/courses/:id/like, GET /api/courses/image
+- API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/candidates, POST /api/courses/publish, POST /api/courses/:id/like, GET /api/courses/image
+- 日付ピッカー統一: `openDatePickerSheet(opts)` で日付選択を共通化（コース追加・予定追加の両方）
+- 予定表連携: 空き週末日タップ → アクション選択シート（予定追加 / コース作成）。`window._coursePresetDate` で日付プリセットを共有
+- イベント → コース: 🗺 ボタン（イベントカード/ピン一覧/ピン詳細）から `openCourseSheetFromEvent()` でコースシートを起動
 - プロフィール連携: app_who（おでかけスタイル）/ app_age（子どもの年齢）をチャット・生成プロンプトに反映
   - 旧キー sg_who / sg_age は読み取り時にフォールバック
 - 画像補完: `node scripts/fill-images.js --city=sg`（generate-model-courses.jsは参照なし）
