@@ -101,6 +101,26 @@ sg-weekend-app/
 - Tailwind CSSを使う
 - 既存のデザインパターンを踏襲する
 
+## フィルターUI（2026-06-28刷新）
+- tabs-section（いつ行く？4タブ）廃止
+- `#filter-row-category` カテゴリチップ横スクロール行を header 直下に常時表示（何も選ばない = 全件）
+- `#event-filter-btn` 絞り込みボタン → `#event-filter-sheet` ボトムシート（いつ行く？/誰と/エリア/キーワード）
+- JS変数: `filterCats` / `filterWeek` / `filterWho` / `filterAreas` / `filterKeyword` / `filterEnding`
+- プロフィールの who フィルターは廃止。filterWho（シート選択）で統一
+
+## 都市対応状況（2026-06-28更新）
+- **SG（シンガポール）**: 稼働中
+- **BKK（バンコク）**: 一時停止中（イベント数少ないため）
+- **SYD（シドニー）**: 一時停止中（イベント数少ないため）
+
+BKK/SYD 停止箇所:
+1. `scripts/run-fetch-all.sh` — BKK/SYD fetchとcourseリフレッシュをコメントアウト済み。discover/analyzeも `--city=sg` に変更済み
+2. `public/index.html` — `ACTIVE_CITIES = ['sg']` 定数で都市セレクトを制御
+
+**復活手順:**
+1. `index.html` の `ACTIVE_CITIES = ['sg']` → `['sg', 'bkk', 'syd']`
+2. `run-fetch-all.sh` のコメントアウトを外し `--city=all` に戻す
+
 ## やってはいけないこと
 - cronはシステムcrontabを使う（PM2 cronはスケジュール制御に不向きなため使わない）
 - APIキー・秘密情報をログに出力しない
