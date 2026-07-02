@@ -79,6 +79,16 @@ sg-weekend-app/
 - コース詳細ボタン: 予定表追加（メイン）/ 公開+タイトル変更（横2列）/ 削除（テキストリンク）
 - マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
 
+## ジャンル・興味機能（2026-07-02実装）
+- ジャンルマスター: GENRE_LIST 定数（13種）。id / emoji / label を持つ
+- ユーザー設定: localStorage `app_genres`（選択ジャンルIDの配列）
+- 設定場所: 設定画面「ジャンル・興味」セクション（`#genre-chips-container`）
+- おすすめモード: 「すべて」チップをタップすると `_recommendModeActive = true` になり、ジャンルマッチのイベントのみ表示。もう一度タップで全件表示に戻る
+  - ジャンル未設定時は `#recommend-setup-banner` を5秒表示して設定を促す
+- 「すべて」チップのラベル: おすすめモードON時は「⭐ おすすめ」に変化（`_syncRecommendChip()`）
+- イベントデータ: `genres` フィールド（文字列配列）。filter-events.js の filterBatch() で付与
+- 遡及タグ付け: `node scripts/fill-genres.js --city=sg [--dry-run]`（Haiku、バッチ20件）
+
 ## i18n対応（2026-06-24実装）
 - 言語切り替え: STRINGS オブジェクト（ja/en）+ `t(key)` 関数 + `applyI18n()`
 - 対応済み: 探すタブ・コース機能全体・設定画面・予定表モーダル・ボトムナビ
@@ -100,6 +110,13 @@ sg-weekend-app/
 - スマホファースト
 - Tailwind CSSを使う
 - 既存のデザインパターンを踏襲する
+
+## UIスタイル規約（2026-07-01統一）
+- **カラー**: inline style で生の色値（`#C8804A` 等）を書かない。必ず `:root` のCSS変数（`var(--caramel)` 等）を使う
+- **閉じる ✕ ボタン**: `background:var(--sand); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-size:16px; border:none; cursor:pointer` を標準スタイルとして使う
+- **CSSクラスの二重定義禁止**: 既存クラスを再定義する場合は古い定義をその場で削除する
+- **カードタイトル**: font-size 16px / font-weight 700 を標準とする（メインイベントカード `.card-title` のみ 18px）
+- **border-radius**: カード系 16〜18px、ボタン系 `var(--radius-btn)`(14px) または 50px(pill) を基本とする
 
 ## フィルターUI（2026-06-28刷新）
 - tabs-section（いつ行く？4タブ）廃止
