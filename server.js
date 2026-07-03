@@ -192,6 +192,17 @@ app.get('/api/subscription-status', async (req, res) => {
 */
 
 // ─────────────────────────────────────────────
+// ADMIN AUTH
+// ─────────────────────────────────────────────
+function requireAdminSecret(req, res, next) {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret || req.headers['x-admin-secret'] !== secret) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  next();
+}
+
+// ─────────────────────────────────────────────
 // FILE LOCK UTILITY
 // ─────────────────────────────────────────────
 const fileLocks = {};
@@ -529,7 +540,14 @@ app.post('/api/feedback', async (req, res) => {
 });
 
 // POST /api/chat — AIチャット（Claude API）
-app.post('/api/chat', async (req, res) => {
+const chatLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'リクエスト上限に達しました。1時間後にお試しください。' },
+});
+app.post('/api/chat', chatLimit, async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not set' });
 
@@ -1247,24 +1265,28 @@ app.get('/api/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
 });
 
-app.post('/api/push-subscribe', (req, res) => {
+app.post('/api/push-subscribe', async (req, res) => {
   const { subscription } = req.body;
   if (!subscription?.endpoint) return res.status(400).json({ error: 'invalid' });
-  const subs = loadPushSubs();
-  const idx = subs.findIndex(s => s.endpoint === subscription.endpoint);
-  if (idx >= 0) subs[idx] = subscription;
-  else subs.push(subscription);
-  savePushSubs(subs);
+  await withFileLock(PUSH_SUBS_PATH, () => {
+    const subs = loadPushSubs();
+    const idx = subs.findIndex(s => s.endpoint === subscription.endpoint);
+    if (idx >= 0) subs[idx] = subscription;
+    else subs.push(subscription);
+    savePushSubs(subs);
+  });
   res.json({ ok: true });
 });
 
-app.delete('/api/push-subscribe', (req, res) => {
+app.delete('/api/push-subscribe', async (req, res) => {
   const { endpoint } = req.body;
-  savePushSubs(loadPushSubs().filter(s => s.endpoint !== endpoint));
+  await withFileLock(PUSH_SUBS_PATH, () => {
+    savePushSubs(loadPushSubs().filter(s => s.endpoint !== endpoint));
+  });
   res.json({ ok: true });
 });
 
-app.post('/api/notify-events-updated', async (req, res) => {
+app.post('/api/notify-events-updated', requireAdminSecret, async (req, res) => {
   const city = req.query.city || 'sg';
   try {
     const sent = await sendPushToAll(city);
@@ -1403,7 +1425,14 @@ app.delete('/api/calendar/:groupId/push-subscribe', (req, res) => {
   } catch (e) { res.status(500).json({ error: 'unsubscribe failed' }); }
 });
 
-app.post('/api/calendar/:groupId/notify', async (req, res) => {
+const calNotifyLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'しばらく待ってから再送してください。' },
+});
+app.post('/api/calendar/:groupId/notify', calNotifyLimit, async (req, res) => {
   const fp = getCalFilePath(req.params.groupId);
   if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
   const { title = '📅 カレンダーが更新されました', body = '予定が更新されました', deviceId } = req.body;
@@ -1493,19 +1522,24 @@ app.post('/api/courses/candidates', courseGenerateLimit, async (req, res) => {
   const resolvedTransport = conditions.transport || null;
   const resolvedNote     = conditions.note     || '';
   const resolvedAge      = profile?.age;
-  const resolvedDeparture = conditions.departure || null;
-  const resolvedReturn    = conditions.return    || null;
+  const resolvedTimeslot  = conditions.timeslot  || null;
+  const timeslotMap = {
+    '午前':    { label: '午前（〜12:00）', departure: '9:00',  return: '12:00' },
+    '午後':    { label: '午後（12:00〜17:00）', departure: '12:00', return: '17:00' },
+    '夕方・夜': { label: '夕方・夜（17:00〜）', departure: '17:00', return: '21:00' },
+  };
+  const timeslotInfo = resolvedTimeslot ? timeslotMap[resolvedTimeslot] : null;
 
   const ageLabels = { baby: '0〜2歳の赤ちゃん', preschool: '幼稚園児（3〜6歳）', school: '小学生以上' };
   const ageNote = resolvedAge && resolvedAge !== 'all' ? `\n- 子どもの年齢: ${ageLabels[resolvedAge] || resolvedAge}` : '';
   const noteStr = resolvedNote ? `\n- リクエスト: ${resolvedNote}` : '';
 
   const styleNote = resolvedStyle === '定番'
-    ? '\n- スタイル: 王道'
-    : resolvedStyle === 'ニッチ'
-    ? '\n- スタイル: 穴場'
+    ? '\n- スタイル: 定番（シティ中心部・観光エリアの有名スポット）'
     : resolvedStyle === 'ローカル'
-    ? '\n- スタイル: 地元流'
+    ? '\n- スタイル: ローカル（シティ中心部・観光エリアは使わない。郊外・住宅エリアの地元民の行きつけ）'
+    : resolvedStyle === 'ニッチ'
+    ? '\n- スタイル: 穴場（シティ中心部は使わない。郊外・住宅街のほとんど知られていない隠れスポットのみ）'
     : '';
 
   const purposeNote = resolvedPurpose ? `\n- 目的: ${resolvedPurpose}` : '';
@@ -1522,14 +1556,15 @@ app.post('/api/courses/candidates', courseGenerateLimit, async (req, res) => {
 
   const foodNote = resolvedFood ? `\n- 食の比重: ${resolvedFood}` : '';
 
+  const timeslotNote = timeslotInfo ? timeslotInfo.label : '指定なし';
   const conditionsBlock = `- 誰と: ${resolvedWho || '誰でも'}
-- 時間帯: ${resolvedDeparture && resolvedReturn ? `${resolvedDeparture}〜${resolvedReturn}` : resolvedDeparture ? `${resolvedDeparture}出発` : resolvedReturn ? `〜${resolvedReturn}帰宅` : '指定なし（終日）'}${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}`;
+- 時間帯: ${timeslotNote}（半日以内のコースにすること）${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}`;
 
   const pinnedNote = pinnedEvents.length > 0
     ? `\n\n【ユーザーが希望するスポット】\n${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}`
     : '';
 
-  const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末1日コースの「方向性」を3つ提案してください。
+  const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末半日コースの「方向性」を3つ提案してください。
 スポット詳細は不要。タイトル・キャッチコピー・概要のみ。
 3つは方向性・テーマ・雰囲気が互いに異なるものにすること。
 
@@ -1579,8 +1614,12 @@ app.post('/api/courses/generate', courseGenerateLimit, async (req, res) => {
   const resolvedTransport = cond.transport || null;  // 移動スタイル
   const resolvedNote     = cond.note     || '';
   const resolvedAge      = profile?.age;
-  const resolvedDeparture = cond.departure || null;
-  const resolvedReturn    = cond.return    || null;
+  const resolvedTimeslot  = cond.timeslot  || null;
+  const timeslotMap2 = {
+    '午前':    '午前（〜12:00）',
+    '午後':    '午後（12:00〜17:00）',
+    '夕方・夜': '夕方・夜（17:00〜）',
+  };
 
   // 登録イベントから候補を取得（常に含める）
   const ep = eventsPath(city);
@@ -1596,11 +1635,11 @@ app.post('/api/courses/generate', courseGenerateLimit, async (req, res) => {
   const noteStr = resolvedNote ? `\n- リクエスト: ${resolvedNote}` : '';
 
   const styleNote = resolvedStyle === '定番'
-    ? '\n- スタイル: 王道（誰もが知る人気スポット中心、初めてでも安心のコース）'
-    : resolvedStyle === 'ニッチ'
-    ? '\n- スタイル: 穴場（地元好きだけが知る隠れスポット中心、混まない・知られていない）'
+    ? '\n- スタイル: 定番（シティ中心部・観光エリアの有名スポット。外国人駐在員や観光客にとっての定番。Marina Bay・Orchard・Clark Quay等のエリアも積極的に使う）'
     : resolvedStyle === 'ローカル'
-    ? '\n- スタイル: 地元流（観光客向けではなく在住者が日常で使う食堂・マーケット・エリアなど）'
+    ? '\n- スタイル: ローカル（シティ中心部・観光エリアは使わないこと。郊外・住宅エリア・地元商店街など、在住者が日常的に通う場所が中心。地元民にとっての"普通の行きつけ"）'
+    : resolvedStyle === 'ニッチ'
+    ? '\n- スタイル: 穴場（シティ中心部は使わないこと。シティの穴場は既に知られすぎている。郊外・住宅街・マイナーエリアの中で、在住者でもほとんど知らない本当に隠れた場所のみ。SNSやガイドブックに載っていないレベル）'
     : '';
 
   const purposeNote = resolvedPurpose === 'ぶらぶら散歩'
@@ -1652,12 +1691,18 @@ app.post('/api/courses/generate', courseGenerateLimit, async (req, res) => {
     ? `\n\n【コンセプト指定】\n以下のタイトルとコンセプトに沿ったコースを作成すること:\nタイトル: ${selectedCandidate.title}\nコンセプト: ${selectedCandidate.description}\n（タイトルは必ずそのまま使用すること）`
     : '';
 
-  const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末1日コースを提案してください。
+  const timeslotLabel2 = resolvedTimeslot && timeslotMap2[resolvedTimeslot]
+    ? timeslotMap2[resolvedTimeslot]
+    : '指定なし';
+
+  const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末半日コースを提案してください。
+
+【重要】コースは半日（最大4〜5時間）以内に収まること。丸一日コースは作らないこと。スポット数はゆったりなら2〜3件、詰め込む場合は3〜4件。条件やリクエストに合わせてAIが判断すること。
 
 条件:
 - 誰と: ${resolvedWho || '誰でも'}
-- 時間帯: ${resolvedDeparture && resolvedReturn ? `${resolvedDeparture}〜${resolvedReturn}` : resolvedDeparture ? `${resolvedDeparture}出発` : resolvedReturn ? `〜${resolvedReturn}帰宅` : '指定なし（終日）'}
-- スポット数: 時間帯に合わせてAIが最適な数を決める（通常3〜4件）${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}${candidateNote}
+- 時間帯: ${timeslotLabel2}
+- スポット数: 条件に応じて2〜4件（AIが判断）${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}${candidateNote}
 
 ${pinnedEvents.length > 0 ? `【重要】ユーザーがピン留めしたイベント（これらを軸・メインスポットとして必ず組み込む）:
 ${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}
@@ -1673,7 +1718,7 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
 
 以下のJSON形式で返してください（余分な説明不要、JSONのみ）:
 {
-  "title": "コースタイトル（20文字以内）。このコースで実際に訪れるスポット名・エリア名・イベント名を必ず1つ以上含めること。旅行雑誌のキャプション風。「静かな午後」「週末の正解」のような抽象的フレーズだけのタイトルは禁止。エリア名＋時間帯＋活動の羅列（例：「East朝ランチ散策」）も禁止。良い例：「ハジレーンと、知られざる壁画の裏道」「Jewel滝を横目に、週末を遊び尽くす」「Clarke Quayから始まる、大人の夜散歩」「セントーサで子どもが全力で走り回る日」",
+  "title": ${selectedCandidate ? `"必ず「${selectedCandidate.title}」をそのまま使用すること（変更禁止）"` : `"コースタイトル（20文字以内）。このコースで実際に訪れるスポット名・エリア名・イベント名を必ず1つ以上含めること。旅行雑誌のキャプション風。「静かな午後」「週末の正解」のような抽象的フレーズだけのタイトルは禁止。エリア名＋時間帯＋活動の羅列（例：「East朝ランチ散策」）も禁止。良い例：「ハジレーンと、知られざる壁画の裏道」「Jewel滝を横目に、週末を遊び尽くす」「Clarke Quayから始まる、大人の夜散歩」「セントーサで子どもが全力で走り回る日」"`},
   "tagline": "キャッチコピー（30文字以内）。タイトルと違う角度から魅力を補足する一言",
   "description": "このコースの魅力（2〜3文、なぜおすすめか具体的に）",
   "imageSearch": "英語キーワード2〜4語",
@@ -1757,7 +1802,7 @@ ${spotList}
       type: 'ai',
       ...course,
       imageUrl,
-      conditions: { with: resolvedWho, area: resolvedArea, purpose: resolvedPurpose, style: resolvedStyle, occasion: resolvedOccasion, foodFocus: resolvedFood, transport: resolvedTransport, departure: resolvedDeparture, return: resolvedReturn },
+      conditions: { with: resolvedWho, area: resolvedArea, purpose: resolvedPurpose, style: resolvedStyle, occasion: resolvedOccasion, foodFocus: resolvedFood, transport: resolvedTransport, timeslot: resolvedTimeslot },
       authorId: req.body.userId || 'anonymous',
       authorName: req.body.userName || '匿名',
       authorAvatar: req.body.userAvatar || '',

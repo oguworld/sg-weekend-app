@@ -3121,6 +3121,10 @@
     html[data-theme="dark"] .update-banner { background: #2E241C; color: var(--midnight); }
     html[data-theme="dark"] .course-card { background: #252019; }
     html[data-theme="dark"] .course-chip:not(.selected) { background: #2E241C; border-color: var(--sand-dark); color: var(--warm-gray); }
+    /* ─── コース作成シート・ジャンルチップ ─── */
+    html[data-theme="dark"] .plan-sheet { background: #252019; }
+    html[data-theme="dark"] .genre-chip:not(.selected) { background: #2E241C; border-color: var(--sand-dark); color: var(--midnight); }
+    html[data-theme="dark"] .who-dot:not(.active) { background: #2E241C; }
     #screen-course {
       padding: 0;
       display: flex;
@@ -3146,9 +3150,9 @@
       gap: 8px;
     }
     .genre-chip {
-      padding: 8px 14px;
+      padding: 6px 11px;
       border-radius: 50px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 500;
       border: 1.5px solid var(--sand-dark);
       background: white;

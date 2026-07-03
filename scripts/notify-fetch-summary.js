@@ -140,7 +140,10 @@ async function main() {
 
   if (totalAccepted > 0 && !process.argv.includes('--skip-push')) {
     const port = process.env.PORT || 3000;
-    fetch(`http://localhost:${port}/api/notify-events-updated`, { method: 'POST' })
+    fetch(`http://localhost:${port}/api/notify-events-updated`, {
+      method: 'POST',
+      headers: { 'x-admin-secret': process.env.ADMIN_SECRET || '' },
+    })
       .then(() => console.log('🔔 Webプッシュ通知送信完了'))
       .catch(() => {});
   }

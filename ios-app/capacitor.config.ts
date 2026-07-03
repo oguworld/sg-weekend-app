@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.dosuru.odenavi',
+  appId: 'app.dosuru',
   appName: 'おでかけNavi',
   webDir: '../public',
   ios: {
