@@ -1,3 +1,20 @@
+    // ─── CAPACITOR DETECTION ───
+    const _isCapacitorApp = !!(window.Capacitor?.isNativePlatform?.());
+    const API_BASE = _isCapacitorApp ? 'https://dosuru.app' : '';
+
+    // ─── CAPACITOR: GA4スキップ・外部リンク制御 ───
+    if (_isCapacitorApp) {
+      window.gtag = function() {};
+      document.addEventListener('click', e => {
+        const anchor = e.target.closest('a[target="_blank"]');
+        if (!anchor) return;
+        e.preventDefault();
+        if (window.Capacitor?.Plugins?.Browser) {
+          window.Capacitor.Plugins.Browser.open({ url: anchor.href });
+        }
+      });
+    }
+
     // ─── GENRE MASTER ───
     const GENRE_LIST = [
       { id: 'gourmet',  emoji: '🍜', label: 'グルメ・食べ歩き' },
@@ -161,7 +178,7 @@
         courseDetailAuthor: '作者:',
         courseAddToPlanBtn: '📅 予定表に追加',
         coursePublishAction: 'みんなに公開する',
-        courseUnpublishAction: '公開済み ✓ &nbsp;（非公開にする）',
+        courseUnpublishAction: '🌐 公開中（非公開に）',
         courseEditTitleBtn: 'タイトルを変更する',
         courseDeleteBtn: '🗑️ このコースを削除する',
         courseEmpty: 'コースがありません',
@@ -713,7 +730,7 @@
         <div style="font-size:15px;">${t('loadingEvents')}</div>
       </div>`;
       try {
-        const res = await fetch(`/api/events?city=${getCity()}`);
+        const res = await fetch(API_BASE + `/api/events?city=${getCity()}`);
         EVENT_DATA = res.ok ? await res.json() : [];
       } catch(e) {
         EVENT_DATA = [];
@@ -919,14 +936,10 @@
     function toggleCatFilter(val) {
       if (val === 'all') {
         filterCats.clear();
-        if (getGenreList().length > 0 && !_recommendModeActive) {
-          // ジャンル設定あり かつ まだおすすめモードでない → おすすめモードON
+        if (getGenreList().length > 0) {
           _recommendModeActive = true;
-        } else if (_recommendModeActive) {
-          // おすすめモードON → おすすめモードOFF（全件表示に戻る）
-          _recommendModeActive = false;
         } else {
-          // ジャンル未設定 → バナーを表示して全件表示
+          _recommendModeActive = false;
           _showRecommendSetupBanner();
         }
       } else {
@@ -1071,6 +1084,17 @@
 
     function renderEventCards() {
       const grid = document.getElementById('cards-grid');
+
+      // ジャンル未設定 + カテゴリ未選択 → 設定促進バナーのみ表示
+      if (filterCats.size === 0 && getGenreList().length === 0 && !showPinnedOnly && filterWeek === '' && filterWho.size === 0 && filterAreas.size === 0 && !filterEnding && !filterNew && filterKeyword === '') {
+        grid.innerHTML = '';
+        const banner = document.getElementById('recommend-setup-banner');
+        if (banner) banner.style.display = 'block';
+        document.getElementById('event-count-label') && (document.getElementById('event-count-label').textContent = '');
+        return;
+      }
+      const banner = document.getElementById('recommend-setup-banner');
+      if (banner) banner.style.display = 'none';
 
       const filtered = EVENT_DATA.filter(e => {
         // ピン留めフィルター
@@ -1342,6 +1366,7 @@
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
+    _recommendModeActive = getGenreList().length > 0;
     _syncRecommendChip();
 
     // ─── ホーム画面 プルリフレッシュ ───
@@ -1551,7 +1576,7 @@
       showTyping();
 
       try {
-        const res = await fetch('/api/chat', {
+        const res = await fetch(API_BASE + '/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1948,6 +1973,7 @@
     });
 
     function showInstallBanner(platform) {
+      if (_isCapacitorApp) return;
       // すでにインストール済みまたは閉じた場合はスキップ
       if (isInStandaloneMode()) return;
       if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return;
@@ -2062,19 +2088,36 @@
           data-genre="${g.id}"
           onclick="toggleGenre('${g.id}')">${g.emoji} ${g.label}</button>
       `).join('');
+      _syncGenreStatusBadge();
+    }
+
+    function toggleGenrePanel() {
+      const panel = document.getElementById('genre-panel');
+      if (!panel) return;
+      const open = panel.style.display === 'none';
+      panel.style.display = open ? 'block' : 'none';
+      const arrow = document.getElementById('genre-status-arrow');
+      if (arrow) arrow.style.transform = open ? 'rotate(180deg)' : '';
+    }
+
+    function _syncGenreStatusBadge() {
+      const label = document.getElementById('genre-status-label');
+      if (!label) return;
+      const count = getGenreList().length;
+      label.textContent = count === 0 ? '未設定' : `${count}件設定済み`;
     }
 
     function _syncRecommendChip() {
       const btn = document.querySelector('#filter-row-category .filter-chip[data-cat="all"]');
       if (!btn) return;
-      btn.textContent = (getGenreList().length > 0 && _recommendModeActive) ? '⭐ おすすめ' : 'すべて';
+      btn.textContent = '⭐ おすすめ';
+      _syncGenreStatusBadge();
     }
 
     function _showRecommendSetupBanner() {
       const banner = document.getElementById('recommend-setup-banner');
       if (!banner) return;
       banner.style.display = 'block';
-      setTimeout(() => { if (banner) banner.style.display = 'none'; }, 5000);
     }
 
     function initSettingsProfile() {
@@ -2209,86 +2252,75 @@
 
       return `
         <div class="pin-detail-title" style="margin-bottom:6px;">${isEn ? 'How to Use' : '使い方'}</div>
-        <div style="font-size:14px;color:var(--warm-gray);line-height:1.7;margin-bottom:20px;">${isEn
-          ? 'おでかけNavi is an app for planning your weekend outings. Browse local events, save what interests you, and organize your plans — all in one place.'
-          : 'おでかけNaviは、週末のお出かけ予定を立てるためのアプリです。地元のイベントを探して気になるものを保存し、週末の計画を一か所でまとめて管理できます。'
-        }</div>
+        <div style="font-size:14px;color:var(--warm-gray);line-height:1.7;margin-bottom:16px;">
+          ${isEn ? 'Find events, build day courses with AI, and plan your weekend.' : '週末のお出かけをかんたんに計画できるアプリです。'}
+        </div>
 
-<div style="background:var(--sage-pale);border-radius:16px;padding:14px 16px;margin-bottom:20px;">
+        <div style="background:var(--sage-pale);border-radius:16px;padding:14px 16px;margin-bottom:16px;">
           <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;">📱 ${isEn ? 'Add to Home Screen' : 'ホーム画面に追加'}</div>
           <div style="font-size:14px;color:var(--warm-gray);line-height:1.8;">${isEn
-            ? '<strong>iPhone:</strong> Safari → Share (□↑) → "Add to Home Screen"<br><strong>Android:</strong> Chrome → ⋮ → "Add to Home screen"<br>No installation required — works just like a native app.'
-            : '<strong>iPhone：</strong>Safari → 共有（□↑）→「ホーム画面に追加」<br><strong>Android：</strong>Chrome → ⋮ →「ホーム画面に追加」<br>インストール不要で、アプリと同じように利用できます。'
+            ? '<strong>iPhone:</strong> Safari → Share (□↑) → "Add to Home Screen"<br><strong>Android:</strong> Chrome → ⋮ → "Add to Home screen"'
+            : '<strong>iPhone：</strong>Safari → 共有（□↑）→「ホーム画面に追加」<br><strong>Android：</strong>Chrome → ⋮ →「ホーム画面に追加」'
           }</div>
         </div>
 
-<div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             ${stepBadge(1)}
             <div style="font-size:15px;font-weight:700;color:var(--midnight);">🔍 ${isEn ? 'Find events' : 'イベントを探す'}</div>
           </div>
           <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">
             ${isEn
-              ? '• Tap a category chip to filter: <strong>🗺 Events / 🎭 Shows / 🍽 Food & Fairs / 🏷 Deals / 🎊 New Open</strong><br>• Tap <strong>Filter</strong> to narrow by date, who you\'re with, area, or keyword<br>• Tap <strong>⏰</strong> to see events ending this week / <strong>🔔</strong> for newly added spots<br>• <strong>📌 Pin</strong> events you like — pins can also be used to build a course'
-              : '• カテゴリチップで絞り込み：<strong>🗺 イベント / 🎭 展示・公演 / 🍽 グルメ・フェア / 🏷 プロモ・お得 / 🎊 新規オープン</strong><br>• <strong>絞り込み</strong>ボタンでいつ行く？・誰と・エリア・キーワードを細かく設定<br>• <strong>⏰</strong> で終了間近のみ表示 / <strong>🔔</strong> で新着（3日以内）のみ表示<br>• <strong>📌 ピン留め</strong> した情報はコースの作成にも活用できます'
+              ? '• <strong>⭐ Recommended</strong> — shows events matching your genre settings<br>• Switch tabs: <strong>Events / Shows / Food / Deals / New Open</strong><br>• Use <strong>Filter ▼</strong> to narrow by date, area, or keyword<br>• <strong>⏰</strong> ending soon &nbsp;/&nbsp; <strong>🔔</strong> newly added'
+              : '• <strong>⭐ おすすめ</strong> — 設定したジャンルに合うイベントを表示<br>• タブ切り替え：<strong>イベント / 展示・公演 / グルメ / プロモ / 新規オープン</strong><br>• <strong>絞り込み ▼</strong> で日程・エリア・キーワードを指定<br>• <strong>⏰</strong> 終了間近 &nbsp;/&nbsp; <strong>🔔</strong> 新着'
             }
           </div>
         </div>
 
-<div style="display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
-          <div style="width:2px;height:16px;background:var(--light-gray);border-radius:1px;"></div>
+        <div style="display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+          <div style="width:2px;height:14px;background:var(--light-gray);border-radius:1px;"></div>
         </div>
-        <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+
+        <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             ${stepBadge(2)}
-            <div style="font-size:15px;font-weight:700;color:var(--midnight);">🗺 ${isEn ? 'Create a course' : 'コースを作る'}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--midnight);">🗺 ${isEn ? 'Build a course' : 'コースを作る'}</div>
           </div>
           <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">
             ${isEn
-              ? '• Open the <strong>Course tab</strong> and tap the <strong>＋ button</strong> to generate a custom day plan with AI<br>• Pick from 3 AI-suggested concepts, then get a full itinerary<br>• Browse <strong>Popular</strong> and <strong>Public Courses</strong> tabs for inspiration and ❤️ like your favorites<br>• Tap <strong>📅</strong> to add an entire course to your schedule at once'
-              : '• <strong>コースタブ</strong> を開き <strong>＋ボタン</strong> をタップ → 条件を選ぶだけでAIが候補を3件提案<br>• 気に入ったコンセプトを選ぶと、AIが詳細な1日プランを作成します<br>• <strong>人気</strong>・<strong>公開コース</strong> タブで他のユーザーのプランを参考にできます<br>• 気に入ったコースは <strong>📅</strong> で予定表に一括追加'
+              ? '• Open <strong>Course tab</strong> → tap <strong>＋</strong> → AI suggests 3 concepts<br>• Pick one → get a full day itinerary<br>• Tap <strong>📅</strong> to add the whole course to your schedule'
+              : '• <strong>コースタブ</strong> → <strong>＋</strong> をタップ → AIが3候補を提案<br>• 気に入ったコンセプトを選ぶとフルプランを生成<br>• <strong>📅</strong> で予定表に一括追加できます'
             }
           </div>
         </div>
 
-<div style="display:flex;align-items:center;justify-content:center;margin-bottom:12px;">
-          <div style="width:2px;height:16px;background:var(--light-gray);border-radius:1px;"></div>
+        <div style="display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
+          <div style="width:2px;height:14px;background:var(--light-gray);border-radius:1px;"></div>
         </div>
+
         <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:20px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
             ${stepBadge(3)}
-            <div style="font-size:15px;font-weight:700;color:var(--midnight);">📅 ${isEn ? 'Plan your weekend' : '予定を立てる'}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--midnight);">📅 ${isEn ? 'Manage your schedule' : '予定を管理する'}</div>
           </div>
           <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">
             ${isEn
-              ? '• Tap <strong>📅 Add to plan</strong> on an event card to set a date &amp; time slot<br>• Or tap <strong>＋</strong> to add a free-form plan<br>• Tap <strong>🔗 Share</strong> to sync your schedule with family or friends'
-              : '• イベントカードの <strong>📅 予定に追加</strong> で日時・時間帯を設定<br>• <strong>＋ボタン</strong> で自由に予定を追加することも可能<br>• <strong>🔗 共有</strong> で家族や友人と予定を共有できます'
+              ? '• Tap <strong>📅 Add to plan</strong> on any event card<br>• Or tap <strong>＋</strong> in the Schedule tab to add freely<br>• Share your schedule with family via <strong>🔗 Share</strong>'
+              : '• イベントカードの <strong>📅 予定に追加</strong> で日時を設定<br>• 予定表の <strong>＋</strong> で自由に予定を追加<br>• <strong>🔗 共有</strong> で家族と予定を共有'
             }
           </div>
         </div>
 
-<div style="background:var(--sage-pale);border-radius:16px;padding:14px 16px;margin-bottom:12px;">
-          <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;">⚙️ ${isEn ? 'Personalize in Settings' : '設定でカスタマイズ'}</div>
+        <div style="background:var(--sage-pale);border-radius:16px;padding:14px 16px;margin-bottom:4px;">
+          <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;">⚙️ ${isEn ? 'Settings' : '設定'}</div>
           <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">${isEn
-            ? '• <strong>Who you\'re going with</strong> — set your style (family, couple, solo, or friends) to personalize course suggestions<br>• <strong>Kids\' age</strong> — shown when "Family" is selected; used to tailor AI course recommendations<br>• <strong>Language</strong> — toggle between Japanese and English at any time'
-            : '• <strong>おでかけスタイル</strong> — ファミリー・カップル・ひとりなど設定すると、コース作成のAIプロンプトに反映されます<br>• <strong>子どもの年齢</strong> — ファミリー選択時のみ表示。AIがより適切なプランを提案します<br>• <strong>言語</strong> — 日本語と英語をいつでも切り替えられます'
+            ? '• <strong>Genres & Interests</strong> — select genres to personalize ⭐ Recommended<br>• <strong>Who you\'re going with</strong> — tailors AI course suggestions<br>• <strong>Language</strong> — switch between Japanese and English'
+            : '• <strong>ジャンル・興味</strong> — ジャンルを選ぶと ⭐ おすすめ に反映されます<br>• <strong>一緒に行く人</strong> — コース生成AIのプロンプトに反映されます<br>• <strong>言語</strong> — 日本語と英語を切り替えできます'
           }</div>
-        </div>
-
-<div style="background:var(--sage-pale);border-radius:16px;padding:14px 16px;margin-bottom:4px;">
-          <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;">📩 ${isEn ? 'Submit an event via LINE' : 'LINEでイベントを投稿'}</div>
-          <div style="font-size:14px;color:var(--warm-gray);line-height:1.8;margin-bottom:12px;">${isEn
-            ? 'Know a great spot? Send a URL or photo to the LINE Bot — it may appear in the app after review.'
-            : 'おすすめのイベントやお店を知っていたら、URLや写真をLINE Botに送ってください。承認されるとアプリに掲載されます。'
-          }</div>
-          <a href="https://lin.ee/7mhmipl" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;background:#06C755;color:#fff;font-size:14px;font-weight:700;padding:11px 16px;border-radius:12px;text-decoration:none;">
-            <span style="font-size:16px;">💬</span>
-            ${isEn ? 'Add LINE Bot & Submit' : 'LINE Botを追加して投稿する'}
-          </a>
         </div>`;
     }
 
-    let _howtoRendered = false;
+    let _howtoRendered = false; // SW更新時にリセット → 再レンダリング
     let _howtoOpen = false;
     function openShareModal() {
       if (_howtoOpen) return;
@@ -2326,7 +2358,7 @@
       const text = document.getElementById('feedback-text').value.trim();
       if (!text) { showToast(t('toastFeedbackEmpty')); return; }
       try {
-        const res = await fetch('/api/feedback', {
+        const res = await fetch(API_BASE + '/api/feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text }),
@@ -2355,6 +2387,7 @@
     async function initPushState() {
       const item = document.getElementById('push-setting-item');
       if (!item) return;
+      if (_isCapacitorApp) { item.style.display = 'none'; return; }
       if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
         item.style.display = 'none';
         return;
@@ -2382,7 +2415,7 @@
         if (_pushSubscription) {
           if (gid) await _deregisterGroupPush(gid);
           await _pushSubscription.unsubscribe();
-          await fetch('/api/push-subscribe', {
+          await fetch(API_BASE + '/api/push-subscribe', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ endpoint: _pushSubscription.endpoint }),
@@ -2392,13 +2425,13 @@
         } else {
           const perm = await Notification.requestPermission();
           if (perm !== 'granted') { _updatePushBtn(); showToast(t('toastPushDenied')); return; }
-          const res = await fetch('/api/vapid-public-key');
+          const res = await fetch(API_BASE + '/api/vapid-public-key');
           const { publicKey } = await res.json();
           _pushSubscription = await reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: _urlBase64ToUint8Array(publicKey),
           });
-          await fetch('/api/push-subscribe', {
+          await fetch(API_BASE + '/api/push-subscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subscription: _pushSubscription }),
@@ -2471,6 +2504,14 @@
       if (screen === 'home') {
         document.getElementById('screen-home').style.display = 'block';
         if (appHeader) appHeader.style.display = 'block';
+        // カテゴリチップを「おすすめ」に戻す
+        filterCats.clear();
+        _recommendModeActive = getGenreList().length > 0;
+        _syncCatChips();
+        _syncRecommendChip();
+        // チップ行を左端にスクロール
+        const chipRow = document.getElementById('filter-row-category');
+        if (chipRow) chipRow.scrollLeft = 0;
         if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
         else { renderEventCards(); }
       } else {
@@ -2589,8 +2630,8 @@
       try {
         if (tab === 'everyone') {
           const [popRes, comRes] = await Promise.all([
-            fetch(`/api/courses?city=${city}&tab=popular`),
-            fetch(`/api/courses?city=${city}&tab=community`)
+            fetch(API_BASE + `/api/courses?city=${city}&tab=popular`),
+            fetch(API_BASE + `/api/courses?city=${city}&tab=community`)
           ]);
           const [popular, community] = await Promise.all([popRes.json(), comRes.json()]);
           renderEveryoneTab(popular, community);
@@ -2655,7 +2696,7 @@
 
       if (personalized && whoLabel) {
         html += `<div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;
-          color:var(--midnight);padding:20px 0 8px;">✨ ${whoLabel}向けコース</div>
+          color:var(--midnight);padding:20px 0 8px;">✨ ${whoLabel}向け</div>
           <div style="display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;
             scroll-padding-left:16px;padding:0 16px 6px;box-sizing:border-box;
             width:100vw;margin-left:-16px;
@@ -2841,7 +2882,7 @@
 
       if (!course) {
         try {
-          const community = await fetch(`/api/courses?city=${city}&tab=community`).then(r => r.json());
+          const community = await fetch(API_BASE + `/api/courses?city=${city}&tab=community`).then(r => r.json());
           course = community.find(c => c.id === courseId);
         } catch(e) {}
       }
@@ -2852,7 +2893,7 @@
       // 画像なしの場合はバックグラウンドで取得してlocalStorageを更新
       if (!course.imageUrl) {
         const query = course.imageSearch || '';
-        fetch(`/api/courses/image?query=${encodeURIComponent(query)}&city=${city}`)
+        fetch(API_BASE + `/api/courses/image?query=${encodeURIComponent(query)}&city=${city}`)
           .then(r => r.json())
           .then(data => {
             if (data.imageUrl) {
@@ -2945,7 +2986,7 @@
               ` : `
                 <button onclick="unpublishCourseById('${course.id}')" id="unpublish-btn-${course.id}"
                   style="flex:1;padding:11px 8px;background:var(--warm-white);color:var(--sage);font-size:13px;
-                         border:1.5px solid var(--sage);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
+                         border:1.5px solid var(--sage);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;">
                   ${t('courseUnpublishAction')}
                 </button>
               `}
@@ -3049,7 +3090,7 @@
             style="display:flex;align-items:center;gap:8px;padding:9px 12px;
                    font-size:14px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;
                    border:none;border-top:${i > 0 ? '1px solid var(--border-color,#e8e0d8)' : 'none'};
-                   background:var(--card-bg,#fff);color:var(--midnight);text-align:left;width:100%;">
+                   background:var(--warm-white);color:var(--midnight);text-align:left;width:100%;">
             <span class="pin-check" style="flex-shrink:0;width:18px;height:18px;border-radius:4px;
                    border:1.5px solid var(--light-gray);display:inline-block;line-height:15px;
                    text-align:center;font-size:13px;align-self:center;"></span>
@@ -3125,7 +3166,7 @@
         const check = pinChip.querySelector('.pin-check');
         if (sel) {
           pinChip.classList.remove('selected');
-          pinChip.style.background = 'var(--card-bg,#fff)';
+          pinChip.style.background = 'var(--warm-white)';
           pinChip.style.color = 'var(--midnight)';
           pinChip.style.fontWeight = '';
           if (check) { check.textContent = ''; check.style.borderColor = '#ccc'; check.style.background = ''; }
@@ -3198,7 +3239,7 @@
       }
 
       try {
-        const res = await fetch('/api/courses/candidates', {
+        const res = await fetch(API_BASE + '/api/courses/candidates', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ city, conditions, profile, pinnedEvents })
@@ -3280,7 +3321,7 @@
       }
 
       try {
-        const res = await fetch('/api/courses/generate', {
+        const res = await fetch(API_BASE + '/api/courses/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -3404,7 +3445,7 @@
       // 公開済みならサーバーからも削除
       if (target?.published) {
         try {
-          await fetch(`/api/courses/${courseId}?city=${city}`, { method: 'DELETE' });
+          await fetch(API_BASE + `/api/courses/${courseId}?city=${city}`, { method: 'DELETE' });
         } catch(e) {}
       }
 
@@ -3519,7 +3560,7 @@
       }
 
       try {
-        await fetch(`/api/courses/${courseId}/like`, {
+        await fetch(API_BASE + `/api/courses/${courseId}/like`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ city: getCity(), action })
@@ -3540,7 +3581,7 @@
     async function checkSimilarCourses(course) {
       try {
         const city = getCity();
-        const res = await fetch(`/api/courses?city=${city}&tab=community`);
+        const res = await fetch(API_BASE + `/api/courses?city=${city}&tab=community`);
         const existing = await res.json();
         const title = course.title || '';
         const newSpots = (course.spots || []).map(s => s.name || '').filter(Boolean);
@@ -3574,7 +3615,7 @@
       }
 
       try {
-        await fetch('/api/courses/publish', {
+        await fetch(API_BASE + '/api/courses/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...course, isPublic: true })
@@ -3602,7 +3643,7 @@
     async function unpublishCourseById(courseId) {
       const city = getCity();
       try {
-        await fetch(`/api/courses/${courseId}/unpublish`, {
+        await fetch(API_BASE + `/api/courses/${courseId}/unpublish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ city })
@@ -4401,10 +4442,10 @@
           style="display:flex;align-items:center;gap:8px;padding:9px 12px;width:100%;
                  font-size:14px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;text-align:left;
                  border:none;border-top:${i > 0 ? '1px solid var(--border-color,#e8e0d8)' : 'none'};
-                 background:${sel ? 'var(--caramel-pale)' : 'var(--card-bg,#fff)'};
+                 background:${sel ? 'var(--caramel-pale)' : 'var(--warm-white)'};
                  color:${sel ? 'var(--caramel)' : 'var(--midnight)'};font-weight:${sel ? '700' : 'normal'};">
           <span style="flex-shrink:0;width:18px;height:18px;border-radius:4px;
-                 border:1.5px solid ${sel ? 'var(--caramel)' : '#ccc'};
+                 border:1.5px solid ${sel ? 'var(--caramel)' : 'var(--light-gray)'};
                  background:${sel ? 'var(--caramel)' : ''};color:#fff;
                  display:inline-block;line-height:15px;text-align:center;font-size:13px;align-self:center;">
             ${sel ? '✓' : ''}</span>
@@ -5162,7 +5203,7 @@
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
         if (!sub) return;
-        await fetch('/api/calendar/'+gid+'/push-subscribe', {
+        await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription: sub, deviceId: getCalDeviceId() }),
@@ -5175,7 +5216,7 @@
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
         if (!sub) return;
-        await fetch('/api/calendar/'+gid+'/push-subscribe', {
+        await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ endpoint: sub.endpoint }),
@@ -5202,7 +5243,7 @@
       if (!cb || !cb.checked) return;
       const actionLabel = actionType === 'updated' ? '更新' : '追加';
       try {
-        await fetch('/api/calendar/'+gid+'/notify', {
+        await fetch(API_BASE + '/api/calendar/'+gid+'/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -5226,7 +5267,7 @@
         } else {
           body = { customPlans, eventPlans };
         }
-        await fetch('/api/calendar/'+gid, {
+        await fetch(API_BASE + '/api/calendar/'+gid, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
@@ -5237,7 +5278,7 @@
     async function fetchFromServer() {
       const gid = getSharedGroupId(); if (!gid) return false;
       try {
-        const r = await fetch('/api/calendar/'+gid);
+        const r = await fetch(API_BASE + '/api/calendar/'+gid);
         if (!r.ok) {
           if (r.status === 404) { setSharedGroupId(null); updateCalSyncBtn(); }
           return false;
@@ -5345,7 +5386,7 @@
         const customPlans = getCustomPlans();
         const eventPlans  = JSON.parse(localStorage.getItem(city+'_event_plans')||'[]');
         const encryptedData = await _encryptPlans(key, {customPlans, eventPlans});
-        const r = await fetch('/api/calendar/create', {
+        const r = await fetch(API_BASE + '/api/calendar/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ city, encryptedData })
@@ -5542,7 +5583,7 @@
       const gid = _pendingJoinGroupId;
       const key = _pendingJoinKey;
       try {
-        const r = await fetch(`/api/calendar/${gid}`);
+        const r = await fetch(API_BASE + `/api/calendar/${gid}`);
         if (!r.ok) throw new Error();
         const serverData = await r.json();
 
@@ -5570,7 +5611,7 @@
         } else {
           putBody = merged;
         }
-        await fetch(`/api/calendar/${gid}`, {
+        await fetch(API_BASE + `/api/calendar/${gid}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(putBody)
@@ -5597,7 +5638,7 @@
     }
 
     // ─── PWA SERVICE WORKER ───
-    if ('serviceWorker' in navigator) {
+    if (!_isCapacitorApp && 'serviceWorker' in navigator) {
       // 初回ロード時点のコントローラーを記録（初回インストールとアップデートを区別）
       const hadController = !!navigator.serviceWorker.controller;
 

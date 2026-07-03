@@ -1,0 +1,31 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Build and upload to App Store"
+  lane :deploy do
+    setup_ci if ENV['CI']
+    match(type: "appstore", readonly: is_ci)
+    build_app(
+      workspace: "ios/App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store"
+    )
+    upload_to_app_store(
+      skip_metadata: true,
+      skip_screenshots: true,
+      precheck_include_in_app_purchases: false
+    )
+  end
+
+  desc "Upload to TestFlight only"
+  lane :beta do
+    setup_ci if ENV['CI']
+    match(type: "appstore", readonly: is_ci)
+    build_app(
+      workspace: "ios/App/App.xcworkspace",
+      scheme: "App",
+      export_method: "app-store"
+    )
+    upload_to_testflight(skip_waiting_for_build_processing: true)
+  end
+end

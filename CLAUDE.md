@@ -46,6 +46,20 @@ sg-weekend-app/
 ├── public/
 │   ├── index.html
 │   └── sw.js
+├── ios-app/                       ← iOSアプリ化（Capacitor）2026-07-03追加
+│   ├── package.json
+│   ├── capacitor.config.ts
+│   ├── Gemfile
+│   ├── fastlane/
+│   │   ├── Appfile
+│   │   └── Fastfile
+│   ├── resources/
+│   │   ├── icon.png    ← 1024×1024px
+│   │   └── splash.png  ← 2732×2732px
+│   └── README.md       ← MacInCloud初回セットアップ手順
+├── .github/
+│   └── workflows/
+│       └── ios-deploy.yml  ← releaseブランチpushで自動デプロイ
 └── .claude/
     ├── plan.md
     ├── next.md
@@ -78,6 +92,20 @@ sg-weekend-app/
 - transportチップ: data-val=公共交通・バス（表示ラベルは都市別: SG=MRT・バス, BKK=BTS・MRT・バス, SYD=電車・バス）
 - コース詳細ボタン: 予定表追加（メイン）/ 公開+タイトル変更（横2列）/ 削除（テキストリンク）
 - マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
+
+## iOSアプリ化（Capacitor）2026-07-03実装
+- 方式: ローカルバンドル（webDir: `../public`）。Web版と同じHTMLをアプリ内に同梱
+- appId: `app.dosuru.odenavi` / appName: `おでかけNavi`
+- `_isCapacitorApp`: `window.Capacitor?.isNativePlatform?.()` で検出。app.js 先頭で定義
+- `API_BASE`: Capacitor環境では `https://dosuru.app`、Web環境では空文字列。全fetchに付与済み
+- GA4スキップ: `_isCapacitorApp` 時に `window.gtag = function(){}` でnoop化
+- 外部リンク: `a[target="_blank"]` クリックを `Capacitor.Plugins.Browser.open()` でデバイスブラウザに渡す
+- SW登録・インストールバナー・Push通知UI: Capacitor環境でスキップ/非表示
+- CI/CD: `release` ブランチpush → GitHub Actions（macOS runner）→ Fastlane deploy → App Store申請
+- Fastlane: `deploy`（App Store本番）/ `beta`（TestFlight）の2レーン
+- GitHub Secrets: ASC_KEY_ID / ASC_ISSUER_ID / ASC_PRIVATE_KEY / MATCH_PASSWORD / MATCH_GIT_BASIC_AUTH
+- 初回セットアップ: MacInCloudで `npx cap add ios` → Xcode確認 → `fastlane match init` → GitHub Secrets登録
+- 詳細手順: `ios-app/README.md` 参照
 
 ## ジャンル・興味機能（2026-07-02実装）
 - ジャンルマスター: GENRE_LIST 定数（13種）。id / emoji / label を持つ

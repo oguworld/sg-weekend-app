@@ -37,7 +37,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260704">
+  <link rel="stylesheet" href="/app.css?v=20260704f">
 </head>
 <body>
   </div>
@@ -83,12 +83,12 @@
 
     <!-- Category Filter (new horizontal scroll) -->
     <div id="filter-row-category">
-      <button id="chip-all-recommend" class="filter-chip active" data-cat="all" onclick="toggleCatFilter('all')">すべて</button>
-      <button class="filter-chip" data-cat="event" onclick="toggleCatFilter('event')">🗺 イベント</button>
-      <button class="filter-chip" data-cat="show" onclick="toggleCatFilter('show')">🎭 展示・公演</button>
-      <button class="filter-chip" data-cat="gourmet" onclick="toggleCatFilter('gourmet')">🍽 グルメ・フェア</button>
-      <button class="filter-chip" data-cat="sale" onclick="toggleCatFilter('sale')">🏷 プロモ・お得</button>
-      <button class="filter-chip" data-cat="opening" onclick="toggleCatFilter('opening')">🎊 新規オープン</button>
+      <button id="chip-all-recommend" class="filter-chip active" data-cat="all" onclick="toggleCatFilter('all')">⭐ おすすめ</button>
+      <button class="filter-chip" data-cat="event" onclick="toggleCatFilter('event')">イベント</button>
+      <button class="filter-chip" data-cat="show" onclick="toggleCatFilter('show')">展示・公演</button>
+      <button class="filter-chip" data-cat="gourmet" onclick="toggleCatFilter('gourmet')">グルメ・フェア</button>
+      <button class="filter-chip" data-cat="sale" onclick="toggleCatFilter('sale')">プロモ・お得</button>
+      <button class="filter-chip" data-cat="opening" onclick="toggleCatFilter('opening')">新規オープン</button>
     </div>
   </header>
 
@@ -99,20 +99,24 @@
       <span class="ptr-label"></span>
       <div class="ptr-spinner"></div>
     </div>
-    <!-- おすすめ設定促進バナー -->
-    <div id="recommend-setup-banner" style="display:none;margin:12px 16px 0;padding:12px 16px;
-      background:var(--caramel-pale);border-radius:14px;border:1.5px solid var(--caramel-light);">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="font-size:13px;color:var(--midnight);line-height:1.5;flex:1;">
-          ⭐ ジャンルを設定すると<br>あなた好みのイベントが表示されます
-        </div>
-        <button onclick="switchNav('settings');document.getElementById('recommend-setup-banner').style.display='none'"
-          style="padding:7px 14px;border-radius:50px;border:none;background:var(--caramel);
-          color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;
-          font-family:'Noto Sans JP',sans-serif;">
-          設定する
-        </button>
+    <!-- おすすめ設定促進バナー（中央表示） -->
+    <div id="recommend-setup-banner" style="display:none;position:absolute;top:50%;left:50%;
+      transform:translate(-50%,-60%);width:calc(100% - 48px);max-width:320px;
+      padding:28px 24px;background:var(--warm-white);border-radius:20px;
+      box-shadow:0 4px 24px rgba(0,0,0,0.10);text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">⭐</div>
+      <div style="font-size:15px;font-weight:700;color:var(--midnight);margin-bottom:8px;">
+        ジャンルを設定しましょう
       </div>
+      <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;margin-bottom:20px;">
+        好きなジャンルを選ぶと<br>あなた好みのイベントが表示されます
+      </div>
+      <button onclick="switchNav('settings');document.getElementById('recommend-setup-banner').style.display='none'"
+        style="padding:12px 32px;border-radius:50px;border:none;background:var(--caramel);
+        color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+        font-family:'Noto Sans JP',sans-serif;">
+        設定する
+      </button>
     </div>
     <!-- Cards -->
     <div class="cards-grid" id="cards-grid">
@@ -267,10 +271,10 @@
       <!-- おでかけスタイル（折りたたみ） -->
       <div class="settings-item" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0;" onclick="toggleWhoPanel()">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <span class="settings-item-label">おでかけスタイル</span>
+          <span class="settings-item-label">一緒に行く人</span>
           <div style="display:flex;align-items:center;gap:6px;">
             <span id="settings-who-summary"
-              style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);flex-shrink:0;pointer-events:none;">
+              style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);flex-shrink:0;pointer-events:none;">
               <span id="settings-who-label"></span>
               <span style="font-size:11px;color:var(--warm-gray);transition:transform 0.2s;" id="settings-who-arrow">▼</span>
             </span>
@@ -315,17 +319,21 @@
         </div>
       </div>
 
-    </div>
-
-    <!-- 2. ジャンル・興味 -->
-    <div class="settings-section">
-      <div class="settings-section-title">ジャンル・興味</div>
-      <div class="settings-item" style="flex-direction:column;align-items:stretch;gap:12px;padding:16px 18px;">
-        <div style="font-size:13px;color:var(--warm-gray);line-height:1.5;">
-          好きなジャンルを選ぶと「⭐ おすすめ」でピックアップ表示されます
+      <!-- 興味ジャンル（折りたたみ） -->
+      <div class="settings-item" style="cursor:pointer;" onclick="toggleGenrePanel()">
+        <span class="settings-item-label">ジャンル・興味</span>
+        <span id="genre-status-badge" style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);flex-shrink:0;">
+          <span id="genre-status-label">未設定</span>
+          <span id="genre-status-arrow" style="font-size:11px;color:var(--warm-gray);transition:transform 0.2s;">▼</span>
+        </span>
+      </div>
+      <div id="genre-panel" style="display:none;padding:0 18px 16px;">
+        <div style="font-size:15px;color:var(--warm-gray);line-height:1.5;padding:4px 0 12px;">
+          好きなジャンルを選ぶと「⭐ おすすめ」で表示されます
         </div>
         <div id="genre-chips-container" class="genre-chips"></div>
       </div>
+
     </div>
 
     <!-- 3. アプリ設定 -->
@@ -335,7 +343,7 @@
       <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="labelDarkMode">ダークモード</span>
         <button id="dark-mode-toggle-btn" onclick="toggleDarkMode()"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
           <span id="dark-mode-label">自動</span>
         </button>
       </div>
@@ -343,7 +351,7 @@
       <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="labelLang">言語</span>
         <button id="lang-toggle-btn" onclick="setLang(getLang()==='ja'?'en':'ja')"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
           <span id="lang-toggle-flag">🇯🇵</span>
           <span id="lang-toggle-name">日本語</span>
         </button>
@@ -352,7 +360,7 @@
       <div class="settings-item" style="padding:12px 18px;" id="push-setting-item">
         <span class="settings-item-label" data-i18n="labelPush">イベント通知</span>
         <button id="push-toggle-btn"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--light-gray);background:white;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--warm-gray);transition:all 0.18s;flex-shrink:0;">
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--light-gray);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--warm-gray);transition:all 0.18s;flex-shrink:0;">
           ―
         </button>
       </div>
@@ -505,15 +513,15 @@
   <!-- ─── BOTTOM NAV ─── -->
   <nav class="bottom-nav">
     <button class="nav-item active" id="nav-home" onclick="switchNav('home')">
-      <span class="nav-icon">🔍</span>
+      <span class="nav-icon">🎫</span>
       <span class="nav-label" data-i18n="navHome">期間限定</span>
     </button>
     <button class="nav-item" id="nav-course" onclick="switchNav('course')">
-      <span class="nav-icon">🗺️</span>
+      <span class="nav-icon">🧭</span>
       <span class="nav-label" data-i18n="navCourse">コース</span>
     </button>
     <button class="nav-item" id="nav-plan" onclick="switchNav('plan')">
-      <span class="nav-icon">🗓️</span>
+      <span class="nav-icon">📅</span>
       <span class="nav-label" data-i18n="navPlan">予定表</span>
     </button>
     <button class="nav-item" id="nav-settings" onclick="switchNav('settings')">
@@ -792,11 +800,11 @@
       </div>
     </div>
     <div class="cal-popup-filter-row" id="cal-popup-filter-row">
-      <button class="sale-filter-chip" data-cat="event">🗺 イベント</button>
-      <button class="sale-filter-chip" data-cat="show">🎭 展示・公演</button>
-      <button class="sale-filter-chip" data-cat="gourmet">🍽 グルメ・フェア</button>
-      <button class="sale-filter-chip" data-cat="sale">🏷 プロモ・お得</button>
-      <button class="sale-filter-chip" data-cat="opening">🎊 新規オープン</button>
+      <button class="sale-filter-chip" data-cat="event">イベント</button>
+      <button class="sale-filter-chip" data-cat="show">展示・公演</button>
+      <button class="sale-filter-chip" data-cat="gourmet">グルメ・フェア</button>
+      <button class="sale-filter-chip" data-cat="sale">プロモ・お得</button>
+      <button class="sale-filter-chip" data-cat="opening">新規オープン</button>
     </div>
     <div class="cal-popup-events" id="cal-popup-events"></div>
     <button class="cal-popup-fab" id="cal-popup-fab" onclick="calPopupScrollTop()" aria-label="トップへ戻る">↑</button>
@@ -988,7 +996,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260704a"></script>
+  <script src="/app.js?v=20260704j"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
