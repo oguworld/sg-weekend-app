@@ -1,6 +1,5 @@
-import { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
+/** @type {import('@capacitor/cli').CapacitorConfig} */
+const config = {
   appId: 'app.dosuru',
   appName: 'おでかけNavi',
   webDir: '../public',
@@ -9,4 +8,4 @@ const config: CapacitorConfig = {
   },
 };
 
-export default config;
+module.exports = config;
