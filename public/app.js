@@ -17,19 +17,19 @@
 
     // ─── GENRE MASTER ───
     const GENRE_LIST = [
-      { id: 'gourmet',  emoji: '🍜', label: 'グルメ・食べ歩き' },
-      { id: 'nature',   emoji: '🌿', label: '自然・公園' },
-      { id: 'art',      emoji: '🎨', label: 'アート・文化' },
-      { id: 'shopping', emoji: '🛍', label: 'ショッピング' },
-      { id: 'workshop', emoji: '🎡', label: '体験・ワークショップ' },
-      { id: 'music',    emoji: '🎵', label: '音楽・エンタメ' },
-      { id: 'kids',     emoji: '👶', label: '子ども向け' },
-      { id: 'sports',   emoji: '🏃', label: 'スポーツ・アウトドア' },
-      { id: 'theater',  emoji: '🎬', label: '映画・舞台' },
-      { id: 'learning', emoji: '📚', label: '学び・教育' },
-      { id: 'wellness', emoji: '💆', label: 'ウェルネス・スパ' },
-      { id: 'festival', emoji: '🎪', label: '祭り・マーケット' },
-      { id: 'animals',  emoji: '🐾', label: '動物・ペット' },
+      { id: 'gourmet',  emoji: '🍜', label: 'グルメ・食べ歩き',    labelEn: 'Food & Dining' },
+      { id: 'nature',   emoji: '🌿', label: '自然・公園',          labelEn: 'Nature & Parks' },
+      { id: 'art',      emoji: '🎨', label: 'アート・文化',        labelEn: 'Art & Culture' },
+      { id: 'shopping', emoji: '🛍', label: 'ショッピング',        labelEn: 'Shopping' },
+      { id: 'workshop', emoji: '🎡', label: '体験・ワークショップ', labelEn: 'Experiences' },
+      { id: 'music',    emoji: '🎵', label: '音楽・エンタメ',      labelEn: 'Music & Entertainment' },
+      { id: 'kids',     emoji: '👶', label: '子ども向け',          labelEn: 'Kids' },
+      { id: 'sports',   emoji: '🏃', label: 'スポーツ・アウトドア', labelEn: 'Sports & Outdoors' },
+      { id: 'theater',  emoji: '🎬', label: '映画・舞台',          labelEn: 'Movies & Shows' },
+      { id: 'learning', emoji: '📚', label: '学び・教育',          labelEn: 'Learning' },
+      { id: 'wellness', emoji: '💆', label: 'ウェルネス・スパ',    labelEn: 'Wellness & Spa' },
+      { id: 'festival', emoji: '🎪', label: '祭り・マーケット',    labelEn: 'Festivals & Markets' },
+      { id: 'animals',  emoji: '🐾', label: '動物・ペット',        labelEn: 'Animals & Pets' },
     ];
 
     // ─── I18N ───
@@ -45,12 +45,15 @@
         tabThreeWeeks: '3週後',
         sectionTitle: '絞り込む',
         tabAll: '指定なし',
-        catAll: '✨ すべて',
-        catEvent: '🗺 イベント',
-        catShow: '🎭 展示・公演',
-        catGourmet: '🍽 グルメ・フェア',
-        catSale: '🏷 プロモ・お得',
-        catOpening: '🎊 新規オープン',
+        catAll: 'すべて',
+        catRecommend: 'おすすめ',
+        addToPlanBtnShort: '予定追加',
+        courseCreateBtnShort: 'コース作成',
+        catEvent: 'イベント',
+        catShow: '展示・公演',
+        catGourmet: 'グルメ・フェア',
+        catSale: 'プロモ・お得',
+        catOpening: '新規オープン',
         catStarting: '🆕 今週から',
         catEnding: '🔥 今週まで',
         labelWhen: 'いつ行く？',
@@ -83,7 +86,7 @@
         pinBtn: 'ピン留め',
         pinnedBtn: '外す ✓',
         shareBtn: '📤 共有する',
-        articleLink: '詳細を見る',
+        articleLink: '元記事を見る',
         tipsLabel: '🎒 ひとことメモ',
         hintLabel: '💡 ヒント',
         tabWeekendBadge: '今週',
@@ -120,6 +123,7 @@
         pinEmpty: 'まだピン留めがありません',
         pinEmptyDesc: '気になるスポットのカードから<br>📌ピン留めしてみましょう！',
         howtoLabel: '使い方',
+        howtoOpenBtn: '見る',
         shareSettingsDesc: 'シンガポール在住の友達にこのアプリを紹介しよう！',
         shareSettingsBtn: '友達にシェアする',
         bannerToday: '⏰ 本日まで',
@@ -207,6 +211,25 @@
         labelTitle: 'タイトル',
         scheduleDayCount: '{n}件',
         scheduleHolidayBadge: '🎌 連休',
+        labelWhoWith: '一緒に行く人',
+        labelWhoSolo: '🚶 ひとりで',
+        labelWhoCouple: '💑 夫婦・カップル',
+        labelWhoGroup: '👥 グループ',
+        labelWhoFamily: '👨‍👩‍👧 ファミリー',
+        labelChildAge: '子どもの年齢',
+        labelAgeBaby: '👶 0〜2歳',
+        labelAgePreschool: '🧒 3〜6歳',
+        labelAgeSchool: '🎒 小学生以上',
+        labelGenres: 'ジャンル・興味',
+        genreStatusUnset: '未設定',
+        genreStatusSet: '{n}件設定済み',
+        genreHint: '好きなジャンルを選ぶと「⭐ おすすめ」で表示されます',
+        labelOfficialX: 'SNS',
+        labelAboutApp: 'アプリについて',
+        labelOfficialSite: '公式サイト',
+        supportBtn: '$5 を贈る',
+        scheduleMakePlan: '予定を立てる',
+        courseCreateBtn: '🗺 コース作成',
       },
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
@@ -219,12 +242,15 @@
         tabThreeWeeks: 'In 3 Weeks',
         sectionTitle: 'Filter',
         tabAll: 'All dates',
-        catAll: '✨ All',
-        catEvent: '🗺 Events',
-        catShow: '🎭 Shows & Exhibitions',
-        catGourmet: '🍽 Food & Fairs',
-        catSale: '🏷 Promos & Deals',
-        catOpening: '🎊 Grand Openings',
+        catAll: 'All',
+        catRecommend: 'Recommended',
+        addToPlanBtnShort: 'Add Plan',
+        courseCreateBtnShort: 'Create Course',
+        catEvent: 'Events',
+        catShow: 'Shows & Exhibitions',
+        catGourmet: 'Food & Fairs',
+        catSale: 'Promos & Deals',
+        catOpening: 'Grand Openings',
         catStarting: '📅 This Week',
         catEnding: '⏰ Ending Soon',
         labelWhen: 'When?',
@@ -257,7 +283,7 @@
         pinBtn: 'Pin',
         pinnedBtn: 'Unpin ✓',
         shareBtn: '📤 Share',
-        articleLink: 'View details',
+        articleLink: 'Source article',
         tipsLabel: '🎒 Tips',
         hintLabel: '💡 Hint',
         tabWeekendBadge: 'This Wk',
@@ -294,6 +320,7 @@
         pinEmpty: 'No pins yet',
         pinEmptyDesc: 'Tap 📌 on any card to pin it!',
         howtoLabel: 'How to Use',
+        howtoOpenBtn: 'Open',
         shareSettingsDesc: 'Share this app with your friends in Singapore!',
         shareSettingsBtn: 'Share with Friends',
         bannerToday: '⏰ Today only',
@@ -381,6 +408,25 @@
         labelTitle: 'Title',
         scheduleDayCount: '{n}',
         scheduleHolidayBadge: '🎌 Long Weekend',
+        labelWhoWith: 'Who to go with',
+        labelWhoSolo: '🚶 Solo',
+        labelWhoCouple: '💑 Couple',
+        labelWhoGroup: '👥 Group',
+        labelWhoFamily: '👨‍👩‍👧 Family',
+        labelChildAge: "Kids' age",
+        labelAgeBaby: '👶 0–2 yrs',
+        labelAgePreschool: '🧒 3–6 yrs',
+        labelAgeSchool: '🎒 School age+',
+        labelGenres: 'Genres & Interests',
+        genreStatusUnset: 'Not set',
+        genreStatusSet: '{n} selected',
+        genreHint: 'Select genres to enable ⭐ Recommended',
+        labelOfficialX: 'SNS',
+        labelAboutApp: 'About',
+        labelOfficialSite: 'Official Site',
+        supportBtn: 'Gift $5',
+        scheduleMakePlan: 'Plan a trip',
+        courseCreateBtn: '🗺 Course',
       }
     };
 
@@ -532,10 +578,14 @@
       buildCitySelect();
       updateTabLabels();
       _syncRecommendChip();
+      updateDarkModeUI();
+      if (typeof initSettingsProfile === 'function') initSettingsProfile();
+      if (typeof initSettingsGenres === 'function') initSettingsGenres();
     }
 
     function setLang(lang) {
       localStorage.setItem('sg_lang', lang);
+      _howtoRendered = false;
       applyI18n();
       updateCityUI();
       updateDarkModeUI();
@@ -736,6 +786,13 @@
         EVENT_DATA = [];
       }
       EVENT_DATA.forEach(e => { EVENT_REGISTRY[e.id] = e; });
+      if (EVENT_DATA.length > 0) {
+        const pins = getPins();
+        const cleaned = Object.fromEntries(Object.entries(pins).filter(([id]) => EVENT_REGISTRY[id]));
+        if (Object.keys(cleaned).length < Object.keys(pins).length) {
+          savePins(cleaned);
+        }
+      }
       renderEventCards();
       renderPinnedEventsList();
     }
@@ -785,18 +842,17 @@
         `<span class="star${idx < (e.major_score || 3) ? ' filled' : ''}">★</span>`
       ).join('');
 
-      // tipsリスト
-      const tipsList = Array.isArray(rawTips) && rawTips.length
-        ? `<div class="tips-box">
-            <div class="tips-label">${t('tipsLabel')}</div>
-            <ul class="tips-list">${rawTips.map(tip => `<li>${tip}</li>`).join('')}</ul>
-          </div>`
-        : e.tip
-          ? `<div class="tips-box">
-              <div class="tips-label">${t('hintLabel')}</div>
-              <ul class="tips-list"><li>${e.tip}</li></ul>
-            </div>`
-          : '';
+      // tipsリスト（初期非表示、トグル展開）
+      const tipsInner = Array.isArray(rawTips) && rawTips.length
+        ? `<ul class="tips-list">${rawTips.map(tip => `<li>${tip}</li>`).join('')}</ul>`
+        : e.tip ? `<ul class="tips-list"><li>${e.tip}</li></ul>` : '';
+      const tipsBtn = tipsInner
+        ? `<button class="tips-toggle-btn" onclick="toggleCardTips('${e.id}')" id="tips-btn-${e.id}">${t('tipsLabel')}<span class="tips-arrow">▽</span></button>`
+        : '';
+      const tipsContent = tipsInner
+        ? `<div class="tips-box tips-box--collapsible" id="tips-${e.id}" style="display:none;">${tipsInner}</div>`
+        : '';
+      const tipsList = tipsBtn;
 
       // プロフィールバッジ
       const whoLabels = { family: t('whoFamilyBadge'), couple: t('whoCoupleBadge'), solo: t('whoSoloBadge'), group: t('whoGroupBadge') };
@@ -850,54 +906,77 @@
         else              bannerLabel = t('bannerDaysLeft').replace('{d}', d);
       }
 
+      const igSc = getInstagramShortcode(e.url);
+      const metaInImage = (e.location || e.period || e.hours)
+        ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;opacity:0.92;">
+            ${e.location ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📍 ${e.location}</span>` : ''}
+            ${(e.period || e.hours) ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📅 ${e.period || e.hours}</span>` : ''}
+          </div>` : '';
+      const heroOverlayContent = `
+        <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.78) 100%);pointer-events:none;"></div>
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px 13px;">
+          ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:4px;padding:2px 7px;margin-bottom:5px;">${bannerLabel}</div>` : ''}
+          <h2 style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);">${e.store || e.title || ''}</h2>
+          ${metaInImage}
+        </div>
+        ${newRibbon}`;
+
       return `
         <article class="spot-card${isEndingSoon ? ' ending-soon' : ''}" data-tab="${e.tab || 'weekend'}" data-age="${eAgeAttr}"
                  data-id="${e.id}" style="animation-delay:${i * 0.06}s;">
-          ${newRibbon}
-          <div class="card-body">
-            ${bannerLabel ? `<div class="ending-soon-banner">${bannerLabel}</div>` : ''}
-            <div class="sale-card-top"${hasRibbon ? ' style="padding-right:44px;"' : ''}>
-              <h2 class="card-title" style="margin-bottom:0;flex:1;min-width:0;">${e.store || e.title || ''}</h2>
+          ${igSc ? (() => {
+            const igEmbedUrl = (e.url || '').replace(/\/$/, '') + '/?utm_source=ig_embed';
+            const igMetaHtml = `
+              <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.78) 100%);pointer-events:none;z-index:2;"></div>
+              <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px 13px;pointer-events:none;z-index:3;">
+                ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:4px;padding:2px 7px;margin-bottom:5px;">${bannerLabel}</div>` : ''}
+                <h2 style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);${hasRibbon ? 'padding-right:44px;' : ''}">${e.store || e.title || ''}</h2>
+                ${(e.location || e.period || e.hours) ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;opacity:0.92;">
+                  ${e.location ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📍 ${e.location}</span>` : ''}
+                  ${(e.period || e.hours) ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📅 ${e.period || e.hours}</span>` : ''}
+                </div>` : ''}
+              </div>`;
+            return `${newRibbon}<div class="card-body">
+              <div style="position:relative;margin:-18px -18px 0;">
+                <div class="ig-embed-wrap">
+                  <blockquote class="instagram-media"
+                    data-instgrm-permalink="${igEmbedUrl}"
+                    data-instgrm-version="14"
+                    style="margin:0;max-width:100%;min-width:unset;width:100%;border-radius:0;">
+                  </blockquote>
+                </div>
+                ${igMetaHtml}
+              </div>`;
+          })() : (() => {
+            const imgHtml = (e.image && !e.image.includes('cdninstagram.com') && !/\.(mp4|mov|webm)(\?|$)/i.test(e.image))
+              ? `<img src="${e.image}" alt="${(e.store || '').replace(/"/g,'&quot;')}"
+                      style="width:100%;height:220px;object-fit:cover;display:block;"
+                      onerror="handleImgError(this,'${bgClass}','${safeEmoji}')" />`
+              : `<div class="card-image-bg ${bgClass}" style="height:220px;">${e.emoji || '📍'}</div>`;
+            return `<div class="card-hero" style="position:relative;overflow:hidden;">
+              ${imgHtml}
+              ${heroOverlayContent}
             </div>
-            ${(() => {
-              const igSc = getInstagramShortcode(e.url);
-              if (igSc) {
-                const igEmbedUrl = (e.url || '').replace(/\/$/, '') + '/?utm_source=ig_embed';
-                return `<div class="ig-embed-wrap" style="margin:12px -18px;">
-                          <blockquote class="instagram-media"
-                            data-instgrm-permalink="${igEmbedUrl}"
-                            data-instgrm-version="14"
-                            style="margin:0;max-width:100%;min-width:unset;width:100%;border-radius:0;">
-                          </blockquote>
-                        </div>`;
-              }
-              if (e.image && !e.image.includes('cdninstagram.com') && !/\.(mp4|mov|webm)(\?|$)/i.test(e.image)) {
-                return `<div class="card-image-area" style="margin:12px -18px;">
-                          <img src="${e.image}" alt="${(e.store || '').replace(/"/g,'&quot;')}"
-                               style="width:100%;height:170px;object-fit:cover;display:block;"
-                               onerror="handleImgError(this,'${bgClass}','${safeEmoji}')" />
-                        </div>`;
-              }
-              return `<div class="card-image-area" style="margin:12px -18px;">
-                        <div class="card-image-bg ${bgClass}">${e.emoji || '📍'}</div>
-                      </div>`;
-            })()}
+            <div class="card-body" style="padding-top:12px;">`;
+          })()}
             ${displayContent ? `<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${displayContent}</p>` : ''}
-            <div class="card-meta">
-              <span class="meta-item"><span class="meta-icon">📍</span>${e.location || ''}</span>
-              ${e.period || e.hours ? `<span class="meta-item"><span class="meta-icon">📅</span>${e.period || e.hours}${e.url ? `　<a href="${e.url}" target="_blank" rel="noopener" style="color:var(--caramel);font-size:15px;font-weight:300;text-decoration:none;white-space:nowrap;">🔗 ${t('articleLink')}</a>` : ''}</span>` : ''}
+            <div class="card-sub-row">
+              ${tipsList}
+              ${e.url ? `<a href="${e.url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
             </div>
-            ${tipsList}
-            <div style="display:flex;align-items:center;justify-content:center;margin-top:12px;gap:6px;flex-wrap:wrap;">
-              <button class="sale-pin-btn${pinned ? ' pinned' : ''}" id="pin-${e.id}"
-                onclick="togglePinById('${e.id}')">
-                📌 <span id="pin-label-${e.id}">${pinned ? t('pinnedBtn') : t('pinBtn')}</span>
+            ${tipsContent}
+            <div class="card-action-row">
+              <button class="card-action-btn${pinned ? ' pinned' : ''}" id="pin-${e.id}" onclick="togglePinById('${e.id}')">
+                <span class="card-action-icon">📌</span>
+                <span id="pin-label-${e.id}">${pinned ? t('pinnedBtn') : t('pinBtn')}</span>
               </button>
-              <button class="plan-add-card-btn" onclick="openEventPlanModal('${e.id}')">
-                ${t('addToPlanBtn')}
+              <button class="card-action-btn" onclick="openEventPlanModal('${e.id}')">
+                <span class="card-action-icon">📅</span>
+                <span>${t('addToPlanBtnShort')}</span>
               </button>
-              <button class="plan-add-card-btn" onclick="openCourseSheetFromEvent('${e.id}')">
-                🗺 コース作成
+              <button class="card-action-btn" onclick="openCourseSheetFromEvent('${e.id}')">
+                <span class="card-action-icon">🗺</span>
+                <span>${t('courseCreateBtnShort')}</span>
               </button>
             </div>
           </div>
@@ -933,14 +1012,27 @@
     function toggleEndingFilter() { _setIconFilter('ending'); }
     function toggleNewFilter()    { _setIconFilter('new'); }
 
+    function toggleCardTips(id) {
+      const box = document.getElementById('tips-' + id);
+      const btn = document.getElementById('tips-btn-' + id);
+      if (!box || !btn) return;
+      const open = box.style.display === 'none';
+      box.style.display = open ? 'block' : 'none';
+      btn.classList.toggle('active', open);
+      const arrow = btn.querySelector('.tips-arrow');
+      if (arrow) arrow.textContent = open ? '△' : '▽';
+    }
+
     function toggleCatFilter(val) {
       if (val === 'all') {
         filterCats.clear();
+        _recommendModeActive = false;
+      } else if (val === 'recommend') {
+        filterCats.clear();
         if (getGenreList().length > 0) {
-          _recommendModeActive = true;
+          _recommendModeActive = !_recommendModeActive;
         } else {
-          _recommendModeActive = false;
-          _showRecommendSetupBanner();
+          _recommendModeActive = true;
         }
       } else {
         _recommendModeActive = false;
@@ -958,7 +1050,8 @@
     function _syncCatChips() {
       const isAll = filterCats.size === 0;
       document.querySelectorAll('#filter-row-category .filter-chip').forEach(b => {
-        if (b.dataset.cat === 'all') b.classList.toggle('active', isAll);
+        if (b.dataset.cat === 'all') b.classList.toggle('active', isAll && !_recommendModeActive);
+        else if (b.dataset.cat === 'recommend') b.classList.toggle('active', _recommendModeActive);
         else b.classList.toggle('active', filterCats.has(b.dataset.cat));
       });
     }
@@ -1085,16 +1178,21 @@
     function renderEventCards() {
       const grid = document.getElementById('cards-grid');
 
-      // ジャンル未設定 + カテゴリ未選択 → 設定促進バナーのみ表示
-      if (filterCats.size === 0 && getGenreList().length === 0 && !showPinnedOnly && filterWeek === '' && filterWho.size === 0 && filterAreas.size === 0 && !filterEnding && !filterNew && filterKeyword === '') {
-        grid.innerHTML = '';
-        const banner = document.getElementById('recommend-setup-banner');
-        if (banner) banner.style.display = 'block';
+      // おすすめモードON かつジャンル未設定 → グリッド内に案内を表示
+      if (_recommendModeActive && getGenreList().length === 0) {
+        grid.innerHTML = `<div style="padding:48px 24px 32px;text-align:center;">
+          <div style="font-size:40px;margin-bottom:16px;">⭐</div>
+          <div style="font-size:15px;font-weight:700;color:var(--midnight);margin-bottom:8px;">あなた好みのイベントを表示</div>
+          <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;margin-bottom:24px;">
+            好きなジャンルを設定すると<br>マッチするイベントだけ表示されます
+          </div>
+          <button onclick="switchNav('settings')" style="padding:12px 32px;border-radius:50px;border:none;
+            background:var(--caramel);color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+            font-family:'Noto Sans JP',sans-serif;">ジャンルを設定する</button>
+        </div>`;
         document.getElementById('event-count-label') && (document.getElementById('event-count-label').textContent = '');
         return;
       }
-      const banner = document.getElementById('recommend-setup-banner');
-      if (banner) banner.style.display = 'none';
 
       const filtered = EVENT_DATA.filter(e => {
         // ピン留めフィルター
@@ -1162,14 +1260,17 @@
 
     // ─── カテゴリフィルターチップ 即時タップ対応（スクロール中は無視）───
     {
-      let _catTouchStartY = 0;
+      let _catTouchStartX = 0, _catTouchStartY = 0;
       document.getElementById('filter-row-category')?.addEventListener('touchstart', e => {
+        _catTouchStartX = e.touches[0].clientX;
         _catTouchStartY = e.touches[0].clientY;
       }, { passive: true });
       document.getElementById('filter-row-category')?.addEventListener('touchend', e => {
         const chip = e.target.closest('.filter-chip');
         if (!chip) return;
-        if (Math.abs(e.changedTouches[0].clientY - _catTouchStartY) > 8) return;
+        const dx = Math.abs(e.changedTouches[0].clientX - _catTouchStartX);
+        const dy = Math.abs(e.changedTouches[0].clientY - _catTouchStartY);
+        if (dx > 8 || dy > 8) return;
         e.preventDefault();
         toggleCatFilter(chip.dataset.cat);
       }, { passive: false });
@@ -1177,34 +1278,23 @@
 
     // ─── カード領域スワイプでタブ切り替え ───
     {
-      const CAT_ORDER = ['event', 'show', 'gourmet', 'sale', 'opening'];
+      const CAT_ORDER = ['all', 'recommend', 'event', 'show', 'gourmet', 'sale', 'opening'];
       let _swipeStartX = 0, _swipeStartY = 0, _swipeIntent = null;
 
       function _currentCatIdx() {
-        if (filterCats.size !== 1) return -1;
-        return CAT_ORDER.indexOf([...filterCats][0]);
+        if (_recommendModeActive) return CAT_ORDER.indexOf('recommend');
+        if (filterCats.size === 0) return CAT_ORDER.indexOf('all');
+        const cat = [...filterCats][0];
+        return CAT_ORDER.indexOf(cat);
       }
 
       function _switchCatBySwipe(dir) {
         const idx = _currentCatIdx();
         const next = idx + dir;
-        if (next < -1 || next >= CAT_ORDER.length) return;
-        if (next === -1) {
-          filterCats.clear();
-          _syncCatChips();
-          updateFilterBadge();
-          renderEventCards();
-        } else {
-          const cat = CAT_ORDER[next];
-          filterCats.clear();
-          filterCats.add(cat);
-          _syncCatChips();
-          updateFilterBadge();
-          renderEventCards();
-          // タブ行を選択位置にスクロール
-          document.querySelector(`#filter-row-category .filter-chip[data-cat="${cat}"]`)
-            ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
+        if (next < 0 || next >= CAT_ORDER.length) return;
+        toggleCatFilter(CAT_ORDER[next]);
+        const chip = document.querySelector(`#filter-row-category .filter-chip[data-cat="${CAT_ORDER[next]}"]`);
+        chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         window.scrollTo({ top: 0, behavior: 'instant' });
       }
 
@@ -1310,11 +1400,7 @@
       setCalPopupFilter(chip.dataset.cat);
     }, { passive: false });
 
-    // ─── ヘッダー「使い方」ボタン 即時タップ対応 ───
-    {
-      const el = document.getElementById('howto-btn');
-      if (el) el.addEventListener('touchend', e => { e.preventDefault(); openShareModal(); }, { passive: false });
-    }
+
 
     // ─── 閉じる✕ボタン 即時タップ対応（data-close 属性で一括登録） ───
     document.addEventListener('touchend', e => {
@@ -1366,7 +1452,7 @@
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
-    _recommendModeActive = getGenreList().length > 0;
+    _recommendModeActive = false;
     _syncRecommendChip();
 
     // ─── ホーム画面 プルリフレッシュ ───
@@ -1860,7 +1946,7 @@
               ${t('shareBtn')}
             </button>` : ''}
             <button class="sale-pin-btn" onclick="openCourseSheetFromEvent('${id}'); closePinDetail();">
-              🗺 コース作成
+              ${t('courseCreateBtn')}
             </button>
           </div>
         </div>`;
@@ -2083,10 +2169,11 @@
       const container = document.getElementById('genre-chips-container');
       if (!container) return;
       const selected = new Set(getGenreList());
+      const isEn = getLang() === 'en';
       container.innerHTML = GENRE_LIST.map(g => `
         <button class="genre-chip${selected.has(g.id) ? ' selected' : ''}"
           data-genre="${g.id}"
-          onclick="toggleGenre('${g.id}')">${g.emoji} ${g.label}</button>
+          onclick="toggleGenre('${g.id}')">${g.emoji} ${isEn ? g.labelEn : g.label}</button>
       `).join('');
       _syncGenreStatusBadge();
     }
@@ -2104,27 +2191,24 @@
       const label = document.getElementById('genre-status-label');
       if (!label) return;
       const count = getGenreList().length;
-      label.textContent = count === 0 ? '未設定' : `${count}件設定済み`;
+      label.textContent = count === 0 ? t('genreStatusUnset') : t('genreStatusSet').replace('{n}', count);
     }
 
     function _syncRecommendChip() {
-      const btn = document.querySelector('#filter-row-category .filter-chip[data-cat="all"]');
-      if (!btn) return;
-      btn.textContent = '⭐ おすすめ';
+      _syncCatChips();
       _syncGenreStatusBadge();
-    }
-
-    function _showRecommendSetupBanner() {
-      const banner = document.getElementById('recommend-setup-banner');
-      if (!banner) return;
-      banner.style.display = 'block';
     }
 
     function initSettingsProfile() {
       const who = getWhoList();
       const ages = getAgeList();
-      const whoMap = { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
-      const ageMap = { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
+      const isEn = getLang() === 'en';
+      const whoMap = isEn
+        ? { solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }
+        : { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
+      const ageMap = isEn
+        ? { baby: '0–2 yrs', preschool: '3–6 yrs', school: 'School age+' }
+        : { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
 
       ['solo', 'couple', 'family', 'group'].forEach(w => {
         const dot = document.getElementById('who-dot-' + w);
@@ -2150,11 +2234,11 @@
         if (who.includes('family') && ages.length) {
           const ageLabel = ageMap[ages[0]];
           if (ageLabel) {
-            parts = parts.filter(p => p !== 'ファミリー');
-            parts.push(`ファミリー（${ageLabel}）`);
+            parts = parts.filter(p => p !== whoMap['family']);
+            parts.push(isEn ? `Family (${ageLabel})` : `ファミリー（${ageLabel}）`);
           }
         }
-        labelEl.textContent = parts.length ? parts.join('・') : '未設定';
+        labelEl.textContent = parts.length ? parts.join(isEn ? ', ' : '・') : t('genreStatusUnset');
       }
     }
 
@@ -2504,9 +2588,8 @@
       if (screen === 'home') {
         document.getElementById('screen-home').style.display = 'block';
         if (appHeader) appHeader.style.display = 'block';
-        // カテゴリチップを「おすすめ」に戻す
         filterCats.clear();
-        _recommendModeActive = getGenreList().length > 0;
+        _recommendModeActive = false;
         _syncCatChips();
         _syncRecommendChip();
         // チップ行を左端にスクロール
@@ -2964,14 +3047,10 @@
             ❤️ ${course.likes || 0}&nbsp;&nbsp;${t('courseDetailAuthor')} ${course.authorName || 'AI'}&nbsp;&nbsp;${(course.createdAt||'').slice(0,10)}
           </div>
 
-          <div style="display:flex;gap:8px;margin-top:12px;">
-            <button onclick="addCourseToScheduleById('${course.id}')"
-              style="flex:1;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              ${t('courseAddToPlanBtn')}
-            </button>
-            <button onclick="toggleLike('${course.id}')" id="like-btn-${course.id}" data-like-id="${course.id}" data-likes="${course.likes||0}"
-              style="padding:14px 18px;background:var(--warm-white);border:1.5px solid var(--sand-dark);border-radius:12px;font-size:20px;cursor:pointer;">
-              ${liked ? '❤️' : '🤍'}
+          <div style="display:flex;justify-content:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--sand);">
+            <button onclick="addCourseToScheduleById('${course.id}')" class="card-action-btn" style="flex:none;width:calc(33% - 4px);">
+              <span class="card-action-icon">📅</span>
+              <span>予定に追加</span>
             </button>
           </div>
 
@@ -3936,20 +4015,32 @@
       });
     }
 
-    function openEmojiPicker(target) {
+    function toggleEmojiInline(target) {
+      const inline = document.getElementById(`plan-${target}-emoji-inline`);
+      if (!inline) return;
+      if (inline.style.display !== 'none') {
+        inline.style.display = 'none';
+        return;
+      }
       _emojiPickerTarget = target;
-      const grid = document.getElementById('emoji-picker-grid');
-      grid.innerHTML = PLAN_EMOJIS.map(([e, l]) =>
-        `<button class="emoji-picker-btn${_selectedPlanEmoji === e ? ' selected' : ''}" data-emoji="${e}" onclick="selectPlanEmoji('${e}'); closeEmojiPicker();">${e}<span class="emoji-label">${l}</span></button>`
-      ).join('');
-      document.getElementById('emoji-picker-overlay').classList.add('visible');
-      document.getElementById('emoji-picker-sheet').classList.add('visible');
+      inline.innerHTML = `<div class="emoji-picker-grid" style="padding:8px 0 4px;">${
+        PLAN_EMOJIS.map(([e, l]) =>
+          `<button class="emoji-picker-btn${_selectedPlanEmoji === e ? ' selected' : ''}" data-emoji="${e}" onclick="selectPlanEmoji('${e}');closeEmojiInline('${target}');">${e}<span class="emoji-label">${l}</span></button>`
+        ).join('')
+      }</div>`;
+      inline.style.display = 'block';
     }
 
-    function closeEmojiPicker() {
-      document.getElementById('emoji-picker-overlay')?.classList.remove('visible');
-      document.getElementById('emoji-picker-sheet')?.classList.remove('visible');
+    function closeEmojiInline(target) {
+      const inline = document.getElementById(`plan-${target}-emoji-inline`);
+      if (inline) inline.style.display = 'none';
       _emojiPickerTarget = null;
+    }
+
+    function openEmojiPicker(target) { toggleEmojiInline(target); }
+    function closeEmojiPicker() {
+      closeEmojiInline('custom');
+      closeEmojiInline('detail');
     }
 
     function selectPlanMember(member) {
@@ -4297,7 +4388,7 @@
           <div class="plan-card-actions" onclick="event.stopPropagation()">
             <button class="plan-to-plan-btn" onclick="openEventPlanModal('${p.id}')">📅 ${t('addToPlanBtn').replace('📅 ','')}</button>
             <button class="plan-unpin-btn" onclick="removePin('${p.id}')">📌 外す</button>
-            <button class="plan-to-plan-btn" onclick="openCourseSheetFromEvent('${p.id}')">🗺 コース</button>
+            <button class="plan-to-plan-btn" onclick="openCourseSheetFromEvent('${p.id}')">${t('courseCreateBtn')}</button>
           </div>
         </div>`;
       }).join('');
@@ -4635,17 +4726,17 @@
               : `<div class="schedule-empty-day" style="padding:0;overflow:hidden;">
                    <div style="cursor:pointer;text-align:center;padding:10px 14px;"
                      onclick="toggleSchedulePlanExpand('${dateKey}')">
-                     <span style="font-size:13px;color:var(--light-gray);">＋ 予定を立てる</span>
+                     <span style="font-size:13px;color:var(--light-gray);">＋ ${t('scheduleMakePlan')}</span>
                    </div>
                    <div id="schedule-plan-actions-${dateKey}"
-                     style="display:none;padding:4px 14px 10px;gap:8px;justify-content:center;">
-                     <button class="sale-pin-btn"
+                     style="display:none;padding:4px 12px 10px;justify-content:center;gap:6px;">
+                     <button class="card-action-btn" style="flex:none;width:calc(33% - 4px);"
                        onclick="event.stopPropagation();openCustomPlanModal('${dateKey}')">
-                       📅 予定を追加
+                       <span class="card-action-icon">📅</span><span>予定を追加</span>
                      </button>
-                     <button class="sale-pin-btn"
+                     <button class="card-action-btn" style="flex:none;width:calc(33% - 4px);"
                        onclick="event.stopPropagation();_openCourseFromSchedule('${dateKey}')">
-                       🗺 コース作成
+                       <span class="card-action-icon">🗺</span><span>${t('courseCreateBtnShort')}</span>
                      </button>
                    </div>
                  </div>`;

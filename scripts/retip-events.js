@@ -7,8 +7,9 @@ const fs   = require('fs');
 const path = require('path');
 
 const client = new Anthropic();
-const CITIES = ['sg', 'bkk', 'syd'];
-const BATCH_SIZE = 10;
+const CITIES = process.argv.find(a => a.startsWith('--city='))?.split('=')[1]?.split(',') || ['sg', 'bkk', 'syd'];
+const MISSING_ONLY = process.argv.includes('--missing-only');
+const BATCH_SIZE = 5;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -54,18 +55,20 @@ async function processCity(city) {
   if (!fs.existsSync(eventsPath)) { console.log(`[${city}] events.json なし、スキップ`); return; }
 
   const events = JSON.parse(fs.readFileSync(eventsPath, 'utf8'));
-  console.log(`[${city}] ${events.length}件処理開始`);
+  const targets = MISSING_ONLY ? events.filter(e => !e.tips || e.tips.length === 0) : events;
+  console.log(`[${city}] ${targets.length}件処理開始${MISSING_ONLY ? '（tips未設定のみ）' : ''}`);
 
   const updated = [...events];
+  const targetIndices = MISSING_ONLY ? events.map((e, i) => (!e.tips || e.tips.length === 0) ? i : -1).filter(i => i >= 0) : events.map((_, i) => i);
 
-  for (let i = 0; i < events.length; i += BATCH_SIZE) {
-    const batch = events.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+    const batch = targets.slice(i, i + BATCH_SIZE);
     process.stdout.write(`  ${i + 1}〜${Math.min(i + BATCH_SIZE, events.length)}件目... `);
 
     try {
       const results = await retipBatch(batch);
       for (const r of results) {
-        const idx = i + r.index;
+        const idx = targetIndices[i + r.index];
         if (r.tips_ja && r.tips_ja.length) updated[idx].tips    = r.tips_ja;
         if (r.tips_en && r.tips_en.length) updated[idx].tips_en = r.tips_en;
       }

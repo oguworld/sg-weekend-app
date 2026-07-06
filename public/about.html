@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>おでかけNavi — シンガポール在住日本人の週末おでかけガイド</title>
+  <meta name="description" content="シンガポール在住の日本人向け週末おでかけ情報アプリ。AIがあなただけのおでかけコースを提案します。">
+  <meta property="og:title" content="おでかけNavi">
+  <meta property="og:description" content="シンガポール在住日本人の週末おでかけガイド">
+  <meta property="og:image" content="https://dosuru.app/icons/icon-512.png">
+  <meta property="og:url" content="https://dosuru.app/about">
+  <link rel="icon" href="/icons/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Kaisei+Opti:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --caramel: #C8804A;
+      --caramel-dark: #A8622E;
+      --caramel-pale: #FDF0E6;
+      --cream: #FDFAF6;
+      --midnight: #2C2420;
+      --warm-gray: #8C7B72;
+      --sand: #E8DDD4;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--cream);
+      color: var(--midnight);
+      line-height: 1.6;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(253,250,246,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--sand);
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--midnight);
+    }
+    .nav-logo img { width: 32px; height: 32px; border-radius: 8px; }
+    .nav-logo span { font-weight: 700; font-size: 16px; }
+    .nav-cta {
+      background: var(--caramel);
+      color: #fff;
+      border: none; border-radius: 50px;
+      padding: 10px 20px;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.15s;
+    }
+    .nav-cta:hover { background: var(--caramel-dark); }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 120px 24px 40px;
+      text-align: center;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: var(--caramel-pale);
+      color: var(--caramel);
+      font-size: 13px; font-weight: 700;
+      padding: 6px 16px; border-radius: 50px;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-family: 'Kaisei Opti', serif;
+      font-size: clamp(32px, 8vw, 52px);
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 20px;
+      color: var(--midnight);
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--caramel);
+    }
+    .hero p {
+      font-size: 17px;
+      color: var(--warm-gray);
+      margin-bottom: 36px;
+      line-height: 1.8;
+    }
+    .hero-btns {
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+    }
+    .btn-primary {
+      background: var(--caramel);
+      color: #fff;
+      border: none; border-radius: 50px;
+      padding: 16px 32px;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-primary:hover { background: var(--caramel-dark); transform: translateY(-1px); }
+    .btn-secondary {
+      background: #fff;
+      color: var(--midnight);
+      border: 1.5px solid var(--sand);
+      border-radius: 50px;
+      padding: 16px 32px;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+    .btn-secondary:hover { border-color: var(--caramel); transform: translateY(-1px); }
+
+    /* ── PHONE MOCKUP ── */
+    .mockup-wrap {
+      padding: 0 24px 80px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .mockup-wrap::-webkit-scrollbar { display: none; }
+    .mockup-inner {
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      min-width: max-content;
+      padding: 0 24px;
+    }
+    .mockup-item {
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+    }
+    .mockup-label {
+      font-size: 13px; font-weight: 700; color: var(--warm-gray);
+      letter-spacing: 0.04em;
+    }
+    .phone {
+      width: 220px;
+      background: #EED8C4;
+      border-radius: 40px;
+      padding: 10px;
+      box-shadow: 0 24px 60px rgba(200,128,74,0.18), 0 8px 20px rgba(200,128,74,0.1);
+    }
+    .phone-img-wrap {
+      border-radius: 30px;
+      overflow: hidden;
+      position: relative;
+    }
+    .phone-img-wrap::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 48px;
+      background: linear-gradient(to bottom, #EED8C4 0%, transparent 100%);
+      pointer-events: none;
+    }
+    .phone img {
+      width: 100%;
+      display: block;
+    }
+
+    /* ── FEATURES ── */
+    .features {
+      background: #fff;
+      padding: 80px 24px;
+    }
+    .section-label {
+      text-align: center;
+      font-size: 13px; font-weight: 700;
+      color: var(--caramel);
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      text-align: center;
+      font-family: 'Kaisei Opti', serif;
+      font-size: clamp(24px, 5vw, 36px);
+      font-weight: 700;
+      margin-bottom: 48px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .feature-card {
+      background: var(--cream);
+      border-radius: 20px;
+      padding: 28px 24px;
+    }
+    .feature-icon {
+      width: 52px; height: 52px;
+      background: var(--caramel-pale);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    .feature-card h3 {
+      font-size: 17px; font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 14px; color: var(--warm-gray);
+      line-height: 1.7;
+    }
+
+    /* ── AUDIENCE ── */
+    .audience {
+      padding: 80px 24px;
+      max-width: 680px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .audience-list {
+      list-style: none;
+      display: flex; flex-direction: column; gap: 12px;
+      margin-top: 32px; text-align: left;
+    }
+    .audience-list li {
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-size: 15px;
+      display: flex; align-items: center; gap: 12px;
+      box-shadow: 0 2px 8px rgba(44,36,32,0.05);
+    }
+    .audience-list li span { font-size: 20px; }
+
+    /* ── CTA BOTTOM ── */
+    .cta-bottom {
+      background: var(--caramel-pale);
+      padding: 80px 24px;
+      text-align: center;
+    }
+    .cta-bottom h2 {
+      font-family: 'Kaisei Opti', serif;
+      font-size: clamp(24px, 5vw, 36px);
+      margin-bottom: 12px;
+    }
+    .cta-bottom p {
+      color: var(--warm-gray);
+      margin-bottom: 36px;
+      font-size: 15px;
+    }
+    .cta-store-badges {
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .store-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--midnight);
+      color: #fff;
+      border-radius: 12px;
+      padding: 12px 20px;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .store-badge:hover { opacity: 0.85; }
+    .store-badge-icon { font-size: 24px; }
+    .store-badge-text { text-align: left; }
+    .store-badge-sub { font-size: 10px; opacity: 0.7; }
+    .store-badge-name { font-size: 15px; font-weight: 700; }
+    .cta-web-link {
+      font-size: 14px; color: var(--warm-gray);
+    }
+    .cta-web-link a {
+      color: var(--caramel); font-weight: 700; text-decoration: none;
+    }
+    .cta-web-link a:hover { text-decoration: underline; }
+
+    /* ── FOOTER ── */
+    /* ── SOURCES ── */
+    .sources {
+      padding: 64px 24px;
+      background: #fff;
+      text-align: center;
+    }
+    .sources-lead {
+      font-size: 15px; color: var(--warm-gray);
+      max-width: 520px; margin: 16px auto 32px;
+      line-height: 1.8;
+    }
+    .sources-grid {
+      display: flex; flex-wrap: wrap;
+      justify-content: center; gap: 10px;
+      max-width: 640px; margin: 0 auto;
+    }
+    .source-chip {
+      background: var(--cream);
+      border: 1.5px solid var(--sand);
+      border-radius: 50px;
+      padding: 8px 18px;
+      font-size: 13px; font-weight: 700;
+      color: var(--midnight);
+      white-space: nowrap;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .source-chip:hover {
+      border-color: var(--caramel);
+      background: var(--caramel-pale);
+    }
+    .sources-note {
+      font-size: 12px; color: var(--warm-gray);
+      margin-top: 20px;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 32px 24px calc(32px + env(safe-area-inset-bottom, 0px));
+      text-align: center;
+      font-size: 13px;
+      color: var(--warm-gray);
+      border-top: 1px solid var(--sand);
+    }
+    footer p { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; }
+    footer a { color: var(--warm-gray); text-decoration: underline; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="/about" class="nav-logo">
+      <img src="/icons/icon-128.png" alt="おでかけNavi">
+      <span>おでかけNavi</span>
+    </a>
+    <a href="#download" class="nav-cta">ダウンロード →</a>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-badge">シンガポール在住の日本人向け</div>
+    <h1>週末の<em>おでかけ</em>、<br>もっと楽しく。</h1>
+    <p>イベント情報を毎週更新。<br>AIがあなただけのおでかけコースを提案します。</p>
+    <div class="hero-btns">
+      <a href="#download" class="btn-primary">📱 アプリを入手</a>
+    </div>
+  </section>
+
+  <!-- PHONE MOCKUP -->
+  <div class="mockup-wrap">
+    <div class="mockup-inner">
+
+      <!-- SCREEN 1: 探す -->
+      <div class="mockup-item">
+        <div class="phone">
+          <div class="phone-img-wrap">
+            <img src="/screenshots/screen-events.png?v=3" alt="イベントを探す">
+          </div>
+        </div>
+        <div class="mockup-label">イベントを探す</div>
+      </div>
+
+      <!-- SCREEN 2: コース -->
+      <div class="mockup-item">
+        <div class="phone">
+          <div class="phone-img-wrap">
+            <img src="/screenshots/screen-courses.png?v=2" alt="AIコース提案">
+          </div>
+        </div>
+        <div class="mockup-label">AIコース提案</div>
+      </div>
+
+      <!-- SCREEN 3: 予定表 -->
+      <div class="mockup-item">
+        <div class="phone">
+          <div class="phone-img-wrap">
+            <img src="/screenshots/screen-schedule.png?v=2" alt="予定表で管理">
+          </div>
+        </div>
+        <div class="mockup-label">予定表で管理</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SOURCES -->
+  <section class="sources">
+    <div class="section-label">DATA SOURCES</div>
+    <h2 class="section-title">主要メディアから毎週自動収集</h2>
+    <p class="sources-lead">シンガポールの有名情報サイト・公式機関をまとめてチェック。自分で各サイトを見て回る手間がありません。</p>
+    <div class="sources-grid">
+      <a href="https://thesmartlocal.com" target="_blank" rel="noopener" class="source-chip">The Smart Local</a>
+      <a href="https://www.timeout.com/singapore" target="_blank" rel="noopener" class="source-chip">Time Out Singapore</a>
+      <a href="https://thehoneycombers.com/singapore" target="_blank" rel="noopener" class="source-chip">Honeycombers</a>
+      <a href="https://mothership.sg" target="_blank" rel="noopener" class="source-chip">Mothership SG</a>
+      <a href="https://eatbook.sg" target="_blank" rel="noopener" class="source-chip">Eatbook</a>
+      <a href="https://www.littledayout.com" target="_blank" rel="noopener" class="source-chip">Little Day Out</a>
+      <a href="https://danielfooddiary.com" target="_blank" rel="noopener" class="source-chip">Daniel Food Diary</a>
+      <a href="https://www.nparks.gov.sg" target="_blank" rel="noopener" class="source-chip">NParks</a>
+    </div>
+    <p class="sources-note">※ その他複数ソースから取得・AIでフィルタリングしています</p>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features">
+    <div class="section-label">FEATURES</div>
+    <h2 class="section-title">3つの便利な機能</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <h3>イベント情報を探す</h3>
+        <p>シンガポールの最新イベント・グルメ・体験情報を毎週更新。カテゴリ・エリア・日程で絞り込めます。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🗺</div>
+        <h3>AIがコースを提案</h3>
+        <p>行きたいイベントや好みのスタイルを選ぶだけで、AIが一日のおでかけコースを自動生成。ランチから移動手段まで提案。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📅</div>
+        <h3>予定表で管理・共有</h3>
+        <p>気になるイベントやコースを予定表に追加。家族と共有して、週末の計画をスムーズに立てられます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDIENCE -->
+  <section class="audience">
+    <div class="section-label">FOR YOU</div>
+    <h2 class="section-title">こんな方におすすめ</h2>
+    <ul class="audience-list">
+      <li><span>✈️</span> シンガポールに赴任中の日本人駐在員・ご家族</li>
+      <li><span>🗓</span> 週末の過ごし方に迷っている方</li>
+      <li><span>👶</span> 子連れでどこに行くか悩んでいる方</li>
+      <li><span>🌏</span> 現地のイベント情報を日本語で知りたい方</li>
+    </ul>
+  </section>
+
+  <!-- CTA BOTTOM -->
+  <section class="cta-bottom" id="download">
+    <h2>今すぐ始めよう</h2>
+    <p>無料でご利用いただけます。</p>
+    <div class="cta-store-badges">
+      <a href="https://apps.apple.com/sg/app/%E3%81%8A%E3%81%A7%E3%81%8B%E3%81%91navi/id6787159354" class="store-badge">
+        <div class="store-badge-icon"></div>
+        <div class="store-badge-text">
+          <div class="store-badge-sub">Download on the</div>
+          <div class="store-badge-name">App Store</div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <p>© 2026 WILLOA PTE. LTD. / おでかけNavi
+      <a href="https://about.dosuru.app">トップ</a>
+      <a href="https://about.dosuru.app/privacy">プライバシーポリシー</a>
+      <a href="https://about.dosuru.app/contact">お問い合わせ</a>
+    </p>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,25 @@
+:root {
+  --caramel: #C8804A;
+  --caramel-dark: #A8622E;
+  --caramel-pale: #FDF0E6;
+  --cream: #FDFAF6;
+  --midnight: #2C2420;
+  --warm-gray: #8C7B72;
+  --sand: #E8DDD4;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Noto Sans JP', sans-serif; background: var(--cream); color: var(--midnight); line-height: 1.8; }
+nav {
+  background: rgba(253,250,246,0.95);
+  border-bottom: 1px solid var(--sand);
+  padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--midnight); }
+.nav-logo img { width: 32px; height: 32px; border-radius: 8px; }
+.nav-logo span { font-weight: 700; font-size: 16px; }
+.nav-back { color: var(--caramel); text-decoration: none; font-size: 14px; font-weight: 700; }
+h1 { font-family: 'Kaisei Opti', serif; font-size: 28px; margin-bottom: 8px; }
+footer { text-align: center; padding: 32px 24px; font-size: 13px; color: var(--warm-gray); border-top: 1px solid var(--sand); }
+footer p { color: var(--warm-gray); font-size: 13px; }
+footer a { color: var(--warm-gray); }

@@ -218,6 +218,24 @@ async function withFileLock(filePath, fn) {
 // ─────────────────────────────────────────────
 app.use(express.json());
 
+// 許可オリジン（about サブドメイン + Capacitor アプリ）
+const ALLOWED_ORIGINS = [
+  'https://about.dosuru.app',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'http://localhost',
+];
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // index.html と sw.js はキャッシュしない
 app.use((req, res, next) => {
   if (req.path === '/' || req.path === '/index.html' || req.path === '/sw.js') {
@@ -905,11 +923,16 @@ function savePendingEvent(draft, submittedBy, city = 'sg') {
 
 async function sendLinePush(userId, messages) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  await fetch('https://api.line.me/v2/bot/message/push', {
+  const res = await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ to: userId, messages }),
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[LINE push] ${res.status} ${res.statusText} — ${body}`);
+    throw new Error(`LINE push failed: ${res.status} ${body}`);
+  }
 }
 
 async function replyLine(replyToken, messages) {
@@ -929,7 +952,8 @@ function buildEventFlexMessage(pendingId, event, city = 'sg') {
   const typeText = typeMap[event.type] || event.type;
   const preview  = (event.content || '').slice(0, 120) + ((event.content || '').length > 120 ? '…' : '');
 
-  const hasImage = !!(event.image);
+  // LINE requires absolute HTTPS URLs for images
+  const hasImage = !!(event.image && /^https:\/\//i.test(event.image));
 
   return {
     type: 'flex',
@@ -1508,6 +1532,24 @@ const courseGenerateLimit = rateLimit({
   message: { error: 'リクエスト上限に達しました。1時間後にお試しください。' },
 });
 
+// 既存コースタイトルを取得するヘルパー
+function getExistingCourseTitles(city) {
+  const paths = [
+    path.join(__dirname, `data/${city}/community-courses.json`),
+    path.join(__dirname, `data/${city}/model-courses.json`),
+  ];
+  const titles = [];
+  for (const p of paths) {
+    if (fs.existsSync(p)) {
+      try {
+        const courses = JSON.parse(fs.readFileSync(p));
+        courses.forEach(c => { if (c.title) titles.push(c.title); });
+      } catch {}
+    }
+  }
+  return titles;
+}
+
 // POST /api/courses/candidates — 候補3件生成（Haiku）
 app.post('/api/courses/candidates', courseGenerateLimit, async (req, res) => {
   const { city = 'sg', conditions = {}, profile, pinnedEvents = [] } = req.body;
@@ -1564,16 +1606,21 @@ app.post('/api/courses/candidates', courseGenerateLimit, async (req, res) => {
     ? `\n\n【ユーザーが希望するスポット】\n${pinnedEvents.map(p => `- ${p.emoji || '📌'} ${p.title}（${p.area || ''}）`).join('\n')}`
     : '';
 
+  const existingTitles = getExistingCourseTitles(city);
+  const existingNote = existingTitles.length > 0
+    ? `\n\n【既存コース（エリア・テーマが被らないようにすること）】\n${existingTitles.map(t => `- ${t}`).join('\n')}`
+    : '';
+
   const prompt = `${cityConf.nameJa}在住日本人向けに、以下の条件で週末半日コースの「方向性」を3つ提案してください。
 スポット詳細は不要。タイトル・キャッチコピー・概要のみ。
 3つは方向性・テーマ・雰囲気が互いに異なるものにすること。
 
 条件:
-${conditionsBlock}${pinnedNote}
+${conditionsBlock}${pinnedNote}${existingNote}
 
 返却形式（JSONのみ、余分な説明不要）:
 [
-  { "title": "タイトル（20文字以内、スポット名・エリア名を含む）", "tagline": "キャッチコピー（30文字以内）", "description": "このコースの魅力（1〜2文）" },
+  { "title": "タイトル（20文字以内。英語の地名＋日本語説明の形式。例：「Haji Lane、壁画と仲間の午後」「Clarke Quay、大人の夜散歩」）", "tagline": "キャッチコピー（30文字以内）", "description": "このコースの魅力（1〜2文）" },
   { "title": "...", "tagline": "...", "description": "..." },
   { "title": "...", "tagline": "...", "description": "..." }
 ]`;
@@ -1691,6 +1738,11 @@ app.post('/api/courses/generate', courseGenerateLimit, async (req, res) => {
     ? `\n\n【コンセプト指定】\n以下のタイトルとコンセプトに沿ったコースを作成すること:\nタイトル: ${selectedCandidate.title}\nコンセプト: ${selectedCandidate.description}\n（タイトルは必ずそのまま使用すること）`
     : '';
 
+  const existingTitlesForGenerate = getExistingCourseTitles(city);
+  const existingNoteForGenerate = existingTitlesForGenerate.length > 0
+    ? `\n【既存コース（スポット・エリア・テーマが被らないようにすること）】\n${existingTitlesForGenerate.map(t => `- ${t}`).join('\n')}\n`
+    : '';
+
   const timeslotLabel2 = resolvedTimeslot && timeslotMap2[resolvedTimeslot]
     ? timeslotMap2[resolvedTimeslot]
     : '指定なし';
@@ -1699,7 +1751,7 @@ app.post('/api/courses/generate', courseGenerateLimit, async (req, res) => {
 
 【重要】コースは半日（最大4〜5時間）以内に収まること。丸一日コースは作らないこと。スポット数はゆったりなら2〜3件、詰め込む場合は3〜4件。条件やリクエストに合わせてAIが判断すること。
 
-条件:
+${existingNoteForGenerate}条件:
 - 誰と: ${resolvedWho || '誰でも'}
 - 時間帯: ${timeslotLabel2}
 - スポット数: 条件に応じて2〜4件（AIが判断）${resolvedArea ? `\n- エリア: ${resolvedArea}` : ''}${purposeNote}${styleNote}${occasionNote}${foodNote}${transportNote}${ageNote}${noteStr}${candidateNote}
@@ -1718,14 +1770,14 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
 
 以下のJSON形式で返してください（余分な説明不要、JSONのみ）:
 {
-  "title": ${selectedCandidate ? `"必ず「${selectedCandidate.title}」をそのまま使用すること（変更禁止）"` : `"コースタイトル（20文字以内）。このコースで実際に訪れるスポット名・エリア名・イベント名を必ず1つ以上含めること。旅行雑誌のキャプション風。「静かな午後」「週末の正解」のような抽象的フレーズだけのタイトルは禁止。エリア名＋時間帯＋活動の羅列（例：「East朝ランチ散策」）も禁止。良い例：「ハジレーンと、知られざる壁画の裏道」「Jewel滝を横目に、週末を遊び尽くす」「Clarke Quayから始まる、大人の夜散歩」「セントーサで子どもが全力で走り回る日」"`},
+  "title": ${selectedCandidate ? `"必ず「${selectedCandidate.title}」をそのまま使用すること（変更禁止）"` : `"コースタイトル（20文字以内）。【形式】英語の地名・スポット名＋日本語の説明。例：「Haji Lane、壁画と仲間のアート午後」「Clarke Quay、大人の夜散歩」「Jewel、滝を横目に週末を遊び尽くす」。日本語だけのタイトル禁止（例：「ハジレーンで散歩」はNG）。抽象的な日本語フレーズだけも禁止（例：「静かな午後」はNG）"`},
   "tagline": "キャッチコピー（30文字以内）。タイトルと違う角度から魅力を補足する一言",
   "description": "このコースの魅力（2〜3文、なぜおすすめか具体的に）",
   "imageSearch": "英語キーワード2〜4語",
   "spots": [
     {
       "time": "09:00",
-      "name": "スポット名",
+      "name": "スポット名（必ず英語の正式名称で。例: ArtScience Museum, Gardens by the Bay, Lau Pa Sat）",
       "type": "観光|グルメ|ショッピング|公園|文化",
       "duration": "90分",
       "description": "おすすめポイント（40〜60文字）",
@@ -2023,6 +2075,19 @@ app.post('/api/courses/:id/unpublish', async (req, res) => {
     });
   }
   res.json({ ok: true });
+});
+
+// ─────────────────────────────────────────────
+// Static HTML pages (about subdomain)
+// ─────────────────────────────────────────────
+app.get('/about', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'about.html'));
+});
+app.get('/privacy', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'privacy.html'));
+});
+app.get('/contact', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'contact.html'));
 });
 
 // ─────────────────────────────────────────────

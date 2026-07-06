@@ -37,7 +37,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260704f">
+  <link rel="stylesheet" href="/app.css?v=20260705r">
 </head>
 <body>
   </div>
@@ -62,12 +62,6 @@
           <span id="app-subtitle-city">シンガポール在住者の週末おでかけガイド</span>
         </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button class="header-share-btn" id="howto-btn" onclick="openShareModal()">
-          <span style="font-size:22px;">🗺</span>
-          <span data-i18n="howtoLabel" style="display:block;font-size:12px;font-family:'Noto Sans JP',sans-serif;font-weight:600;color:var(--warm-gray);letter-spacing:0.05em;margin-top:2px;">使い方</span>
-        </button>
-      </div>
     </div>
 
     <!-- Section Header (moved from main) -->
@@ -83,12 +77,13 @@
 
     <!-- Category Filter (new horizontal scroll) -->
     <div id="filter-row-category">
-      <button id="chip-all-recommend" class="filter-chip active" data-cat="all" onclick="toggleCatFilter('all')">⭐ おすすめ</button>
-      <button class="filter-chip" data-cat="event" onclick="toggleCatFilter('event')">イベント</button>
-      <button class="filter-chip" data-cat="show" onclick="toggleCatFilter('show')">展示・公演</button>
-      <button class="filter-chip" data-cat="gourmet" onclick="toggleCatFilter('gourmet')">グルメ・フェア</button>
-      <button class="filter-chip" data-cat="sale" onclick="toggleCatFilter('sale')">プロモ・お得</button>
-      <button class="filter-chip" data-cat="opening" onclick="toggleCatFilter('opening')">新規オープン</button>
+      <button class="filter-chip active" data-cat="all" data-i18n="catAll" onclick="toggleCatFilter('all')">すべて</button>
+      <button class="filter-chip" data-cat="recommend" data-i18n="catRecommend" onclick="toggleCatFilter('recommend')">おすすめ</button>
+      <button class="filter-chip" data-cat="event" data-i18n="catEvent" onclick="toggleCatFilter('event')">イベント</button>
+      <button class="filter-chip" data-cat="show" data-i18n="catShow" onclick="toggleCatFilter('show')">展示・公演</button>
+      <button class="filter-chip" data-cat="gourmet" data-i18n="catGourmet" onclick="toggleCatFilter('gourmet')">グルメ・フェア</button>
+      <button class="filter-chip" data-cat="sale" data-i18n="catSale" onclick="toggleCatFilter('sale')">プロモ・お得</button>
+      <button class="filter-chip" data-cat="opening" data-i18n="catOpening" onclick="toggleCatFilter('opening')">新規オープン</button>
     </div>
   </header>
 
@@ -100,24 +95,6 @@
       <div class="ptr-spinner"></div>
     </div>
     <!-- おすすめ設定促進バナー（中央表示） -->
-    <div id="recommend-setup-banner" style="display:none;position:absolute;top:50%;left:50%;
-      transform:translate(-50%,-60%);width:calc(100% - 48px);max-width:320px;
-      padding:28px 24px;background:var(--warm-white);border-radius:20px;
-      box-shadow:0 4px 24px rgba(0,0,0,0.10);text-align:center;">
-      <div style="font-size:32px;margin-bottom:12px;">⭐</div>
-      <div style="font-size:15px;font-weight:700;color:var(--midnight);margin-bottom:8px;">
-        ジャンルを設定しましょう
-      </div>
-      <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;margin-bottom:20px;">
-        好きなジャンルを選ぶと<br>あなた好みのイベントが表示されます
-      </div>
-      <button onclick="switchNav('settings');document.getElementById('recommend-setup-banner').style.display='none'"
-        style="padding:12px 32px;border-radius:50px;border:none;background:var(--caramel);
-        color:#fff;font-size:14px;font-weight:700;cursor:pointer;
-        font-family:'Noto Sans JP',sans-serif;">
-        設定する
-      </button>
-    </div>
     <!-- Cards -->
     <div class="cards-grid" id="cards-grid">
       <!-- /api/events から動的生成 -->
@@ -271,7 +248,7 @@
       <!-- おでかけスタイル（折りたたみ） -->
       <div class="settings-item" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0;" onclick="toggleWhoPanel()">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <span class="settings-item-label">一緒に行く人</span>
+          <span class="settings-item-label" data-i18n="labelWhoWith">一緒に行く人</span>
           <div style="display:flex;align-items:center;gap:6px;">
             <span id="settings-who-summary"
               style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);flex-shrink:0;pointer-events:none;">
@@ -284,34 +261,34 @@
         <div id="settings-who-panel" style="display:none;" onclick="event.stopPropagation()">
           <div style="border-top:1px solid var(--sand);margin-top:10px;padding-top:4px;">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;" onclick="toggleSettingsWho('solo')">
-              <span style="font-size:15px;color:var(--text);">🚶 ひとりで</span>
+              <span style="font-size:15px;color:var(--text);" data-i18n="labelWhoSolo">🚶 ひとりで</span>
               <div class="who-dot" id="who-dot-solo"></div>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--sand);" onclick="toggleSettingsWho('couple')">
-              <span style="font-size:15px;color:var(--text);">💑 夫婦・カップル</span>
+              <span style="font-size:15px;color:var(--text);" data-i18n="labelWhoCouple">💑 夫婦・カップル</span>
               <div class="who-dot" id="who-dot-couple"></div>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--sand);" onclick="toggleSettingsWho('group')">
-              <span style="font-size:15px;color:var(--text);">👥 グループ</span>
+              <span style="font-size:15px;color:var(--text);" data-i18n="labelWhoGroup">👥 グループ</span>
               <div class="who-dot" id="who-dot-group"></div>
             </div>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--sand);" onclick="toggleSettingsWho('family')">
-              <span style="font-size:15px;color:var(--text);">👨‍👩‍👧 ファミリー</span>
+              <span style="font-size:15px;color:var(--text);" data-i18n="labelWhoFamily">👨‍👩‍👧 ファミリー</span>
               <div class="who-dot" id="who-dot-family"></div>
             </div>
             <!-- 子どもの年齢（ファミリー選択時のみ） -->
             <div id="settings-age-section" style="display:none;border-top:1px solid var(--sand);padding-top:4px;margin-top:4px;">
-              <div style="font-size:12px;font-weight:700;color:var(--warm-gray);padding:6px 0 2px;">子どもの年齢</div>
+              <div style="font-size:12px;font-weight:700;color:var(--warm-gray);padding:6px 0 2px;" data-i18n="labelChildAge">子どもの年齢</div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;" onclick="selectSettingsAge('baby')">
-                <span style="font-size:15px;color:var(--text);">👶 0〜2歳</span>
+                <span style="font-size:15px;color:var(--text);" data-i18n="labelAgeBaby">👶 0〜2歳</span>
                 <div class="who-dot" id="age-dot-baby"></div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--sand);" onclick="selectSettingsAge('preschool')">
-                <span style="font-size:15px;color:var(--text);">🧒 3〜6歳</span>
+                <span style="font-size:15px;color:var(--text);" data-i18n="labelAgePreschool">🧒 3〜6歳</span>
                 <div class="who-dot" id="age-dot-preschool"></div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--sand);" onclick="selectSettingsAge('school')">
-                <span style="font-size:15px;color:var(--text);">🎒 小学生以上</span>
+                <span style="font-size:15px;color:var(--text);" data-i18n="labelAgeSchool">🎒 小学生以上</span>
                 <div class="who-dot" id="age-dot-school"></div>
               </div>
             </div>
@@ -321,7 +298,7 @@
 
       <!-- 興味ジャンル（折りたたみ） -->
       <div class="settings-item" style="cursor:pointer;" onclick="toggleGenrePanel()">
-        <span class="settings-item-label">ジャンル・興味</span>
+        <span class="settings-item-label" data-i18n="labelGenres">ジャンル・興味</span>
         <span id="genre-status-badge" style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);flex-shrink:0;">
           <span id="genre-status-label">未設定</span>
           <span id="genre-status-arrow" style="font-size:11px;color:var(--warm-gray);transition:transform 0.2s;">▼</span>
@@ -329,7 +306,7 @@
       </div>
       <div id="genre-panel" style="display:none;padding:0 18px 16px;">
         <div style="font-size:15px;color:var(--warm-gray);line-height:1.5;padding:4px 0 12px;">
-          好きなジャンルを選ぶと「⭐ おすすめ」で表示されます
+          <span data-i18n="genreHint">好きなジャンルを選ぶと「⭐ おすすめ」で表示されます</span>
         </div>
         <div id="genre-chips-container" class="genre-chips"></div>
       </div>
@@ -372,14 +349,12 @@
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secOther">その他</div>
 
-      <div class="settings-item" style="flex-direction:column;align-items:stretch;gap:10px;padding:16px 18px;">
-        <textarea id="feedback-text" data-i18n-ph="feedbackPlaceholder"
-          placeholder="改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！"
-          style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:16px;color:var(--midnight);background:var(--cream);resize:none;height:100px;outline:none;line-height:1.6;"></textarea>
-        <button id="feedback-send-btn" onclick="sendFeedback()" data-i18n="feedbackSend"
-          style="padding:12px;border-radius:var(--radius-btn);background:var(--warm-white);color:var(--warm-gray);border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
+      <div class="settings-item" style="padding:12px 18px;">
+        <span class="settings-item-label" data-i18n="howtoLabel">使い方</span>
+        <button onclick="openShareModal()"
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;"
           onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
-          📨 送信する
+          <span data-i18n="howtoOpenBtn">見る</span>
         </button>
       </div>
 
@@ -397,17 +372,37 @@
         <a href="https://buy.stripe.com/28EfZ9eN56aZaEEbmY4c800" target="_blank" rel="noopener"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;text-decoration:none;"
           onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
-          SGD 5
+          <span data-i18n="supportBtn">$5 を贈る</span>
+        </a>
+      </div>
+
+      <div class="settings-item" style="padding:12px 18px;">
+        <span class="settings-item-label" data-i18n="labelAboutApp">アプリについて</span>
+        <a href="https://about.dosuru.app" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;text-decoration:none;"
+          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
+          <span data-i18n="labelOfficialSite">公式サイト</span>
         </a>
       </div>
 
       <div class="settings-item" style="padding:16px 18px;">
-        <span class="settings-item-label">公式X</span>
+        <span class="settings-item-label" data-i18n="labelOfficialX">SNS</span>
         <a href="https://x.com/willoa_sg" target="_blank" rel="noopener"
           style="display:inline-flex;align-items:center;gap:6px;color:var(--midnight);text-decoration:none;font-size:15px;font-weight:600;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
           @willoa_sg
         </a>
+      </div>
+
+      <div class="settings-item" style="flex-direction:column;align-items:stretch;gap:10px;padding:16px 18px;">
+        <textarea id="feedback-text" data-i18n-ph="feedbackPlaceholder"
+          placeholder="改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！"
+          style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:16px;color:var(--midnight);background:var(--cream);resize:none;height:100px;outline:none;line-height:1.6;"></textarea>
+        <button id="feedback-send-btn" onclick="sendFeedback()" data-i18n="feedbackSend"
+          style="padding:12px;border-radius:var(--radius-btn);background:var(--warm-white);color:var(--warm-gray);border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
+          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
+          📨 送信する
+        </button>
       </div>
 
     </div>
@@ -894,11 +889,12 @@
     <div class="plan-modal-body">
       <div class="plan-modal-section-label"><span data-i18n="labelTitle">タイトル</span> <span style="color:var(--terracotta)">*</span></div>
       <div class="plan-title-row">
-        <button class="plan-emoji-selector-btn" id="plan-custom-emoji-selector" onclick="openEmojiPicker('custom')">
+        <button class="plan-emoji-selector-btn" id="plan-custom-emoji-selector" onclick="toggleEmojiInline('custom')">
           <span class="pes-emoji" id="plan-custom-selected-emoji">📝</span>
         </button>
         <input class="plan-modal-text-input" id="plan-custom-title" type="text" data-i18n-ph="customPlanTitlePlaceholder" placeholder="タイトルを入力" maxlength="40" oninput="updateCustomPlanAddBtn()" style="margin-bottom:0;flex:1;" />
       </div>
+      <div id="plan-custom-emoji-inline" style="display:none;margin-top:6px;"></div>
       <div id="plan-custom-pins-container" style="display:none;margin-top:8px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border-color,#e8e0d8);">
         <div id="plan-custom-pins-list"></div>
       </div>
@@ -953,11 +949,12 @@
       <div id="plan-detail-emoji-wrap" style="display:none;">
         <div class="plan-modal-section-label"><span data-i18n="labelTitle">タイトル</span> <span style="color:var(--terracotta)">*</span></div>
         <div class="plan-title-row">
-          <button class="plan-emoji-selector-btn" id="plan-detail-emoji-selector" onclick="openEmojiPicker('detail')">
+          <button class="plan-emoji-selector-btn" id="plan-detail-emoji-selector" onclick="toggleEmojiInline('detail')">
             <span class="pes-emoji" id="plan-detail-selected-emoji">📝</span>
           </button>
           <input class="plan-modal-text-input" id="plan-detail-title" type="text" placeholder="タイトルを入力" maxlength="40" style="margin-bottom:0;flex:1;" />
         </div>
+        <div id="plan-detail-emoji-inline" style="display:none;margin-top:6px;"></div>
       </div>
       <div class="plan-modal-section-label" data-i18n="planModalDateLabel">日付を選ぶ</div>
       <div class="plan-date-chips" id="plan-detail-date-chips"></div>
@@ -996,7 +993,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260704j"></script>
+  <script src="/app.js?v=20260706j"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
@@ -1061,14 +1058,16 @@
     <div class="plan-modal-handle"></div>
     <div id="schedule-plan-action-label"
       style="font-size:14px;font-weight:700;color:var(--midnight);margin:8px 0 16px;text-align:center;font-family:'Noto Sans JP',sans-serif;"></div>
-    <div style="display:flex;gap:8px;">
-      <button id="schedule-plan-action-add-btn" class="sale-pin-btn"
-        style="flex:1;justify-content:center;padding:13px 8px;font-size:15px;font-weight:700;border-radius:12px;">
-        📅 予定を追加
+    <div style="display:flex;gap:6px;">
+      <button id="schedule-plan-action-add-btn" class="card-action-btn"
+        style="flex:1;padding:10px 8px;">
+        <span class="card-action-icon">📅</span>
+        <span>予定を追加</span>
       </button>
-      <button id="schedule-plan-action-course-btn" class="sale-pin-btn"
-        style="flex:1;justify-content:center;padding:13px 8px;font-size:15px;font-weight:700;border-radius:12px;">
-        🗺 コースを作る
+      <button id="schedule-plan-action-course-btn" class="card-action-btn"
+        style="flex:1;padding:10px 8px;">
+        <span class="card-action-icon">🗺</span>
+        <span>コースを作る</span>
       </button>
     </div>
   </div>

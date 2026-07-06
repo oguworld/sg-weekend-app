@@ -12,8 +12,15 @@
 - VPS: Contabo (IP: 194.233.92.41)
 - ユーザー: masahiko
 - プロジェクトパス: /home/masahiko/sg-weekend-app/
-- ドメイン: dosuru.app
+- ドメイン: dosuru.app（アプリ本体）/ about.dosuru.app（紹介LP）
 - SSL: Let's Encrypt (Cloudflare DNS)
+
+## サブドメイン
+- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開）
+  - ファイル: `public/about.html`
+  - nginx: `/etc/nginx/sites-enabled/about.dosuru.app`（Node.jsへプロキシ）
+  - Express route: `GET /about` → `public/about.html`
+  - App StoreのURLはプレースホルダー（審査通過後に差し替え）
 
 ## 起動・操作コマンド
 pm2 restart sg-weekend
@@ -121,6 +128,13 @@ sg-weekend-app/
 - 言語切り替え: STRINGS オブジェクト（ja/en）+ `t(key)` 関数 + `applyI18n()`
 - 対応済み: 探すタブ・コース機能全体・設定画面・予定表モーダル・ボトムナビ
 - 未対応（スコープ外）: 共有カレンダー機能・AIチャットシート・インストールモーダル
+
+### ⚠️ i18n 必須ルール
+UI文字列を追加・変更するときは **必ず ja と en の両方を同時に対応** する。
+- 静的HTMLにテキストを直書きしない。`data-i18n="キー名"` を付け、デフォルトテキストは日本語にする
+- `app.js` の `STRINGS.ja` と `STRINGS.en` に **同じキーを同時に** 追加する
+- JS側でテキストを生成する場合は `t('キー名')` を使う（ハードコード禁止）
+- 変更後は英語モードに切り替えて目視確認すること（キー名がそのまま表示されたら追加漏れ）
 
 ## X自動投稿（scripts/post-to-x.js）
 - ペルソナ: 日本・SG両方フラットに見る30-40代男性。構造・逆説・気づきを提示するスタイル

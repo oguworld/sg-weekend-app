@@ -39,14 +39,23 @@ jobs:
           bundler-cache: true
           working-directory: ios-app
 
+      - name: Extract release notes from package.json
+        id: notes
+        run: |
+          NOTES=$(node -p "require('./ios-app/package.json').releaseNotes || 'バグ修正とパフォーマンス改善'")
+          echo "release_notes=${NOTES}" >> $GITHUB_OUTPUT
+
       - name: Deploy to App Store
         run: |
           cd ios-app
           bundle exec fastlane deploy
         env:
-          ASC_KEY_ID:              ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID:           ${{ secrets.ASC_ISSUER_ID }}
-          ASC_PRIVATE_KEY:         ${{ secrets.ASC_PRIVATE_KEY }}
-          DIST_CERT_BASE64:        ${{ secrets.DIST_CERT_BASE64 }}
-          DIST_CERT_PASSWORD:      ${{ secrets.DIST_CERT_PASSWORD }}
+          ASC_KEY_ID:               ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:            ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY:          ${{ secrets.ASC_PRIVATE_KEY }}
+          DIST_CERT_BASE64:         ${{ secrets.DIST_CERT_BASE64 }}
+          DIST_CERT_PASSWORD:       ${{ secrets.DIST_CERT_PASSWORD }}
           PROVISION_PROFILE_BASE64: ${{ secrets.PROVISION_PROFILE_BASE64 }}
+          APPLE_TEAM_ID:            ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_NUMBER:             ${{ github.run_number }}
+          RELEASE_NOTES:            ${{ steps.notes.outputs.release_notes }}

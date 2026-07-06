@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/post-to-x.js
 // X (Twitter) への自動投稿スクリプト
-// 使い方: node post-to-x.js --type=event|life [--city=sg|bkk|syd|all]
+// 使い方: node post-to-x.js [--city=sg|bkk|syd|all] [--dry-run]
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const Anthropic = require('@anthropic-ai/sdk');
@@ -24,96 +24,9 @@ const PERSONA = `【人物設定】
 SGのローカルカルチャーや歴史、ホーカーフードにも興味がある。
 シンガポール在住日本人向けの週末おでかけ情報アプリ（dosuru.app）を作っていて、
 使ってもらえると嬉しいとは思っているが、ごり押しはしたくない。
-日本に対してもSGに対してもポジティブでもネガティブでもなく、ただ生活している。
+基本的にSGの暮らしを楽しんでいる。愚痴・不満・ネガティブな感想は発信しない。
+発見・共感・小さな喜びを自然に伝えるスタイル。
 家族のことはあまり話さない。自分自身の日常をつぶやくスタイル。`;
-
-const LIFE_THEMES = [
-  // 週末・おでかけ
-  '今週末も特に決まってない',
-  '週末の予定を考えてる時間の方が長い',
-  '久しぶりにセントーサに行ったら思ったより人が少なかった',
-  'チャンギ空港に用もないのにふらっと来てしまった',
-  '行こうと思ってたところがなくなってた',
-  '結局いつものホーカーで終わる週末、それはそれでいい',
-
-  // SG日常（10年目線）
-  '近所のホーカーの値段が静かに上がってる',
-  '知り合いが帰任した。また一人いなくなった',
-  'コンドのプールを結局あまり使わない',
-  '10年住んでてまだ行ってない場所がある',
-  'MRT乗り換えがもう完全に体で覚えてる',
-  'スコールが来るかと思ったら来なかった',
-  '暑いのにもう慣れすぎて25度だと寒いと感じる',
-  'シングリッシュが普通に出てくるようになって久しい',
-  '気づいたら10年経ってた',
-  'SGって住んでみると意外と狭い',
-  '長く住むほどSGのことが分からなくなってくる気がする',
-  '周りの日本人が少しずつ入れ替わっていく',
-
-  // 仕事
-  '今日ミーティングが多かった。多すぎた',
-  '集中したいときにかぎって話しかけられる',
-  'リモートワークと出社、結局どっちが合ってるのかよく分からない',
-  'SGで働いてると英語で詰められることがある。これはこれで鍛えられる',
-  '仕事の打ち合わせをホーカーでやることがたまにある。わりと好き',
-  'やること多いのに優先順位がうまくつけられない日がある',
-  '週末になると平日の仕事のことを忘れてしまう。月曜にまた思い出す',
-
-  // 食べ物・飲み
-  'ホーカーのチキンライス、食べ飽きないな',
-  '最近ラクサにはまってる',
-  'SGのコーヒー文化、けっこう好き。コピティアムのkopi-o',
-  'クラフトビールの店が増えた気がする',
-  '近所に新しい店ができてた。入ってみようかな',
-  '外食ばかりだと、たまに自炊したくなる',
-
-  // スポーツ・体を動かすこと
-  '朝ランしてきた。暑いけどこれが一番頭が動く',
-  '週末ランニング、距離より続けることの方が大事だと最近思ってる',
-  'テニス久しぶりにやったら思ったより動けた',
-  'テニス、うまくなりたいとは思ってるけどなかなか練習できてない',
-  'サッカー観てた。やっぱりライブで観るのと全然違う',
-  'プレミアリーグの試合、時差的にキツい時間帯に始まる',
-  'スポーツ観るのも好きだけど、やっぱり自分で動く方が好き',
-  'SGのジムとかスポーツ施設、わりと充実してる',
-
-  // SGローカルカルチャー・歴史・食
-  'ホーカーのチキンライス、食べ飽きないな',
-  '最近ラクサにはまってる',
-  'コピティアムのkopi-o、もう普通に好き',
-  '古いショップハウスが残ってるエリアをぶらぶらするのが好き',
-  'SGの歴史、住んでみると思ってたよりずっと複雑で面白い',
-  'チャイナタウンとかリトルインディアとか、観光地なんだけど何回行っても発見がある',
-  'SGのローカルフード、ちゃんと記録しておきたいと思いながらできてない',
-  '昔からあるホーカーセンターが少しずつなくなっていくのが寂しい',
-  'SGの多文化な感じ、10年経っても慣れないというかまだ面白いと思う',
-
-  // 旅行
-  'バンコク、また行きたい。SGから近いのに全然違う感じがする',
-  'バリって何回行っても飽きない',
-  'SGにいると旅行のハードルが下がる。どこも2〜3時間で着く',
-  '旅行から帰ってくると、SGがホームだなと思う',
-  '次どこ行くか考えてる。東南アジア、まだ行ってないところがある',
-  '連休の使い方、毎回ギリギリまで決まらない',
-
-  // 将来のこと
-  'いつか帰るんだろうけど、帰ったらどうするんだろうって時々思う',
-  'このままSGに住み続けるのか、まだ全然決まってない',
-  '次のステップをそろそろ考えないといけない気がしてきた',
-  'SGにいる間にやっておきたいことって、意外と後回しにしてしまう',
-  '10年後もここにいるのかな、と時々ふと思う',
-
-  // アプリ開発者としての本音
-  '自分で作ったアプリなのに、週末の行き先探すとき普通に使ってる',
-  'dosuru.appのコース作成機能、自分で使ってみたら思ったより良かった',
-  'この機能どうしようかまだ迷ってる',
-  'アプリのデザイン直したいんだけど、なかなか時間が取れない',
-  'AIに任せたらだいぶ楽になった部分はあるけど、結局細かい調整が大変',
-  'こういうアプリ誰かが作ってくれないかなと思ってたら自分が作ることになってた',
-  'シンガポールの週末情報、意外とまとまってるところがなかった',
-  'このUI、もうちょっとシンプルにできそうなんだよな',
-  '機能追加したいものは山ほどあるけど、時間が足りない',
-];
 
 const anthropic = new Anthropic();
 
@@ -134,10 +47,7 @@ function loadHistory() {
 }
 
 function resolveType(type, history) {
-  if (type !== 'auto') return type;
-  const types = ['event', 'life'];
-  const available = types.filter(t => t !== history.lastType);
-  return available[Math.floor(Math.random() * available.length)];
+  return 'event';
 }
 
 function saveHistory(history) {
@@ -167,11 +77,12 @@ function getActiveEvents(events) {
   return events.filter(e => !e.end_date || e.end_date >= today);
 }
 
-function pickEvent(events, postedIds) {
-  const unseen = events.filter(e => !postedIds.includes(e.id));
-  const pool = (unseen.length > 0 ? unseen : events)
+function pickEvent(events, history) {
+  const { eventIds = [], postedStores = [] } = history;
+  const unseen = events.filter(e => !eventIds.includes(e.id) && !postedStores.includes(e.store));
+  const pool = (unseen.length > 0 ? unseen : events.filter(e => !eventIds.includes(e.id)))
     .sort((a, b) => (b.major_score || 0) - (a.major_score || 0))
-    .slice(0, 10);
+    .slice(0, 15);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -226,10 +137,13 @@ ${tipsText ? `ポイント: ${tipsText}` : ''}
 
 【要件】
 - 「〜開催中です」「ぜひご参加を」などの告知・アナウンス文は禁止
-- 「行ってみたい」「子ども連れて行けそう」「これは気になる」など素直な反応でいい
+- 実際には行っていない。ネットや情報収集で見かけた程度の距離感で書く
+- 「行ってきた」「食べた」など実体験のように書かない
+- 行きたいとは思うけど結局行かないかも、くらいの温度感でいい
+- 「〜が好きだな」「〜っていいな」など、まとめるような感想で締めない
+- 一人称は使わない（「俺」「私」「僕」は書かない）
 - オチや気づきは不要。思ったことをそのまま書く
 - 深読みしない、分析しない、教えようとしない
-- 家族（妻・子ども）が出てきてもいい
 - 絵文字は0〜2個（国旗絵文字🇸🇬🇹🇭🇦🇺は使わない）
 - URLとハッシュタグは含めない（別途追加します）
 - 本文（ハッシュタグ除く）は日本語90文字以内に厳守
@@ -242,37 +156,45 @@ ${tipsText ? `ポイント: ${tipsText}` : ''}
   return `${body}\n\n${urlLine}${buildHashtags(event.city)}`;
 }
 
-async function generateLifePost(theme) {
+async function generateLifePost(articles) {
+  const summary = articles.map((e, i) =>
+    `${i + 1}. [${e.type || 'info'}] ${e.store || ''}${e.content ? ': ' + e.content.slice(0, 80) : ''}`
+  ).join('\n');
 
   const res = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 300,
     messages: [{
       role: 'user',
-      content: `以下の人物として、このきっかけからX投稿を書いてください。
+      content: `以下の人物として、最近のシンガポールの話題に触れて感じたことをX投稿として書いてください。
 
 ${PERSONA}
 
-【きっかけ】
-${theme}
+【最近のSGの話題（参考）】
+${summary}
 
 【要件】
-- 日常のつぶやき。オチや気づきは不要
-- ポジティブでもネガティブでもなく、批判も礼賛もしない。ただ思ったことを書く
-- 日本に対してもSGに対してもフラット。どちらかをひいきしない
-- 深読みしない、分析しない、何かを教えようとしない
-- 家族（妻・子ども）の話が出てきてもいい
-- 一言でも複数文でも、自然に収まる長さで
-- 絵文字は0〜2個
+- イベント告知・宣伝・アナウンスにならないこと。「在住者の生活目線のつぶやき」として書く
+- 実際には行っていない。情報として見かけた・知った程度の距離感で書く
+- 「行ってきた」「食べた」など実体験のように書かない
+- 行きたいとは思うけど結局行かないかも、くらいの温度感でいい
+- 「〜が好きだな」「〜っていいな」など、まとめるような感想で締めない
+- 一人称は使わない（「俺」「私」「僕」は書かない）
+- 特定の記事を紹介するのではなく、話題から連想した日常の気づき・発見を書く
+- 愚痴・不満・ネガティブな感想は絶対に書かない
+- SGの暮らしへの親しみや小さな喜びを自然に込める
+- 深読みしない、分析しない、教えようとしない
+- 絵文字は0〜2個（国旗絵文字は使わない）
 - URLとハッシュタグは含めない
-- 本文（ハッシュタグ除く）は日本語90文字以内に厳守
-- 日本語のみ。1つだけ完成した投稿文を出力（前置き・説明不要）`,
+- 本文は日本語90文字以内に厳守
+- 日本語のみ。完成した投稿文のみ出力（前置き・説明不要）`,
     }],
   });
 
   const body = res.content[0].text.trim();
   return `${body}\n\n#海外生活 #海外在住日本人 #週末の過ごし方`;
 }
+
 
 // ─── X投稿 ────────────────────────────────────────────────────────
 function buildOAuthHeader(method, url, credentials) {
@@ -349,16 +271,19 @@ async function main() {
       console.log('[post-to-x] アクティブなイベントなし。終了します。');
       return;
     }
-    const event = pickEvent(events, history.eventIds);
+    const event = pickEvent(events, history);
     const conf = CITY_CONFIG[event.city] || CITY_CONFIG.sg;
     console.log(`[post-to-x] 選択イベント: ${event.store} (${conf.nameJa})`);
     text = await generateEventPost(event);
     history.eventIds = [event.id, ...history.eventIds].slice(0, HISTORY_MAX);
+    history.postedStores = [event.store, ...(history.postedStores || [])].slice(0, HISTORY_MAX);
 
-  } else {
-    const theme = LIFE_THEMES[Math.floor(Math.random() * LIFE_THEMES.length)];
-    console.log(`[post-to-x] 生活つぶやき: ${theme}`);
-    text = await generateLifePost(theme);
+  } else if (type === 'life') {
+    const allEvents = getActiveEvents(loadEvents(city));
+    const sample = allEvents.sort(() => Math.random() - 0.5).slice(0, 5);
+    console.log(`[post-to-x] 生活つぶやき参考: ${sample.map(e => e.store).join(' / ')}`);
+    text = await generateLifePost(sample);
+
   }
 
   history.lastType = type;
