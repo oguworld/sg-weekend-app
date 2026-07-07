@@ -30,7 +30,7 @@
     html { background: var(--warm-white); overscroll-behavior-y: none; }
     body {
       font-family: 'Noto Sans JP', sans-serif;
-      background: var(--cream);
+      background: var(--warm-white);
       color: var(--midnight);
       min-height: 100vh;
       overscroll-behavior-y: none;
