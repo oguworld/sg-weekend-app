@@ -25,12 +25,12 @@
 
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
-    html, body { overscroll-behavior-x: none; background-color: #FFFDF9; }
+    html, body { overscroll-behavior-x: none; background-color: var(--cream); }
     body { overscroll-behavior-y: none; }
-    html { background: var(--warm-white); overscroll-behavior-y: none; }
+    html { background: var(--cream); overscroll-behavior-y: none; }
     body {
       font-family: 'Noto Sans JP', sans-serif;
-      background: var(--warm-white);
+      background: var(--cream);
       color: var(--midnight);
       min-height: 100vh;
       overscroll-behavior-y: none;
@@ -38,7 +38,7 @@
 
     /* ─── HEADER ─── */
     .app-header {
-      background: var(--warm-white);
+      background: var(--cream);
       padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 0;
       border-bottom: none;
       position: fixed;
