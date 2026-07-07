@@ -27,6 +27,11 @@ jobs:
           cd ios-app
           npx cap add ios
 
+      - name: Generate app icons
+        run: |
+          cd ios-app
+          npx @capacitor/assets generate --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#FFFFFF'
+
       - name: Sync Capacitor
         run: |
           cd ios-app
