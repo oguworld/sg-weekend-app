@@ -43,7 +43,9 @@ jobs:
         id: notes
         run: |
           NOTES=$(node -p "require('./ios-app/package.json').releaseNotes || 'バグ修正とパフォーマンス改善'")
+          VER=$(node -p "require('./ios-app/package.json').version.split('.').slice(0,2).join('.')")
           echo "release_notes=${NOTES}" >> $GITHUB_OUTPUT
+          echo "app_version=${VER}" >> $GITHUB_OUTPUT
 
       - name: Deploy to App Store
         run: |
@@ -59,3 +61,4 @@ jobs:
           APPLE_TEAM_ID:            ${{ secrets.APPLE_TEAM_ID }}
           BUILD_NUMBER:             ${{ github.run_number }}
           RELEASE_NOTES:            ${{ steps.notes.outputs.release_notes }}
+          APP_VERSION:              ${{ steps.notes.outputs.app_version }}

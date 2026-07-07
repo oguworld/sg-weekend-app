@@ -1,6 +1,5 @@
 require 'base64'
 require 'tmpdir'
-require 'json'
 
 default_platform(:ios)
 
@@ -48,8 +47,7 @@ platform :ios do
       key_content: ENV['ASC_PRIVATE_KEY']
     )
 
-    pkg           = JSON.parse(File.read('package.json'))
-    app_version   = pkg['version'].split('.').first(2).join('.')  # "1.1.0" -> "1.1"
+    app_version   = ENV['APP_VERSION'] || "1.1"
     release_notes = ENV['RELEASE_NOTES'] || "バグ修正とパフォーマンス改善"
 
     upload_to_app_store(
