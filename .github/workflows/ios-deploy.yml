@@ -66,7 +66,7 @@ jobs:
         id: notes
         run: |
           NOTES=$(node -p "require('./ios-app/package.json').releaseNotes || 'バグ修正とパフォーマンス改善'")
-          VER=$(node -p "require('./ios-app/package.json').version.split('.').slice(0,2).join('.')")
+          VER=$(node -p "require('./ios-app/package.json').version")
           echo "release_notes=${NOTES}" >> $GITHUB_OUTPUT
           echo "app_version=${VER}" >> $GITHUB_OUTPUT
 
