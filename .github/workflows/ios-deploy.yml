@@ -38,6 +38,12 @@ jobs:
           cd ios-app
           npx cap sync ios
 
+      - name: Set export compliance in Info.plist
+        run: |
+          cd ios-app
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" ios/App/App/Info.plist
+
       - name: Select Xcode 26
         run: |
           XCODE=$(ls /Applications/ | grep -E '^Xcode_26' | sort -r | head -1)
