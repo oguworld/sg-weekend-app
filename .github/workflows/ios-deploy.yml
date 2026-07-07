@@ -32,6 +32,17 @@ jobs:
           cd ios-app
           npx cap sync ios
 
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(ls /Applications/ | grep -E '^Xcode_26' | sort -r | head -1)
+          if [ -n "$XCODE" ]; then
+            sudo xcode-select -s "/Applications/${XCODE}"
+            echo "Selected: $XCODE"
+          else
+            echo "Xcode 26 not found, using default: $(xcode-select -p)"
+          fi
+          xcodebuild -version
+
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
