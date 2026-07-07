@@ -30,7 +30,8 @@ jobs:
       - name: Generate app icons
         run: |
           cd ios-app
-          npx @capacitor/assets generate --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#FFFFFF'
+          npm install @capacitor/assets --save-dev
+          npx capacitor-assets generate --ios
 
       - name: Sync Capacitor
         run: |
