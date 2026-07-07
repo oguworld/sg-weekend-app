@@ -60,7 +60,8 @@ platform :ios do
       skip_screenshots:                  true,
       precheck_include_in_app_purchases: false,
       force:                             true,
-      release_notes:                     { "ja" => release_notes, "en-US" => release_notes }
+      release_notes:                     { "ja" => release_notes, "en-US" => release_notes },
+      submission_information:            { export_compliance_uses_encryption: false }
     )
   end
 end
