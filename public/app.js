@@ -37,6 +37,14 @@
         }
         e.preventDefault();
       }, { passive: false });
+
+      // キーボード表示時にフォーカス中の入力欄をキーボードの上に自動スクロール
+      window.visualViewport?.addEventListener('resize', () => {
+        const focused = document.activeElement;
+        if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) {
+          setTimeout(() => focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+        }
+      });
     }
 
     // ─── GENRE MASTER ───
