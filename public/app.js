@@ -16,7 +16,7 @@
       // ステータスバー背景色をアプリのクリーム色に統一
       const _sb = window.Capacitor?.Plugins?.StatusBar;
       if (_sb) {
-        _sb.setStyle({ style: 'DARK' });
+        _sb.setStyle({ style: 'LIGHT' });
         _sb.setBackgroundColor({ color: '#FFF9F2' });
       }
     }
