@@ -242,7 +242,7 @@ async function fetchInstagramPosts(accounts = []) {
       const url = new URL(`https://graph.facebook.com/v25.0/${igUserId}`);
       url.searchParams.set(
         'fields',
-        `business_discovery.username(${username}){media{caption,media_url,thumbnail_url,media_type,timestamp,permalink}}`
+        `business_discovery.username(${username}){media{caption,media_url,thumbnail_url,media_type,timestamp,permalink,children{media_url,thumbnail_url}}}`
       );
       url.searchParams.set('access_token', pageToken);
 
@@ -271,7 +271,11 @@ async function fetchInstagramPosts(accounts = []) {
           description: post.caption.slice(0, 800),
           link:        externalLink || post.permalink,
           pubDate:     post.timestamp,
-          image:       (post.media_type === 'VIDEO' ? post.thumbnail_url : post.media_url) || post.thumbnail_url || post.media_url || null,
+          image:       post.media_type === 'VIDEO'
+            ? (post.thumbnail_url || null)
+            : post.media_type === 'CAROUSEL_ALBUM'
+              ? (post.children?.data?.[0]?.media_url || post.media_url || null)
+              : (post.media_url || null),
           source:      `Instagram / @${username}`,
         });
         count++;

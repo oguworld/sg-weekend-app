@@ -10,6 +10,7 @@ const pageToken = process.env.INSTAGRAM_PAGE_TOKEN;
 const igUserId  = process.env.INSTAGRAM_IG_USER_ID;
 
 const CITIES = {
+  sg:  path.join(__dirname, '..', 'data', 'sg',  'events.json'),
   bkk: path.join(__dirname, '..', 'data', 'bkk', 'events.json'),
   syd: path.join(__dirname, '..', 'data', 'syd', 'events.json'),
 };
@@ -31,7 +32,7 @@ async function fetchAccountMedia(username) {
   const url = new URL(`https://graph.facebook.com/v25.0/${igUserId}`);
   url.searchParams.set(
     'fields',
-    `business_discovery.username(${username}){media.limit(50){media_url,thumbnail_url,media_type,permalink}}`
+    `business_discovery.username(${username}){media.limit(50){media_url,thumbnail_url,media_type,permalink,children{media_url,thumbnail_url}}}`
   );
   url.searchParams.set('access_token', pageToken);
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(15000) });
@@ -78,8 +79,11 @@ async function refreshCity(city) {
         if (!permalinks.has(post.permalink)) continue;
         const ev = byPermalink.get(post.permalink);
         if (!ev) continue;
-        const newImage = (post.media_type === 'VIDEO' ? post.thumbnail_url : post.media_url)
-          || post.thumbnail_url || post.media_url || null;
+        const newImage = post.media_type === 'VIDEO'
+          ? (post.thumbnail_url || null)
+          : post.media_type === 'CAROUSEL_ALBUM'
+            ? (post.children?.data?.[0]?.media_url || post.media_url || null)
+            : (post.media_url || null);
         if (newImage) {
           ev.image = newImage;
           updated++;
