@@ -142,23 +142,6 @@
       padding: 20px 20px calc(80px + env(safe-area-inset-bottom, 0px));
     }
 
-    /* ─── PULL-TO-REFRESH ─── */
-    #ptr-indicator {
-      height: 0;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin: -20px -20px 20px;
-      background: var(--warm-white);
-    }
-    .ptr-arrow { font-size: 18px; color: var(--caramel); transition: transform 0.2s ease; display: inline-block; }
-    .ptr-label { font-size: 13px; color: var(--warm-gray); }
-    .ptr-spinner { width: 20px; height: 20px; border: 2.5px solid var(--caramel-pale); border-top-color: var(--caramel); border-radius: 50%; display: none; }
-    #ptr-indicator.ptr-loading .ptr-spinner { display: block; animation: ptr-spin 0.7s linear infinite; }
-    #ptr-indicator.ptr-loading .ptr-arrow, #ptr-indicator.ptr-loading .ptr-label { display: none; }
-    @keyframes ptr-spin { to { transform: rotate(360deg); } }
 
     /* ─── PROFILE SETTINGS ─── */
     .profile-chips {

@@ -2,7 +2,7 @@
     const _isCapacitorApp = !!(window.Capacitor?.isNativePlatform?.());
     const API_BASE = _isCapacitorApp ? 'https://dosuru.app' : '';
 
-    // ─── CAPACITOR: GA4スキップ・外部リンク制御・ステータスバー ───
+    // ─── CAPACITOR: GA4スキップ・外部リンク制御・overscroll防止 ───
     if (_isCapacitorApp) {
       window.gtag = function() {};
       document.addEventListener('click', e => {
@@ -13,11 +13,11 @@
           window.Capacitor.Plugins.Browser.open({ url: anchor.href });
         }
       });
-      // ステータスバー背景色をアプリのクリーム色に統一
-      const _sb = window.Capacitor?.Plugins?.StatusBar;
-      if (_sb) {
-        _sb.setStyle({ style: 'DARK' });
-      }
+      // WKWebViewの上方向ゴムバンドスクロールを禁止（ヘッダーのずれ防止）
+      document.addEventListener('touchmove', e => {
+        const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        if (scrollY <= 0) e.preventDefault();
+      }, { passive: false });
     }
 
     // ─── GENRE MASTER ───
@@ -1480,62 +1480,6 @@
     _recommendModeActive = false;
     _syncRecommendChip();
 
-    // ─── ホーム画面 プルリフレッシュ ───
-    if (!_isCapacitorApp) (function() {
-      let startY = 0, lastY = 0, isPulling = false, isRefreshing = false;
-      const TRIGGER = 80;
-      const MAX_H = 56;
-      const ind   = document.getElementById('ptr-indicator');
-      const arrow = ind.querySelector('.ptr-arrow');
-      const label = ind.querySelector('.ptr-label');
-      function scrollTop() {
-        return Math.max(window.scrollY || 0, document.documentElement.scrollTop || 0);
-      }
-      function reset() {
-        isPulling = false;
-        ind.style.transition = 'height 0.3s ease';
-        ind.style.height = '0px';
-        ind.classList.remove('ptr-loading');
-        if (arrow) { arrow.style.transform = ''; }
-        if (label) { label.textContent = ''; }
-      }
-      const homeEl = document.getElementById('screen-home');
-      homeEl.addEventListener('touchstart', e => {
-        if (scrollTop() > 5) return;
-        startY = lastY = e.touches[0].clientY;
-        isPulling = false;
-      }, { passive: true });
-      homeEl.addEventListener('touchmove', e => {
-        if (isRefreshing || scrollTop() > 5) return;
-        lastY = e.touches[0].clientY;
-        const dy = lastY - startY;
-        if (dy <= 0) { if (isPulling) reset(); return; }
-        isPulling = true;
-        const h = Math.min(dy * 0.55, MAX_H);
-        ind.style.transition = 'none';
-        ind.style.height = h + 'px';
-        if (arrow) arrow.style.transform = dy >= TRIGGER ? 'rotate(180deg)' : 'rotate(0deg)';
-        if (label) label.textContent = dy >= TRIGGER ? '離して更新' : '';
-      }, { passive: true });
-      homeEl.addEventListener('touchend', () => {
-        if (!isPulling) return;
-        const dy = lastY - startY;
-        isPulling = false;
-        if (dy >= TRIGGER && !isRefreshing) {
-          isRefreshing = true;
-          ind.style.transition = 'height 0.2s ease';
-          ind.style.height = MAX_H + 'px';
-          ind.classList.add('ptr-loading');
-          loadEventData().finally(() => {
-            isRefreshing = false;
-            setTimeout(reset, 300);
-          });
-        } else {
-          reset();
-        }
-      }, { passive: true });
-    })(); // end !_isCapacitorApp PTR
-
     // ─── FAB ───
     (function() {
       const fab = document.getElementById('fab-top');
@@ -2664,57 +2608,14 @@
     async function initCourseScreen() {
       await switchCourseTab('everyone');
 
-      // スワイプでタブ切り替え & プルリフレッシュ（初回のみ登録）
+      // スワイプでタブ切り替え（初回のみ登録）
       const sc = document.querySelector('#screen-course .screen-content');
       if (sc && !sc._swipeInit) {
         sc._swipeInit = true;
         let _courseSwipeOnHScroll = false;
-        let _ptrStartY = 0, _ptrLastY = 0, _ptrPulling = false, _ptrRefreshing = false;
-        const PTR_TRIGGER = 80, PTR_MAX_H = 52;
-        const ptrInd   = document.getElementById('ptr-indicator-course');
-        const ptrArrow = ptrInd?.querySelector('.ptr-arrow');
-        const ptrLabel = ptrInd?.querySelector('.ptr-label');
-        function _ptrReset() {
-          _ptrPulling = false;
-          if (ptrInd) { ptrInd.style.transition = 'height 0.3s ease'; ptrInd.style.height = '0px'; ptrInd.classList.remove('ptr-loading'); }
-          if (ptrArrow) ptrArrow.style.transform = '';
-          if (ptrLabel) ptrLabel.textContent = '';
-        }
-
         sc.addEventListener('touchstart', e => {
           _courseSwipeStartX = e.touches[0].clientX;
           _courseSwipeOnHScroll = !!e.target.closest('#course-everyone-carousel');
-          _ptrStartY = _ptrLastY = e.touches[0].clientY;
-          _ptrPulling = false;
-        }, { passive: true });
-
-        sc.addEventListener('touchmove', e => {
-          if (_isCapacitorApp || _ptrRefreshing || sc._ptrLocked || sc.scrollTop > 5) return;
-          _ptrLastY = e.touches[0].clientY;
-          const dy = _ptrLastY - _ptrStartY;
-          if (dy <= 0) { if (_ptrPulling) _ptrReset(); return; }
-          _ptrPulling = true;
-          const h = Math.min(dy * 0.55, PTR_MAX_H);
-          if (ptrInd) { ptrInd.style.transition = 'none'; ptrInd.style.height = h + 'px'; }
-          if (ptrArrow) ptrArrow.style.transform = dy >= PTR_TRIGGER ? 'rotate(180deg)' : 'rotate(0deg)';
-          if (ptrLabel) ptrLabel.textContent = dy >= PTR_TRIGGER ? '離して更新' : '';
-        }, { passive: true });
-
-        sc.addEventListener('touchend', e => {
-          // プルリフレッシュ（垂直）- Capacitorでは無効
-          if (_isCapacitorApp || !_ptrPulling) return;
-          const dy = _ptrLastY - _ptrStartY;
-          _ptrPulling = false;
-          if (dy >= PTR_TRIGGER && !_ptrRefreshing) {
-            _ptrRefreshing = true;
-            if (ptrInd) { ptrInd.style.transition = 'height 0.2s ease'; ptrInd.style.height = PTR_MAX_H + 'px'; ptrInd.classList.add('ptr-loading'); }
-            Promise.resolve(switchCourseTab(currentCourseTab)).finally(() => {
-              _ptrRefreshing = false;
-              setTimeout(_ptrReset, 300);
-            });
-          } else {
-            _ptrReset();
-          }
         }, { passive: true });
       }
     }
