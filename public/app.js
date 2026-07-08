@@ -2,7 +2,7 @@
     const _isCapacitorApp = !!(window.Capacitor?.isNativePlatform?.());
     const API_BASE = _isCapacitorApp ? 'https://dosuru.app' : '';
 
-    // ─── CAPACITOR: GA4スキップ・外部リンク制御 ───
+    // ─── CAPACITOR: GA4スキップ・外部リンク制御・ステータスバー ───
     if (_isCapacitorApp) {
       window.gtag = function() {};
       document.addEventListener('click', e => {
@@ -13,6 +13,12 @@
           window.Capacitor.Plugins.Browser.open({ url: anchor.href });
         }
       });
+      // ステータスバー背景色をアプリのクリーム色に統一
+      const _sb = window.Capacitor?.Plugins?.StatusBar;
+      if (_sb) {
+        _sb.setStyle({ style: 'DARK' });
+        _sb.setBackgroundColor({ color: '#FFF9F2' });
+      }
     }
 
     // ─── GENRE MASTER ───
