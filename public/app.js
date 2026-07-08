@@ -38,12 +38,30 @@
         e.preventDefault();
       }, { passive: false });
 
-      // キーボード表示時にフォーカス中の入力欄をキーボードの上に自動スクロール
+      // キーボード表示時にフォーカス中の入力欄をキーボードの上に正確にスクロール
       window.visualViewport?.addEventListener('resize', () => {
         const focused = document.activeElement;
-        if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) {
-          setTimeout(() => focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
-        }
+        if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
+        const vv = window.visualViewport;
+        const keyboardHeight = window.innerHeight - vv.height;
+        if (keyboardHeight < 50) return; // キーボードが出ていない
+        setTimeout(() => {
+          const rect = focused.getBoundingClientRect();
+          const visibleBottom = vv.height - 20; // 20px 余白
+          if (rect.bottom > visibleBottom) {
+            const scrollBy = rect.bottom - visibleBottom;
+            // 最近傍のスクロール可能な親をスクロール
+            let el = focused.parentElement;
+            while (el && el !== document.documentElement) {
+              const ov = window.getComputedStyle(el).overflowY;
+              if ((ov === 'auto' || ov === 'scroll') && el.scrollHeight > el.clientHeight) {
+                el.scrollTop += scrollBy;
+                return;
+              }
+              el = el.parentElement;
+            }
+          }
+        }, 80);
       });
     }
 

@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -18,5 +18,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "キーボード表示時のナビバー挙動を統一（@capacitor/keyboard追加でresize:none有効化）"
+  "releaseNotes": "キーボード表示時にフォームフィールドが隠れる問題を修正"
 }
