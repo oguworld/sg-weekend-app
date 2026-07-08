@@ -1481,7 +1481,7 @@
     _syncRecommendChip();
 
     // ─── ホーム画面 プルリフレッシュ ───
-    (function() {
+    if (!_isCapacitorApp) (function() {
       let startY = 0, lastY = 0, isPulling = false, isRefreshing = false;
       const TRIGGER = 80;
       const MAX_H = 56;
@@ -1534,7 +1534,7 @@
           reset();
         }
       }, { passive: true });
-    })();
+    })(); // end !_isCapacitorApp PTR
 
     // ─── FAB ───
     (function() {
@@ -2689,7 +2689,7 @@
         }, { passive: true });
 
         sc.addEventListener('touchmove', e => {
-          if (_ptrRefreshing || sc._ptrLocked || sc.scrollTop > 5) return;
+          if (_isCapacitorApp || _ptrRefreshing || sc._ptrLocked || sc.scrollTop > 5) return;
           _ptrLastY = e.touches[0].clientY;
           const dy = _ptrLastY - _ptrStartY;
           if (dy <= 0) { if (_ptrPulling) _ptrReset(); return; }
@@ -2701,8 +2701,8 @@
         }, { passive: true });
 
         sc.addEventListener('touchend', e => {
-          // プルリフレッシュ（垂直）
-          if (!_ptrPulling) return;
+          // プルリフレッシュ（垂直）- Capacitorでは無効
+          if (_isCapacitorApp || !_ptrPulling) return;
           const dy = _ptrLastY - _ptrStartY;
           _ptrPulling = false;
           if (dy >= PTR_TRIGGER && !_ptrRefreshing) {

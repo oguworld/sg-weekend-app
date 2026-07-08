@@ -876,7 +876,7 @@
     /* ─── SCREENS (pin list, calendar, settings) ─── */
     .screen {
       display: none;
-      padding: 20px 20px calc(80px + env(safe-area-inset-bottom, 0px));
+      padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(80px + env(safe-area-inset-bottom, 0px));
       min-height: 80vh;
     }
     #screen-plan {
@@ -3190,6 +3190,7 @@
     html[data-theme="dark"] .who-dot:not(.active) { background: #2E241C; }
     #screen-course {
       padding: 0;
+      padding-top: env(safe-area-inset-top, 0px);
       display: flex;
       flex-direction: column;
       height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
@@ -3203,6 +3204,7 @@
       min-height: 0;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: none;
       padding: 0 0 160px;
     }
 
