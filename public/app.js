@@ -24,15 +24,18 @@
         while (el && el !== document.documentElement) {
           const ov = window.getComputedStyle(el).overflowY;
           if (ov === 'auto' || ov === 'scroll') {
-            const atTop    = el.scrollTop <= 0;
-            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-            if (dy > 0 && atTop)    { e.preventDefault(); return; } // 上端での引き上げ防止
-            if (dy < 0 && atBottom) { e.preventDefault(); return; } // 下端での引き下げ防止
-            return; // スクロール余地あり → 通常スクロール許可
+            // 実際に縦スクロール可能な要素のみ対象（overflow-x:autoの副作用でoverflow-y:autoになる要素を除外）
+            if (el.scrollHeight > el.clientHeight) {
+              const atTop    = el.scrollTop <= 0;
+              const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+              if (dy > 0 && atTop)    { e.preventDefault(); return; }
+              if (dy < 0 && atBottom) { e.preventDefault(); return; }
+              return; // スクロール余地あり → 許可
+            }
           }
           el = el.parentElement;
         }
-        e.preventDefault(); // スクロール対象なし → 防止
+        e.preventDefault();
       }, { passive: false });
     }
 
