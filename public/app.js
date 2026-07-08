@@ -40,17 +40,29 @@
 
       // キーボード表示時にフォーカス中の入力欄をキーボードの上に正確にスクロール
       window.visualViewport?.addEventListener('resize', () => {
-        const focused = document.activeElement;
-        if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
         const vv = window.visualViewport;
         const keyboardHeight = window.innerHeight - vv.height;
-        if (keyboardHeight < 50) return; // キーボードが出ていない
+        const focused = document.activeElement;
+
+        // チャットシート: スクロール親がないので bottom を動かしてシート全体を上げる
+        const chatSheet = document.getElementById('chat-sheet');
+        if (chatSheet?.classList.contains('visible')) {
+          chatSheet.style.bottom = keyboardHeight > 50 ? keyboardHeight + 'px' : '0px';
+          if (keyboardHeight > 50) {
+            const msgs = document.getElementById('chat-messages');
+            if (msgs) setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 100);
+          }
+        }
+
+        if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
+        if (keyboardHeight < 50) return;
+
         setTimeout(() => {
           const rect = focused.getBoundingClientRect();
           const visibleBottom = vv.height - 20; // 20px 余白
           if (rect.bottom > visibleBottom) {
             const scrollBy = rect.bottom - visibleBottom;
-            // 最近傍のスクロール可能な親をスクロール
+            // 最近傍のスクロール可能な親をスクロール（設定画面・モーダル等）
             let el = focused.parentElement;
             while (el && el !== document.documentElement) {
               const ov = window.getComputedStyle(el).overflowY;
