@@ -14,9 +14,22 @@
         }
       });
       // WKWebViewの上方向ゴムバンドスクロールを禁止（ヘッダーのずれ防止）
+      // 指が下に動く（dy>0）= トップ側へのオーバースクロール のみ防止。通常の下スクロールは許可。
+      let _capTouchStartY = 0;
+      document.addEventListener('touchstart', e => {
+        _capTouchStartY = e.touches[0].clientY;
+      }, { passive: true });
       document.addEventListener('touchmove', e => {
-        const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
-        if (scrollY <= 0) e.preventDefault();
+        const dy = e.touches[0].clientY - _capTouchStartY;
+        if (dy <= 0) return; // 下方向スクロール（通常）は許可
+        // スクロール中の子コンテナがあり、まだ上に余地があれば許可
+        let el = e.target;
+        while (el && el !== document.documentElement) {
+          const ov = window.getComputedStyle(el).overflowY;
+          if ((ov === 'auto' || ov === 'scroll') && el.scrollTop > 0) return;
+          el = el.parentElement;
+        }
+        e.preventDefault(); // トップでの引っ張りを防止
       }, { passive: false });
     }
 
