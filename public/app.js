@@ -38,31 +38,27 @@
         e.preventDefault();
       }, { passive: false });
 
-      // キーボード表示時にフォーカス中の入力欄をキーボードの上に正確にスクロール
-      window.visualViewport?.addEventListener('resize', () => {
-        const vv = window.visualViewport;
-        const keyboardHeight = window.innerHeight - vv.height;
-        const focused = document.activeElement;
+      // キーボード表示時の入力欄スクロール
+      // @capacitor/keyboard のネイティブイベントで正確なキーボード高さを取得
+      const _screenH = window.innerHeight; // キーボード表示前の画面高さを保存
 
-        // チャットシート: スクロール親がないので bottom を動かしてシート全体を上げる
+      function _onCapKeyboardShow(kbHeight) {
+        // チャットシート: スクロール親がないのでシート全体を上げる
         const chatSheet = document.getElementById('chat-sheet');
         if (chatSheet?.classList.contains('visible')) {
-          chatSheet.style.bottom = keyboardHeight > 50 ? keyboardHeight + 'px' : '0px';
-          if (keyboardHeight > 50) {
-            const msgs = document.getElementById('chat-messages');
-            if (msgs) setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 100);
-          }
+          chatSheet.style.bottom = kbHeight + 'px';
+          const msgs = document.getElementById('chat-messages');
+          if (msgs) setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 100);
         }
 
+        // フォーカス中の入力欄が隠れていたらスクロール親を動かす
+        const focused = document.activeElement;
         if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
-        if (keyboardHeight < 50) return;
-
         setTimeout(() => {
           const rect = focused.getBoundingClientRect();
-          const visibleBottom = vv.height - 20; // 20px 余白
+          const visibleBottom = _screenH - kbHeight - 20;
           if (rect.bottom > visibleBottom) {
             const scrollBy = rect.bottom - visibleBottom;
-            // 最近傍のスクロール可能な親をスクロール（設定画面・モーダル等）
             let el = focused.parentElement;
             while (el && el !== document.documentElement) {
               const ov = window.getComputedStyle(el).overflowY;
@@ -74,7 +70,33 @@
             }
           }
         }, 80);
-      });
+      }
+
+      function _onCapKeyboardHide() {
+        const chatSheet = document.getElementById('chat-sheet');
+        if (chatSheet) chatSheet.style.bottom = '0px';
+      }
+
+      const _CapKB = window.Capacitor?.Plugins?.Keyboard;
+      if (_CapKB?.addListener) {
+        _CapKB.addListener('keyboardWillShow', (info) => _onCapKeyboardShow(info.keyboardHeight));
+        _CapKB.addListener('keyboardWillHide', () => _onCapKeyboardHide());
+      } else {
+        // フォールバック: focusin で遅延実行
+        document.addEventListener('focusin', e => {
+          const el = e.target;
+          if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+          setTimeout(() => {
+            const kbHeight = _screenH - window.visualViewport.height;
+            if (kbHeight > 50) _onCapKeyboardShow(kbHeight);
+          }, 350);
+        }, true);
+        document.addEventListener('focusout', e => {
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            setTimeout(_onCapKeyboardHide, 100);
+          }
+        }, true);
+      }
     }
 
     // ─── GENRE MASTER ───

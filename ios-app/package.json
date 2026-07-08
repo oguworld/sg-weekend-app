@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -18,5 +18,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "キーボード表示時にAIチャット・設定入力欄が隠れる問題を修正"
+  "releaseNotes": "キーボード表示時の入力欄隠れ問題を根本修正（Capacitorネイティブイベント使用）"
 }
