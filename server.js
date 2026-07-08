@@ -2080,6 +2080,11 @@ app.post('/api/courses/:id/unpublish', async (req, res) => {
 // ─────────────────────────────────────────────
 // Static HTML pages (about subdomain)
 // ─────────────────────────────────────────────
+app.get('/api/version', (req, res) => {
+  const pkg = require('./ios-app/package.json');
+  res.json({ version: pkg.version });
+});
+
 app.get('/about', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'about.html'));
 });

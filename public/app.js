@@ -230,6 +230,7 @@
         genreStatusUnset: '未設定',
         genreStatusSet: '{n}件設定済み',
         genreHint: '好きなジャンルを選ぶと「⭐ おすすめ」で表示されます',
+        labelVersion: 'バージョン',
         labelOfficialX: 'SNS',
         labelAboutApp: 'アプリについて',
         labelOfficialSite: '公式サイト',
@@ -427,6 +428,7 @@
         genreStatusUnset: 'Not set',
         genreStatusSet: '{n} selected',
         genreHint: 'Select genres to enable ⭐ Recommended',
+        labelVersion: 'Version',
         labelOfficialX: 'SNS',
         labelAboutApp: 'About',
         labelOfficialSite: 'Official Site',
@@ -1458,6 +1460,24 @@
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
+
+    // バージョン表示
+    (async () => {
+      const el = document.getElementById('app-version-label');
+      if (!el) return;
+      try {
+        const _sb = window.Capacitor?.Plugins?.App;
+        if (_isCapacitorApp && _sb) {
+          const info = await _sb.getInfo();
+          el.textContent = `v${info.version} (${info.build})`;
+        } else {
+          const r = await fetch(`${API_BASE}/api/version`);
+          const d = await r.json();
+          el.textContent = `v${d.version}`;
+        }
+      } catch(e) { el.textContent = '-'; }
+    })();
+
     _recommendModeActive = false;
     _syncRecommendChip();
 
