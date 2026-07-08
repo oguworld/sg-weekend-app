@@ -206,6 +206,142 @@ BKK/SYD 停止箇所:
 - テスト用の一時データ変更は必ず元に戻してからコミットする
 - APIを変更する場合は後方互換性を保つ（旧バージョンのアプリが動き続けるか確認）
 
+## iOS / Capacitor 開発ノウハウ（2026-07-08）
+
+### Web版とiOS版の関係
+- **同一コード**: Capacitorは `public/` をバンドル。Web版とiOS版は完全に同じHTML/CSS/JS
+- **`_isCapacitorApp`フラグ**で分岐: GA4スキップ / 外部リンク処理 / overscroll防止 / SW登録スキップ / インストールバナースキップ / Push通知UI非表示
+- データは共有（events.json / API）。Web版でデータ破壊 = 本番App利用者への影響
+
+### ❌ 絶対にやってはいけないこと
+
+**`html, body { overflow: hidden; height: 100% }` を使わない**
+→ WKWebView で bottom-nav が常に「上に上がった状態」で固定されてしまう副作用がある。overscrollをJSで制御する（下記参照）。
+
+**スクリーンコンテナに `position: fixed` を使わない**
+→ stacking context が生成され、その上に重なるはずの bottom-nav のクリックが効かなくなる。スクリーンは `height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))` で通常フローに置く。
+
+**overlay の z-index を bottom-nav (9999) より低くしない**
+→ モーダルオーバーレイが nav を隠せず、キーボード表示時に nav がオーバーレイの上に飛び出して見える。
+
+**PTR（プルトゥリフレッシュ）を実装しない**
+→ WKWebView でヘッダーずれ・白いステータスバーの原因になる。一度問題になったので永久廃止。
+
+### ✅ 正しいスクロール・レイアウトパターン
+
+```css
+/* 固定ヘッダー + スクロールコンテンツ の正解パターン */
+.screen-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
+}
+.screen-header  { flex-shrink: 0; }
+.screen-content { flex: 1; min-height: 0; overflow-y: auto; }
+/* flex: 1; min-height: 0; の両方が必要。min-height: 0 がないとオーバーフローしない */
+```
+
+### ✅ iOS overscroll（ゴムバンドスクロール）防止
+
+```javascript
+// touchmove を passive:false で登録し、必要な場合のみ preventDefault
+document.addEventListener('touchmove', e => {
+  const dy = e.touches[0].clientY - startY;
+  let el = e.target;
+  while (el && el !== document.documentElement) {
+    const ov = window.getComputedStyle(el).overflowY;
+    if (ov === 'auto' || ov === 'scroll') {
+      if (el.scrollHeight > el.clientHeight) {  // ← 縦スクロール可能な要素のみ対象
+        const atTop    = el.scrollTop <= 0;
+        const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+        if (dy > 0 && atTop)    { e.preventDefault(); return; }
+        if (dy < 0 && atBottom) { e.preventDefault(); return; }
+        return;
+      }
+      // ← scrollHeight <= clientHeight の要素はスキップ（overflow-x:auto の副作用でoverflow-y:autoになる水平カルーセルを除外）
+    }
+    el = el.parentElement;
+  }
+  e.preventDefault();
+}, { passive: false });
+```
+
+**注意**: `overflow-x: auto` を設定すると CSS仕様で `overflow-y` も暗黙的に `auto` になる。そのため `scrollHeight > clientHeight` の条件チェックが必須。これがないと水平カルーセルで縦スクロールが効かなくなる。
+
+### ✅ Capacitor キーボード設定
+
+`capacitor.config.js` に設定するだけでなく、**`@capacitor/keyboard` パッケージのインストールも必須**。パッケージがないと設定は iOS ネイティブに反映されない（サイレントに無視される）。
+
+```javascript
+// capacitor.config.js
+plugins: {
+  Keyboard: {
+    resize: 'none',  // キーボードがWebViewを縮小しない → ナビがキーボード裏に隠れる自然な挙動
+  },
+},
+```
+
+```json
+// package.json
+"@capacitor/keyboard": "^6.0.0"  // これがないと上記設定が効かない
+```
+
+さらに `visualViewport` でフォーカス入力欄を自動スクロール:
+```javascript
+window.visualViewport?.addEventListener('resize', () => {
+  const el = document.activeElement;
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+    setTimeout(() => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+  }
+});
+```
+
+### ✅ CSSキャッシュバスティング手順（セットで変更必須）
+
+```html
+<!-- index.html -->
+<link rel="stylesheet" href="/app.css?v=YYYYMMDDX">
+```
+```javascript
+// sw.js
+const CACHE_NAME = 'sg-weekend-vXXX';  // 数字を上げる
+```
+**両方同時に変更しないと古いCSSがServiceWorkerにキャッシュされたまま残る。**
+
+### ✅ iOS ステータスバー
+
+GitHub Actions の workflow で Info.plist を直接書き換えて設定:
+```yaml
+- name: Set status bar style in Info.plist
+  run: |
+    /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool false" ios/App/App/Info.plist || \
+    /usr/libexec/PlistBuddy -c "Set :UIViewControllerBasedStatusBarAppearance false" ios/App/App/Info.plist
+    /usr/libexec/PlistBuddy -c "Add :UIStatusBarStyle string UIStatusBarStyleDarkContent" ios/App/App/Info.plist || \
+    /usr/libexec/PlistBuddy -c "Set :UIStatusBarStyle UIStatusBarStyleDarkContent" ios/App/App/Info.plist
+```
+
+### ✅ Instagram API: CAROUSEL_ALBUM 対応
+
+`CAROUSEL_ALBUM` タイプの投稿は `media_url` がルートに返ってこない。`children` を必ずリクエストする:
+```javascript
+// fields に children{media_url,thumbnail_url} を追加
+`business_discovery.username(${username}){media{caption,media_url,thumbnail_url,media_type,timestamp,permalink,children{media_url,thumbnail_url}}}`
+
+// 画像取得ロジック
+const image = post.media_type === 'VIDEO'
+  ? post.thumbnail_url
+  : post.media_type === 'CAROUSEL_ALBUM'
+    ? (post.children?.data?.[0]?.media_url || post.media_url)
+    : post.media_url;
+```
+
+### ✅ TestFlight デバッグのコツ
+
+- Web版で直らない場合でもiOSで直ることがある（WKWebView固有の挙動）
+- CSSの変更はSW経由でキャッシュされるため、バージョンを上げないと反映されない
+- `pm2 restart sg-weekend` は Web版のみ。iOS版は TestFlight ビルドが必要
+- ビルド時間: GitHub Actions → TestFlight 反映まで約15〜20分
+
 ## やってはいけないこと
 - cronはシステムcrontabを使う（PM2 cronはスケジュール制御に不向きなため使わない）
 - APIキー・秘密情報をログに出力しない
