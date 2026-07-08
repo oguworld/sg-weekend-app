@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -11,11 +11,12 @@
     "@capacitor/core": "^6.0.0",
     "@capacitor/app": "^6.0.0",
     "@capacitor/browser": "^6.0.0",
+    "@capacitor/keyboard": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "キーボード表示時のナビバー表示を改善"
+  "releaseNotes": "キーボード表示時のナビバー挙動を統一（@capacitor/keyboard追加でresize:none有効化）"
 }
