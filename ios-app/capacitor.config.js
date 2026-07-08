@@ -5,6 +5,7 @@ const config = {
   webDir: '../public',
   ios: {
     contentInset: 'always',
+    backgroundColor: '#FFF9F2',
   },
 };
 
