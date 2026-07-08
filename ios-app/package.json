@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -17,5 +17,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "ナビバー安定化・全画面スクロール改善・ステータスバー文字色修正"
+  "releaseNotes": "キーボード表示時のナビバー表示を改善"
 }
