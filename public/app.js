@@ -1460,13 +1460,8 @@
       localStorage.setItem('_custom_plans_migrated', '1');
     })();
 
-    // ─── ヘッダー高さをコンテンツのpadding-topに反映（fixed header対応）───
-    function syncHeaderHeight() {
-      const h = document.querySelector('.app-header')?.offsetHeight || 0;
-      document.getElementById('screen-home').style.paddingTop = h + 'px';
-    }
-    syncHeaderHeight();
-    window.addEventListener('resize', syncHeaderHeight);
+    // app-headerはscreen-home内のstickyヘッダーになったためsyncHeaderHeightは不要
+    function syncHeaderHeight() {}
 
     loadEventData();
     initPushState();
@@ -2568,7 +2563,7 @@
       const cityChanged = getCity() !== _loadedCity;
       const appHeader = document.querySelector('.app-header');
       if (screen === 'home') {
-        document.getElementById('screen-home').style.display = 'block';
+        document.getElementById('screen-home').style.display = 'flex';
         if (appHeader) appHeader.style.display = 'block';
         filterCats.clear();
         _recommendModeActive = false;
@@ -2584,7 +2579,7 @@
         if (appHeader) appHeader.style.display = 'none';
         const el = document.getElementById('screen-' + screen);
         if (el) {
-          el.style.display = el.id === 'screen-course' ? 'flex' : 'block';
+          el.style.display = 'flex';
           el.classList.add('visible');
         }
         if (screen === 'plan') {

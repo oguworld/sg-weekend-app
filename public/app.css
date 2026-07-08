@@ -41,11 +41,10 @@
       background: var(--cream);
       padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 0;
       border-bottom: none;
-      position: fixed;
+      position: sticky;
       top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
+      z-index: 10;
+      flex-shrink: 0;
       box-shadow: 0 2px 18px rgba(42,37,32,0.06);
     }
 
@@ -139,7 +138,9 @@
 
     /* ─── MAIN SCROLL AREA ─── */
     .main {
-      padding: 20px 20px calc(80px + env(safe-area-inset-bottom, 0px));
+      display: flex;
+      flex-direction: column;
+      height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
     }
 
 
@@ -859,13 +860,32 @@
     /* ─── SCREENS (pin list, calendar, settings) ─── */
     .screen {
       display: none;
-      padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px calc(80px + env(safe-area-inset-bottom, 0px));
-      min-height: 80vh;
     }
-    #screen-plan {
-      padding-bottom: calc(170px + env(safe-area-inset-bottom, 0px));
+    #screen-plan,
+    #screen-settings {
+      padding: 0;
+      padding-top: env(safe-area-inset-top, 0px);
+      height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
     }
-    .screen.visible { display: block; }
+    #screen-plan.visible,
+    #screen-settings.visible {
+      display: flex;
+      flex-direction: column;
+    }
+    #screen-plan .plan-title-header,
+    #screen-settings .plan-title-header {
+      flex-shrink: 0;
+      padding: 20px 20px 0;
+    }
+    .screen-scroll-content {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: none;
+      padding: 0 20px 80px;
+    }
+    .screen.visible { display: flex; }
 
     .screen-title {
       font-family: 'Kaisei Opti', serif;
