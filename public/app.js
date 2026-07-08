@@ -13,23 +13,26 @@
           window.Capacitor.Plugins.Browser.open({ url: anchor.href });
         }
       });
-      // WKWebViewの上方向ゴムバンドスクロールを禁止（ヘッダーのずれ防止）
-      // 指が下に動く（dy>0）= トップ側へのオーバースクロール のみ防止。通常の下スクロールは許可。
+      // WKWebViewのゴムバンドスクロールを上下両方向で禁止（ナビバーのずれ防止）
       let _capTouchStartY = 0;
       document.addEventListener('touchstart', e => {
         _capTouchStartY = e.touches[0].clientY;
       }, { passive: true });
       document.addEventListener('touchmove', e => {
         const dy = e.touches[0].clientY - _capTouchStartY;
-        if (dy <= 0) return; // 下方向スクロール（通常）は許可
-        // スクロール中の子コンテナがあり、まだ上に余地があれば許可
         let el = e.target;
         while (el && el !== document.documentElement) {
           const ov = window.getComputedStyle(el).overflowY;
-          if ((ov === 'auto' || ov === 'scroll') && el.scrollTop > 0) return;
+          if (ov === 'auto' || ov === 'scroll') {
+            const atTop    = el.scrollTop <= 0;
+            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+            if (dy > 0 && atTop)    { e.preventDefault(); return; } // 上端での引き上げ防止
+            if (dy < 0 && atBottom) { e.preventDefault(); return; } // 下端での引き下げ防止
+            return; // スクロール余地あり → 通常スクロール許可
+          }
           el = el.parentElement;
         }
-        e.preventDefault(); // トップでの引っ張りを防止
+        e.preventDefault(); // スクロール対象なし → 防止
       }, { passive: false });
     }
 

@@ -28,14 +28,11 @@
     html, body { overscroll-behavior-x: none; background-color: var(--cream); }
     body { overscroll-behavior-y: none; }
     html { background: var(--cream); overscroll-behavior-y: none; }
-    html, body {
-      overflow: hidden;
-      height: 100%;
-    }
     body {
       font-family: 'Noto Sans JP', sans-serif;
       background: var(--cream);
       color: var(--midnight);
+      min-height: 100vh;
       overscroll-behavior-y: none;
     }
 
