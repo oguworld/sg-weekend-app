@@ -80,15 +80,22 @@
           focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           return;
         }
-        // 画面直下の入力欄（設定画面の#feedback-text/#nickname-inputなど）: 祖先のスクロールコンテナ内で中央に寄せる
-        let container = focused.parentElement;
-        while (container && container !== document.body) {
-          const cs = getComputedStyle(container);
-          if (cs.overflowY === 'auto' && container.scrollHeight > container.clientHeight) {
-            focused.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            break;
+        // 画面直下の入力欄（設定画面の#feedback-text/#nickname-inputなど）:
+        // resize:'none'下ではビューポート高さが変化せずscrollHeight<=clientHeightと誤判定されるため、
+        // 「スクロール可能かどうか」ではなくフォーカス要素の実際の画面内位置で判定する
+        const rect = focused.getBoundingClientRect();
+        const visibleBottom = _screenH - kbHeight - 24; // キーボード上に見た目の余白24pxを確保
+        const overflow = rect.bottom - visibleBottom;
+        if (overflow > 0) {
+          let container = focused.parentElement;
+          while (container && container !== document.body) {
+            const cs = getComputedStyle(container);
+            if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+              container.scrollTop += overflow;
+              break;
+            }
+            container = container.parentElement;
           }
-          container = container.parentElement;
         }
       }, 80);
     }

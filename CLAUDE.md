@@ -344,6 +344,30 @@ document.getElementById('home-scroll-content').addEventListener('scroll', () => 
 3. `_screenH`（キーボード表示前の画面高さ）は`let`で保持し、`_resetSheetKeyboardOffset()`実行時（＝キーボードが閉じた正しいタイミング）にのみ再取得する（Capacitor環境でのみ使用）
 4. `curH <= kbH + 80`のガード値はやや恣意的。実機テストで表示崩れがあれば調整する
 
+### ⚠️ z-index是正時は「companion要素」だけでなく「子シート」も辿って確認する（2026-07-09追記）
+
+`.plan-modal-overlay`/`.plan-modal`のようなoverlay+本体のペアだけでなく、同じ構造を持つ**別クラス**（`.plan-sheet`等）にも是正漏れが起きやすい。あるz-index値を変更したら、以下を横展開で確認すること:
+
+1. 同じCSSクラスを使う他の要素（`.plan-sheet`は`#course-sheet`と`#course-detail-sheet`の2箇所で共有されていた）
+2. その要素の**内側から開かれる子シート**（`#course-detail-sheet`内の「タイトルを編集」ボタンが開く`#title-edit-sheet`など）。親のz-indexだけ上げて子のz-indexを据え置くと、子シートが親の背後に隠れる新規バグになる
+3. 最終的なz-index順序を一覧化し、意図した重なり順（overlay < 本体 < 子シート < 日付ピッカー等のさらに上位シート）になっているか確認する
+
+### ⚠️ `resize:'none'`下のキーボード回避フォールバックは「スクロール可能判定」に頼らない（2026-07-09追記）
+
+`Keyboard: { resize: 'none' }`設定下では、キーボード表示中も`clientHeight`はビューポート全体のまま変化しない。そのため「`overflowY === 'auto' && scrollHeight > clientHeight`（＝物理的にスクロール可能かどうか）」で祖先要素を判定する方式は、**コンテンツ量が少ない画面では常にfalseになり、実際にはキーボードに隠れているのにフォールバック処理が発火しない**という誤判定を起こす。
+
+正しい判定は「スクロール可能かどうか」ではなく「フォーカス要素が実際に画面のどこにあるか」:
+
+```javascript
+const rect = focused.getBoundingClientRect();
+const visibleBottom = _screenH - kbHeight - 24; // キーボード上の余白
+const overflow = rect.bottom - visibleBottom;
+if (overflow > 0) {
+  // 祖先の overflow-y:auto/scroll 要素の scrollTop を overflow 分だけ動かす
+  // （スクロール可能かどうかに関わらず操作を試みる。動かせない場合は実害なし）
+}
+```
+
 ### ✅ CSSキャッシュバスティング手順（セットで変更必須）
 
 ```html
