@@ -239,6 +239,8 @@ BKK/SYD 停止箇所:
 **overlay の z-index を bottom-nav (9999) より低くしない**
 → モーダルオーバーレイが nav を隠せず、キーボード表示時に nav がオーバーレイの上に飛び出して見える。
 
+**例外（2026-07-09）**: コンテンツ選択系モーダル（`event-filter-sheet`, `plan-modal`, `plan-sheet`, `title-edit-sheet` 等）は、ユーザーのUX判断により意図的に bottom-nav (9999) より低い z-index（3099〜3102番台）を使い、モーダル表示中も bottom-nav が表示され続ける設計を正式採用する。対象: `.plan-modal-overlay`(3099) / `.plan-modal`・`.plan-sheet`(3100) / `#title-edit-overlay`(3101) / `#title-edit-sheet`(3102)。これらのシート/オーバーレイのペアでは「シート本体 ≥ 自身のoverlay」の相対関係のみ守ればよく、bottom-navより下でよい。一方、`date-picker`・`schedule-plan-action-sheet` 等その他のモーダルは引き続き旧ルール（bottom-nav以上）を維持しているため、新規モーダル追加時はどちらの方針に合わせるか設計時に明示すること。
+
 **PTR（プルトゥリフレッシュ）を実装しない**
 → WKWebView でヘッダーずれ・白いステータスバーの原因になる。一度問題になったので永久廃止。
 

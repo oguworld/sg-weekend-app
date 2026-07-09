@@ -1747,10 +1747,10 @@
     }
 
     function openPinDetail(id) {
-      lockScroll();
       const pins = getPins();
       const p = pins[id];
       if (!p) return;
+      lockScroll();
 
       const fullEvent = EVENT_REGISTRY[p.id];
       const bgClass = (fullEvent && fullEvent.bgClass) ? fullEvent.bgClass : getBgClass(p.id || p.store || '');
@@ -1837,9 +1837,9 @@
     }
 
     function openEventDetailFromSchedule(eventId, planId, planType) {
-      lockScroll();
       const event = EVENT_REGISTRY[eventId];
       if (!event) return;
+      lockScroll();
       const bgClass = event.bgClass || getBgClass(event.id || event.store || '');
       const isEn = getLang() === 'en';
       const content = (isEn && event.content_en) ? event.content_en : (event.content || '');
@@ -2356,6 +2356,9 @@
     let _loadedCity = getCity();
 
     function switchNav(screen) {
+      if (screen === 'settings') {
+        console.log('[DEBUG switchNav→settings]', new Error().stack);
+      }
       closeAllPopups();
       ['home','course','plan','settings'].forEach(s => {
         document.getElementById('nav-' + s).classList.remove('active');

@@ -2206,7 +2206,7 @@
       background: white;
       border-radius: 24px 24px 0 0;
       box-shadow: 0 -6px 32px rgba(44,36,32,0.16);
-      z-index: 10011;
+      z-index: 3100;
       display: flex;
       flex-direction: column;
       transform: translateY(100%);
@@ -2605,13 +2605,13 @@
     .schedule-empty-day { font-size: 13px; color: var(--light-gray); padding: 12px 14px; background: var(--warm-white); }
     /* ─── PLAN MODALS (bottom sheet) ─── */
     .plan-modal-overlay {
-      position: fixed; inset: 0; background: rgba(44,36,32,.4); z-index: 10010;
+      position: fixed; inset: 0; background: rgba(44,36,32,.4); z-index: 3099;
       display: none; opacity: 0; transition: opacity 0.2s;
     }
     .plan-modal-overlay.visible { display: block; opacity: 1; }
     .plan-modal {
       position: fixed; bottom: 0; left: 0; right: 0; background: white;
-      border-radius: 24px 24px 0 0; z-index: 10011; max-height: 88vh;
+      border-radius: 24px 24px 0 0; z-index: 3100; max-height: 88vh;
       display: none; flex-direction: column; overflow: hidden;
       transform: translateY(100%); transition: transform 0.3s cubic-bezier(.32,2,.55,.89), bottom 0.2s ease;
     }
