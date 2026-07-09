@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.1.13",
+  "version": "1.2",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -18,5 +18,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "AIチャット機能を削除し、キーボード表示時の入力欄隠れ問題を修正。トップへ戻るボタンの挙動も修正しました。"
+  "releaseNotes": "UI表示・キーボード挙動を全面的に改善しました。"
 }
