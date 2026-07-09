@@ -9,7 +9,7 @@
 日本語UI必須。スマホファースト。
 
 ## サーバー情報
-- VPS: Contabo (IP: 194.233.92.41)
+- VPS: Contabo (IP: 194.233.82.43)
 - ユーザー: masahiko
 - プロジェクトパス: /home/masahiko/sg-weekend-app/
 - ドメイン: dosuru.app（アプリ本体）/ about.dosuru.app（紹介LP）
@@ -18,7 +18,7 @@
 ## サブドメイン
 - **about.dosuru.app**: アプリ紹介LP（2026-07-04公開）
   - ファイル: `public/about.html`
-  - nginx: `/etc/nginx/sites-enabled/about.dosuru.app`（Node.jsへプロキシ）
+  - nginx: `/etc/nginx/sites-available/dosuru.app`内の3つ目のserverブロックに同居（Node.jsへプロキシ）
   - Express route: `GET /about` → `public/about.html`
   - App StoreのURLはプレースホルダー（審査通過後に差し替え）
 
@@ -99,6 +99,12 @@ sg-weekend-app/
 - transportチップ: data-val=公共交通・バス（表示ラベルは都市別: SG=MRT・バス, BKK=BTS・MRT・バス, SYD=電車・バス）
 - コース詳細ボタン: 予定表追加（メイン）/ 公開+タイトル変更（横2列）/ 削除（テキストリンク）
 - マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
+- タイトル編集シート（`#title-edit-sheet`）: 2026-07-09に `.plan-modal` クラス方式（`.visible`トグル）に統一。旧インラインstyle（display:block/none）方式は廃止
+
+## AIチャット機能の廃止（2026-07-09）
+- AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
+- `server.js` の `/api/chat` エンドポイントは旧App Store版の後方互換のため残置（新規呼び出し元なし）
+- `.chat-overlay` / `.chat-sheet-handle` / `.chat-mic-btn` クラスは pin-picker/emoji-picker/コースメモ音声入力（`course-note-mic-btn`）が共有するため引き続き使用
 
 ## iOSアプリ化（Capacitor）2026-07-03実装
 - 方式: ローカルバンドル（webDir: `../public`）。Web版と同じHTMLをアプリ内に同梱
@@ -108,8 +114,9 @@ sg-weekend-app/
 - GA4スキップ: `_isCapacitorApp` 時に `window.gtag = function(){}` でnoop化
 - 外部リンク: `a[target="_blank"]` クリックを `Capacitor.Plugins.Browser.open()` でデバイスブラウザに渡す
 - SW登録・インストールバナー・Push通知UI: Capacitor環境でスキップ/非表示
-- CI/CD: `release` ブランチpush → GitHub Actions（macOS runner）→ Fastlane deploy → App Store申請
-- Fastlane: `deploy`（App Store本番）/ `beta`（TestFlight）の2レーン
+- CI/CD: `release` ブランチpush → GitHub Actions（macOS runner）→ Fastlane deploy → TestFlight配信（社内テストのみ、`distribute_external: false`）
+- Fastlane: レーンは `deploy` のみ。中身は `upload_to_testflight`（App Store本番申請は含まない）
+- App Store本番申請は現状このワークフローに含まれず、別途手動対応が必要
 - GitHub Secrets: ASC_KEY_ID / ASC_ISSUER_ID / ASC_PRIVATE_KEY / MATCH_PASSWORD / MATCH_GIT_BASIC_AUTH
 - 初回セットアップ: MacInCloudで `npx cap add ios` → Xcode確認 → `fastlane match init` → GitHub Secrets登録
 - 詳細手順: `ios-app/README.md` 参照
@@ -127,7 +134,7 @@ sg-weekend-app/
 ## i18n対応（2026-06-24実装）
 - 言語切り替え: STRINGS オブジェクト（ja/en）+ `t(key)` 関数 + `applyI18n()`
 - 対応済み: 期間限定タブ・コース機能全体・設定画面・予定表モーダル・ボトムナビ
-- 未対応（スコープ外）: 共有カレンダー機能・AIチャットシート・インストールモーダル
+- 未対応（スコープ外）: 共有カレンダー機能・インストールモーダル
 
 ### ⚠️ i18n 必須ルール
 UI文字列を追加・変更するときは **必ず ja と en の両方を同時に対応** する。
@@ -286,15 +293,15 @@ plugins: {
 "@capacitor/keyboard": "^6.0.0"  // これがないと上記設定が効かない
 ```
 
-さらに `visualViewport` でフォーカス入力欄を自動スクロール:
-```javascript
-window.visualViewport?.addEventListener('resize', () => {
-  const el = document.activeElement;
-  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
-    setTimeout(() => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
-  }
-});
-```
+### ✅ 全画面共通キーボード被り対策（2026-07-09実装）
+
+`.plan-modal` / `.plan-sheet` / `#title-edit-sheet` すべてを対象に、**シート全体を持ち上げる方式**で統一（内部スクロールとの二重対応はしない）。Web版（iOS Safari/Android Chrome含む）でも同じ挙動になるよう共通関数化した。
+
+- `_liftVisibleSheetForKeyboard(kbHeight)`: フォーカス中要素から `closest('.plan-modal, .plan-sheet, #title-edit-sheet')` で対象シートを特定し `style.bottom = kbHeight + 'px'` で持ち上げる
+- `_resetSheetKeyboardOffset()`: 対象シート全体の `bottom` を `0px` に戻す
+- Capacitor環境: `@capacitor/keyboard` の `keyboardWillShow`/`keyboardWillHide` ネイティブイベントから共通関数を呼ぶ（正確な高さ取得）。プラグイン未検出時は `focusin`/`focusout` + `visualViewport.height` によるフォールバック
+- Web環境: `window.visualViewport.addEventListener('resize', ...)` で `window.innerHeight - visualViewport.height` からキーボード高さを推定（閾値50px超で発火）。`focusout` でリセット
+- `.plan-modal` / `.plan-sheet` に `transition: bottom 0.2s ease` を追加し、持ち上げ/リセットをアニメーションさせる
 
 ### ✅ CSSキャッシュバスティング手順（セットで変更必須）
 

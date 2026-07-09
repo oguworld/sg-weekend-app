@@ -38,62 +38,85 @@
         e.preventDefault();
       }, { passive: false });
 
-      // キーボード表示時の入力欄スクロール
-      // @capacitor/keyboard のネイティブイベントで正確なキーボード高さを取得
-      const _screenH = window.innerHeight; // キーボード表示前の画面高さを保存
+    }
 
-      function _onCapKeyboardShow(kbHeight) {
-        // チャットシート: スクロール親がないのでシート全体を上げる
-        const chatSheet = document.getElementById('chat-sheet');
-        if (chatSheet?.classList.contains('visible')) {
-          chatSheet.style.bottom = kbHeight + 'px';
-          const msgs = document.getElementById('chat-messages');
-          if (msgs) setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 100);
-        }
+    // ─── 全画面共通: キーボード被り対策（Web版・Capacitor版共通） ───
+    // フォーカス中の要素が属するシート（.plan-modal / .plan-sheet / #title-edit-sheet）を
+    // 特定し、シート全体を bottom: kbHeight で持ち上げる（内部スクロールとの二重対応はしない）
+    const _screenH = window.innerHeight; // キーボード表示前の画面高さを保存
 
-        // フォーカス中の入力欄が隠れていたらスクロール親を動かす
-        const focused = document.activeElement;
-        if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
-        setTimeout(() => {
-          const rect = focused.getBoundingClientRect();
-          const visibleBottom = _screenH - kbHeight - 20;
-          if (rect.bottom > visibleBottom) {
-            const scrollBy = rect.bottom - visibleBottom;
-            let el = focused.parentElement;
-            while (el && el !== document.documentElement) {
-              const ov = window.getComputedStyle(el).overflowY;
-              if ((ov === 'auto' || ov === 'scroll') && el.scrollHeight > el.clientHeight) {
-                el.scrollTop += scrollBy;
-                return;
-              }
-              el = el.parentElement;
+    function _liftVisibleSheetForKeyboard(kbHeight) {
+      const focused = document.activeElement;
+      if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
+      const sheet = focused.closest('.plan-modal, .plan-sheet, #title-edit-sheet');
+      if (!sheet) return;
+      sheet.style.bottom = kbHeight + 'px';
+
+      // フォーカス中の入力欄が隠れていたらスクロール親を動かす
+      setTimeout(() => {
+        const rect = focused.getBoundingClientRect();
+        const visibleBottom = _screenH - kbHeight - 20;
+        if (rect.bottom > visibleBottom) {
+          const scrollBy = rect.bottom - visibleBottom;
+          let el = focused.parentElement;
+          while (el && el !== document.documentElement) {
+            const ov = window.getComputedStyle(el).overflowY;
+            if ((ov === 'auto' || ov === 'scroll') && el.scrollHeight > el.clientHeight) {
+              el.scrollTop += scrollBy;
+              return;
             }
+            el = el.parentElement;
           }
-        }, 80);
-      }
+        }
+      }, 80);
+    }
 
-      function _onCapKeyboardHide() {
-        const chatSheet = document.getElementById('chat-sheet');
-        if (chatSheet) chatSheet.style.bottom = '0px';
-      }
+    function _resetSheetKeyboardOffset() {
+      document.querySelectorAll('.plan-modal, .plan-sheet, #title-edit-sheet').forEach(sheet => {
+        sheet.style.bottom = '0px';
+      });
+    }
 
+    function _onCapKeyboardShow(kbHeight) {
+      _liftVisibleSheetForKeyboard(kbHeight);
+    }
+
+    if (_isCapacitorApp) {
+      // Capacitor環境: @capacitor/keyboard のネイティブイベントで正確なキーボード高さを取得
       const _CapKB = window.Capacitor?.Plugins?.Keyboard;
       if (_CapKB?.addListener) {
         _CapKB.addListener('keyboardWillShow', (info) => _onCapKeyboardShow(info.keyboardHeight));
-        _CapKB.addListener('keyboardWillHide', () => _onCapKeyboardHide());
+        _CapKB.addListener('keyboardWillHide', () => _resetSheetKeyboardOffset());
       } else {
-        // フォールバック: focusin で遅延実行
+        // フォールバック: keyboardプラグイン未検出時は focusin/focusout で近似
         document.addEventListener('focusin', e => {
           const el = e.target;
           if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
           setTimeout(() => {
             const kbHeight = _screenH - window.visualViewport.height;
-            if (kbHeight > 50) _onCapKeyboardShow(kbHeight);
+            if (kbHeight > 50) _liftVisibleSheetForKeyboard(kbHeight);
           }, 350);
         }, true);
         document.addEventListener('focusout', e => {
           if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            setTimeout(_onCapKeyboardHide, 100);
+            setTimeout(_resetSheetKeyboardOffset, 100);
+          }
+        }, true);
+      }
+    } else {
+      // Web環境（iOS Safari / Android Chrome 含む）: visualViewport で推定
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+          const kbHeight = _screenH - window.visualViewport.height;
+          if (kbHeight > 50) {
+            _liftVisibleSheetForKeyboard(kbHeight);
+          } else {
+            _resetSheetKeyboardOffset();
+          }
+        });
+        document.addEventListener('focusout', e => {
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            setTimeout(_resetSheetKeyboardOffset, 100);
           }
         }, true);
       }
@@ -1430,7 +1453,6 @@
     {
       let _fabTx = 0, _fabTy = 0;
       [
-        { id: 'fab-ai',     fn: () => openAIChat() },
         { id: 'course-fab', fn: () => openCourseSheet() },
         { id: 'fab-plan',   fn: () => openCustomPlanModal() },
       ].forEach(({ id, fn }) => {
@@ -1502,7 +1524,6 @@
       ['share-overlay',      () => closeShareModal()],
       ['share-modal-close',  () => closeShareModal()],
       ['pin-detail-overlay', () => closePinDetail()],
-      ['chat-overlay',       () => closeAIChat()],
       ['pin-picker-overlay',   () => closePinPicker()],
       ['emoji-picker-overlay',    () => closeEmojiPicker()],
       ['schedule-action-overlay', () => closeScheduleActionSheet()],
@@ -1565,9 +1586,6 @@
       document.getElementById('cal-popup-events').addEventListener('scroll', () => {
         calFab.classList.toggle('visible', document.getElementById('cal-popup-events').scrollTop > 150);
       }, { passive: true });
-
-      // AI FAB は home タブで常時表示
-      document.getElementById('fab-ai').classList.add('visible');
     })();
     function fabScrollTop() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1576,174 +1594,13 @@
       document.getElementById('cal-popup-events').scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ─── AI CHAT ───
-    let CHAT_HISTORY = [];
-
-    function openAIChat() {
-      lockScroll();
-      const msgs = document.getElementById('chat-messages');
-      if (!msgs.children.length) {
-        appendChatBubble('ai', 'こんにちは！週末のお出かけについて何でも聞いてください 🌴\n例：「子連れでおすすめは？」「来週末どこ行く？」');
-      }
-      document.getElementById('chat-overlay').classList.add('visible');
-      document.getElementById('chat-sheet').classList.add('visible');
-      setTimeout(() => document.getElementById('chat-input').focus(), 350);
-    }
-
-    function closeAIChat() {
-      if (isVoiceRecording) stopVoiceInput();
-      document.getElementById('chat-overlay').classList.remove('visible');
-      document.getElementById('chat-sheet').classList.remove('visible');
-      unlockScroll();
-    }
-
-    function resetAIChat() {
-      CHAT_HISTORY = [];
-      document.getElementById('chat-messages').innerHTML = '';
-      appendChatBubble('ai', 'こんにちは！週末のお出かけについて何でも聞いてください 🌴\n例：「子連れでおすすめは？」「来週末どこ行く？」');
-    }
-
-    function appendChatBubble(role, text) {
-      const msgs = document.getElementById('chat-messages');
-      const el = document.createElement('div');
-      el.className = `chat-bubble ${role}`;
-      el.textContent = text;
-      msgs.appendChild(el);
-      msgs.scrollTop = msgs.scrollHeight;
-      return el;
-    }
-
-    function renderChatMiniCard(ev) {
-      const emoji = ev.emoji || '📍';
-      const name = (ev.store || ev.title || '').replace(/'/g, "\\'");
-      const period = ev.period || ev.hours || '';
-      const location = ev.location || '';
-      const meta = [period, location].filter(Boolean).join('  ·  ');
-      const safeId = ev.id;
-      return `<div class="chat-mini-wrap">
-        <div class="chat-mini-card" onclick="toggleChatMiniDetail(this,'${safeId}')">
-          <span class="chat-mini-emoji">${emoji}</span>
-          <div class="chat-mini-info">
-            <div class="chat-mini-name">${name}</div>
-            ${meta ? `<div class="chat-mini-meta">${meta}</div>` : ''}
-          </div>
-          <span class="chat-mini-arrow">›</span>
-        </div>
-        <div class="chat-mini-detail" id="chat-detail-${safeId}"></div>
-      </div>`;
-    }
-
-    function toggleChatMiniDetail(btn, id) {
-      const wrap = btn.closest('.chat-mini-wrap');
-      const detail = wrap.querySelector('.chat-mini-detail');
-      const isOpen = detail.classList.contains('open');
-      if (isOpen) {
-        detail.classList.remove('open');
-        btn.classList.remove('expanded');
-      } else {
-        if (!detail.innerHTML.trim()) {
-          const ev = EVENT_REGISTRY[id];
-          if (ev) {
-            const html = renderEventCard(ev, 0, true);
-            if (html) {
-              const tmp = document.createElement('div');
-              tmp.innerHTML = html.trim();
-              if (tmp.firstElementChild) detail.appendChild(tmp.firstElementChild);
-            }
-          }
-        }
-        detail.classList.add('open');
-        btn.classList.add('expanded');
-        setTimeout(() => detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
-      }
-    }
-
-    function appendChatCards(eventIds) {
-      if (!eventIds?.length) return;
-      const msgs = document.getElementById('chat-messages');
-      const wrap = document.createElement('div');
-      wrap.className = 'chat-cards-wrap';
-      eventIds.slice(0, 3).forEach(id => {
-        const ev = EVENT_REGISTRY[id];
-        if (!ev) return;
-        const tmp = document.createElement('div');
-        tmp.innerHTML = renderChatMiniCard(ev).trim();
-        if (tmp.firstElementChild) wrap.appendChild(tmp.firstElementChild);
-      });
-      if (wrap.children.length) {
-        msgs.appendChild(wrap);
-        msgs.scrollTop = msgs.scrollHeight;
-      }
-    }
-
-    function showTyping() {
-      const msgs = document.getElementById('chat-messages');
-      const el = document.createElement('div');
-      el.className = 'chat-bubble ai';
-      el.id = 'chat-typing-indicator';
-      el.innerHTML = '<div class="chat-typing"><span></span><span></span><span></span></div>';
-      msgs.appendChild(el);
-      msgs.scrollTop = msgs.scrollHeight;
-    }
-
-    function hideTyping() {
-      document.getElementById('chat-typing-indicator')?.remove();
-    }
-
-    async function chatSend() {
-      const input = document.getElementById('chat-input');
-      const sendBtn = document.getElementById('chat-send-btn');
-      const text = input.value.trim();
-      if (!text) return;
-
-      appendChatBubble('user', text);
-      CHAT_HISTORY.push({ role: 'user', content: text });
-      input.value = '';
-      sendBtn.disabled = true;
-      sendBtn.classList.remove('visible');
-      document.getElementById('chat-mic-btn').style.display = '';
-      showTyping();
-
-      try {
-        const res = await fetch(API_BASE + '/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: text,
-            history: CHAT_HISTORY.slice(-6),
-            lang: getLang(),
-            city: getCity(),
-          }),
-        });
-        hideTyping();
-
-        if (!res.ok) throw new Error('API error');
-        const data = await res.json();
-
-        appendChatBubble('ai', data.message || '回答を取得できませんでした。');
-        appendChatCards(data.eventIds);
-        CHAT_HISTORY.push({ role: 'assistant', content: data.message || '' });
-
-      } catch (e) {
-        hideTyping();
-        appendChatBubble('ai', 'エラーが発生しました。もう一度お試しください。');
-      }
-    }
-
-    document.getElementById('chat-input').addEventListener('input', function() {
-      const hasText = !!this.value.trim();
-      document.getElementById('chat-send-btn').disabled = !hasText;
-      document.getElementById('chat-send-btn').classList.toggle('visible', hasText);
-      document.getElementById('chat-mic-btn').style.display = hasText ? 'none' : '';
-    });
-
     // ─── VOICE INPUT ───
     let voiceRecognition = null;
     let isVoiceRecording = false;
 
     (function initVoiceMic() {
       if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
-        ['chat-mic-btn', 'course-note-mic-btn'].forEach(id => {
+        ['course-note-mic-btn'].forEach(id => {
           const btn = document.getElementById(id);
           if (btn) btn.style.display = 'none';
         });
@@ -1794,55 +1651,6 @@
 
       voiceRecognition.start();
     }
-
-    function toggleVoiceInput() {
-      if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) return;
-      if (isVoiceRecording) { stopVoiceInput(); return; }
-
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      voiceRecognition = new SR();
-      voiceRecognition.lang = getLang() === 'en' ? 'en-US' : 'ja-JP';
-      voiceRecognition.continuous = false;
-      voiceRecognition.interimResults = true;
-
-      const micBtn  = document.getElementById('chat-mic-btn');
-      const input   = document.getElementById('chat-input');
-      const sendBtn = document.getElementById('chat-send-btn');
-
-      voiceRecognition.onstart = () => {
-        isVoiceRecording = true;
-        micBtn.classList.add('recording');
-        input.placeholder = getLang() === 'en' ? 'Listening...' : '聴いています...';
-      };
-
-      voiceRecognition.onresult = (e) => {
-        const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
-        input.value = transcript;
-        const hasText = !!transcript.trim();
-        sendBtn.disabled = !hasText;
-        sendBtn.classList.toggle('visible', hasText);
-        micBtn.style.display = hasText ? 'none' : '';
-      };
-
-      voiceRecognition.onend = () => {
-        isVoiceRecording = false;
-        micBtn.classList.remove('recording');
-        input.placeholder = getLang() === 'en' ? 'Ask about your weekend plans...' : '週末の予定を相談してみよう...';
-        voiceRecognition = null;
-      };
-
-      voiceRecognition.onerror = () => {
-        isVoiceRecording = false;
-        micBtn.classList.remove('recording');
-        input.placeholder = getLang() === 'en' ? 'Ask about your weekend plans...' : '週末の予定を相談してみよう...';
-        voiceRecognition = null;
-      };
-
-      voiceRecognition.start();
-    }
-    document.getElementById('chat-input').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.isComposing) chatSend();
-    });
 
     // ─── PIN LOGIC ───
     function pinsKey() { return `${getCity()}_pins`; }
@@ -2586,7 +2394,6 @@
       closePinPicker();
       closeEmojiPicker();
       closeScheduleActionSheet();
-      closeAIChat();
       closeEventFilterSheet();
       closeCourseDetail();
       closeCourseSheet();
@@ -2615,9 +2422,6 @@
 
       const hideFabs = FAB_HIDDEN_SCREENS.has(screen);
       document.getElementById('fab-top').style.display = hideFabs ? 'none' : '';
-      const fabAi = document.getElementById('fab-ai');
-      fabAi.style.display = hideFabs ? 'none' : '';
-      if (!hideFabs) fabAi.classList.add('visible');
       // スクロールトップは scrollY リセット後なので非表示に戻す
       document.getElementById('fab-top').classList.remove('visible');
       const fabPlanGroup = document.getElementById('fab-plan-group');
@@ -3477,16 +3281,17 @@
       const input = document.getElementById('title-edit-input');
       input.value = course.title || '';
       lockScroll();
-      document.getElementById('title-edit-overlay').style.display = 'block';
-      document.getElementById('title-edit-sheet').style.display = 'block';
+      document.getElementById('title-edit-overlay').classList.add('visible');
+      document.getElementById('title-edit-sheet').classList.add('visible');
       setTimeout(() => input.focus(), 100);
     }
 
     function closeTitleEdit() {
       _editingCourseId = null;
       unlockScroll();
-      document.getElementById('title-edit-overlay').style.display = 'none';
-      document.getElementById('title-edit-sheet').style.display = 'none';
+      document.getElementById('title-edit-overlay').classList.remove('visible');
+      document.getElementById('title-edit-sheet').classList.remove('visible');
+      document.getElementById('title-edit-sheet').style.bottom = '0px';
       document.getElementById('title-edit-input').blur();
     }
 

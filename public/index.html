@@ -37,7 +37,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260708c">
+  <link rel="stylesheet" href="/app.css?v=20260709a">
 </head>
 <body>
   </div>
@@ -525,7 +525,6 @@
   </nav>
 
   <!-- FAB -->
-  <button class="fab-ai" id="fab-ai" onclick="openAIChat()" aria-label="AIチャット">AI</button>
   <button class="fab" id="fab-top" onclick="fabScrollTop()" aria-label="トップへ戻る">↑</button>
   <!-- FAB Plan Speed Dial -->
   <div class="fab-plan-group" id="fab-plan-group">
@@ -701,8 +700,8 @@
   <!-- Course Detail Sheet -->
   <div id="course-detail-overlay" class="plan-modal-overlay" onclick="closeCourseDetail()"></div>
   <!-- タイトル編集シート -->
-  <div class="chat-overlay" id="title-edit-overlay" onclick="closeTitleEdit()" style="display:none;z-index:2100;"></div>
-  <div id="title-edit-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2101;
+  <div class="chat-overlay" id="title-edit-overlay" onclick="closeTitleEdit()" style="z-index:2100;"></div>
+  <div id="title-edit-sheet" class="plan-modal" style="z-index:2101;
     background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px calc(84px + env(safe-area-inset-bottom,0px));
     box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
     <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:10px;" data-i18n="titleEditLabel">タイトルを編集</div>
@@ -729,25 +728,6 @@
       <button data-close onclick="closeCourseDetail()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
     </div>
     <div id="course-detail-content" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));"></div>
-  </div>
-
-  <!-- AI Chat Sheet -->
-  <div class="chat-overlay" id="chat-overlay" onclick="closeAIChat()"></div>
-  <div class="chat-sheet" id="chat-sheet">
-    <div class="chat-sheet-handle"></div>
-    <div class="chat-sheet-header">
-      <div class="chat-sheet-title">🤖 AIアシスタント</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button class="chat-sheet-reset" onclick="resetAIChat()" title="会話をリセット">↺</button>
-        <button data-close class="chat-sheet-close" onclick="closeAIChat()">✕</button>
-      </div>
-    </div>
-    <div class="chat-messages" id="chat-messages"></div>
-    <div class="chat-input-area">
-      <input class="chat-input" id="chat-input" type="text" placeholder="週末の予定を相談してみよう..." maxlength="200" />
-      <button class="chat-mic-btn" id="chat-mic-btn" onclick="toggleVoiceInput()" title="音声入力" aria-label="音声入力">🎤</button>
-      <button class="chat-send-btn" id="chat-send-btn" onclick="chatSend()" disabled>↑</button>
-    </div>
   </div>
 
   <!-- Pin Picker Sheet -->
@@ -992,7 +972,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260706j"></script>
+  <script src="/app.js?v=20260709a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
