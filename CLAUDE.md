@@ -303,6 +303,8 @@ plugins: {
 - Web環境: `window.visualViewport.addEventListener('resize', ...)` で `window.innerHeight - visualViewport.height` からキーボード高さを推定（閾値50px超で発火）。`focusout` でリセット
 - `.plan-modal` / `.plan-sheet` に `transition: bottom 0.2s ease` を追加し、持ち上げ/リセットをアニメーションさせる
 
+**⚠️ 実装時の注意（2026-07-09追記修正）**: `_liftVisibleSheetForKeyboard`に「シート全体を持ち上げた後、フォーカス要素がまだ隠れていたら内部スクロール可能な祖先要素の`scrollTop`も追加操作する」フォールバックを**足さないこと**。これをやると`.plan-sheet`/`.plan-modal-body`のような内部スクロール領域を持つシートで「シートが上がりすぎる」二重対応バグになる（一度実装され修正済み）。持ち上げは`style.bottom`一本化のみで統一する。`_screenH`（キーボード表示前の画面高さ）は`let`で保持し、`_resetSheetKeyboardOffset()`実行時（＝キーボードが閉じた正しいタイミング）にのみ再取得する。
+
 ### ✅ CSSキャッシュバスティング手順（セットで変更必須）
 
 ```html

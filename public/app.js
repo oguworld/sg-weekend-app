@@ -43,7 +43,7 @@
     // ─── 全画面共通: キーボード被り対策（Web版・Capacitor版共通） ───
     // フォーカス中の要素が属するシート（.plan-modal / .plan-sheet / #title-edit-sheet）を
     // 特定し、シート全体を bottom: kbHeight で持ち上げる（内部スクロールとの二重対応はしない）
-    const _screenH = window.innerHeight; // キーボード表示前の画面高さを保存
+    let _screenH = window.innerHeight; // キーボード表示前の画面高さを保存
 
     function _liftVisibleSheetForKeyboard(kbHeight) {
       const focused = document.activeElement;
@@ -51,27 +51,10 @@
       const sheet = focused.closest('.plan-modal, .plan-sheet, #title-edit-sheet');
       if (!sheet) return;
       sheet.style.bottom = kbHeight + 'px';
-
-      // フォーカス中の入力欄が隠れていたらスクロール親を動かす
-      setTimeout(() => {
-        const rect = focused.getBoundingClientRect();
-        const visibleBottom = _screenH - kbHeight - 20;
-        if (rect.bottom > visibleBottom) {
-          const scrollBy = rect.bottom - visibleBottom;
-          let el = focused.parentElement;
-          while (el && el !== document.documentElement) {
-            const ov = window.getComputedStyle(el).overflowY;
-            if ((ov === 'auto' || ov === 'scroll') && el.scrollHeight > el.clientHeight) {
-              el.scrollTop += scrollBy;
-              return;
-            }
-            el = el.parentElement;
-          }
-        }
-      }, 80);
     }
 
     function _resetSheetKeyboardOffset() {
+      _screenH = window.innerHeight;
       document.querySelectorAll('.plan-modal, .plan-sheet, #title-edit-sheet').forEach(sheet => {
         sheet.style.bottom = '0px';
       });
