@@ -293,17 +293,20 @@ plugins: {
 "@capacitor/keyboard": "^6.0.0"  // これがないと上記設定が効かない
 ```
 
-### ✅ 全画面共通キーボード被り対策（2026-07-09実装）
+### ✅ 全画面共通キーボード被り対策（2026-07-09実装、同日Web版は二重適用のため無効化）
 
-`.plan-modal` / `.plan-sheet` / `#title-edit-sheet` すべてを対象に、**シート全体を持ち上げる方式**で統一（内部スクロールとの二重対応はしない）。Web版（iOS Safari/Android Chrome含む）でも同じ挙動になるよう共通関数化した。
+`.plan-modal` / `.plan-sheet` / `#title-edit-sheet` を対象に、**シート全体を持ち上げる方式**（内部スクロールとの二重対応はしない）。ただし**JSによる`style.bottom`制御はCapacitor環境限定**。Web環境は下記の理由でJS制御を撤去済み。
 
 - `_liftVisibleSheetForKeyboard(kbHeight)`: フォーカス中要素から `closest('.plan-modal, .plan-sheet, #title-edit-sheet')` で対象シートを特定し `style.bottom = kbHeight + 'px'` で持ち上げる
 - `_resetSheetKeyboardOffset()`: 対象シート全体の `bottom` を `0px` に戻す
-- Capacitor環境: `@capacitor/keyboard` の `keyboardWillShow`/`keyboardWillHide` ネイティブイベントから共通関数を呼ぶ（正確な高さ取得）。プラグイン未検出時は `focusin`/`focusout` + `visualViewport.height` によるフォールバック
-- Web環境: `window.visualViewport.addEventListener('resize', ...)` で `window.innerHeight - visualViewport.height` からキーボード高さを推定（閾値50px超で発火）。`focusout` でリセット
-- `.plan-modal` / `.plan-sheet` に `transition: bottom 0.2s ease` を追加し、持ち上げ/リセットをアニメーションさせる
+- Capacitor環境: `@capacitor/keyboard` の `keyboardWillShow`/`keyboardWillHide` ネイティブイベントから共通関数を呼ぶ（正確な高さ取得。`resize:'none'`でネイティブ追従が起きないためJS制御が必須）。プラグイン未検出時は `focusin`/`focusout` + `visualViewport.height` によるフォールバック
+- **Web環境（iOS Safari/Android Chrome含む）: JSによる`sheet.style.bottom`操作は一切行わない。** モバイルSafariには`position:fixed;bottom:0`要素をキーボード表示時にvisualViewportの可視領域へ自動追従させるネイティブ挙動があり（設定画面でボトムナビが一緒に上がる現象と同じ）、`.plan-sheet`/`.plan-modal`もこの対象になる。ここにJSで`bottom`を加算すると「ネイティブ追従分」+「JS加算分」の二重適用となり、キーボード高さの約2倍押し上げられてシートが画面上端を超えて完全に消える重大バグになった（2026-07-09発覚・当日中に修正）
+- `.plan-modal` / `.plan-sheet` に `transition: bottom 0.2s ease` を追加し、Capacitor環境での持ち上げ/リセットをアニメーションさせる
 
-**⚠️ 実装時の注意（2026-07-09追記修正）**: `_liftVisibleSheetForKeyboard`に「シート全体を持ち上げた後、フォーカス要素がまだ隠れていたら内部スクロール可能な祖先要素の`scrollTop`も追加操作する」フォールバックを**足さないこと**。これをやると`.plan-sheet`/`.plan-modal-body`のような内部スクロール領域を持つシートで「シートが上がりすぎる」二重対応バグになる（一度実装され修正済み）。持ち上げは`style.bottom`一本化のみで統一する。`_screenH`（キーボード表示前の画面高さ）は`let`で保持し、`_resetSheetKeyboardOffset()`実行時（＝キーボードが閉じた正しいタイミング）にのみ再取得する。
+**⚠️ 実装時の注意**:
+1. `_liftVisibleSheetForKeyboard`に「シート全体を持ち上げた後、フォーカス要素がまだ隠れていたら内部スクロール可能な祖先要素の`scrollTop`も追加操作する」フォールバックを**足さないこと**。内部スクロール領域を持つシートで「シートが上がりすぎる」二重対応バグになる（一度実装され修正済み）。持ち上げは`style.bottom`一本化のみで統一する
+2. **Web環境で`visualViewport.resize`から`_liftVisibleSheetForKeyboard`/`sheet.style.bottom`を呼ばないこと**。ネイティブ追従と二重適用になりシートが消える（一度実装され2026-07-09に撤去済み）。Web環境はブラウザのネイティブ挙動に完全に委ね、JS側は何もしない
+3. `_screenH`（キーボード表示前の画面高さ）は`let`で保持し、`_resetSheetKeyboardOffset()`実行時（＝キーボードが閉じた正しいタイミング）にのみ再取得する（Capacitor環境でのみ使用）
 
 ### ✅ CSSキャッシュバスティング手順（セットで変更必須）
 

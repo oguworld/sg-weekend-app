@@ -87,22 +87,9 @@
         }, true);
       }
     } else {
-      // Web環境（iOS Safari / Android Chrome 含む）: visualViewport で推定
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', () => {
-          const kbHeight = _screenH - window.visualViewport.height;
-          if (kbHeight > 50) {
-            _liftVisibleSheetForKeyboard(kbHeight);
-          } else {
-            _resetSheetKeyboardOffset();
-          }
-        });
-        document.addEventListener('focusout', e => {
-          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            setTimeout(_resetSheetKeyboardOffset, 100);
-          }
-        }, true);
-      }
+      // Web環境（iOS Safari / Android Chrome 含む）: position:fixed;bottom:0 要素は
+      // モバイルブラウザのネイティブ挙動でvisualViewportに自動追従するため、
+      // JSによるsheet.style.bottomの操作は行わない（二重適用で上がりすぎるため）
     }
 
     // ─── GENRE MASTER ───
