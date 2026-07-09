@@ -204,6 +204,7 @@
         emptyDesc: 'このカテゴリのおでかけ先は<br>近日公開予定です。<br>タブを切り替えて他の候補を見てみましょう。',
         pinScreenTitle: '📌 ピン留め',
         calScreenTitle: '📅 カレンダー',
+        homeScreenTitle: 'イベント情報',
         settingsTitle: '設定',
         secProfile: 'プロフィール',
         secAppSettings: 'アプリ設定',
@@ -222,7 +223,7 @@
         secAbout: 'アプリ情報',
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
-        navHome: '期間限定',
+        navHome: 'イベント',
         navPlan: '予定表',
         navSettings: '設定',
         pinBtn: 'ピン留め',
@@ -366,6 +367,7 @@
         labelOfficialX: 'SNS',
         labelAboutApp: 'アプリについて',
         labelOfficialSite: '公式サイト',
+        labelAboutSns: 'アプリについて・SNS',
         supportBtn: '$5 を贈る',
         scheduleMakePlan: '予定を立てる',
         courseCreateBtn: '🗺 コース作成',
@@ -398,6 +400,7 @@
         emptyDesc: 'No spots in this category yet.<br>Check back soon or try another tab.',
         pinScreenTitle: '📌 Pinned',
         calScreenTitle: '📅 Calendar',
+        homeScreenTitle: 'Event Info',
         settingsTitle: 'Settings',
         secProfile: 'Profile',
         secAppSettings: 'App Settings',
@@ -416,7 +419,7 @@
         secAbout: 'About',
         aboutAppName: 'App',
         aboutVersion: 'Version',
-        navHome: 'Limited',
+        navHome: 'Event',
         navPlan: 'Schedule',
         navSettings: 'Settings',
         pinBtn: 'Pin',
@@ -560,6 +563,7 @@
         labelOfficialX: 'SNS',
         labelAboutApp: 'About',
         labelOfficialSite: 'Official Site',
+        labelAboutSns: 'About & SNS',
         supportBtn: 'Gift $5',
         scheduleMakePlan: 'Plan a trip',
         courseCreateBtn: '🗺 Course',
@@ -680,12 +684,6 @@
       const city = getCity();
       const meta = CITY_META[city] || CITY_META.sg;
       const lang = getLang();
-
-      const titleEl = document.getElementById('app-title-city');
-      if (titleEl) titleEl.textContent = `週末どうする？${meta.flag} ${meta.code}`;
-
-      const subtitleEl = document.getElementById('app-subtitle-city');
-      if (subtitleEl) subtitleEl.textContent = lang === 'en' ? meta.subtitleEn : meta.subtitleJa;
 
       buildCitySelect();
 

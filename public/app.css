@@ -39,7 +39,7 @@
     /* ─── HEADER ─── */
     .app-header {
       background: var(--cream);
-      padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 0;
+      padding: calc(env(safe-area-inset-top, 0px) + 20px) 20px 0;
       border-bottom: none;
       position: sticky;
       top: 0;
@@ -54,30 +54,8 @@
       justify-content: space-between;
       margin-bottom: 16px;
     }
-
-    .app-title {
-      font-family: 'Kaisei Opti', serif;
-      font-size: 24px;
-      color: var(--midnight);
-      line-height: 1.15;
-      font-weight: 700;
-    }
-    .app-title span {
-      display: block;
-      font-family: 'Noto Sans JP', sans-serif;
-      font-size: 12px;
-      font-weight: 300;
-      color: var(--warm-gray);
-      letter-spacing: 0.12em;
-      margin-top: 3px;
-    }
-    #app-title-city {
-      font-family: 'Kaisei Opti', serif;
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--midnight);
-      letter-spacing: normal;
-      margin-top: 0;
+    .header-top .screen-title {
+      margin-bottom: 0;
     }
 
     .header-share-btn {

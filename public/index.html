@@ -37,7 +37,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260709j">
+  <link rel="stylesheet" href="/app.css?v=20260710d">
 </head>
 <body>
   </div>
@@ -48,12 +48,7 @@
   <main class="main" id="screen-home">
     <header class="app-header">
       <div class="header-top">
-        <div>
-          <div class="app-title">
-            <span id="app-title-city">週末どうする？🇸🇬 SG</span>
-            <span id="app-subtitle-city">シンガポール在住者の週末おでかけガイド</span>
-          </div>
-        </div>
+        <span class="screen-title" data-i18n="homeScreenTitle">イベント情報</span>
       </div>
 
       <!-- Section Header (moved from main) -->
@@ -341,6 +336,25 @@
         </button>
       </div>
 
+      <div class="settings-item" style="padding:16px 18px;">
+        <span class="settings-item-label" data-i18n="labelAboutSns">アプリについて・SNS</span>
+        <div style="display:inline-flex;align-items:center;gap:14px;">
+          <a href="https://about.dosuru.app" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;justify-content:center;color:var(--midnight);text-decoration:none;font-size:20px;">
+            🌐
+          </a>
+          <a href="https://x.com/willoa_sg" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;justify-content:center;color:var(--midnight);text-decoration:none;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="settings-item" style="padding:12px 18px;">
+        <span class="settings-item-label" data-i18n="labelVersion">バージョン</span>
+        <span id="app-version-label" style="font-size:14px;color:var(--warm-gray);">-</span>
+      </div>
+
       <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="shareSettingsBtn">友達にシェアする</span>
         <button id="do-share-btn" onclick="doShare()"
@@ -356,29 +370,6 @@
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;text-decoration:none;"
           onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
           <span data-i18n="supportBtn">$5 を贈る</span>
-        </a>
-      </div>
-
-      <div class="settings-item" style="padding:12px 18px;">
-        <span class="settings-item-label" data-i18n="labelVersion">バージョン</span>
-        <span id="app-version-label" style="font-size:14px;color:var(--warm-gray);">-</span>
-      </div>
-
-      <div class="settings-item" style="padding:12px 18px;">
-        <span class="settings-item-label" data-i18n="labelAboutApp">アプリについて</span>
-        <a href="https://about.dosuru.app" target="_blank" rel="noopener"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;text-decoration:none;"
-          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
-          <span data-i18n="labelOfficialSite">公式サイト</span>
-        </a>
-      </div>
-
-      <div class="settings-item" style="padding:16px 18px;">
-        <span class="settings-item-label" data-i18n="labelOfficialX">SNS</span>
-        <a href="https://x.com/willoa_sg" target="_blank" rel="noopener"
-          style="display:inline-flex;align-items:center;gap:6px;color:var(--midnight);text-decoration:none;font-size:15px;font-weight:600;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-          @willoa_sg
         </a>
       </div>
 
@@ -498,7 +489,7 @@
   <nav class="bottom-nav">
     <button class="nav-item active" id="nav-home" onclick="switchNav('home')">
       <span class="nav-icon">🎫</span>
-      <span class="nav-label" data-i18n="navHome">期間限定</span>
+      <span class="nav-label" data-i18n="navHome">イベント</span>
     </button>
     <button class="nav-item" id="nav-course" onclick="switchNav('course')">
       <span class="nav-icon">🧭</span>
@@ -952,7 +943,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260710b"></script>
+  <script src="/app.js?v=20260710c"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
