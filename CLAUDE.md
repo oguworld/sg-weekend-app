@@ -293,6 +293,28 @@ plugins: {
 "@capacitor/keyboard": "^6.0.0"  // これがないと上記設定が効かない
 ```
 
+**プラグイン取得は `registerPlugin()` を優先する（2026-07-09追記）**: `window.Capacitor?.Plugins?.Keyboard` だけに頼ると、Capacitor 6環境で `addListener` が動かないケースがある。`window.Capacitor.registerPlugin('Keyboard')` を先に試み、失敗時のみ従来方式にフォールバックする防御的実装にする。
+
+```javascript
+let _CapKB = null;
+try {
+  if (window.Capacitor?.registerPlugin) {
+    _CapKB = window.Capacitor.registerPlugin('Keyboard');
+  }
+} catch (_) {}
+if (!_CapKB) _CapKB = window.Capacitor?.Plugins?.Keyboard;
+```
+
+### ✅ 「トップへ戻る」FABのスクロール監視は内部スクロールコンテナを見る（2026-07-09修正）
+
+画面本体が `overflow-y:auto` の内部コンテナ（例: `#home-scroll-content`）でスクロールする構成の場合、`window.addEventListener('scroll', ...)` は発火しない。`window.scrollY` も常に0のままで、FABの表示切り替え・`scrollTo`はその内部コンテナに対して行う。
+
+```javascript
+document.getElementById('home-scroll-content').addEventListener('scroll', () => {
+  fab.classList.toggle('visible', document.getElementById('home-scroll-content').scrollTop > 300);
+}, { passive: true });
+```
+
 ### ✅ 全画面共通キーボード被り対策（2026-07-09実装、同日Web版は二重適用のため無効化）
 
 `.plan-modal` / `.plan-sheet` / `#title-edit-sheet` を対象に、**シート全体を持ち上げる方式**（内部スクロールとの二重対応はしない）。ただし**JSによる`style.bottom`制御はCapacitor環境限定**。Web環境は下記の理由でJS制御を撤去済み。

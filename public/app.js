@@ -66,7 +66,14 @@
 
     if (_isCapacitorApp) {
       // Capacitor環境: @capacitor/keyboard のネイティブイベントで正確なキーボード高さを取得
-      const _CapKB = window.Capacitor?.Plugins?.Keyboard;
+      // Capacitor 6: Plugins.Keyboard ではなく registerPlugin() 経由でないと addListener が動かない場合があるため優先し、失敗時は従来方式にフォールバック
+      let _CapKB = null;
+      try {
+        if (window.Capacitor?.registerPlugin) {
+          _CapKB = window.Capacitor.registerPlugin('Keyboard');
+        }
+      } catch (_) {}
+      if (!_CapKB) _CapKB = window.Capacitor?.Plugins?.Keyboard;
       if (_CapKB?.addListener) {
         _CapKB.addListener('keyboardWillShow', (info) => _onCapKeyboardShow(info.keyboardHeight));
         _CapKB.addListener('keyboardWillHide', () => _resetSheetKeyboardOffset());
@@ -1548,8 +1555,8 @@
     // ─── FAB ───
     (function() {
       const fab = document.getElementById('fab-top');
-      window.addEventListener('scroll', () => {
-        fab.classList.toggle('visible', window.scrollY > 300);
+      document.getElementById('home-scroll-content').addEventListener('scroll', () => {
+        fab.classList.toggle('visible', document.getElementById('home-scroll-content').scrollTop > 300);
       }, { passive: true });
 
       const calFab = document.getElementById('cal-popup-fab');
@@ -1558,7 +1565,7 @@
       }, { passive: true });
     })();
     function fabScrollTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'smooth' });
     }
     function calPopupScrollTop() {
       document.getElementById('cal-popup-events').scrollTo({ top: 0, behavior: 'smooth' });
