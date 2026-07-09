@@ -2,6 +2,17 @@
     const _isCapacitorApp = !!(window.Capacitor?.isNativePlatform?.());
     const API_BASE = _isCapacitorApp ? 'https://dosuru.app' : '';
 
+    // ─── DEBUG: 実機デバッグ用サーバーログ送信（原因特定後に削除すること）───
+    function _sendDebugLog(event, data) {
+      try {
+        fetch(API_BASE + '/api/debug-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event, ...data, ts: Date.now(), isCapacitor: _isCapacitorApp }),
+        }).catch(() => {});
+      } catch (_) {}
+    }
+
     // ─── CAPACITOR: GA4スキップ・外部リンク制御・overscroll防止 ───
     if (_isCapacitorApp) {
       window.gtag = function() {};
@@ -1458,6 +1469,7 @@
         btn.addEventListener('touchend', e => {
           const dx = Math.abs(e.changedTouches[0].clientX - _navTouchStartX);
           const dy = Math.abs(e.changedTouches[0].clientY - _navTouchStartY);
+          _sendDebugLog('nav_touchend', { target: s, dx, dy, fired: !(dx > 10 || dy > 10), eventDataLoaded: EVENT_DATA.length > 0 });
           if (dx > 10 || dy > 10) return;
           e.preventDefault();
           switchNav(s);
@@ -2358,6 +2370,7 @@
     function switchNav(screen) {
       if (screen === 'settings') {
         console.log('[DEBUG switchNav→settings]', new Error().stack);
+        _sendDebugLog('switchNav_settings', { stack: new Error().stack });
       }
       closeAllPopups();
       ['home','course','plan','settings'].forEach(s => {

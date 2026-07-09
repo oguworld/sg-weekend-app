@@ -515,6 +515,13 @@ app.get('/api/school-calendar', (req, res) => {
   }
 });
 
+// POST /api/debug-log — 実機デバッグ用ログ収集（原因特定後に削除すること）
+app.post('/api/debug-log', (req, res) => {
+  const line = JSON.stringify({ receivedAt: new Date().toISOString(), ...req.body }) + '\n';
+  fs.appendFile(path.join(__dirname, 'logs', 'debug-nav.log'), line, () => {});
+  res.json({ ok: true });
+});
+
 // POST /api/feedback — フィードバック受信 → LINE Push送信
 app.post('/api/feedback', async (req, res) => {
   const { message } = req.body;
