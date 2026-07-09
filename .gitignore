@@ -3,6 +3,7 @@ node_modules/
 logs/
 *.log
 .claude/
+data/
 
 # iOS署名関連（絶対にコミットしない）
 *.p12
