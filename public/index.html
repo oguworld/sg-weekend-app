@@ -37,22 +37,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260709f">
+  <link rel="stylesheet" href="/app.css?v=20260709g">
 </head>
 <body>
   </div>
 
   <!-- ─── HEADER ─── -->
-  <!-- ─── INSTALL BANNER ─── -->
-  <div class="install-banner" id="install-banner">
-    <div class="install-banner-icon">📱</div>
-    <div class="install-banner-body">
-      <div class="install-banner-title">ホーム画面に追加しよう！</div>
-      <div class="install-banner-desc" id="install-banner-desc">おでかけNaviとして使えます</div>
-    </div>
-    <button class="install-banner-btn" id="install-banner-btn" onclick="handleInstall()">追加</button>
-    <button class="install-banner-close" onclick="dismissInstallBanner()">✕</button>
-  </div>
 
   <!-- ─── HOME SCREEN ─── -->
   <main class="main" id="screen-home">
@@ -784,16 +774,6 @@
     <button class="cal-popup-fab" id="cal-popup-fab" onclick="calPopupScrollTop()" aria-label="トップへ戻る">↑</button>
   </div>
 
-  <!-- Update Banner -->
-  <div class="update-banner" id="update-banner">
-    <div class="install-banner-icon">🔄</div>
-    <div class="install-banner-body">
-      <div class="install-banner-title">アプリが更新されました</div>
-      <div class="install-banner-desc">タップして最新版を反映</div>
-    </div>
-    <button class="update-banner-btn" onclick="location.reload()">反映する</button>
-  </div>
-
   <!-- ─── DATE PICKER MODAL (共通) ─── -->
   <div class="plan-modal-overlay" id="date-picker-overlay" onclick="closeDatePickerSheet()"></div>
   <div class="plan-modal" id="date-picker-modal">
@@ -972,7 +952,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260709f"></script>
+  <script src="/app.js?v=20260709g"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

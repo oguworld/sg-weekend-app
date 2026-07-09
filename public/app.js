@@ -255,10 +255,6 @@
         bannerDaysLeft: '⏰ あと{d}日',
         toastProfileSet: '✅ {label} に設定しました',
         profileLabelAll: '指定なし（すべて）',
-        installDescIos: '画面下の共有ボタン（□↑）→「ホーム画面に追加」でOK！',
-        installDescAndroid: 'おでかけNaviとしてホーム画面から起動できます',
-        installBtnIos: '方法を見る',
-        installBtnAndroid: '追加する',
         planModalDateLabel: '日付を選ぶ',
         planModalSlotLabel: '時間帯を選ぶ',
         planModalDateLabelReq: '日付を選ぶ <span style="color:var(--terracotta)">*</span>',
@@ -453,10 +449,6 @@
         bannerDaysLeft: '⏰ {d} days left',
         toastProfileSet: '✅ Set to: {label}',
         profileLabelAll: 'All (no preference)',
-        installDescIos: 'Tap the share button (□↑) at the bottom → "Add to Home Screen"',
-        installDescAndroid: 'Add おでかけNavi to your home screen for quick access',
-        installBtnIos: 'How to',
-        installBtnAndroid: 'Add',
         planModalDateLabel: 'Select Date',
         planModalSlotLabel: 'Select Time',
         planModalDateLabelReq: 'Select Date <span style="color:var(--terracotta)">*</span>',
@@ -1906,74 +1898,6 @@
     }
 
     updatePinButtons();
-
-    // ─── INSTALL BANNER ───
-    let deferredPrompt = null;
-    const INSTALL_DISMISSED_KEY = 'sg_install_dismissed';
-
-    function isIOS() {
-      return /iphone|ipad|ipod/i.test(navigator.userAgent);
-    }
-    function isInStandaloneMode() {
-      return window.matchMedia('(display-mode: standalone)').matches ||
-             window.navigator.standalone === true;
-    }
-
-    // Android: beforeinstallprompt をキャッチ
-    window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      showInstallBanner('android');
-    });
-
-    function showInstallBanner(platform) {
-      if (_isCapacitorApp) return;
-      // すでにインストール済みまたは閉じた場合はスキップ
-      if (isInStandaloneMode()) return;
-      if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return;
-
-      const desc = document.getElementById('install-banner-desc');
-      const btn = document.getElementById('install-banner-btn');
-
-      if (platform === 'ios') {
-        desc.textContent = t('installDescIos');
-        btn.textContent = t('installBtnIos');
-      } else {
-        desc.textContent = t('installDescAndroid');
-        btn.textContent = t('installBtnAndroid');
-      }
-
-      setTimeout(() => {
-        document.getElementById('install-banner').classList.add('visible');
-      }, 3000); // 3秒後に表示
-    }
-
-    function handleInstall() {
-      if (deferredPrompt) {
-        // Android: ネイティブダイアログを表示
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(choice => {
-          if (choice.outcome === 'accepted') {
-            dismissInstallBanner();
-          }
-          deferredPrompt = null;
-        });
-      } else {
-        // iOS: シェアモーダルを開く
-        dismissInstallBanner();
-        openShareModal();
-      }
-    }
-
-    function dismissInstallBanner() {
-      document.getElementById('install-banner').classList.remove('visible');
-      localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
-    }
-
-    // iOS: 初回アクセス時にバナー表示
-    if (isIOS() && !isInStandaloneMode()) {
-      showInstallBanner('ios');
-    }
 
     // ─── PROFILE SETTINGS ───
     function getWhoList() {
@@ -5550,74 +5474,3 @@
       }
     }
 
-    // ─── PWA SERVICE WORKER ───
-    if (!_isCapacitorApp && 'serviceWorker' in navigator) {
-      // 初回ロード時点のコントローラーを記録（初回インストールとアップデートを区別）
-      const hadController = !!navigator.serviceWorker.controller;
-
-      // controllerchange: skipWaiting+claim で新SWがページを掌握した瞬間に確実に発火
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (hadController) {
-          const banner = document.getElementById('update-banner');
-          if (banner) banner.classList.add('show');
-        }
-        // 新SWにバージョン確認を再送
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
-        }
-      });
-
-      // SW_UPDATED メッセージも念のため残す（controllerchange の補完）
-      navigator.serviceWorker.addEventListener('message', e => {
-        if (e.data?.type === 'SW_UPDATED') {
-          const banner = document.getElementById('update-banner');
-          if (banner) banner.classList.add('show');
-        }
-        if (e.data?.type === 'SW_VERSION') {
-          const incoming = e.data.version;
-          const saved = localStorage.getItem('sw-version');
-          if (saved && saved !== incoming) {
-            const banner = document.getElementById('update-banner');
-            if (banner) banner.classList.add('show');
-          }
-          localStorage.setItem('sw-version', incoming);
-        }
-      });
-
-      window.addEventListener('load', async () => {
-        let reg;
-        try {
-          reg = await navigator.serviceWorker.register('/sw.js');
-        } catch (err) {
-          console.warn('SW registration failed:', err);
-        }
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
-        }
-      });
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          navigator.serviceWorker.getRegistration().then(reg => {
-            reg?.update();
-            if (navigator.serviceWorker.controller) {
-              navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
-            }
-          });
-        }
-      });
-
-      // バナー系ボタン: touchend で即時反応（click の遅延回避）
-      const updateBannerBtn = document.querySelector('.update-banner-btn');
-      if (updateBannerBtn) {
-        updateBannerBtn.addEventListener('touchend', () => { location.reload(); }, { passive: true });
-      }
-      const installBannerBtn = document.getElementById('install-banner-btn');
-      if (installBannerBtn) {
-        installBannerBtn.addEventListener('touchend', e => { e.preventDefault(); handleInstall(); }, { passive: false });
-      }
-      const installBannerClose = document.querySelector('.install-banner-close');
-      if (installBannerClose) {
-        installBannerClose.addEventListener('touchend', e => { e.preventDefault(); dismissInstallBanner(); }, { passive: false });
-      }
-    }
