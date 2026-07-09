@@ -84,7 +84,7 @@
         // resize:'none'下ではビューポート高さが変化せずscrollHeight<=clientHeightと誤判定されるため、
         // 「スクロール可能かどうか」ではなくフォーカス要素の実際の画面内位置で判定する
         const rect = focused.getBoundingClientRect();
-        const visibleBottom = _screenH - kbHeight - 24; // キーボード上に見た目の余白24pxを確保
+        const visibleBottom = _screenH - kbHeight - 60; // キーボード上に見た目の余白60pxを確保
         const overflow = rect.bottom - visibleBottom;
         if (overflow > 0) {
           let container = focused.parentElement;
@@ -5314,7 +5314,7 @@
         <div style="display:flex;gap:8px;">
           <input id="manual-group-id" type="text" maxlength="6" placeholder="グループID（例: ABC123）"
                  style="flex:1;padding:12px 10px;border:1.5px solid var(--light-gray);border-radius:10px;font-size:16px;font-family:inherit;background:var(--cream);text-transform:uppercase;"/>
-          <button class="cal-sync-action primary" style="width:72px;margin:0;" onclick="doManualJoin()">参加</button>
+          <button class="cal-sync-action primary" style="width:96px;margin:0;" onclick="doManualJoin()">参加</button>
         </div>`;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });

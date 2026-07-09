@@ -52,6 +52,12 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UIStatusBarStyle string UIStatusBarStyleDarkContent" ios/App/App/Info.plist || \
           /usr/libexec/PlistBuddy -c "Set :UIStatusBarStyle UIStatusBarStyleDarkContent" ios/App/App/Info.plist
 
+      - name: Set camera usage description in Info.plist
+        run: |
+          cd ios-app
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist
+
       - name: Select Xcode 26
         run: |
           XCODE=$(ls /Applications/ | grep -E '^Xcode_26' | sort -r | head -1)
