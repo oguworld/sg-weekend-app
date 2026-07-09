@@ -1079,7 +1079,7 @@
     .cal-cell.today.sg-holiday { background: var(--caramel); }
 
     /* Calendar event popup */
-    .cal-popup-overlay { display: none; position: fixed; inset: 0; background: rgba(44,36,32,0.3); z-index: 349; }
+    .cal-popup-overlay { display: none; position: fixed; inset: 0; background: rgba(44,36,32,0.3); z-index: 10001; }
     .cal-popup-overlay.visible { display: block; }
     .cal-popup {
       display: none;
@@ -2077,7 +2077,7 @@
       position: fixed;
       inset: 0;
       background: rgba(44,36,32,0.45);
-      z-index: 350;
+      z-index: 10002;
     }
     .pin-detail-overlay.visible { display: block; }
 
@@ -2104,7 +2104,7 @@
       background: var(--warm-white);
       border-radius: 24px 24px 0 0;
       padding: 24px 20px calc(90px + env(safe-area-inset-bottom));
-      z-index: 360;
+      z-index: 10003;
       box-shadow: 0 -8px 40px rgba(42,37,32,0.18);
       animation: slideUp 0.28s ease;
       max-height: 95vh;
@@ -2289,16 +2289,6 @@
     .card-plan-btn:active { opacity: 0.7; }
 
     /* プラン追加・編集ボトムシート */
-    .plan-modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(44,36,32,0.4);
-      z-index: 500;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-    }
-    .plan-modal-overlay.visible { opacity: 1; pointer-events: auto; }
     .plan-sheet {
       position: fixed;
       bottom: 0; left: 0; right: 0;
@@ -2706,19 +2696,19 @@
     .schedule-empty-day { font-size: 13px; color: var(--light-gray); padding: 12px 14px; background: var(--warm-white); }
     /* ─── PLAN MODALS (bottom sheet) ─── */
     .plan-modal-overlay {
-      position: fixed; inset: 0; background: rgba(44,36,32,.4); z-index: 2000;
+      position: fixed; inset: 0; background: rgba(44,36,32,.4); z-index: 10010;
       display: none; opacity: 0; transition: opacity 0.2s;
     }
     .plan-modal-overlay.visible { display: block; opacity: 1; }
     .plan-modal {
       position: fixed; bottom: 0; left: 0; right: 0; background: white;
-      border-radius: 24px 24px 0 0; z-index: 2001; max-height: 88vh;
+      border-radius: 24px 24px 0 0; z-index: 10011; max-height: 88vh;
       display: none; flex-direction: column; overflow: hidden;
       transform: translateY(100%); transition: transform 0.3s cubic-bezier(.32,2,.55,.89), bottom 0.2s ease;
     }
     .plan-modal.visible { display: flex; transform: translateY(0); }
-    #date-picker-overlay { z-index: 2100; }
-    #date-picker-modal   { z-index: 2101; }
+    #date-picker-overlay { z-index: 10020; }
+    #date-picker-modal   { z-index: 10021; }
     .plan-modal-handle { width: 40px; height: 4px; background: var(--light-gray); border-radius: 2px; margin: 12px auto 4px; flex-shrink: 0; }
     .plan-modal-header { padding: 6px 20px 12px; flex-shrink: 0; border-bottom: 1px solid var(--sand); }
     .plan-modal-title { font-family: 'Kaisei Opti', serif; font-size: 17px; font-weight: 700; color: var(--midnight); margin-bottom: 2px; }

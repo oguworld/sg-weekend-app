@@ -246,6 +246,13 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get('/', (req, res, next) => {
+  if (req.hostname === 'about.dosuru.app') {
+    return res.sendFile(path.join(__dirname, 'public', 'about.html'));
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─────────────────────────────────────────────

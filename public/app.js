@@ -48,14 +48,16 @@
     // ボトムシートをキーボード分だけ縮小＋上移動（入力欄がキーボードに隠れなくなる）
     // シート上端の位置は変えず、下端側だけキーボード分削ることで画面上端へのはみ出しを防ぐ
     function _adjustSheetForKb(sheet, kbH) {
+      const MARGIN = 24; // キーボード上に見た目の余白を確保する（縮小量とbottom移動量は必ず同じ値にすること。異なるとオーバーシュート問題が再発する）
+      const SAFE_GAP = kbH + MARGIN;
       const cs = getComputedStyle(sheet);
       const hasMaxH = cs.maxHeight !== 'none' && parseFloat(cs.maxHeight) > 0;
       const curH = parseFloat(hasMaxH ? cs.maxHeight : cs.height) || 0;
-      if (curH <= kbH + 80) return; // 縮めすぎる場合はスキップ
+      if (curH <= SAFE_GAP + 80) return; // 縮めすぎる場合はスキップ
       sheet.dataset.kbIsMaxH = hasMaxH ? '1' : '';
-      if (hasMaxH) sheet.style.maxHeight = (curH - kbH) + 'px';
-      else         sheet.style.height    = (curH - kbH) + 'px';
-      sheet.style.bottom = kbH + 'px';
+      if (hasMaxH) sheet.style.maxHeight = (curH - SAFE_GAP) + 'px';
+      else         sheet.style.height    = (curH - SAFE_GAP) + 'px';
+      sheet.style.bottom = SAFE_GAP + 'px';
     }
 
     function _resetSheetAfterKb(sheet) {
@@ -76,6 +78,17 @@
         if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
         if (focused.closest('.plan-modal, .plan-sheet')) {
           focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          return;
+        }
+        // 画面直下の入力欄（設定画面の#feedback-text/#nickname-inputなど）: 祖先のスクロールコンテナ内で中央に寄せる
+        let container = focused.parentElement;
+        while (container && container !== document.body) {
+          const cs = getComputedStyle(container);
+          if (cs.overflowY === 'auto' && container.scrollHeight > container.clientHeight) {
+            focused.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            break;
+          }
+          container = container.parentElement;
         }
       }, 80);
     }
