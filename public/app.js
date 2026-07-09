@@ -41,22 +41,49 @@
     }
 
     // ─── 全画面共通: キーボード被り対策（Web版・Capacitor版共通） ───
-    // フォーカス中の要素が属するシート（.plan-modal / .plan-sheet / #title-edit-sheet）を
-    // 特定し、シート全体を bottom: kbHeight で持ち上げる（内部スクロールとの二重対応はしない）
+    // 表示中のシート（.plan-modal.visible / .plan-sheet.visible ※#title-edit-sheetはplan-modalクラスを持つため含まれる）を
+    // キーボード分だけ縮小＋bottom移動する（シート上端の位置は変えない。詳細は_adjustSheetForKb参照）
     let _screenH = window.innerHeight; // キーボード表示前の画面高さを保存
 
+    // ボトムシートをキーボード分だけ縮小＋上移動（入力欄がキーボードに隠れなくなる）
+    // シート上端の位置は変えず、下端側だけキーボード分削ることで画面上端へのはみ出しを防ぐ
+    function _adjustSheetForKb(sheet, kbH) {
+      const cs = getComputedStyle(sheet);
+      const hasMaxH = cs.maxHeight !== 'none' && parseFloat(cs.maxHeight) > 0;
+      const curH = parseFloat(hasMaxH ? cs.maxHeight : cs.height) || 0;
+      if (curH <= kbH + 80) return; // 縮めすぎる場合はスキップ
+      sheet.dataset.kbIsMaxH = hasMaxH ? '1' : '';
+      if (hasMaxH) sheet.style.maxHeight = (curH - kbH) + 'px';
+      else         sheet.style.height    = (curH - kbH) + 'px';
+      sheet.style.bottom = kbH + 'px';
+    }
+
+    function _resetSheetAfterKb(sheet) {
+      if (!('kbIsMaxH' in sheet.dataset)) return;
+      if (sheet.dataset.kbIsMaxH === '1') sheet.style.maxHeight = '';
+      else sheet.style.height = '';
+      sheet.style.bottom = '';
+      delete sheet.dataset.kbIsMaxH;
+    }
+
     function _liftVisibleSheetForKeyboard(kbHeight) {
-      const focused = document.activeElement;
-      if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
-      const sheet = focused.closest('.plan-modal, .plan-sheet, #title-edit-sheet');
-      if (!sheet) return;
-      sheet.style.bottom = kbHeight + 'px';
+      document.querySelectorAll('.plan-modal.visible, .plan-sheet.visible')
+        .forEach(sheet => _adjustSheetForKb(sheet, kbHeight));
+
+      // フォーカス要素を可視範囲に（シート縮小後に実行）
+      setTimeout(() => {
+        const focused = document.activeElement;
+        if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
+        if (focused.closest('.plan-modal, .plan-sheet')) {
+          focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 80);
     }
 
     function _resetSheetKeyboardOffset() {
       _screenH = window.innerHeight;
-      document.querySelectorAll('.plan-modal, .plan-sheet, #title-edit-sheet').forEach(sheet => {
-        sheet.style.bottom = '0px';
+      document.querySelectorAll('.plan-modal, .plan-sheet').forEach(sheet => {
+        _resetSheetAfterKb(sheet);
       });
     }
 
