@@ -134,14 +134,13 @@
   <div class="screen" id="screen-course" style="display:none;">
     <div class="course-screen-header plan-title-header">
       <span class="screen-title" data-i18n="courseScreenTitle">おでかけコース</span>
-    </div>
-    <div class="screen-content" id="course-screen-content">
-
       <!-- ピルタブ -->
       <div class="course-tab-bar">
         <button class="course-tab active" data-tab="everyone" onclick="switchCourseTab('everyone')" data-i18n="courseTabEveryone">みんなのコース</button>
         <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')" data-i18n="courseTabMylist">マイコース</button>
       </div>
+    </div>
+    <div class="screen-content" id="course-screen-content">
 
       <!-- コース一覧 -->
       <div id="course-list" style="padding:0 16px;display:flex;flex-direction:column;padding-bottom:120px;"></div>
@@ -327,14 +326,6 @@
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secOther">その他</div>
 
-      <div class="settings-item" style="padding:12px 18px;">
-        <span class="settings-item-label" data-i18n="howtoLabel">使い方</span>
-        <button onclick="openShareModal()"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;"
-          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
-          <span data-i18n="howtoOpenBtn">見る</span>
-        </button>
-      </div>
 
       <div class="settings-item" style="padding:16px 18px;">
         <span class="settings-item-label" data-i18n="labelAboutSns">公式サイト・SNS</span>
@@ -430,15 +421,6 @@
   </div>
 
   <!-- ─── HOWTO MODAL（使い方） ─── -->
-  <div class="pin-detail-overlay" id="share-overlay" onclick="if(!_touchCapableDetected) closeShareModal()"></div>
-  <div class="pin-detail-modal" id="share-modal">
-    <div class="pin-detail-header">
-      <div class="pin-detail-emoji">🗺</div>
-      <button data-close class="pin-detail-close" id="share-modal-close" onclick="if(!_touchCapableDetected) closeShareModal()">✕</button>
-    </div>
-    <div id="howto-content" style="overflow-y:auto;max-height:72vh;padding-bottom:4px;"></div>
-  </div>
-
   <!-- ─── 共有カレンダー MODAL ─── -->
   <div class="pin-detail-overlay" id="cal-sync-overlay" onclick="closeCalSync()"></div>
   <div class="pin-detail-modal" id="cal-sync-modal">

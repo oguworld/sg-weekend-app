@@ -316,8 +316,6 @@
         countSuffix: '件',
         pinEmpty: 'まだピン留めがありません',
         pinEmptyDesc: '気になるスポットのカードから<br>📌ピン留めしてみましょう！',
-        howtoLabel: '使い方',
-        howtoOpenBtn: '見る',
         shareSettingsDesc: 'シンガポール在住の友達にこのアプリを紹介しよう！',
         shareSettingsBtn: '友達にシェアする',
         bannerToday: '⏰ 本日まで',
@@ -512,8 +510,6 @@
         countSuffix: '',
         pinEmpty: 'No pins yet',
         pinEmptyDesc: 'Tap 📌 on any card to pin it!',
-        howtoLabel: 'How to Use',
-        howtoOpenBtn: 'Open',
         shareSettingsDesc: 'Share this app with your friends in Singapore!',
         shareSettingsBtn: 'Share with Friends',
         bannerToday: '⏰ Today only',
@@ -770,7 +766,6 @@
 
     function setLang(lang) {
       localStorage.setItem('sg_lang', lang);
-      _howtoRendered = false;
       applyI18n();
       updateCityUI();
       updateDarkModeUI();
@@ -1599,8 +1594,6 @@
     // ─── オーバーレイ・モーダル閉じる 即時タップ対応 ───
     [
       ['install-overlay',    () => closeInstallModal()],
-      ['share-overlay',      () => closeShareModal()],
-      ['share-modal-close',  () => closeShareModal()],
       ['pin-detail-overlay', () => closePinDetail()],
       ['pin-picker-overlay',   () => closePinPicker()],
       ['emoji-picker-overlay',    () => closeEmojiPicker()],
@@ -2191,105 +2184,12 @@
       unlockScroll();
     }
 
-    function renderHowtoContent() {
-      const isEn = getLang() === 'en';
-      const stepBadge = (n) => `<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--caramel);color:#fff;font-size:12px;font-weight:700;flex-shrink:0;">${n}</span>`;
-
-      return `
-        <div class="pin-detail-title" style="margin-bottom:6px;">${isEn ? 'How to Use' : '使い方'}</div>
-        <div style="font-size:14px;color:var(--warm-gray);line-height:1.7;margin-bottom:16px;">
-          ${isEn ? 'Find events, build day courses with AI, and plan your weekend.' : '週末のお出かけをかんたんに計画できるアプリです。'}
-        </div>
-
-        <div style="background:var(--sage-pale);border-radius:16px;padding:14px 16px;margin-bottom:16px;">
-          <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;">📱 ${isEn ? 'Add to Home Screen' : 'ホーム画面に追加'}</div>
-          <div style="font-size:14px;color:var(--warm-gray);line-height:1.8;">${isEn
-            ? '<strong>iPhone:</strong> Safari → Share (□↑) → "Add to Home Screen"<br><strong>Android:</strong> Chrome → ⋮ → "Add to Home screen"'
-            : '<strong>iPhone：</strong>Safari → 共有（□↑）→「ホーム画面に追加」<br><strong>Android：</strong>Chrome → ⋮ →「ホーム画面に追加」'
-          }</div>
-        </div>
-
-        <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            ${stepBadge(1)}
-            <div style="font-size:15px;font-weight:700;color:var(--midnight);">🔍 ${isEn ? 'Find events' : 'イベントを探す'}</div>
-          </div>
-          <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">
-            ${isEn
-              ? '• <strong>⭐ Recommended</strong> — shows events matching your genre settings<br>• Switch tabs: <strong>Events / Shows / Food / Deals / New Open</strong><br>• Use <strong>Filter ▼</strong> to narrow by date, area, or keyword<br>• <strong>⏰</strong> ending soon &nbsp;/&nbsp; <strong>🔔</strong> newly added'
-              : '• <strong>⭐ おすすめ</strong> — 設定したジャンルに合うイベントを表示<br>• タブ切り替え：<strong>イベント / 展示・公演 / グルメ / プロモ / 新規オープン</strong><br>• <strong>絞り込み ▼</strong> で日程・エリア・キーワードを指定<br>• <strong>⏰</strong> 終了間近 &nbsp;/&nbsp; <strong>🔔</strong> 新着'
-            }
-          </div>
-        </div>
-
-        <div style="display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
-          <div style="width:2px;height:14px;background:var(--light-gray);border-radius:1px;"></div>
-        </div>
-
-        <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            ${stepBadge(2)}
-            <div style="font-size:15px;font-weight:700;color:var(--midnight);">🗺 ${isEn ? 'Build a course' : 'コースを作る'}</div>
-          </div>
-          <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">
-            ${isEn
-              ? '• Open <strong>Course tab</strong> → tap <strong>＋</strong> → AI suggests 3 concepts<br>• Pick one → get a full day itinerary<br>• Tap <strong>📅</strong> to add the whole course to your schedule'
-              : '• <strong>コースタブ</strong> → <strong>＋</strong> をタップ → AIが3候補を提案<br>• 気に入ったコンセプトを選ぶとフルプランを生成<br>• <strong>📅</strong> で予定表に一括追加できます'
-            }
-          </div>
-        </div>
-
-        <div style="display:flex;align-items:center;justify-content:center;margin-bottom:10px;">
-          <div style="width:2px;height:14px;background:var(--light-gray);border-radius:1px;"></div>
-        </div>
-
-        <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;margin-bottom:20px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            ${stepBadge(3)}
-            <div style="font-size:15px;font-weight:700;color:var(--midnight);">📅 ${isEn ? 'Manage your schedule' : '予定を管理する'}</div>
-          </div>
-          <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">
-            ${isEn
-              ? '• Tap <strong>📅 Add to plan</strong> on any event card<br>• Or tap <strong>＋</strong> in the Schedule tab to add freely<br>• Share your schedule with family via <strong>🔗 Share</strong>'
-              : '• イベントカードの <strong>📅 予定に追加</strong> で日時を設定<br>• 予定表の <strong>＋</strong> で自由に予定を追加<br>• <strong>🔗 共有</strong> で家族と予定を共有'
-            }
-          </div>
-        </div>
-
-        <div style="background:var(--sage-pale);border-radius:16px;padding:14px 16px;margin-bottom:4px;">
-          <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;">⚙️ ${isEn ? 'Settings' : '設定'}</div>
-          <div style="font-size:14px;color:var(--warm-gray);line-height:1.9;">${isEn
-            ? '• <strong>Genres & Interests</strong> — select genres to personalize ⭐ Recommended<br>• <strong>Who you\'re going with</strong> — tailors AI course suggestions<br>• <strong>Language</strong> — switch between Japanese and English'
-            : '• <strong>ジャンル・興味</strong> — ジャンルを選ぶと ⭐ おすすめ に反映されます<br>• <strong>一緒に行く人</strong> — コース生成AIのプロンプトに反映されます<br>• <strong>言語</strong> — 日本語と英語を切り替えできます'
-          }</div>
-        </div>`;
-    }
-
-    let _howtoRendered = false; // SW更新時にリセット → 再レンダリング
-    let _howtoOpen = false;
-    function openShareModal() {
-      if (_howtoOpen) return;
-      _howtoOpen = true;
-      if (!_howtoRendered) {
-        document.getElementById('howto-content').innerHTML = renderHowtoContent();
-        _howtoRendered = true;
-      }
-      document.getElementById('howto-content').scrollTop = 0;
-      document.getElementById('share-modal').classList.add('visible');
-      document.getElementById('share-overlay').classList.add('visible');
-    }
-    function closeShareModal() {
-      if (!_howtoOpen) return;
-      _howtoOpen = false;
-      document.getElementById('share-modal').classList.remove('visible');
-      document.getElementById('share-overlay').classList.remove('visible');
-    }
     async function doShare() {
       const cityMeta = CITY_META[getCity()] || CITY_META.sg;
       const data = {
         title: 'おでかけNavi',
         text: `${cityMeta.subtitleJa}！週末どうする？はここで決まる👇`,
-        url: 'https://dosuru.app',
+        url: 'https://apps.apple.com/app/id6787159354',
       };
       if (navigator.share) {
         try { await navigator.share(data); } catch(e) {}
@@ -2398,7 +2298,6 @@
     // ─── NAV LOGIC ───
     function closeAllPopups() {
       closeInstallModal();
-      closeShareModal();
       closeCalPopup();
       closePinDetail();
       closePinPicker();
