@@ -141,17 +141,32 @@
         // resize:'none'下ではビューポート高さが変化せずscrollHeight<=clientHeightと誤判定されるため、
         // 「スクロール可能かどうか」ではなくフォーカス要素の実際の画面内位置で判定する
         const rect = focused.getBoundingClientRect();
-        const visibleBottom = _screenH - kbHeight - 60; // キーボード上に見た目の余白60pxを確保
+        const visibleBottom = _screenH - kbHeight - 80; // キーボード上に見た目の余白80pxを確保
         const overflow = rect.bottom - visibleBottom;
+        _sendDebugLog('settings_kb_fallback', {
+          focusedId: focused.id || null,
+          screenH: _screenH,
+          kbHeight,
+          rectBottom: rect.bottom,
+          visibleBottom,
+          overflow,
+        });
         if (overflow > 0) {
           let container = focused.parentElement;
+          let foundContainer = null;
           while (container && container !== document.body) {
             const cs = getComputedStyle(container);
             if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+              foundContainer = container.className || container.id || container.tagName;
               container.scrollTop += overflow;
               break;
             }
             container = container.parentElement;
+          }
+          _sendDebugLog('settings_kb_fallback_result', { foundContainer, appliedScroll: overflow });
+          if (!foundContainer) {
+            // スクロール可能な祖先が見つからない場合の保険
+            focused.scrollIntoView({ block: 'center', behavior: 'smooth' });
           }
         }
       }, 80);
