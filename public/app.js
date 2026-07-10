@@ -87,8 +87,25 @@
       setTimeout(() => {
         const focused = document.activeElement;
         if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
-        if (focused.closest('.plan-modal, .plan-sheet')) {
-          focused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        const sheet = focused.closest('.plan-modal, .plan-sheet');
+        if (sheet) {
+          // scrollIntoView({block:'nearest'})だと要素下端がスクロールコンテナ下端に密着し余白が生まれないため、
+          // 縮小後のシート内下端を基準に一定の余白(MARGIN)を確保して手動でスクロールする
+          const MARGIN = 16;
+          const fRect = focused.getBoundingClientRect();
+          const sRect = sheet.getBoundingClientRect();
+          const overflow = fRect.bottom - (sRect.bottom - MARGIN);
+          if (overflow > 0) {
+            let container = focused.parentElement;
+            while (container && container !== sheet && container !== document.body) {
+              const cs = getComputedStyle(container);
+              if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && container.scrollHeight > container.clientHeight) {
+                container.scrollBy({ top: overflow, behavior: 'smooth' });
+                break;
+              }
+              container = container.parentElement;
+            }
+          }
           return;
         }
         // 画面直下の入力欄（設定画面の#feedback-text/#nickname-inputなど）:
