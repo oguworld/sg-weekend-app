@@ -2219,8 +2219,20 @@
       }
     }
 
-    // ─── PUSH NOTIFICATIONS ───
+    // ─── PUSH NOTIFICATIONS（Web版） ───
     let _pushSubscription = null;
+
+    // Web版・iOS版共通: 現在プッシュ通知が有効かどうか（グループ通知登録の可否判定に使用）
+    function _hasActivePushSub() {
+      return _isCapacitorApp ? !!_nativeDeviceToken : !!_pushSubscription;
+    }
+
+    // Web版・iOS版共通: 「通知をオンにしましょう」プロンプトを表示すべきか
+    // （iOS版は `Notification`（Web API）がWKWebView上で信頼できないため、ネイティブプラグインの許可状態を使う）
+    function _shouldShowPushPrompt() {
+      if (_isCapacitorApp) return !_nativeDeviceToken && !!_getCapPushPlugin() && !_nativePushDenied;
+      return !_pushSubscription && 'PushManager' in window && Notification.permission !== 'denied';
+    }
 
     function _urlBase64ToUint8Array(base64String) {
       const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -2232,7 +2244,7 @@
     async function initPushState() {
       const item = document.getElementById('push-setting-item');
       if (!item) return;
-      if (_isCapacitorApp) { item.style.display = 'none'; return; }
+      if (_isCapacitorApp) { await _initNativePush(); return; }
       if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
         item.style.display = 'none';
         return;
@@ -2247,11 +2259,13 @@
     function _updatePushBtn() {
       const btn = document.getElementById('push-toggle-btn');
       if (!btn) return;
-      const denied = Notification.permission === 'denied';
-      btn.textContent = denied ? t('pushDenied') : _pushSubscription ? t('pushOn') : t('pushOff');
+      const denied = _isCapacitorApp ? _nativePushDenied : Notification.permission === 'denied';
+      const on = _isCapacitorApp ? !!_nativeDeviceToken : !!_pushSubscription;
+      btn.textContent = denied ? t('pushDenied') : on ? t('pushOn') : t('pushOff');
     }
 
     async function togglePush() {
+      if (_isCapacitorApp) { await _toggleNativePush(); return; }
       if (!('PushManager' in window)) { showToast(t('toastPushError')); return; }
       if (Notification.permission === 'denied') { showToast(t('toastPushDenied')); return; }
       try {
@@ -2293,6 +2307,136 @@
     async function enablePushForCalendar() {
       await togglePush();
       if (getSharedGroupId()) renderCalSyncModal();
+    }
+
+    // ─── PUSH NOTIFICATIONS（iOSアプリ/Capacitor版・APNs） ───
+    // Web版のtogglePush()（Promiseベース、PushManager経由）とは別に、
+    // @capacitor/push-notificationsはコールバック/イベント形式のため独立実装する
+    let _nativeDeviceToken = localStorage.getItem('app_ios_push_token') || null;
+    let _nativePushDenied = false;
+    let _CapPush = null;
+    function _getCapPushPlugin() {
+      if (_CapPush) return _CapPush;
+      try {
+        if (window.Capacitor?.registerPlugin) {
+          _CapPush = window.Capacitor.registerPlugin('PushNotifications');
+        }
+      } catch (_) {}
+      if (!_CapPush) _CapPush = window.Capacitor?.Plugins?.PushNotifications;
+      return _CapPush;
+    }
+
+    let _nativePushListenersBound = false;
+    let _nativePushRegisterIntent = null; // 'init' | 'toggle-on' | null（registrationイベント発火時にどちらの操作起因かを判別）
+    function _bindNativePushListenersOnce(plugin) {
+      if (_nativePushListenersBound) return;
+      _nativePushListenersBound = true;
+      plugin.addListener('registration', (token) => {
+        _nativeDeviceToken = token.value;
+        _nativePushDenied = false;
+        localStorage.setItem('app_ios_push_token', token.value);
+        _registerNativePushToken(token.value);
+        if (_nativePushRegisterIntent === 'toggle-on') {
+          const gid = getSharedGroupId();
+          if (gid) _registerGroupPush(gid);
+          showToast(t('toastPushOn'));
+        }
+        _nativePushRegisterIntent = null;
+        _updatePushBtn();
+      });
+      plugin.addListener('registrationError', () => {
+        if (_nativePushRegisterIntent === 'toggle-on') showToast(t('toastPushError'));
+        _nativePushRegisterIntent = null;
+        _updatePushBtn();
+      });
+      // 通知タップでアプリが起動/フォアグラウンド化した際の遷移（共有カレンダー通知なら参加ダイアログ、それ以外はトップ画面へ）
+      plugin.addListener('pushNotificationActionPerformed', (action) => {
+        try {
+          const url = action?.notification?.data?.url;
+          if (url) {
+            const u = new URL(url, 'https://dosuru.app');
+            const joinId = u.searchParams.get('join');
+            if (joinId && /^[A-Z2-9]{6}$/.test(joinId)) {
+              _pendingJoinGroupId = joinId;
+              _pendingJoinKey = u.hash.replace('#', '') || null;
+              const desc = document.getElementById('cal-join-desc');
+              if (desc) desc.innerHTML = `グループ <strong>${joinId}</strong> に参加しますか？<br><br>現在の予定データと統合されます。`;
+              document.getElementById('cal-join-overlay').classList.add('visible');
+              document.getElementById('cal-join-modal').classList.add('visible');
+            }
+          }
+        } catch (e) {}
+        switchNav('home');
+      });
+    }
+
+    async function _initNativePush() {
+      const item = document.getElementById('push-setting-item');
+      const plugin = _getCapPushPlugin();
+      if (!plugin) { if (item) item.style.display = 'none'; return; }
+      _bindNativePushListenersOnce(plugin);
+      try {
+        const permStatus = await plugin.checkPermissions();
+        _nativePushDenied = permStatus.receive === 'denied';
+        if (permStatus.receive === 'granted') {
+          _nativePushRegisterIntent = 'init';
+          await plugin.register();
+        } else {
+          // 未許可 or 拒否済み。トグルOFF表示のまま、次回togglePush()で許可ダイアログを出す
+          _nativeDeviceToken = null;
+        }
+      } catch (e) {}
+      _updatePushBtn();
+    }
+
+    async function _toggleNativePush() {
+      const plugin = _getCapPushPlugin();
+      if (!plugin) { showToast(t('toastPushError')); return; }
+      _bindNativePushListenersOnce(plugin);
+      try {
+        if (_nativeDeviceToken) {
+          const gid = getSharedGroupId();
+          if (gid) await _deregisterGroupPush(gid);
+          await _deregisterNativePushToken(_nativeDeviceToken);
+          _nativeDeviceToken = null;
+          localStorage.removeItem('app_ios_push_token');
+          showToast(t('toastPushOff'));
+        } else {
+          const permStatus = await plugin.checkPermissions();
+          let perm = permStatus.receive;
+          if (perm !== 'granted') {
+            const req = await plugin.requestPermissions();
+            perm = req.receive;
+          }
+          _nativePushDenied = perm === 'denied';
+          if (perm !== 'granted') { showToast(t('toastPushDenied')); _updatePushBtn(); return; }
+          _nativePushRegisterIntent = 'toggle-on';
+          await plugin.register();
+        }
+      } catch (e) {
+        showToast(t('toastPushError'));
+      }
+      _updatePushBtn();
+    }
+
+    async function _registerNativePushToken(deviceToken) {
+      try {
+        await fetch(API_BASE + '/api/push-subscribe-ios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceToken }),
+        });
+      } catch (e) {}
+    }
+
+    async function _deregisterNativePushToken(deviceToken) {
+      try {
+        await fetch(API_BASE + '/api/push-subscribe-ios', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deviceToken }),
+        });
+      } catch (e) {}
     }
 
     // ─── NAV LOGIC ───
@@ -5025,6 +5169,17 @@
       return id;
     }
     async function _registerGroupPush(gid) {
+      if (_isCapacitorApp) {
+        if (!_nativeDeviceToken) return;
+        try {
+          await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe-ios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceToken: _nativeDeviceToken, deviceId: getCalDeviceId() }),
+          });
+        } catch(e) {}
+        return;
+      }
       try {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
@@ -5038,6 +5193,17 @@
     }
 
     async function _deregisterGroupPush(gid) {
+      if (_isCapacitorApp) {
+        if (!_nativeDeviceToken) return;
+        try {
+          await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe-ios', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceToken: _nativeDeviceToken }),
+          });
+        } catch(e) {}
+        return;
+      }
       try {
         const reg = await navigator.serviceWorker.ready;
         const sub = await reg.pushManager.getSubscription();
@@ -5156,7 +5322,7 @@
       const gid = getSharedGroupId();
       const el = document.getElementById('cal-sync-modal-content');
       if (gid) {
-        const showPushPrompt = !_pushSubscription && 'PushManager' in window && Notification.permission !== 'denied';
+        const showPushPrompt = _shouldShowPushPrompt();
         el.innerHTML = `
           ${showPushPrompt ? `
           <div style="background:var(--caramel-pale);border:1px solid var(--caramel-light);border-radius:12px;padding:12px 14px;margin-bottom:14px;text-align:center;">
@@ -5220,7 +5386,7 @@
         const d = await r.json();
         setCalKey(key);
         setSharedGroupId(d.groupId);
-        if (_pushSubscription) await _registerGroupPush(d.groupId);
+        if (_hasActivePushSub()) await _registerGroupPush(d.groupId);
         updateCalSyncBtn();
         renderCalSyncModal();
       } catch(e) {
@@ -5239,7 +5405,7 @@
     async function doLeaveGroup() {
       if (!confirm('グループから離脱しますか？\n最新のサーバーデータをローカルに保存します。')) return;
       const gid = getSharedGroupId();
-      if (gid && _pushSubscription) await _deregisterGroupPush(gid);
+      if (gid && _hasActivePushSub()) await _deregisterGroupPush(gid);
       await fetchFromServer();
       setSharedGroupId(null);
       setCalKey(null);
@@ -5449,12 +5615,12 @@
         saveEventPlans(merged.eventPlans);
         _calSyncFromServer = false;
         setSharedGroupId(gid);
-        if (_pushSubscription) await _registerGroupPush(gid);
+        if (_hasActivePushSub()) await _registerGroupPush(gid);
         updateCalSyncBtn();
         renderScheduleTab();
         closeJoinPrompt();
         showToast('グループに参加しました！');
-        if (!_pushSubscription && 'PushManager' in window && Notification.permission !== 'denied') {
+        if (_shouldShowPushPrompt()) {
           renderCalSyncModal();
           document.getElementById('cal-sync-modal').classList.add('visible');
         }

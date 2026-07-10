@@ -12,6 +12,63 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 );
 
+// ─────────────────────────────────────────────
+// APNs (iOSアプリ向けネイティブPush)
+// 環境変数未設定時はiOS送信のみスキップ（Web Push可用性には一切影響しない）
+// ─────────────────────────────────────────────
+const APNS_KEY_ID     = process.env.APNS_KEY_ID;
+const APNS_TEAM_ID    = process.env.APNS_TEAM_ID;
+const APNS_BUNDLE_ID  = process.env.APNS_BUNDLE_ID;
+const APNS_PRIVATE_KEY = process.env.APNS_PRIVATE_KEY;
+const APNS_PRODUCTION  = process.env.APNS_PRODUCTION === 'true';
+const APNS_ENABLED = !!(APNS_KEY_ID && APNS_TEAM_ID && APNS_BUNDLE_ID && APNS_PRIVATE_KEY);
+
+let apnProvider = null;
+if (APNS_ENABLED) {
+  try {
+    const apn = require('@parse/node-apn');
+    apnProvider = new apn.Provider({
+      token: {
+        key: APNS_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        keyId: APNS_KEY_ID,
+        teamId: APNS_TEAM_ID,
+      },
+      production: APNS_PRODUCTION,
+    });
+    console.log(`📱 APNs初期化完了（production=${APNS_PRODUCTION}）`);
+  } catch (e) {
+    console.warn('⚠️  APNs初期化に失敗しました。iOS向けPushはスキップされます:', e.message);
+    apnProvider = null;
+  }
+} else {
+  console.warn('⚠️  APNs関連の環境変数が未設定のため、iOS向けPushはスキップされます（Web Pushは通常通り動作します）');
+}
+
+// APNsへ1件送信。無効トークンなど恒久的な失敗時は true（削除対象）を返す
+async function sendApnToToken(deviceToken, { title, body, url }) {
+  if (!apnProvider) return false;
+  const apn = require('@parse/node-apn');
+  const note = new apn.Notification();
+  note.topic = APNS_BUNDLE_ID;
+  note.alert = { title, body };
+  note.sound = 'default';
+  note.payload = { url: url || '/' };
+  try {
+    const result = await apnProvider.send(note, deviceToken);
+    const failure = result.failed?.[0];
+    if (failure) {
+      const reason = failure.response?.reason;
+      const isInvalid = failure.status === 410 || reason === 'BadDeviceToken' || reason === 'Unregistered';
+      if (isInvalid) return true;
+      console.error('APNs送信失敗:', failure.status, reason);
+    }
+    return false;
+  } catch (e) {
+    console.error('APNs送信エラー:', e.message);
+    return false;
+  }
+}
+
 const PUSH_SUBS_PATH = path.join(__dirname, 'data', 'push-subscriptions.json');
 function loadPushSubs() {
   try { return JSON.parse(fs.readFileSync(PUSH_SUBS_PATH, 'utf8')); } catch { return []; }
@@ -19,24 +76,35 @@ function loadPushSubs() {
 function savePushSubs(subs) {
   fs.writeFileSync(PUSH_SUBS_PATH, JSON.stringify(subs, null, 2), 'utf8');
 }
+// 既存データ（platformフィールドなし）は 'web' にフォールバック
+function subPlatform(sub) {
+  return sub.platform || 'web';
+}
 async function sendPushToAll(cityKey) {
   const cityConf = CITIES[cityKey] || CITIES.sg;
-  const payload = JSON.stringify({
-    title: '新着おでかけ情報',
-    body: '最新の週末スポット情報が届きました！',
-  });
+  const title = '新着おでかけ情報';
+  const body = '最新の週末スポット情報が届きました！';
+  const payload = JSON.stringify({ title, body });
   const subs = loadPushSubs();
   if (subs.length === 0) return 0;
   const expiredEndpoints = new Set();
+  const expiredTokens = new Set();
   await Promise.allSettled(subs.map(async sub => {
+    if (subPlatform(sub) === 'ios') {
+      const invalid = await sendApnToToken(sub.deviceToken, { title, body });
+      if (invalid) expiredTokens.add(sub.deviceToken);
+      return;
+    }
     try {
       await webpush.sendNotification(sub, payload);
     } catch (e) {
       if (e.statusCode === 410 || e.statusCode === 404) expiredEndpoints.add(sub.endpoint);
     }
   }));
-  if (expiredEndpoints.size > 0) savePushSubs(subs.filter(s => !expiredEndpoints.has(s.endpoint)));
-  return subs.length - expiredEndpoints.size;
+  if (expiredEndpoints.size > 0 || expiredTokens.size > 0) {
+    savePushSubs(subs.filter(s => !expiredEndpoints.has(s.endpoint) && !expiredTokens.has(s.deviceToken)));
+  }
+  return subs.length - expiredEndpoints.size - expiredTokens.size;
 }
 
 const app = express();
@@ -1324,6 +1392,29 @@ app.delete('/api/push-subscribe', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── iOS（APNs）向け購読登録・解除（既存Web Pushエンドポイントとは完全に分離） ───
+app.post('/api/push-subscribe-ios', async (req, res) => {
+  const { deviceToken } = req.body;
+  if (!deviceToken) return res.status(400).json({ error: 'invalid' });
+  await withFileLock(PUSH_SUBS_PATH, () => {
+    const subs = loadPushSubs();
+    const idx = subs.findIndex(s => s.platform === 'ios' && s.deviceToken === deviceToken);
+    const entry = { platform: 'ios', deviceToken, registeredAt: new Date().toISOString() };
+    if (idx >= 0) subs[idx] = entry;
+    else subs.push(entry);
+    savePushSubs(subs);
+  });
+  res.json({ ok: true });
+});
+
+app.delete('/api/push-subscribe-ios', async (req, res) => {
+  const { deviceToken } = req.body;
+  await withFileLock(PUSH_SUBS_PATH, () => {
+    savePushSubs(loadPushSubs().filter(s => !(s.platform === 'ios' && s.deviceToken === deviceToken)));
+  });
+  res.json({ ok: true });
+});
+
 app.post('/api/notify-events-updated', requireAdminSecret, async (req, res) => {
   const city = req.query.city || 'sg';
   try {
@@ -1463,6 +1554,37 @@ app.delete('/api/calendar/:groupId/push-subscribe', (req, res) => {
   } catch (e) { res.status(500).json({ error: 'unsubscribe failed' }); }
 });
 
+// ─── iOS（APNs）向け 共有カレンダー購読登録・解除 ───
+app.post('/api/calendar/:groupId/push-subscribe-ios', (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  const { deviceToken, deviceId } = req.body;
+  if (!deviceToken) return res.status(400).json({ error: 'invalid' });
+  try {
+    const cal = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const subs = cal.pushSubscriptions || [];
+    const idx = subs.findIndex(s => s.platform === 'ios' && s.deviceToken === deviceToken);
+    const entry = { platform: 'ios', deviceToken, deviceId: deviceId || null, registeredAt: new Date().toISOString() };
+    if (idx >= 0) subs[idx] = entry;
+    else subs.push(entry);
+    fs.writeFileSync(fp, JSON.stringify({ ...cal, pushSubscriptions: subs }, null, 2));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'subscribe failed' }); }
+});
+
+app.delete('/api/calendar/:groupId/push-subscribe-ios', (req, res) => {
+  const fp = getCalFilePath(req.params.groupId);
+  if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
+  const { deviceToken } = req.body;
+  if (!deviceToken) return res.status(400).json({ error: 'invalid' });
+  try {
+    const cal = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const subs = (cal.pushSubscriptions || []).filter(s => !(s.platform === 'ios' && s.deviceToken === deviceToken));
+    fs.writeFileSync(fp, JSON.stringify({ ...cal, pushSubscriptions: subs }, null, 2));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'unsubscribe failed' }); }
+});
+
 const calNotifyLimit = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -1480,13 +1602,16 @@ app.post('/api/calendar/:groupId/notify', calNotifyLimit, async (req, res) => {
     if (subs.length === 0) return res.json({ ok: true, sent: 0 });
     const gid = req.params.groupId;
     const city = cal.city || 'sg';
-    const payload = JSON.stringify({
-      title,
-      body,
-      data: { url: `/?join=${gid}&city=${city}` },
-    });
+    const url = `/?join=${gid}&city=${city}`;
+    const payload = JSON.stringify({ title, body, data: { url } });
     const expired = new Set();
+    const expiredTokens = new Set();
     await Promise.allSettled(subs.map(async sub => {
+      if (subPlatform(sub) === 'ios') {
+        const invalid = await sendApnToToken(sub.deviceToken, { title, body, url });
+        if (invalid) expiredTokens.add(sub.deviceToken);
+        return;
+      }
       const { deviceId: _d, ...webSub } = sub;
       try {
         await webpush.sendNotification(webSub, payload);
@@ -1494,11 +1619,11 @@ app.post('/api/calendar/:groupId/notify', calNotifyLimit, async (req, res) => {
         if (e.statusCode === 410 || e.statusCode === 404) expired.add(sub.endpoint);
       }
     }));
-    if (expired.size > 0) {
-      const allSubs = (cal.pushSubscriptions || []).filter(s => !expired.has(s.endpoint));
+    if (expired.size > 0 || expiredTokens.size > 0) {
+      const allSubs = (cal.pushSubscriptions || []).filter(s => !expired.has(s.endpoint) && !expiredTokens.has(s.deviceToken));
       fs.writeFileSync(fp, JSON.stringify({ ...cal, pushSubscriptions: allSubs }, null, 2));
     }
-    res.json({ ok: true, sent: subs.length - expired.size });
+    res.json({ ok: true, sent: subs.length - expired.size - expiredTokens.size });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

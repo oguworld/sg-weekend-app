@@ -115,18 +115,46 @@ sg-weekend-app/
 
 ## iOSアプリ化（Capacitor）2026-07-03実装
 - 方式: ローカルバンドル（webDir: `../public`）。Web版と同じHTMLをアプリ内に同梱
-- appId: `app.dosuru.odenavi` / appName: `おでかけNavi`
+- appId: `app.dosuru`（2026-07-10訂正: 以前`app.dosuru.odenavi`と誤記していたが、実際にApple Developer Portalに登録され署名・TestFlight配信に使われている値は`ios-app/capacitor.config.js`の`app.dosuru`） / appName: `おでかけNavi`
 - `_isCapacitorApp`: `window.Capacitor?.isNativePlatform?.()` で検出。app.js 先頭で定義
 - `API_BASE`: Capacitor環境では `https://dosuru.app`、Web環境では空文字列。全fetchに付与済み
 - GA4スキップ: `_isCapacitorApp` 時に `window.gtag = function(){}` でnoop化
 - 外部リンク: `a[target="_blank"]` クリックを `Capacitor.Plugins.Browser.open()` でデバイスブラウザに渡す
-- SW登録・インストールバナー・Push通知UI: Capacitor環境でスキップ/非表示
+- SW登録・インストールバナー: Capacitor環境でスキップ/非表示
+- Push通知UI: 2026-07-10よりCapacitor環境でも表示・利用可能（APNs対応。詳細は下記「APNsプッシュ通知対応」セクション参照）
 - CI/CD: `release` ブランチpush → GitHub Actions（macOS runner）→ Fastlane deploy → TestFlight配信（社内テストのみ、`distribute_external: false`）
 - Fastlane: レーンは `deploy` のみ。中身は `upload_to_testflight`（App Store本番申請は含まない）
 - App Store本番申請は現状このワークフローに含まれず、別途手動対応が必要
 - GitHub Secrets: ASC_KEY_ID / ASC_ISSUER_ID / ASC_PRIVATE_KEY / MATCH_PASSWORD / MATCH_GIT_BASIC_AUTH
 - 初回セットアップ: MacInCloudで `npx cap add ios` → Xcode確認 → `fastlane match init` → GitHub Secrets登録
 - 詳細手順: `ios-app/README.md` 参照
+
+## iOSアプリのAPNsプッシュ通知対応（2026-07-10実装）
+- Web版（VAPID/Web Push）とは完全に独立した仕組みとしてiOSネイティブPush（APNs）を追加。既存のWeb Pushエンドポイント・データ構造は無変更
+- 方式: サーバーから`@parse/node-apn`経由でAPNsへ直接送信（`node-apn`本家は2022-05が最終更新のため、同API・アクティブにメンテされているforkの`@parse/node-apn`を採用）
+- **環境変数未設定時のフェイルセーフ**: `APNS_KEY_ID`/`APNS_TEAM_ID`/`APNS_BUNDLE_ID`/`APNS_PRIVATE_KEY`のいずれかが`.env`に無い場合、`server.js`は`apnProvider = null`のまま正常起動し、警告ログを出すだけでiOS向け送信のみスキップする。Web Pushの可用性には一切影響しない
+- `.env`変数: `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_BUNDLE_ID` / `APNS_PRIVATE_KEY`（.p8の中身。VAPID鍵と同じ「文字列をそのまま格納」方式、`\n`エスケープを実行時に復元） / `APNS_PRODUCTION`（`'true'`文字列でproduction接続。TestFlight/App Store配信は必ずproduction）
+- データモデル: `data/push-subscriptions.json` / `data/shared-calendars/{groupId}.json`の`pushSubscriptions`に`platform`フィールド追加（`'web'`または`'ios'`）。既存データ（`platform`なし）は読み込み時に`sub.platform || 'web'`にフォールバック（`subPlatform()`関数）。ファイル自体のマイグレーションは行わない
+  - web: `{ platform:'web', endpoint, keys:{p256dh, auth} }`（既存構造のまま）
+  - ios: `{ platform:'ios', deviceToken, registeredAt }`
+- API（既存Web Push系エンドポイントは無変更、iOS向けは完全に別エンドポイント）:
+  - `POST /api/push-subscribe-ios` / `DELETE /api/push-subscribe-ios` `{ deviceToken }`
+  - `POST /api/calendar/:groupId/push-subscribe-ios` / `DELETE .../push-subscribe-ios` `{ deviceToken, deviceId }`
+  - `sendPushToAll(cityKey)` / `POST /api/calendar/:groupId/notify`: 内部で`platform`別に振り分けて送信（外部APIレスポンス構造は無変更）
+- APNs送信失敗時の自動クリーンアップ: `result.failed[0].status === 410`または`reason === 'BadDeviceToken'/'Unregistered'`で無効トークンと判定し、Web Pushの410/404処理と同様に自動削除
+- クライアント（`public/app.js`）: `_isCapacitorApp`時は`_initNativePush()`/`_toggleNativePush()`（`@capacitor/push-notifications`使用、`registerPlugin('PushNotifications')`優先→`Plugins.PushNotifications`フォールバック）。Web版の`togglePush()`（Promiseベース）とは別関数体系。`_nativeDeviceToken`をlocalStorage `app_ios_push_token`で永続化
+  - `_hasActivePushSub()`/`_shouldShowPushPrompt()`: Web版・iOS版共通のプッシュ状態判定ヘルパー。iOS版は`Notification`（Web API）がWKWebView上で信頼できないため使わず、ネイティブプラグインの許可状態（`_nativePushDenied`）を使う
+  - 通知タップ時: `pushNotificationActionPerformed`リスナーで共有カレンダー参加ダイアログ表示 or `switchNav('home')`
+  - 新規UI文言は追加していない（既存の`pushOn`/`pushOff`/`pushDenied`/`toastPush*`キーを流用）
+- iOS/CI: `ios-app/package.json`に`@capacitor/push-notifications@^6.0.0`追加。`.github/workflows/ios-deploy.yml`に以下2ステップを追加
+  1. `App.entitlements`を新規生成しPlistBuddyで`aps-environment: production`を設定（Info.plist向けPlistBuddyパターンと同様の手法だが、対象ファイルが異なる新規ファイル）
+  2. Ruby/Bundler設定後（`xcodeproj`gemが使える状態になった後）に`bundle exec ruby`で`xcodeproj`gemを使い、Xcodeプロジェクトの`CODE_SIGN_ENTITLEMENTS`ビルド設定を`App/App.entitlements`に紐付け。Capacitorの`ios/`はCIで`npx cap add ios`により毎回生成されるためデフォルトで`.entitlements`ファイルもビルド設定紐付けも存在しない。手順の順序（Ruby setup後に実行必須）を変えると`xcodeproj` gemが見つからず失敗する
+- **フェーズ0（ユーザー手動作業、実装済みコードの動作に必須）**: 2026-07-10時点で未実施。TestFlight配信・実機での通知送受信にはこれらの完了が前提
+  1. Apple Developer PortalでAPNs Auth Key（.p8）発行
+  2. App ID（`app.dosuru`）でPush Notifications capability有効化
+  3. 配布用Provisioning Profile再生成（capability変更に伴い必須）→ GitHub Secrets `PROVISION_PROFILE_BASE64`更新
+  4. VPSの`.env`に`.p8`の中身と`APNS_KEY_ID`/`APNS_TEAM_ID`/`APNS_BUNDLE_ID`/`APNS_PRODUCTION=true`を追記（`.p8`はGit管理下に絶対に置かない）
+- スコープ外（設計時点で明示）: Android版対応、通知既読管理・一覧UI、ジャンル/エリア別配信パーソナライズ、FCM導入、Web版・iOS版購読者の名寄せ、サイレントプッシュ、通知文言の多言語化
 
 ## ジャンル・興味機能（2026-07-02実装）
 - ジャンルマスター: GENRE_LIST 定数（13種）。id / emoji / label を持つ
@@ -473,7 +501,7 @@ document.addEventListener('click', e => {
 
 一見「ゴーストクリックだけを狙い撃ちで潰す」ように見えるが、実際には**touchendハンドラを持たずonclick属性のnative clickイベントのみに依存している全てのボタン**（イベントカード内の「予定に追加」「コース作成」等、多数）も道連れで無反応にしてしまう。ボトムナビ・FAB等の一部ボタンだけがtouchendハンドラで代替処理されていたため一見動いているように見え、リリース後にユーザー報告で発覚した重大な退行バグとなった。
 
-**正しい対処**: ゴーストクリックが実証されている要素（17箇所: ボトムナビ4/FAB2/シェア・フィードバック・言語切替ボタン/各種オーバーレイのclose等）の`onclick`属性**個別**に、`if(!_touchCapableDetected) 関数呼び出し(...)`のガードを埋め込む。グローバルなclickリスナーは追加しない。
+**正しい対処**: ゴーストクリックが実証されている要素（現在16箇所: ボトムナビ4/FAB3〈course-fab・fab-plan・fab-top〉/シェア・フィードバック・言語切替ボタン/各種オーバーレイのclose等）の`onclick`属性**個別**に、`if(!_touchCapableDetected) 関数呼び出し(...)`のガードを埋め込む。グローバルなclickリスナーは追加しない。
 
 ```html
 <!-- 例: ボトムナビ -->
@@ -491,6 +519,10 @@ document.addEventListener('touchstart', () => { _touchCapableDetected = true; },
 - PCブラウザ（マウス操作）では`_touchCapableDetected`が`false`のままなので、ガード対象17箇所も含め全てのonclickが従来通り機能する
 
 **教訓**: グローバルなイベントブロック（全clickの無条件ブロック等）は影響範囲が広すぎるリスクがある。「問題が実証されている要素」への個別適用を常に優先し、「まとめて一括対処」という安易な方式は避けること。
+
+**オーバーレイ背景タップで閉じる系は「onclickガード」ではなく「専用touchendリスナー」で統一済み**: `install-overlay`/`pin-detail-overlay`/`pin-picker-overlay`/`emoji-picker-overlay`/`schedule-action-overlay`/`cal-popup-overlay`の6つは、`onclick="if(!_touchCapableDetected) ...")`の個別ガードに加えて、`app.js`側で配列一括登録の専用`touchend`リスナー（`e.preventDefault(); fn();`を直接呼ぶ方式）も併用している（`app.js`内`['install-overlay', () => closeInstallModal()], ...`のforEach）。
+
+**⚠️ 未対応の類似要素あり（2026-07-10監査で判明・未修正）**: 同じ「背景タップで閉じるオーバーレイ」構造を持つ以下8箇所は、上記6箇所と異なり`onclick`属性のみでガードもtouchendも無い素の状態: `course-sheet-overlay` / `course-detail-overlay` / `date-picker-overlay` / `event-filter-overlay` / `plan-modal-overlay` / `schedule-plan-action-overlay` / `cal-sync-overlay` / `title-edit-overlay`。ゴーストクリックの実害（二重発火・無反応）が実証されたわけではないが、6箇所側と扱いが不揃いなため、次にこの系統を触る際は同じ`touchend`一括登録パターンへ揃えることを検討する。
 
 ## server.js編集時の注意（2026-07-09追記）
 - `server.js`内、47〜200行目付近は無効化中のStripe決済コードが`/* ... */`で丸ごとコメントアウトされている。この範囲に新しいルートを追加すると**サイレントに一切発火しない**（エラーも出ない）ため要注意

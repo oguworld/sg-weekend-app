@@ -58,6 +58,17 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist || \
           /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist
 
+      - name: Create App.entitlements (Push Notifications capability)
+        run: |
+          cd ios-app
+          ENTITLEMENTS_PATH="ios/App/App/App.entitlements"
+          if [ ! -f "$ENTITLEMENTS_PATH" ]; then
+            printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n' > "$ENTITLEMENTS_PATH"
+          fi
+          /usr/libexec/PlistBuddy -c "Add :aps-environment string production" "$ENTITLEMENTS_PATH" || \
+          /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$ENTITLEMENTS_PATH"
+          cat "$ENTITLEMENTS_PATH"
+
       - name: Select Xcode 26
         run: |
           XCODE=$(ls /Applications/ | grep -E '^Xcode_26' | sort -r | head -1)
@@ -75,6 +86,22 @@ jobs:
           ruby-version: '3.2'
           bundler-cache: true
           working-directory: ios-app
+
+      - name: Wire App.entitlements into Xcode project build settings
+        run: |
+          cd ios-app
+          bundle exec ruby -e '
+            require "xcodeproj"
+            project_path = "ios/App/App.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.find { |t| t.name == "App" }
+            raise "App target not found" unless target
+            target.build_configurations.each do |config|
+              config.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements"
+            end
+            project.save
+            puts "CODE_SIGN_ENTITLEMENTS set for #{target.build_configurations.map(&:name).join(%q{, })}"
+          '
 
       - name: Extract release notes from package.json
         id: notes
