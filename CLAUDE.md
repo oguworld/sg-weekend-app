@@ -451,6 +451,33 @@ const image = post.media_type === 'VIDEO'
 - `pm2 restart sg-weekend` は Web版のみ。iOS版は TestFlight ビルドが必要
 - ビルド時間: GitHub Actions → TestFlight 反映まで約15〜20分
 
+### ✅ onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック（2026-07-10）
+
+ボトムナビ・FAB等は応答性向上のため`touchend`にJSハンドラ（`e.preventDefault()`で後続clickを抑制する設計）を登録しつつ、HTML側にも`onclick`属性を残す二重登録になっている箇所が多数ある（元々はネイティブclickイベントの座標がスクロール後にずれて信頼できなかったために`touchend`ハンドラが追加された経緯）。
+
+**問題**: iOS WKWebViewでは`touchend`の`preventDefault()`によるネイティブclick抑制が確実に効かないケースがある。過去のタップに対する遅延・ゴースト状態のclickイベントが、しばらく経ってから発火し、`onclick`属性を直接トリガーしてしまう（実機ログで`switchNav@app.js:1505`ではなく`onclick@capacitor://localhost:502`から呼ばれている証拠を確認）。
+
+**やってはいけない対処**: `onclick`属性を全削除する。タッチ非対応のデスクトップブラウザ（マウス操作、Web版）では`touchstart`/`touchend`が発火しないため、ボタンが完全に反応しなくなる。
+
+**正しい対処**: `onclick`属性は残したまま、タッチ操作が一度でも検出された端末では以降の全clickイベントをcaptureフェーズで握りつぶすグローバルな仕組みを追加する（`public/app.js`の`_isCapacitorApp`検出ブロック直後に配置済み）。
+
+```js
+// ─── タッチ端末でのゴースト遅延クリック無害化 ───
+let _touchCapableDetected = false;
+document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
+
+document.addEventListener('click', e => {
+  if (_touchCapableDetected) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, true); // captureフェーズで登録し、onclick属性より先にブロックする
+```
+
+- タッチ操作が一度でも発生した端末（iOS/Android実機、モバイルブラウザ）では、以降の`click`イベントがcaptureフェーズで即座に止められるため、`onclick`属性（遅延ゴーストクリック含む）が発火することは二度とない
+- タッチ操作が一度も検出されない端末（PCのマウス操作）では`_touchCapableDetected`は`false`のままなので、`onclick`属性は従来通り機能する
+- 各ボタンの`touchend`即時タップハンドラは変更不要。タッチ端末では常にこちらが正規の実行経路になる
+
 ## server.js編集時の注意（2026-07-09追記）
 - `server.js`内、47〜200行目付近は無効化中のStripe決済コードが`/* ... */`で丸ごとコメントアウトされている。この範囲に新しいルートを追加すると**サイレントに一切発火しない**（エラーも出ない）ため要注意
 - ルート追加時は必ず追加後に`grep -n "^/\*\|^\*/"`等でコメントブロックの範囲を確認し、対象行が有効なコード領域にあるか確認する

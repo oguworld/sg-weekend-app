@@ -66,6 +66,20 @@
 
     }
 
+    // ─── タッチ端末でのゴースト遅延クリック無害化 ───
+    // 実機ログでonclick属性からの遅延・ゴーストクリック発火が確定したため、
+    // タッチ操作が一度でも検出された端末では以降の全clickイベントをcaptureフェーズで握りつぶす。
+    // onclick属性自体はPCブラウザ（マウス操作）のために残す（削除しない）。
+    let _touchCapableDetected = false;
+    document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
+
+    document.addEventListener('click', e => {
+      if (_touchCapableDetected) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true); // captureフェーズで登録し、onclick属性より先にブロックする
+
     // ─── 全画面共通: キーボード被り対策（Web版・Capacitor版共通） ───
     // 表示中のシート（.plan-modal.visible / .plan-sheet.visible ※#title-edit-sheetはplan-modalクラスを持つため含まれる）を
     // キーボード分だけ縮小＋bottom移動する（シート上端の位置は変えない。詳細は_adjustSheetForKb参照）
