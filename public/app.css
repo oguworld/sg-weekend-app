@@ -2028,7 +2028,7 @@
     .pin-detail-overlay.visible { display: block; }
 
     /* ─── 共有カレンダー ─── */
-    .plan-title-header { display:flex;align-items:center;margin-bottom:20px;min-height:52px; }
+    .plan-title-header { display:flex;align-items:flex-start;margin-bottom:20px;min-height:52px; }
     .plan-title-header .screen-title { margin-bottom:0;flex:1; }
     .header-cal-sync-btn { display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:10px;transition:background 0.15s;-webkit-tap-highlight-color:transparent; }
     .header-cal-sync-btn:active { background:var(--sand); }
@@ -2837,7 +2837,8 @@
     }
     #screen-course .course-screen-header {
       flex-shrink: 0;
-      margin: 20px 20px 0;
+      padding: 20px 20px 0;
+      margin: 0;
     }
     #screen-course .screen-content {
       flex: 1;
