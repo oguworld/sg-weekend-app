@@ -457,26 +457,40 @@ const image = post.media_type === 'VIDEO'
 
 **問題**: iOS WKWebViewでは`touchend`の`preventDefault()`によるネイティブclick抑制が確実に効かないケースがある。過去のタップに対する遅延・ゴースト状態のclickイベントが、しばらく経ってから発火し、`onclick`属性を直接トリガーしてしまう（実機ログで`switchNav@app.js:1505`ではなく`onclick@capacitor://localhost:502`から呼ばれている証拠を確認）。
 
-**やってはいけない対処**: `onclick`属性を全削除する。タッチ非対応のデスクトップブラウザ（マウス操作、Web版）では`touchstart`/`touchend`が発火しないため、ボタンが完全に反応しなくなる。
+**やってはいけない対処①**: `onclick`属性を全削除する。タッチ非対応のデスクトップブラウザ（マウス操作、Web版）では`touchstart`/`touchend`が発火しないため、ボタンが完全に反応しなくなる。
 
-**正しい対処**: `onclick`属性は残したまま、タッチ操作が一度でも検出された端末では以降の全clickイベントをcaptureフェーズで握りつぶすグローバルな仕組みを追加する（`public/app.js`の`_isCapacitorApp`検出ブロック直後に配置済み）。
+**やってはいけない対処②（2026-07-10に実際に踏んだ地雷）**: タッチ操作検出後は**全てのclickイベントを無条件にグローバルブロックする**方式。
 
 ```js
-// ─── タッチ端末でのゴースト遅延クリック無害化 ───
-let _touchCapableDetected = false;
-document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
-
+// ❌ この方式は撤去済み（2026-07-10）。二度と復活させないこと
 document.addEventListener('click', e => {
   if (_touchCapableDetected) {
     e.preventDefault();
     e.stopImmediatePropagation();
   }
-}, true); // captureフェーズで登録し、onclick属性より先にブロックする
+}, true);
 ```
 
-- タッチ操作が一度でも発生した端末（iOS/Android実機、モバイルブラウザ）では、以降の`click`イベントがcaptureフェーズで即座に止められるため、`onclick`属性（遅延ゴーストクリック含む）が発火することは二度とない
-- タッチ操作が一度も検出されない端末（PCのマウス操作）では`_touchCapableDetected`は`false`のままなので、`onclick`属性は従来通り機能する
-- 各ボタンの`touchend`即時タップハンドラは変更不要。タッチ端末では常にこちらが正規の実行経路になる
+一見「ゴーストクリックだけを狙い撃ちで潰す」ように見えるが、実際には**touchendハンドラを持たずonclick属性のnative clickイベントのみに依存している全てのボタン**（イベントカード内の「予定に追加」「コース作成」等、多数）も道連れで無反応にしてしまう。ボトムナビ・FAB等の一部ボタンだけがtouchendハンドラで代替処理されていたため一見動いているように見え、リリース後にユーザー報告で発覚した重大な退行バグとなった。
+
+**正しい対処**: ゴーストクリックが実証されている要素（17箇所: ボトムナビ4/FAB2/シェア・フィードバック・言語切替ボタン/各種オーバーレイのclose等）の`onclick`属性**個別**に、`if(!_touchCapableDetected) 関数呼び出し(...)`のガードを埋め込む。グローバルなclickリスナーは追加しない。
+
+```html
+<!-- 例: ボトムナビ -->
+<button id="nav-home" onclick="if(!_touchCapableDetected) switchNav('home')">
+```
+
+```js
+// public/app.js側は検出のみ。clickのブロックは行わない
+let _touchCapableDetected = false;
+document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
+```
+
+- タッチ操作が一度でも発生した端末では、ガード対象17箇所の`onclick`のみ無効化される（`touchend`ハンドラが既に処理済みのため実害なし）
+- **ガード対象外の全てのボタン（onclick属性のみに依存する多数のボタン）は一切影響を受けず、通常のclickイベントで正常動作する**
+- PCブラウザ（マウス操作）では`_touchCapableDetected`が`false`のままなので、ガード対象17箇所も含め全てのonclickが従来通り機能する
+
+**教訓**: グローバルなイベントブロック（全clickの無条件ブロック等）は影響範囲が広すぎるリスクがある。「問題が実証されている要素」への個別適用を常に優先し、「まとめて一括対処」という安易な方式は避けること。
 
 ## server.js編集時の注意（2026-07-09追記）
 - `server.js`内、47〜200行目付近は無効化中のStripe決済コードが`/* ... */`で丸ごとコメントアウトされている。この範囲に新しいルートを追加すると**サイレントに一切発火しない**（エラーも出ない）ため要注意

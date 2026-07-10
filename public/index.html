@@ -148,7 +148,7 @@
     </div>
 
     <!-- FAB -->
-    <button id="course-fab" onclick="openCourseSheet()" class="fab-plan"
+    <button id="course-fab" onclick="if(!_touchCapableDetected) openCourseSheet()" class="fab-plan"
       style="position:fixed;bottom:calc(100px + env(safe-area-inset-bottom,0px));right:20px;z-index:200;">＋</button>
   </div>
 
@@ -305,7 +305,7 @@
 
       <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="labelLang">言語</span>
-        <button id="lang-toggle-btn" onclick="setLang(getLang()==='ja'?'en':'ja')"
+        <button id="lang-toggle-btn" onclick="if(!_touchCapableDetected) setLang(getLang()==='ja'?'en':'ja')"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
           <span id="lang-toggle-flag">🇯🇵</span>
           <span id="lang-toggle-name">日本語</span>
@@ -357,7 +357,7 @@
 
       <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="shareSettingsBtn">友達にシェアする</span>
-        <button id="do-share-btn" onclick="doShare()"
+        <button id="do-share-btn" onclick="if(!_touchCapableDetected) doShare()"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;"
           onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
           <span data-i18n="shareLabel">シェア</span>
@@ -377,7 +377,7 @@
         <textarea id="feedback-text" data-i18n-ph="feedbackPlaceholder"
           placeholder="改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！"
           style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:14px;border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:16px;color:var(--midnight);background:var(--cream);resize:none;height:100px;outline:none;line-height:1.6;"></textarea>
-        <button id="feedback-send-btn" onclick="sendFeedback()" data-i18n="feedbackSend"
+        <button id="feedback-send-btn" onclick="if(!_touchCapableDetected) sendFeedback()" data-i18n="feedbackSend"
           style="padding:12px;border-radius:var(--radius-btn);background:var(--warm-white);color:var(--warm-gray);border:1.5px solid var(--sand-dark);font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:opacity 0.15s;"
           onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
           📨 送信する
@@ -389,7 +389,7 @@
   </div><!-- /screen-settings -->
 
   <!-- ─── INSTALL MODAL ─── -->
-  <div class="pin-detail-overlay" id="install-overlay" onclick="closeInstallModal()"></div>
+  <div class="pin-detail-overlay" id="install-overlay" onclick="if(!_touchCapableDetected) closeInstallModal()"></div>
   <div class="pin-detail-modal" id="install-modal">
     <div class="pin-detail-header">
       <div class="pin-detail-emoji">📱</div>
@@ -430,11 +430,11 @@
   </div>
 
   <!-- ─── HOWTO MODAL（使い方） ─── -->
-  <div class="pin-detail-overlay" id="share-overlay" onclick="closeShareModal()"></div>
+  <div class="pin-detail-overlay" id="share-overlay" onclick="if(!_touchCapableDetected) closeShareModal()"></div>
   <div class="pin-detail-modal" id="share-modal">
     <div class="pin-detail-header">
       <div class="pin-detail-emoji">🗺</div>
-      <button data-close class="pin-detail-close" id="share-modal-close" onclick="closeShareModal()">✕</button>
+      <button data-close class="pin-detail-close" id="share-modal-close" onclick="if(!_touchCapableDetected) closeShareModal()">✕</button>
     </div>
     <div id="howto-content" style="overflow-y:auto;max-height:72vh;padding-bottom:4px;"></div>
   </div>
@@ -464,7 +464,7 @@
   </div>
 
   <!-- ─── PIN DETAIL MODAL ─── -->
-  <div class="pin-detail-overlay" id="pin-detail-overlay" onclick="closePinDetail()"></div>
+  <div class="pin-detail-overlay" id="pin-detail-overlay" onclick="if(!_touchCapableDetected) closePinDetail()"></div>
   <div class="pin-detail-modal" id="pin-detail-modal">
     <div class="pin-detail-header">
       <div class="pin-detail-emoji" id="pin-detail-emoji">📌</div>
@@ -487,19 +487,19 @@
 
   <!-- ─── BOTTOM NAV ─── -->
   <nav class="bottom-nav">
-    <button class="nav-item active" id="nav-home" onclick="switchNav('home')">
+    <button class="nav-item active" id="nav-home" onclick="if(!_touchCapableDetected) switchNav('home')">
       <span class="nav-icon">🎫</span>
       <span class="nav-label" data-i18n="navHome">イベント</span>
     </button>
-    <button class="nav-item" id="nav-course" onclick="switchNav('course')">
+    <button class="nav-item" id="nav-course" onclick="if(!_touchCapableDetected) switchNav('course')">
       <span class="nav-icon">🧭</span>
       <span class="nav-label" data-i18n="navCourse">コース</span>
     </button>
-    <button class="nav-item" id="nav-plan" onclick="switchNav('plan')">
+    <button class="nav-item" id="nav-plan" onclick="if(!_touchCapableDetected) switchNav('plan')">
       <span class="nav-icon">📅</span>
       <span class="nav-label" data-i18n="navPlan">予定表</span>
     </button>
-    <button class="nav-item" id="nav-settings" onclick="switchNav('settings')">
+    <button class="nav-item" id="nav-settings" onclick="if(!_touchCapableDetected) switchNav('settings')">
       <span class="nav-icon">⚙️</span>
       <span class="nav-label" data-i18n="navSettings">設定</span>
     </button>
@@ -509,7 +509,7 @@
   <button class="fab" id="fab-top" onclick="fabScrollTop()" aria-label="トップへ戻る">↑</button>
   <!-- FAB Plan Speed Dial -->
   <div class="fab-plan-group" id="fab-plan-group">
-    <button class="fab-plan" id="fab-plan" onclick="openCustomPlanModal()" aria-label="予定を追加">＋</button>
+    <button class="fab-plan" id="fab-plan" onclick="if(!_touchCapableDetected) openCustomPlanModal()" aria-label="予定を追加">＋</button>
   </div>
 
   <!-- Course Generator Sheet -->
@@ -712,7 +712,7 @@
   </div>
 
   <!-- Pin Picker Sheet -->
-  <div class="chat-overlay" id="pin-picker-overlay" onclick="closePinPicker()"></div>
+  <div class="chat-overlay" id="pin-picker-overlay" onclick="if(!_touchCapableDetected) closePinPicker()"></div>
   <div class="pin-picker-sheet" id="pin-picker-sheet">
     <div class="chat-sheet-handle"></div>
     <div class="pin-picker-header">
@@ -723,7 +723,7 @@
   </div>
 
   <!-- Emoji Picker Sheet -->
-  <div class="chat-overlay" id="emoji-picker-overlay" onclick="closeEmojiPicker()" style="z-index:2099;"></div>
+  <div class="chat-overlay" id="emoji-picker-overlay" onclick="if(!_touchCapableDetected) closeEmojiPicker()" style="z-index:2099;"></div>
   <div class="pin-picker-sheet" id="emoji-picker-sheet" style="z-index:2100;">
     <div class="chat-sheet-handle"></div>
     <div class="pin-picker-header">
@@ -734,7 +734,7 @@
   </div>
 
   <!-- Schedule Action Sheet -->
-  <div class="chat-overlay" id="schedule-action-overlay" onclick="closeScheduleActionSheet()" style="z-index:2199;background:transparent;"></div>
+  <div class="chat-overlay" id="schedule-action-overlay" onclick="if(!_touchCapableDetected) closeScheduleActionSheet()" style="z-index:2199;background:transparent;"></div>
   <div class="schedule-action-popover" id="schedule-action-sheet">
     <button class="schedule-action-btn" id="schedule-action-view-btn" onclick="scheduleActionViewCard()" style="display:none;">🔍 詳細を見る</button>
     <button class="schedule-action-btn" id="schedule-action-edit-btn" onclick="scheduleActionEdit()">✏️ 編集</button>
@@ -742,7 +742,7 @@
   </div>
 
   <!-- Calendar Popup Overlay -->
-  <div class="cal-popup-overlay" id="cal-popup-overlay" onclick="closeCalPopup()"></div>
+  <div class="cal-popup-overlay" id="cal-popup-overlay" onclick="if(!_touchCapableDetected) closeCalPopup()"></div>
 
   <!-- Calendar Popup -->
   <div class="cal-popup" id="cal-popup">
@@ -943,7 +943,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260710h"></script>
+  <script src="/app.js?v=20260710i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
