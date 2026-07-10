@@ -13,6 +13,21 @@
       } catch (_) {}
     }
 
+    // ─── DEBUG: safe-area-inset-top実測用の非表示計測要素（原因特定後に削除すること）───
+    let _safeAreaProbeEl = null;
+    function _getSafeAreaInsetTop() {
+      try {
+        if (!_safeAreaProbeEl) {
+          _safeAreaProbeEl = document.createElement('div');
+          _safeAreaProbeEl.style.cssText = 'position:fixed;top:0;left:0;width:1px;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none;';
+          document.documentElement.appendChild(_safeAreaProbeEl);
+        }
+        return _safeAreaProbeEl.getBoundingClientRect().height;
+      } catch (_) {
+        return 'n/a';
+      }
+    }
+
     // ─── CAPACITOR: GA4スキップ・外部リンク制御・overscroll防止 ───
     if (_isCapacitorApp) {
       window.gtag = function() {};
@@ -2445,6 +2460,23 @@
           initSettingsGenres();
         }
       }
+
+      // ─── DEBUG: ヘッダータイトル位置の実機計測（原因判明後に削除すること）───
+      setTimeout(() => {
+        const titleMap = { home: '.app-header .screen-title', course: '#screen-course .screen-title', plan: '#screen-plan .screen-title', settings: '#screen-settings .screen-title' };
+        const sel = titleMap[screen];
+        const titleEl = sel && document.querySelector(sel);
+        if (titleEl) {
+          const rect = titleEl.getBoundingClientRect();
+          _sendDebugLog('title_position', {
+            screen,
+            titleTop: rect.top,
+            titleBottom: rect.bottom,
+            safeAreaInsetTop: _getSafeAreaInsetTop(),
+            innerHeight: window.innerHeight,
+          });
+        }
+      }, 50);
     }
 
     // ─── COURSE FEATURE ───
