@@ -506,7 +506,7 @@
   </nav>
 
   <!-- FAB -->
-  <button class="fab" id="fab-top" onclick="fabScrollTop()" aria-label="トップへ戻る">↑</button>
+  <button class="fab" id="fab-top" onclick="if(!_touchCapableDetected) fabScrollTop()" aria-label="トップへ戻る">↑</button>
   <!-- FAB Plan Speed Dial -->
   <div class="fab-plan-group" id="fab-plan-group">
     <button class="fab-plan" id="fab-plan" onclick="if(!_touchCapableDetected) openCustomPlanModal()" aria-label="予定を追加">＋</button>

@@ -1532,6 +1532,7 @@
       [
         { id: 'course-fab', fn: () => openCourseSheet() },
         { id: 'fab-plan',   fn: () => openCustomPlanModal() },
+        { id: 'fab-top',    fn: () => fabScrollTop() },
       ].forEach(({ id, fn }) => {
         const btn = document.getElementById(id);
         if (!btn) return;
