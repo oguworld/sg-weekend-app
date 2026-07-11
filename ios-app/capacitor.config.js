@@ -9,7 +9,7 @@ const config = {
   },
   plugins: {
     Keyboard: {
-      resize: 'native', // 設計書12フェーズ1（2026-07-11）: 'none'時のinnerHeight/visualViewport固着バグ対応の実機検証のため変更。問題があればこの1行を'none'に戻すだけでロールバック可能
+      resize: 'none', // 設計書12フェーズ1（2026-07-11実施→同日ロールバック）: 'native'は実機でテキスト入力不可の重大回帰を起こしたため'none'に復元
     },
     SplashScreen: {
       launchShowDuration: 1000,
