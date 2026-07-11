@@ -13,6 +13,28 @@
       } catch (_) {}
     }
 
+    // ─── DEBUG: グローバルtouchstart監視（原因特定後に削除すること。2026-07-11設計書8 計装B）───
+    // 記録専用・一切ブロックしない。preventDefault()/stopPropagation()は絶対に呼ばない。
+    // 2026-07-10のグローバルclickブロック事故（e.preventDefault()/e.stopImmediatePropagation()で
+    // 全ボタンを無反応にした重大バグ）とは性質が異なり、passive:trueを必ず指定し、
+    // イベント伝播・デフォルト動作を一切変更しない受動的リスナーである。
+    // 通常操作でも大量発火するため、モーダルclose後10秒間だけ有効にするフラグで頻度制御する
+    // （closePlanModal()のタイマー計装＝計装Dと同じ10秒ウィンドウで連動）。
+    let _globalTouchWatchActive = false;
+    document.addEventListener('touchstart', e => {
+      if (!_globalTouchWatchActive) return;
+      try {
+        _sendDebugLog('global_touchstart', {
+          targetTag: e.target.tagName,
+          targetId: e.target.id || null,
+          targetClass: (typeof e.target.className === 'string' ? e.target.className : null),
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          isNavDescendant: !!e.target.closest('.bottom-nav'),
+        });
+      } catch (_) {}
+    }, { passive: true, capture: true });
+
     // ─── DEBUG: 「モーダル操作後にタップ全体が効かなくなる」重大バグ調査用の計装（原因特定後に削除すること。2026-07-11追加）───
     // モーダルclose直後・keyboardWillHide発火時に、主要オーバーレイの残留有無とボトムナビの実際のヒットテスト対象を記録する。
     function _debugLogModalCloseState(tag) {
@@ -46,6 +68,40 @@
           activeElementTag: document.activeElement?.tagName || null,
           overlays,
           navHitTest,
+        });
+      } catch (_) {}
+    }
+
+    // ─── DEBUG: レイアウト・座標系のスナップショット（原因特定後に削除すること。2026-07-11設計書8 計装C）───
+    // 「画面が下がったように見える」というユーザー申告の客観的裏付け用。body/html/#screen-plan/
+    // .bottom-nav の位置情報とvisualViewportの状態を記録する。
+    function _debugLogLayoutSnapshot(tag) {
+      try {
+        const rectOf = el => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
+        };
+        const body = document.body;
+        const html = document.documentElement;
+        const screenPlan = document.getElementById('screen-plan');
+        const bottomNav = document.querySelector('.bottom-nav');
+        let screenPlanScrollTop = null;
+        if (screenPlan) {
+          const sc = screenPlan.querySelector('.screen-content, .screen-scroll-content');
+          screenPlanScrollTop = sc ? sc.scrollTop : null;
+        }
+        const vv = window.visualViewport;
+        _sendDebugLog('layout_snapshot', {
+          tag,
+          body: { rect: rectOf(body), transform: getComputedStyle(body).transform, position: getComputedStyle(body).position, scrollTop: body.scrollTop },
+          html: { rect: rectOf(html), transform: getComputedStyle(html).transform, position: getComputedStyle(html).position, scrollTop: html.scrollTop },
+          screenPlan: screenPlan ? { rect: rectOf(screenPlan), transform: getComputedStyle(screenPlan).transform, scrollTop: screenPlanScrollTop } : null,
+          bottomNav: bottomNav ? { rect: rectOf(bottomNav) } : null,
+          visualViewport: vv ? { height: vv.height, offsetTop: vv.offsetTop, offsetLeft: vv.offsetLeft, scale: vv.scale } : null,
+          innerHeight: window.innerHeight,
+          scrollY: window.scrollY,
+          scrollLockDepth: _scrollLockDepth,
         });
       } catch (_) {}
     }
@@ -139,6 +195,20 @@
     // 際限なく潰れるバグがあった。「縮小前の元の高さ」をdatasetに保存し、常にそこを
     // 基準に絶対値で計算し直すことで、同じkbHが何度来ても同じ結果に収束する冪等な処理にする。
     function _adjustSheetForKb(sheet, kbH) {
+      // ─── DEBUG: dataset状態遷移の記録（原因特定後に削除すること。2026-07-11設計書8 計装F/G）───
+      _sendDebugLog('adjust_sheet_kb', {
+        phase: 'enter',
+        sheetId: sheet.id || null,
+        kbH,
+        hadOrigHeight: 'kbOrigHeight' in sheet.dataset,
+        origHeightBefore: sheet.dataset.kbOrigHeight || null,
+        isMaxHBefore: sheet.dataset.kbIsMaxH || null,
+        curMaxHeight: getComputedStyle(sheet).maxHeight,
+        curHeight: getComputedStyle(sheet).height,
+        curBottom: getComputedStyle(sheet).bottom,
+        activeElementId: document.activeElement?.id || null,
+      });
+
       const MARGIN = 24; // キーボード上に見た目の余白を確保する（縮小量とbottom移動量は必ず同じ値にすること。異なるとオーバーシュート問題が再発する）
       const SAFE_GAP = kbH + MARGIN;
       const cs = getComputedStyle(sheet);
@@ -152,16 +222,59 @@
         sheet.dataset.kbIsMaxH = hasMaxH ? '1' : '';
       }
 
-      if (origH <= SAFE_GAP + 80) return; // 縮めすぎる場合はスキップ（元の高さ基準）
+      if (origH <= SAFE_GAP + 80) {
+        // ─── DEBUG（2026-07-11設計書8 計装F/G）───
+        _sendDebugLog('adjust_sheet_kb', {
+          phase: 'exit',
+          sheetId: sheet.id || null,
+          kbH,
+          skippedTooSmall: true,
+          origHeightAfter: sheet.dataset.kbOrigHeight || null,
+          isMaxHAfter: sheet.dataset.kbIsMaxH || null,
+          curMaxHeight: getComputedStyle(sheet).maxHeight,
+          curHeight: getComputedStyle(sheet).height,
+          curBottom: getComputedStyle(sheet).bottom,
+          activeElementId: document.activeElement?.id || null,
+        });
+        return; // 縮めすぎる場合はスキップ（元の高さ基準）
+      }
       const isMaxH = sheet.dataset.kbIsMaxH === '1';
       const newH = origH - SAFE_GAP;
       if (isMaxH) sheet.style.maxHeight = newH + 'px';
       else        sheet.style.height    = newH + 'px';
       sheet.style.bottom = SAFE_GAP + 'px';
+
+      // ─── DEBUG: dataset状態遷移の記録（原因特定後に削除すること。2026-07-11設計書8 計装F/G）───
+      _sendDebugLog('adjust_sheet_kb', {
+        phase: 'exit',
+        sheetId: sheet.id || null,
+        kbH,
+        skippedTooSmall: false,
+        newH,
+        origHeightAfter: sheet.dataset.kbOrigHeight || null,
+        isMaxHAfter: sheet.dataset.kbIsMaxH || null,
+        curMaxHeight: getComputedStyle(sheet).maxHeight,
+        curHeight: getComputedStyle(sheet).height,
+        curBottom: sheet.style.bottom,
+        activeElementId: document.activeElement?.id || null,
+      });
     }
 
     function _resetSheetAfterKb(sheet) {
-      if (!('kbIsMaxH' in sheet.dataset)) return;
+      // ─── DEBUG: dataset状態遷移の記録（原因特定後に削除すること。2026-07-11設計書8 計装F/G）───
+      const _hadKbIsMaxH = 'kbIsMaxH' in sheet.dataset;
+      _sendDebugLog('reset_sheet_kb', {
+        sheetId: sheet.id || null,
+        hadKbIsMaxH: _hadKbIsMaxH,
+        kbIsMaxHValue: sheet.dataset.kbIsMaxH || null,
+        kbOrigHeightValue: sheet.dataset.kbOrigHeight || null,
+        curMaxHeight: getComputedStyle(sheet).maxHeight,
+        curHeight: getComputedStyle(sheet).height,
+        activeElementId: document.activeElement?.id || null,
+        skipped: !_hadKbIsMaxH,
+      });
+
+      if (!_hadKbIsMaxH) return;
       if (sheet.dataset.kbIsMaxH === '1') sheet.style.maxHeight = '';
       else sheet.style.height = '';
       sheet.style.bottom = '';
@@ -263,9 +376,12 @@
 
     // ─── DEBUG: keyboardWillHide発火時の状態計装（原因特定後に削除すること。2026-07-11追加）───
     function _onCapKeyboardHide() {
+      // ─── DEBUG: keyboardWillHideネイティブイベント自体の発火有無を確認（2026-07-11設計書8 計装F）───
+      _sendDebugLog('kb_hide_fired', { activeElementId: document.activeElement?.id || null });
       _debugLogModalCloseState('keyboardWillHide_before');
       _resetSheetKeyboardOffset();
       _debugLogModalCloseState('keyboardWillHide_after');
+      _debugLogLayoutSnapshot('keyboardWillHide_after');
     }
 
     if (_isCapacitorApp) {
@@ -1612,6 +1728,8 @@
         const btn = document.getElementById('nav-' + s);
         if (!btn) return;
         btn.addEventListener('touchstart', e => {
+          // ─── DEBUG: touchstart到達確認（原因特定後に削除すること。2026-07-11設計書8 計装A）───
+          _sendDebugLog('nav_touchstart', { target: s });
           _navTouchStartX = e.touches[0].clientX;
           _navTouchStartY = e.touches[0].clientY;
         }, { passive: true });
@@ -3834,12 +3952,16 @@
       e.preventDefault();
     }
     function lockScroll() {
+      // ─── DEBUG: _scrollLockDepth推移の記録（原因特定後に削除すること。2026-07-11設計書8 計装E）───
+      _sendDebugLog('scroll_lock', { depth: _scrollLockDepth, stack: new Error().stack });
       if (_scrollLockDepth === 0) {
         document.addEventListener('touchmove', _preventBgScroll, { passive: false });
       }
       _scrollLockDepth++;
     }
     function unlockScroll() {
+      // ─── DEBUG: _scrollLockDepth推移の記録（原因特定後に削除すること。2026-07-11設計書8 計装E）───
+      _sendDebugLog('scroll_unlock', { depthBefore: _scrollLockDepth, stack: new Error().stack });
       if (_scrollLockDepth <= 0) return;
       _scrollLockDepth--;
       if (_scrollLockDepth === 0) {
@@ -4325,6 +4447,33 @@
       _planModalSelectedStartTime = null;
       _editingGroupIds = [];
       _debugLogModalCloseState('closePlanModal_after');
+      _debugLogLayoutSnapshot('closePlanModal_after');
+      _startClosePlanModalDebugTimer();
+    }
+
+    // ─── DEBUG: モーダルclose後の時系列タイマー計装（原因特定後に削除すること。2026-07-11設計書8 計装D）───
+    // 1秒おき・計10回（10秒間）、モーダルclose後の状態推移を記録する。closePlanModal()は
+    // closeAllPopups()経由などで多重に呼ばれうるため、直前のタイマーを全てクリアしてから
+    // 新規に張り直す（多重起動防止）。同じ10秒ウィンドウで計装Bのグローバルtouchstart監視も有効化する。
+    let _closePlanModalDebugTimerIds = [];
+    function _startClosePlanModalDebugTimer() {
+      _closePlanModalDebugTimerIds.forEach(id => clearTimeout(id));
+      _closePlanModalDebugTimerIds = [];
+      _globalTouchWatchActive = true;
+      for (let i = 1; i <= 10; i++) {
+        const timerId = setTimeout(() => {
+          const tag = 'closePlanModal_timer_' + i;
+          _debugLogModalCloseState(tag);
+          _debugLogLayoutSnapshot(tag);
+          _sendDebugLog('close_plan_modal_timer_extra', {
+            tag,
+            activeElementId: document.activeElement?.id || null,
+            scrollLockDepth: _scrollLockDepth,
+          });
+          if (i === 10) _globalTouchWatchActive = false;
+        }, i * 1000);
+        _closePlanModalDebugTimerIds.push(timerId);
+      }
     }
 
     // ─── PLAN TAB RENDER ───
