@@ -13,6 +13,45 @@
       } catch (_) {}
     }
 
+    // ─── DEBUG: ビューポート固着監視（原因特定後に削除すること。2026-07-11設計書10 計装H）───
+    // window.innerHeightが「正常値」（初回ロード時に記録した基準値）と異なる状態が
+    // 3秒以上継続した場合、1回だけ_sendDebugLog('viewport_stuck', {...})を送る。
+    // 状態が正常値に戻る、または異なる異常値に変化するまでは再送しない（連投防止のフラグ管理）。
+    // switchNav()等の特定箇所に相乗りせず、アプリ起動から終了までスタンドアロンで動く汎用監視にする
+    // （設計書10で判明した「画面遷移13回をまたいでも固着状態が解消しない」ケースを捉えるため、
+    //  特定関数呼び出し時の10秒ウィンドウ計装＝計装Dでは不十分なことが分かっているため）。
+    const _normalInnerHeight = window.innerHeight; // アプリ起動時（正常時）の基準値
+    let _viewportStuckState = { abnormalHeight: null, sinceTs: null, reported: false };
+    setInterval(() => {
+      try {
+        const cur = window.innerHeight;
+        if (cur === _normalInnerHeight) {
+          // 正常値に戻った → 状態リセット（再度異常になったら再度計測・再送できるようにする）
+          _viewportStuckState = { abnormalHeight: null, sinceTs: null, reported: false };
+          return;
+        }
+        if (_viewportStuckState.abnormalHeight !== cur) {
+          // 異常値が初検出、または前回と異なる異常値に変化 → 計測をやり直す
+          _viewportStuckState = { abnormalHeight: cur, sinceTs: Date.now(), reported: false };
+          return;
+        }
+        // 同じ異常値が継続中
+        if (!_viewportStuckState.reported && Date.now() - _viewportStuckState.sinceTs >= 3000) {
+          _viewportStuckState.reported = true;
+          const navEl = document.querySelector('.bottom-nav');
+          const navRect = navEl ? navEl.getBoundingClientRect() : null;
+          _sendDebugLog('viewport_stuck', {
+            currentInnerHeight: cur,
+            expectedInnerHeight: _normalInnerHeight,
+            stuckDurationMs: Date.now() - _viewportStuckState.sinceTs,
+            visualViewportHeight: window.visualViewport ? window.visualViewport.height : null,
+            bottomNavRect: navRect ? { top: navRect.top, bottom: navRect.bottom, left: navRect.left, right: navRect.right } : null,
+            activeElementId: document.activeElement?.id || null,
+          });
+        }
+      } catch (_) {}
+    }, 1000);
+
     // ─── DEBUG: グローバルtouchstart監視（原因特定後に削除すること。2026-07-11設計書8 計装B）───
     // 記録専用・一切ブロックしない。preventDefault()/stopPropagation()は絶対に呼ばない。
     // 2026-07-10のグローバルclickブロック事故（e.preventDefault()/e.stopImmediatePropagation()で
@@ -24,6 +63,14 @@
     document.addEventListener('touchstart', e => {
       if (!_globalTouchWatchActive) return;
       try {
+        // ─── DEBUG: 計装I（原因特定後に削除すること。2026-07-11設計書10）───
+        // タップ座標とその瞬間の.bottom-navの実際のrectを同じログエントリで直接比較できるようにする。
+        const navEl = document.querySelector('.bottom-nav');
+        let navRectAtTapTime = null;
+        if (navEl) {
+          const r = navEl.getBoundingClientRect();
+          navRectAtTapTime = { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+        }
         _sendDebugLog('global_touchstart', {
           targetTag: e.target.tagName,
           targetId: e.target.id || null,
@@ -31,6 +78,7 @@
           x: e.touches[0].clientX,
           y: e.touches[0].clientY,
           isNavDescendant: !!e.target.closest('.bottom-nav'),
+          navRectAtTapTime,
         });
       } catch (_) {}
     }, { passive: true, capture: true });
