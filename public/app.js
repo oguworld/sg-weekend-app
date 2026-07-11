@@ -98,15 +98,15 @@
           const cs = getComputedStyle(container);
           if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
             foundContainer = container;
-            // .screen-scroll-content の既存padding-bottom(80px)だけでは実際に必要な
-            // スクロール量に足りず、scrollTopがscrollHeight-clientHeightで頭打ちになるケースがあるため、
-            // キーボード表示中のみ一時的にpadding-bottomを拡張して伸びしろを確保してから加算する。
-            if (container.classList.contains('screen-scroll-content')) {
-              if (!container.dataset.kbOrigPaddingBottom) {
-                container.dataset.kbOrigPaddingBottom = getComputedStyle(container).paddingBottom;
-              }
-              container.style.paddingBottom = (kbHeight + 80) + 'px';
+            // 既存padding-bottomだけでは実際に必要なスクロール量に足りず、scrollTopが
+            // scrollHeight-clientHeightで頭打ちになるケースがあるため、キーボード表示中のみ
+            // 一時的にpadding-bottomを拡張して伸びしろを確保してから加算する。
+            // （2026-07-11: 当初 .screen-scroll-content 限定だったが、.plan-modal-body
+            //  （コース作成・予定作成シート等）でも同じ頭打ちが起きるため全スクロールコンテナに汎用化）
+            if (!container.dataset.kbOrigPaddingBottom) {
+              container.dataset.kbOrigPaddingBottom = getComputedStyle(container).paddingBottom;
             }
+            container.style.paddingBottom = (kbHeight + 80) + 'px';
             container.scrollTop += overflow;
             break;
           }
@@ -120,11 +120,9 @@
 
     // キーボードが閉じたら、上で一時付与した padding-bottom を元に戻す（戻し忘れ防止）
     function _resetScrollPaddingAfterKb() {
-      document.querySelectorAll('.screen-scroll-content').forEach(container => {
-        if (container.dataset.kbOrigPaddingBottom) {
-          container.style.paddingBottom = container.dataset.kbOrigPaddingBottom;
-          delete container.dataset.kbOrigPaddingBottom;
-        }
+      document.querySelectorAll('[data-kb-orig-padding-bottom]').forEach(container => {
+        container.style.paddingBottom = container.dataset.kbOrigPaddingBottom;
+        delete container.dataset.kbOrigPaddingBottom;
       });
     }
 
