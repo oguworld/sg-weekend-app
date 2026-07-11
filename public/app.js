@@ -4177,6 +4177,8 @@
       _updateEmojiSelectorDisplay('custom', '📝');
       document.getElementById('plan-custom-title').value = '';
       document.getElementById('plan-custom-memo').value = '';
+      // 新規作成時はメモ欄を非表示（フィールド間フォーカス往復によるビューポート固着回避。設計書14フェーズ1）
+      document.getElementById('plan-custom-memo-section').style.display = 'none';
       // 日付チップを直接表示・リセット
       const _chips = document.getElementById('plan-custom-date-chips');
       if (_chips) {
@@ -4527,6 +4529,8 @@
         b.classList.toggle('selected', _selectedPlanMembers.includes(b.dataset.member));
       });
       document.getElementById('plan-custom-memo').value = first.memo || '';
+      // 編集モードではメモ欄を表示（新規作成時に非表示にしているため明示的に戻す。設計書14フェーズ1）
+      document.getElementById('plan-custom-memo-section').style.display = '';
       const _editImpCb = document.getElementById('plan-custom-important-cb');
       if (_editImpCb) _editImpCb.checked = !!first.important;
       document.getElementById('plan-custom-modal-title').textContent = getLang() === 'en' ? 'Edit schedule' : '予定を編集';

@@ -848,8 +848,10 @@
         <button class="plan-member-chip" data-member="dog" onclick="selectPlanMember('dog')"><span class="member-emoji">🐕</span></button>
         <button class="plan-member-chip" data-member="cat" onclick="selectPlanMember('cat')"><span class="member-emoji">🐱</span></button>
       </div>
-      <div class="plan-modal-section-label" data-i18n="planModalMemoLabel">メモ</div>
-      <textarea class="plan-modal-textarea" id="plan-custom-memo" rows="2" placeholder="例：持ち物メモ、注意事項など"></textarea>
+      <div id="plan-custom-memo-section">
+        <div class="plan-modal-section-label" data-i18n="planModalMemoLabel">メモ</div>
+        <textarea class="plan-modal-textarea" id="plan-custom-memo" rows="2" placeholder="例：持ち物メモ、注意事項など"></textarea>
+      </div>
       <div class="plan-flag-row">
         <label class="plan-important-label" onclick="event.stopPropagation()">
           <input type="checkbox" id="plan-custom-important-cb">
@@ -925,7 +927,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260711h"></script>
+  <script src="/app.js?v=20260711i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
