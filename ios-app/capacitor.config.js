@@ -9,7 +9,7 @@ const config = {
   },
   plugins: {
     Keyboard: {
-      resize: 'none', // キーボードがWebViewを縮小しない → ナビの上に被さる自然な挙動
+      resize: 'native', // 設計書12フェーズ1（2026-07-11）: 'none'時のinnerHeight/visualViewport固着バグ対応の実機検証のため変更。問題があればこの1行を'none'に戻すだけでロールバック可能
     },
     SplashScreen: {
       launchShowDuration: 1000,
