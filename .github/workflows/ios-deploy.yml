@@ -27,10 +27,9 @@ jobs:
           cd ios-app
           npx cap add ios
 
-      - name: Generate app icons
+      - name: Generate app icons and splash screen
         run: |
           cd ios-app
-          npm install @capacitor/assets --save-dev
           npx capacitor-assets generate --ios
 
       - name: Sync Capacitor

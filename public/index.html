@@ -65,7 +65,7 @@
       <!-- Category Filter (new horizontal scroll) -->
       <div id="filter-row-category">
         <button class="filter-chip active" data-cat="all" data-i18n="catAll" onclick="toggleCatFilter('all')">すべて</button>
-        <button class="filter-chip" data-cat="recommend" data-i18n="catRecommend" onclick="toggleCatFilter('recommend')">おすすめ</button>
+        <button class="filter-chip" data-cat="recommend" data-i18n="catRecommend" style="display:none;" onclick="toggleCatFilter('recommend')">おすすめ</button>
         <button class="filter-chip" data-cat="event" data-i18n="catEvent" onclick="toggleCatFilter('event')">イベント</button>
         <button class="filter-chip" data-cat="show" data-i18n="catShow" onclick="toggleCatFilter('show')">展示・公演</button>
         <button class="filter-chip" data-cat="gourmet" data-i18n="catGourmet" onclick="toggleCatFilter('gourmet')">グルメ・フェア</button>
@@ -925,7 +925,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260710j"></script>
+  <script src="/app.js?v=20260711a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

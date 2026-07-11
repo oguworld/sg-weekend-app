@@ -13,9 +13,11 @@
     "@capacitor/browser": "^6.0.0",
     "@capacitor/keyboard": "^6.0.0",
     "@capacitor/push-notifications": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },

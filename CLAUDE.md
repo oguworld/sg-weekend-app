@@ -383,8 +383,8 @@ document.getElementById('home-scroll-content').addEventListener('scroll', () => 
 
 `.plan-modal` / `.plan-sheet`（`#title-edit-sheet`は`.plan-modal`クラスを持つため自動的に含まれる）を対象に、**シートを縮小しながら移動する方式**（シート上端の位置は変えず、下端側だけキーボード分削る）。**JSによる制御はCapacitor環境限定**。Web環境はネイティブ挙動に完全に委ねてJS制御なし。
 
-- `_adjustSheetForKb(sheet, kbH)`: 表示中シートの`max-height`（またはheight）を`kbH`分縮小 + `bottom`を`kbH`に設定。`curH <= kbH + 80`の場合は縮小をスキップ（小さいシートで縮めすぎて表示崩れするのを防ぐガード）。どちらのプロパティを縮小したかは`sheet.dataset.kbIsMaxH`に記録
-- `_resetSheetAfterKb(sheet)`: `dataset.kbIsMaxH`を見て`maxHeight`または`height`のうち縮小した方だけを元に戻し、`bottom`もリセット
+- `_adjustSheetForKb(sheet, kbH)`: 表示中シートの`max-height`（またはheight）を`kbH`分縮小 + `bottom`を`kbH`に設定。`origH <= kbH + 80`の場合は縮小をスキップ（小さいシートで縮めすぎて表示崩れするのを防ぐガード）。どちらのプロパティを縮小したかは`sheet.dataset.kbIsMaxH`に記録。**2026-07-11に冪等化**: 初回適用時のみ「縮小前の元の高さ」を`sheet.dataset.kbOrigHeight`に保存し、2回目以降の呼び出しは必ずこの保存値を基準に`元の高さ - SAFE_GAP`を計算する（`getComputedStyle`の現在値からの相対計算はしない）。詳細は下記「フィールド間フォーカス移動時の多重縮小」参照
+- `_resetSheetAfterKb(sheet)`: `dataset.kbIsMaxH`を見て`maxHeight`または`height`のうち縮小した方だけを元に戻し、`bottom`もリセット。`dataset.kbOrigHeight`も同時に削除する
 - `_liftVisibleSheetForKeyboard(kbHeight)`: `document.querySelectorAll('.plan-modal.visible, .plan-sheet.visible')`で表示中の全シートに`_adjustSheetForKb`を適用。縮小後`setTimeout`内で、フォーカス中の入力欄が縮小後のシート下端から一定の余白（`MARGIN=16px`）を保てるよう`overflow = fRect.bottom - (sRect.bottom - MARGIN)`を計算し、`overflow > 0`の場合のみ内部スクロールコンテナ（`.plan-modal-body`等）を`scrollBy({top: overflow, behavior:'smooth'})`で動かす（2026-07-10改修。旧`focused.scrollIntoView({block:'nearest'})`は要素下端をスクロールコンテナ下端に密着させてしまい余白が生まれない問題があった）
 - `_resetSheetKeyboardOffset()`: 対象シート全てに`_resetSheetAfterKb`を適用
 - Capacitor環境: `@capacitor/keyboard` の `keyboardWillShow`/`keyboardWillHide` ネイティブイベントから共通関数を呼ぶ（正確な高さ取得。`resize:'none'`でネイティブ追従が起きないためJS制御が必須）。プラグイン未検出時は `focusin`/`focusout` + `visualViewport.height` によるフォールバック
@@ -399,6 +399,26 @@ document.getElementById('home-scroll-content').addEventListener('scroll', () => 
 2. **Web環境で`visualViewport.resize`から`_liftVisibleSheetForKeyboard`/シート操作を呼ばないこと**。ネイティブ追従と二重適用になりシートが消える（一度実装され2026-07-09に撤去済み）。Web環境はブラウザのネイティブ挙動に完全に委ね、JS側は何もしない
 3. `_screenH`（キーボード表示前の画面高さ）は`let`で保持し、`_resetSheetKeyboardOffset()`実行時（＝キーボードが閉じた正しいタイミング）にのみ再取得する（Capacitor環境でのみ使用）
 4. `curH <= kbH + 80`のガード値はやや恣意的。実機テストで表示崩れがあれば調整する
+
+### ⚠️ ボトムシートの縮小・移動処理は「現在値からの相対計算」ではなく「初期値基準の絶対計算」で冪等にする（フィールド間フォーカス移動時の多重縮小、2026-07-11発見・修正）
+
+**症状**: 「予定を追加」モーダルでタイトル欄→メモ欄など、同一シート内でフィールド間のフォーカスを移動すると、モーダルの高さが極端に潰れてヘッダーだけが画面下部にごく小さく表示される状態になった。
+
+**原因**: iOSネイティブの一般的挙動として、同一フォーム内でテキストフィールド間のフォーカスが移動する場合（キーボードは表示されたまま消えない）、`keyboardWillHide`は発火せず`keyboardWillShow`のみがフォーカス変更のたびに再送される。旧`_adjustSheetForKb`は**呼ばれるたびに`getComputedStyle`の「現在の」`max-height`を読み、そこからさらに`SAFE_GAP`分を差し引く**相対計算だった。縮めすぎ防止ガード（`curH <= SAFE_GAP + 80`）は「初期状態からの1回の縮小」しか安全性を保証できない設計だったため、`keyboardWillShow`が複数回再発火すると縮小が際限なく積み重なった。
+
+**修正**: 「縮小前の元の高さ」を初回適用時のみ`sheet.dataset.kbOrigHeight`に保存し、2回目以降は必ずこの保存値を基準に絶対値で再計算する（同じ`kbH`が何度来ても同じ最終状態に収束する）。`_resetSheetAfterKb`実行時に保存値もクリアする。
+
+**再発防止の教訓**: ボトムシートの「縮小・移動」系の状態変更処理に限らず、**同一イベント（`keyboardWillShow`等）が1シーケンス中に複数回発火しうるケース**（フィールド間移動・画面回転・外部キーボード着脱など）を実装時に必ず想定し、「N回呼ばれても同じ最終状態に収束するか」をレビュー観点に加えること。`getComputedStyle`の相対値を基準に差分計算する方式ではなく、初期値を保存しておいてそこから絶対値で再計算する冪等な方式を標準パターンとする。2026-07-09の「シート上端が画面外に出る」オーバーシュート問題と根は同じ（「イベント再発火を想定していない一回限りの計算」）だが、今回は下端側の縮小が多重適用されて全体が潰れる新パターン。
+
+### ⚠️ 「スクロールで押し上げる」対策は対象コンテナの伸びしろが要求量を上回っているか確認する（設定画面フィードバック欄、2026-07-11修正）
+
+**症状**: 設定画面「改善要望」欄・ニックネーム欄にフォーカスしても、キーボードに隠れたまま送信ボタンが見えない状態が解消しなかった。
+
+**原因**: `.screen-scroll-content`の`padding-bottom:80px`が、実機ログで確認された実際に必要なスクロール量（146〜239px）に対して不足していた。JS側の祖先探索・`scrollTop`加算ロジック自体は正しく動作していたが、`scrollTop`は`scrollHeight - clientHeight`で物理的に頭打ちになるため、既存paddingの範囲を超えて動かすことができなかった（「命令は出したが動かせる余地が無かった」）。
+
+**修正**: キーボード表示中のみ`.screen-scroll-content`に一時的な`padding-bottom`（`kbHeight + 80`px）を動的付与してスクロールの伸びしろを確保してから`scrollTop`を加算するようにした。元のpadding値は`dataset`に保存し、`_resetSheetKeyboardOffset()`実行時（キーボードが閉じたタイミング）に必ず元へ戻す（戻し忘れると閉じた後も余分な余白が残る新規バグになるため要注意）。
+
+**再発防止の教訓**: 「スクロールで押し上げる」系の対策を実装する際は、対象コンテナが物理的にスクロール可能な量（`scrollHeight - clientHeight`、既存paddingに依存）が要求量を上回っているか必ず考慮する。対象がスクロールコンテナの末尾に近い要素であるほど、既存paddingだけでは不足しがちなので、キーボード表示中は動的に伸びしろを確保する設計を標準パターンにする。診断ログは「要求値」だけでなく「適用後の実測値」も併記すると原因切り分けが早い。
 
 ### ⚠️ z-index是正時は「companion要素」だけでなく「子シート」も辿って確認する（2026-07-09追記）
 

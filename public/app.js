@@ -77,16 +77,32 @@
 
     // ボトムシートをキーボード分だけ縮小＋上移動（入力欄がキーボードに隠れなくなる）
     // シート上端の位置は変えず、下端側だけキーボード分削ることで画面上端へのはみ出しを防ぐ
+    //
+    // ⚠️ 冪等化について（2026-07-11）: 同一シート表示中に keyboardWillShow がフィールド間
+    // フォーカス移動のたびに再発火するケースがある（iOSネイティブの一般的挙動）。
+    // 「現在のgetComputedStyle値」を基準に相対的に縮小する方式だと、呼ばれるたびに
+    // 縮小が積み重なり、ガード式（curH <= SAFE_GAP + 80）が効かない条件下でシートが
+    // 際限なく潰れるバグがあった。「縮小前の元の高さ」をdatasetに保存し、常にそこを
+    // 基準に絶対値で計算し直すことで、同じkbHが何度来ても同じ結果に収束する冪等な処理にする。
     function _adjustSheetForKb(sheet, kbH) {
       const MARGIN = 24; // キーボード上に見た目の余白を確保する（縮小量とbottom移動量は必ず同じ値にすること。異なるとオーバーシュート問題が再発する）
       const SAFE_GAP = kbH + MARGIN;
       const cs = getComputedStyle(sheet);
       const hasMaxH = cs.maxHeight !== 'none' && parseFloat(cs.maxHeight) > 0;
-      const curH = parseFloat(hasMaxH ? cs.maxHeight : cs.height) || 0;
-      if (curH <= SAFE_GAP + 80) return; // 縮めすぎる場合はスキップ
-      sheet.dataset.kbIsMaxH = hasMaxH ? '1' : '';
-      if (hasMaxH) sheet.style.maxHeight = (curH - SAFE_GAP) + 'px';
-      else         sheet.style.height    = (curH - SAFE_GAP) + 'px';
+
+      // 初回適用時のみ「縮小前の元の高さ」を保存。2回目以降はこの保存値を基準にする（冪等化）
+      let origH = parseFloat(sheet.dataset.kbOrigHeight);
+      if (!sheet.dataset.kbOrigHeight || Number.isNaN(origH)) {
+        origH = parseFloat(hasMaxH ? cs.maxHeight : cs.height) || 0;
+        sheet.dataset.kbOrigHeight = String(origH);
+        sheet.dataset.kbIsMaxH = hasMaxH ? '1' : '';
+      }
+
+      if (origH <= SAFE_GAP + 80) return; // 縮めすぎる場合はスキップ（元の高さ基準）
+      const isMaxH = sheet.dataset.kbIsMaxH === '1';
+      const newH = origH - SAFE_GAP;
+      if (isMaxH) sheet.style.maxHeight = newH + 'px';
+      else        sheet.style.height    = newH + 'px';
       sheet.style.bottom = SAFE_GAP + 'px';
     }
 
@@ -96,6 +112,7 @@
       else sheet.style.height = '';
       sheet.style.bottom = '';
       delete sheet.dataset.kbIsMaxH;
+      delete sheet.dataset.kbOrigHeight;
     }
 
     function _liftVisibleSheetForKeyboard(kbHeight) {
@@ -148,6 +165,16 @@
             const cs = getComputedStyle(container);
             if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
               foundContainer = container.className || container.id || container.tagName;
+              // .screen-scroll-content の既存padding-bottom(80px)だけでは実際に必要な
+              // スクロール量に足りず、scrollTopがscrollHeight-clientHeightで頭打ちに
+              // なってしまうケースがある。キーボード表示中のみ一時的にpadding-bottomを
+              // kbHeight分拡張し、スクロールの伸びしろを確保してから加算する。
+              if (container.classList.contains('screen-scroll-content')) {
+                if (!container.dataset.kbOrigPaddingBottom) {
+                  container.dataset.kbOrigPaddingBottom = getComputedStyle(container).paddingBottom;
+                }
+                container.style.paddingBottom = (kbHeight + 80) + 'px';
+              }
               container.scrollTop += overflow;
               break;
             }
@@ -166,6 +193,13 @@
       _screenH = window.innerHeight;
       document.querySelectorAll('.plan-modal, .plan-sheet').forEach(sheet => {
         _resetSheetAfterKb(sheet);
+      });
+      // .screen-scroll-content に一時付与したpadding-bottomを元に戻す（戻し忘れ防止）
+      document.querySelectorAll('.screen-scroll-content').forEach(container => {
+        if (container.dataset.kbOrigPaddingBottom) {
+          container.style.paddingBottom = container.dataset.kbOrigPaddingBottom;
+          delete container.dataset.kbOrigPaddingBottom;
+        }
       });
     }
 
@@ -2049,6 +2083,15 @@
     }
 
     function _syncRecommendChip() {
+      // ジャンル未設定時は「おすすめ」チップ自体を非表示にする（設定済みなら表示）
+      const hasGenres = getGenreList().length > 0;
+      const recommendChip = document.querySelector('#filter-row-category .filter-chip[data-cat="recommend"]');
+      if (recommendChip) recommendChip.style.display = hasGenres ? '' : 'none';
+      // おすすめモードON中にジャンルが0件になった場合は強制的にモードを解除して再描画する
+      if (!hasGenres && _recommendModeActive) {
+        _recommendModeActive = false;
+        if (typeof renderEventCards === 'function') renderEventCards();
+      }
       _syncCatChips();
       _syncGenreStatusBadge();
     }

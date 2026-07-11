@@ -11,6 +11,12 @@ const config = {
     Keyboard: {
       resize: 'none', // キーボードがWebViewを縮小しない → ナビの上に被さる自然な挙動
     },
+    SplashScreen: {
+      launchShowDuration: 1000,
+      backgroundColor: '#FFF9F2',
+      showSpinner: false,
+      launchAutoHide: true,
+    },
   },
 };
 
