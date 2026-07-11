@@ -402,6 +402,8 @@ document.getElementById('home-scroll-content').addEventListener('scroll', () => 
 ### ✅ 全画面共通キーボード被り対策（2026-07-09実装 → 同日Web版無効化 → 同日「縮小+移動」方式に刷新）
 
 > ⚠️ **【2026-07-11 設計書15で撤去済み・以下の記述は実態と乖離しています】** ビューポート固着バグの真因が`ios-app/capacitor.config.js`の`contentInset:'always'`（→`'never'`に変更）と判明し、下記の`_adjustSheetForKb`/`_liftVisibleSheetForKeyboard`等のシート縮小・移動JS一式は**無害な被害者として全撤去した**。現在`public/app.js`に残るキーボード対策は「設定画面直下の入力欄（`#feedback-text`/`#nickname-input`）を逃がす軽量関数`_scrollFocusedIntoViewOnKb()`」のみで、`.plan-modal`/`.plan-sheet`系は内部スクロール（`.plan-modal-body{overflow-y:auto}`）とネイティブ挙動に委ねている。**このセクション本文（縮小+移動方式・冪等化・オーバーシュート経緯等）はTestFlight実機で対策の効果を確認でき次第、全面書き換える予定**（`.claude/next.md`参照）。それまでは歴史的経緯としてのみ残置。
+>
+> **【2026-07-11 設計書16追記】** `_scrollFocusedIntoViewOnKb()`は当初「シート内の入力欄は対象外（`focused.closest('.plan-modal, .plan-sheet')`で早期return）」だったが、この早期リターンを削除。既存の祖先スクロールロジック（`overflow-y:auto`コンテナの`scrollTop`を`overflow`分加算）が、コース作成シート（`#course-sheet`の`#course-note`）等のシート内入力欄にも適用されるようになった。合わせて、設計書14フェーズ1で暫定導入していた「予定作成モーダル新規時のメモ欄非表示化」（`#plan-custom-memo-section`のdisplay制御）も、根本対策（設計書15）成功により不要と判明し撤回。メモ欄は新規・編集どちらでも常時表示。
 
 `.plan-modal` / `.plan-sheet`（`#title-edit-sheet`は`.plan-modal`クラスを持つため自動的に含まれる）を対象に、**シートを縮小しながら移動する方式**（シート上端の位置は変えず、下端側だけキーボード分削る）。**JSによる制御はCapacitor環境限定**。Web環境はネイティブ挙動に完全に委ねてJS制御なし。
 
