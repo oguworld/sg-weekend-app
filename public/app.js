@@ -13,6 +13,43 @@
       } catch (_) {}
     }
 
+    // ─── DEBUG: 「モーダル操作後にタップ全体が効かなくなる」重大バグ調査用の計装（原因特定後に削除すること。2026-07-11追加）───
+    // モーダルclose直後・keyboardWillHide発火時に、主要オーバーレイの残留有無とボトムナビの実際のヒットテスト対象を記録する。
+    function _debugLogModalCloseState(tag) {
+      try {
+        const overlayIds = ['plan-modal-overlay', 'course-sheet-overlay', 'course-detail-overlay', 'title-edit-overlay', 'date-picker-overlay'];
+        const overlays = overlayIds.map(id => {
+          const el = document.getElementById(id);
+          if (!el) return { id, exists: false };
+          const cs = getComputedStyle(el);
+          return { id, exists: true, display: cs.display, opacity: cs.opacity, pointerEvents: cs.pointerEvents, hasVisibleClass: el.classList.contains('visible') };
+        });
+        const navBtn = document.getElementById('nav-plan') || document.querySelector('.bottom-nav .nav-item');
+        let navHitTest = null;
+        if (navBtn) {
+          const r = navBtn.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const hitEl = document.elementFromPoint(cx, cy);
+          navHitTest = {
+            navBtnId: navBtn.id || null,
+            point: { x: cx, y: cy },
+            hitTagName: hitEl?.tagName || null,
+            hitId: hitEl?.id || null,
+            hitClass: (hitEl && typeof hitEl.className === 'string') ? hitEl.className : null,
+            isNavBtnOrDescendant: !!(hitEl && (hitEl === navBtn || navBtn.contains(hitEl))),
+          };
+        }
+        _sendDebugLog('modal_close_hittest', {
+          tag,
+          activeElementId: document.activeElement?.id || null,
+          activeElementTag: document.activeElement?.tagName || null,
+          overlays,
+          navHitTest,
+        });
+      } catch (_) {}
+    }
+
     // ─── DEBUG: safe-area-inset-top実測用の非表示計測要素（原因特定後に削除すること）───
     let _safeAreaProbeEl = null;
     function _getSafeAreaInsetTop() {
@@ -207,6 +244,13 @@
       _liftVisibleSheetForKeyboard(kbHeight);
     }
 
+    // ─── DEBUG: keyboardWillHide発火時の状態計装（原因特定後に削除すること。2026-07-11追加）───
+    function _onCapKeyboardHide() {
+      _debugLogModalCloseState('keyboardWillHide_before');
+      _resetSheetKeyboardOffset();
+      _debugLogModalCloseState('keyboardWillHide_after');
+    }
+
     if (_isCapacitorApp) {
       // Capacitor環境: @capacitor/keyboard のネイティブイベントで正確なキーボード高さを取得
       // Capacitor 6: Plugins.Keyboard ではなく registerPlugin() 経由でないと addListener が動かない場合があるため優先し、失敗時は従来方式にフォールバック
@@ -219,7 +263,7 @@
       if (!_CapKB) _CapKB = window.Capacitor?.Plugins?.Keyboard;
       if (_CapKB?.addListener) {
         _CapKB.addListener('keyboardWillShow', (info) => _onCapKeyboardShow(info.keyboardHeight));
-        _CapKB.addListener('keyboardWillHide', () => _resetSheetKeyboardOffset());
+        _CapKB.addListener('keyboardWillHide', () => _onCapKeyboardHide());
       } else {
         // フォールバック: keyboardプラグイン未検出時は focusin/focusout で近似
         document.addEventListener('focusin', e => {
@@ -3017,6 +3061,7 @@
       document.getElementById('course-detail-overlay').style.display = 'none';
       document.getElementById('course-detail-overlay').style.opacity = '0';
       document.getElementById('course-detail-sheet').classList.remove('visible');
+      _resetSheetKeyboardOffset();
     }
 
     // ─── コース生成シート ───
@@ -3134,6 +3179,7 @@
       _unlockCourseScroll();
       unlockScroll();
       window._coursePresetDate = null;
+      _resetSheetKeyboardOffset();
     }
 
     function showCourseStep(step) {
@@ -3410,6 +3456,7 @@
       document.getElementById('title-edit-sheet').classList.remove('visible');
       document.getElementById('title-edit-sheet').style.bottom = '0px';
       document.getElementById('title-edit-input').blur();
+      _resetSheetKeyboardOffset();
     }
 
     function saveCourseTitle() {
@@ -3514,6 +3561,7 @@
       document.getElementById('date-picker-modal').classList.remove('visible');
       unlockScroll();
       _datepickerCallback = null;
+      _resetSheetKeyboardOffset();
     }
 
     function addCourseToScheduleWithDate(course) {
@@ -3825,11 +3873,15 @@
       _showNotifyCheckboxes();
       const _evImpCb = document.getElementById('plan-event-important-cb');
       if (_evImpCb) _evImpCb.checked = false;
-      document.getElementById('plan-modal-overlay').style.display = 'block';
-      document.getElementById('plan-modal-overlay').style.opacity = '1';
+      document.getElementById('plan-modal-overlay').classList.add('visible');
       document.getElementById('plan-event-modal').classList.add('visible');
       requestAnimationFrame(() => _syncTimeInputUI('event'));
-      } catch(e) { unlockScroll(); throw e; }
+      } catch(e) {
+        unlockScroll();
+        document.getElementById('plan-modal-overlay')?.classList.remove('visible');
+        document.getElementById('plan-event-modal')?.classList.remove('visible');
+        throw e;
+      }
     }
 
     let _customPlanPresetDateKey = null;
@@ -3870,13 +3922,17 @@
       _showNotifyCheckboxes();
       const _cuImpCb = document.getElementById('plan-custom-important-cb');
       if (_cuImpCb) _cuImpCb.checked = false;
-      document.getElementById('plan-modal-overlay').style.display = 'block';
-      document.getElementById('plan-modal-overlay').style.opacity = '1';
+      document.getElementById('plan-modal-overlay').classList.add('visible');
       document.getElementById('plan-custom-modal').classList.add('visible');
       requestAnimationFrame(() => _syncTimeInputUI('custom'));
       const customBody = document.querySelector('#plan-custom-modal .plan-modal-body');
       if (customBody) customBody.scrollTop = 0;
-      } catch(e) { unlockScroll(); throw e; }
+      } catch(e) {
+        unlockScroll();
+        document.getElementById('plan-modal-overlay')?.classList.remove('visible');
+        document.getElementById('plan-custom-modal')?.classList.remove('visible');
+        throw e;
+      }
     }
 
     function openPlanDetailModal(planId, planType) {
@@ -3908,8 +3964,7 @@
       _showNotifyCheckboxes();
       const _dtImpCb = document.getElementById('plan-detail-important-cb');
       if (_dtImpCb) _dtImpCb.checked = !!plan.important;
-      document.getElementById('plan-modal-overlay').style.display = 'block';
-      document.getElementById('plan-modal-overlay').style.opacity = '1';
+      document.getElementById('plan-modal-overlay').classList.add('visible');
       document.getElementById('plan-detail-modal').classList.add('visible');
       requestAnimationFrame(() => _syncTimeInputUI('detail'));
     }
@@ -4205,8 +4260,7 @@
       _updatePinToggleBtn();
       updateCustomPlanAddBtn();
       _showNotifyCheckboxes();
-      document.getElementById('plan-modal-overlay').style.display = 'block';
-      document.getElementById('plan-modal-overlay').style.opacity = '1';
+      document.getElementById('plan-modal-overlay').classList.add('visible');
       document.getElementById('plan-custom-modal').classList.add('visible');
       const customBody = document.querySelector('#plan-custom-modal .plan-modal-body');
       if (customBody) customBody.scrollTop = 0;
@@ -4221,17 +4275,19 @@
     }
 
     function closePlanModal() {
+      _debugLogModalCloseState('closePlanModal_before');
       unlockScroll();
       closePinDropdown();
-      document.getElementById('plan-modal-overlay').style.display = 'none';
-      document.getElementById('plan-modal-overlay').style.opacity = '0';
+      document.getElementById('plan-modal-overlay').classList.remove('visible');
       document.getElementById('plan-event-modal').classList.remove('visible');
       document.getElementById('plan-custom-modal').classList.remove('visible');
       document.getElementById('plan-detail-modal').classList.remove('visible');
+      _resetSheetKeyboardOffset();
       _planModalType = null;
       _planModalSelectedDate = null;
       _planModalSelectedStartTime = null;
       _editingGroupIds = [];
+      _debugLogModalCloseState('closePlanModal_after');
     }
 
     // ─── PLAN TAB RENDER ───
