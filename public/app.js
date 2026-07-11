@@ -430,6 +430,47 @@
       _resetSheetKeyboardOffset();
       _debugLogModalCloseState('keyboardWillHide_after');
       _debugLogLayoutSnapshot('keyboardWillHide_after');
+
+      // FIX: ビューポート固着の強制復元試行（選択肢1、設計書11）
+      const expectedH = _normalInnerHeight; // _screenHではなく起動時基準値を使う（設計書11 注意点1参照）
+      setTimeout(() => _attemptViewportRecovery(expectedH), 400);
+    }
+
+    // FIX: ビューポート固着の強制復元試行（選択肢1、設計書11。効果不十分なら削除・選択肢2へ移行）
+    function _viewportRecoveryStep(i, expectedH, steps) {
+      if (window.innerHeight === expectedH) {
+        _sendDebugLog('viewport_recovery_result', { recovered: true, atStep: i, finalHeight: window.innerHeight, expectedH });
+        return;
+      }
+      if (i >= steps.length) {
+        _sendDebugLog('viewport_recovery_result', { recovered: false, atStep: i, finalHeight: window.innerHeight, expectedH });
+        return;
+      }
+      try { steps[i](); } catch (_) {}
+      setTimeout(() => _viewportRecoveryStep(i + 1, expectedH, steps), 150);
+    }
+
+    function _attemptViewportRecovery(expectedH) {
+      if (window.innerHeight === expectedH) return;
+      _sendDebugLog('viewport_recovery_start', { currentHeight: window.innerHeight, expectedH });
+      const steps = [
+        () => { window.scrollTo(0, 1); window.scrollTo(0, 0); },
+        () => {
+          document.body.style.height = '100.1%';
+          void document.body.offsetHeight;
+          requestAnimationFrame(() => { document.body.style.height = ''; });
+        },
+        () => { window.dispatchEvent(new Event('resize')); },
+        () => {
+          try {
+            let kb = null;
+            if (window.Capacitor?.registerPlugin) kb = window.Capacitor.registerPlugin('Keyboard');
+            if (!kb) kb = window.Capacitor?.Plugins?.Keyboard;
+            if (kb?.hide) kb.hide();
+          } catch (_) {}
+        },
+      ];
+      _viewportRecoveryStep(0, expectedH, steps);
     }
 
     if (_isCapacitorApp) {
@@ -2774,6 +2815,10 @@
       // フォーカスが残ったまま遷移すると、iOS WKWebViewでボトムナビのタップが効かなくなる不具合の対策。2026-07-11）
       if (document.activeElement && document.activeElement !== document.body && typeof document.activeElement.blur === 'function') {
         document.activeElement.blur();
+      }
+      // FIX: ビューポート固着の保険復元（選択肢1、設計書11）。画面遷移をまたいでも固着が解消しないケースへの対策
+      if (_isCapacitorApp && window.innerHeight !== _normalInnerHeight) {
+        _attemptViewportRecovery(_normalInnerHeight);
       }
       closeAllPopups();
       ['home','course','plan','settings'].forEach(s => {
