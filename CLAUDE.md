@@ -158,15 +158,25 @@ sg-weekend-app/
   5. フェーズ0完了後、`ios-deploy.yml`のentitlements自動生成2ステップ（上記iOS/CI 1・2）のコメントアウトを解除して復元する
 - スコープ外（設計時点で明示）: Android版対応、通知既読管理・一覧UI、ジャンル/エリア別配信パーソナライズ、FCM導入、Web版・iOS版購読者の名寄せ、サイレントプッシュ、通知文言の多言語化
 
-## ジャンル・興味機能（2026-07-02実装）
+## ジャンル・興味機能（2026-07-02実装、おすすめモード周りは2026-07-11刷新）
 - ジャンルマスター: GENRE_LIST 定数（13種）。id / emoji / label を持つ
 - ユーザー設定: localStorage `app_genres`（選択ジャンルIDの配列）
 - 設定場所: 設定画面「ジャンル・興味」セクション（`#genre-chips-container`）
-- おすすめモード: 「すべて」チップをタップすると `_recommendModeActive = true` になり、ジャンルマッチのイベントのみ表示。もう一度タップで全件表示に戻る
-  - ジャンル未設定時は `#recommend-setup-banner` を5秒表示して設定を促す
-- 「すべて」チップのラベル: おすすめモードON時は「⭐ おすすめ」に変化（`_syncRecommendChip()`）
+- おすすめモード: 「すべて」チップとは別の独立した「おすすめ」チップ（`data-cat="recommend"`）を`toggleCatFilter('recommend')`でトグルして`_recommendModeActive`をON/OFFする。ジャンルマッチのイベントのみ表示（`genreMatch()`）
+  - 「おすすめ」チップはジャンル未設定時（`getGenreList().length === 0`）は`display:none`で非表示（`_syncRecommendChip()`が制御）。ジャンルを1つ以上設定すると表示される
+  - ジャンル未設定時のおすすめモード誘導は`#recommend-setup-banner`（5秒バナー）ではなく、`renderEventCards()`内のグリッド内インライン案内（⭐+説明文+「ジャンルを設定する」ボタン）。旧記載の5秒バナーは実態と乖離していたため訂正（2026-07-11）
+  - `toggleCatFilter('recommend')`はジャンル未設定時、そもそも`_recommendModeActive`をONにせず入口で早期`return`する（2026-07-11、下記バグ修正で導入）
+- 「すべて」チップは`filterCats.clear(); _recommendModeActive=false`する純粋な全件表示リセット専用ボタン。「おすすめ」チップとラベルが連動して変化する仕様ではない（旧記載「おすすめモードON時は⭐おすすめに変化」は誤り。訂正済み）
 - イベントデータ: `genres` フィールド（文字列配列）。filter-events.js の filterBatch() で付与
 - 遡及タグ付け: `node scripts/fill-genres.js --city=sg [--dry-run]`（Haiku、バッチ20件）
+
+### ⚠️ チップ・タブの表示/非表示制御と、固定配列でのインデックス操作の相互作用に注意（2026-07-11教訓）
+「おすすめ」チップをジャンル未設定時に`display:none`で非表示化した際、同じUI要素を対象にした**別の機構**（ホーム画面のカード領域スワイプでカテゴリを前後に切り替える機能、`public/app.js`）が、表示/非表示を考慮しない固定配列`CAT_ORDER`でインデックス計算していたため、「すべて」から右スワイプしても非表示の`recommend`が経路上に居座り続けて先のカテゴリへ進めなくなるバグが発生した（さらに`toggleCatFilter('recommend')`を一度ONにしてから`_syncRecommendChip()`が事後的にOFFへ戻す「二段構え」実装だったため、非表示チップに`.active`が誤って付与される副次的リスクもあった）。
+
+**再発防止策**:
+- チップ・タブ等のUI要素を`display:none`で動的に出し分ける変更を行う際は、その要素を対象にした「固定配列でのインデックス操作」「`querySelectorAll`での一覧取得」が他に無いか、変更前に`grep`等でコードベース全体を横断確認する
+- 「非表示化」と「状態を強制的に戻すガード」を同じcommitで同時に導入する場合、両者の呼び出し順序・再入（同一関数呼び出しの流れの中で状態が書き換わって戻る）が無いか、変更後にシミュレーションする
+- 上記スワイプ機構は2026-07-11に修正済み: `CAT_ORDER`固定配列を廃止し、`_visibleCatOrder()`（`#filter-row-category .filter-chip`をDOM順・`offsetParent !== null`でフィルタして動的算出）に置き換え。`toggleCatFilter('recommend')`もジャンル未設定時は入口で早期returnする方式に変更し、「一度ONにしてから戻す」二段構えを廃止
 
 ## i18n対応（2026-06-24実装）
 - 言語切り替え: STRINGS オブジェクト（ja/en）+ `t(key)` 関数 + `applyI18n()`

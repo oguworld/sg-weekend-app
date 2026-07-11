@@ -1286,12 +1286,13 @@
         filterCats.clear();
         _recommendModeActive = false;
       } else if (val === 'recommend') {
-        filterCats.clear();
-        if (getGenreList().length > 0) {
-          _recommendModeActive = !_recommendModeActive;
-        } else {
-          _recommendModeActive = true;
+        if (getGenreList().length === 0) {
+          // ジャンル未設定時は「おすすめ」チップ自体が非表示のため、
+          // ONにせず即座に抜ける（表示中カテゴリの状態を変更しない）
+          return;
         }
+        filterCats.clear();
+        _recommendModeActive = !_recommendModeActive;
       } else {
         _recommendModeActive = false;
         const already = filterCats.has(val);
@@ -1536,22 +1537,30 @@
 
     // ─── カード領域スワイプでタブ切り替え ───
     {
-      const CAT_ORDER = ['all', 'recommend', 'event', 'show', 'gourmet', 'sale', 'opening'];
       let _swipeStartX = 0, _swipeStartY = 0, _swipeIntent = null;
 
-      function _currentCatIdx() {
-        if (_recommendModeActive) return CAT_ORDER.indexOf('recommend');
-        if (filterCats.size === 0) return CAT_ORDER.indexOf('all');
+      // 現在DOM上に表示中（display:noneでない）のチップの data-cat を、表示順で取得する。
+      // 固定配列を使わないことで、チップの表示/非表示状態の変化に自動追従する。
+      function _visibleCatOrder() {
+        return [...document.querySelectorAll('#filter-row-category .filter-chip')]
+          .filter(b => b.offsetParent !== null)
+          .map(b => b.dataset.cat);
+      }
+
+      function _currentCatIdx(order) {
+        if (_recommendModeActive) return order.indexOf('recommend');
+        if (filterCats.size === 0) return order.indexOf('all');
         const cat = [...filterCats][0];
-        return CAT_ORDER.indexOf(cat);
+        return order.indexOf(cat);
       }
 
       function _switchCatBySwipe(dir) {
-        const idx = _currentCatIdx();
+        const order = _visibleCatOrder();
+        const idx = _currentCatIdx(order);
         const next = idx + dir;
-        if (next < 0 || next >= CAT_ORDER.length) return;
-        toggleCatFilter(CAT_ORDER[next]);
-        const chip = document.querySelector(`#filter-row-category .filter-chip[data-cat="${CAT_ORDER[next]}"]`);
+        if (idx === -1 || next < 0 || next >= order.length) return;
+        toggleCatFilter(order[next]);
+        const chip = document.querySelector(`#filter-row-category .filter-chip[data-cat="${order[next]}"]`);
         chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         window.scrollTo({ top: 0, behavior: 'instant' });
       }
