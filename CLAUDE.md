@@ -401,6 +401,8 @@ document.getElementById('home-scroll-content').addEventListener('scroll', () => 
 
 ### ✅ 全画面共通キーボード被り対策（2026-07-09実装 → 同日Web版無効化 → 同日「縮小+移動」方式に刷新）
 
+> ⚠️ **【2026-07-11 設計書15で撤去済み・以下の記述は実態と乖離しています】** ビューポート固着バグの真因が`ios-app/capacitor.config.js`の`contentInset:'always'`（→`'never'`に変更）と判明し、下記の`_adjustSheetForKb`/`_liftVisibleSheetForKeyboard`等のシート縮小・移動JS一式は**無害な被害者として全撤去した**。現在`public/app.js`に残るキーボード対策は「設定画面直下の入力欄（`#feedback-text`/`#nickname-input`）を逃がす軽量関数`_scrollFocusedIntoViewOnKb()`」のみで、`.plan-modal`/`.plan-sheet`系は内部スクロール（`.plan-modal-body{overflow-y:auto}`）とネイティブ挙動に委ねている。**このセクション本文（縮小+移動方式・冪等化・オーバーシュート経緯等）はTestFlight実機で対策の効果を確認でき次第、全面書き換える予定**（`.claude/next.md`参照）。それまでは歴史的経緯としてのみ残置。
+
 `.plan-modal` / `.plan-sheet`（`#title-edit-sheet`は`.plan-modal`クラスを持つため自動的に含まれる）を対象に、**シートを縮小しながら移動する方式**（シート上端の位置は変えず、下端側だけキーボード分削る）。**JSによる制御はCapacitor環境限定**。Web環境はネイティブ挙動に完全に委ねてJS制御なし。
 
 - `_adjustSheetForKb(sheet, kbH)`: 表示中シートの`max-height`（またはheight）を`kbH`分縮小 + `bottom`を`kbH`に設定。`origH <= kbH + 80`の場合は縮小をスキップ（小さいシートで縮めすぎて表示崩れするのを防ぐガード）。どちらのプロパティを縮小したかは`sheet.dataset.kbIsMaxH`に記録。**2026-07-11に冪等化**: 初回適用時のみ「縮小前の元の高さ」を`sheet.dataset.kbOrigHeight`に保存し、2回目以降の呼び出しは必ずこの保存値を基準に`元の高さ - SAFE_GAP`を計算する（`getComputedStyle`の現在値からの相対計算はしない）。詳細は下記「フィールド間フォーカス移動時の多重縮小」参照

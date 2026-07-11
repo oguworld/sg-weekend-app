@@ -13,147 +13,6 @@
       } catch (_) {}
     }
 
-    // ─── DEBUG: ビューポート固着監視（原因特定後に削除すること。2026-07-11設計書10 計装H）───
-    // window.innerHeightが「正常値」（初回ロード時に記録した基準値）と異なる状態が
-    // 3秒以上継続した場合、1回だけ_sendDebugLog('viewport_stuck', {...})を送る。
-    // 状態が正常値に戻る、または異なる異常値に変化するまでは再送しない（連投防止のフラグ管理）。
-    // switchNav()等の特定箇所に相乗りせず、アプリ起動から終了までスタンドアロンで動く汎用監視にする
-    // （設計書10で判明した「画面遷移13回をまたいでも固着状態が解消しない」ケースを捉えるため、
-    //  特定関数呼び出し時の10秒ウィンドウ計装＝計装Dでは不十分なことが分かっているため）。
-    const _normalInnerHeight = window.innerHeight; // アプリ起動時（正常時）の基準値
-    let _viewportStuckState = { abnormalHeight: null, sinceTs: null, reported: false };
-    setInterval(() => {
-      try {
-        const cur = window.innerHeight;
-        if (cur === _normalInnerHeight) {
-          // 正常値に戻った → 状態リセット（再度異常になったら再度計測・再送できるようにする）
-          _viewportStuckState = { abnormalHeight: null, sinceTs: null, reported: false };
-          return;
-        }
-        if (_viewportStuckState.abnormalHeight !== cur) {
-          // 異常値が初検出、または前回と異なる異常値に変化 → 計測をやり直す
-          _viewportStuckState = { abnormalHeight: cur, sinceTs: Date.now(), reported: false };
-          return;
-        }
-        // 同じ異常値が継続中
-        if (!_viewportStuckState.reported && Date.now() - _viewportStuckState.sinceTs >= 3000) {
-          _viewportStuckState.reported = true;
-          const navEl = document.querySelector('.bottom-nav');
-          const navRect = navEl ? navEl.getBoundingClientRect() : null;
-          _sendDebugLog('viewport_stuck', {
-            currentInnerHeight: cur,
-            expectedInnerHeight: _normalInnerHeight,
-            stuckDurationMs: Date.now() - _viewportStuckState.sinceTs,
-            visualViewportHeight: window.visualViewport ? window.visualViewport.height : null,
-            bottomNavRect: navRect ? { top: navRect.top, bottom: navRect.bottom, left: navRect.left, right: navRect.right } : null,
-            activeElementId: document.activeElement?.id || null,
-          });
-        }
-      } catch (_) {}
-    }, 1000);
-
-    // ─── DEBUG: グローバルtouchstart監視（原因特定後に削除すること。2026-07-11設計書8 計装B）───
-    // 記録専用・一切ブロックしない。preventDefault()/stopPropagation()は絶対に呼ばない。
-    // 2026-07-10のグローバルclickブロック事故（e.preventDefault()/e.stopImmediatePropagation()で
-    // 全ボタンを無反応にした重大バグ）とは性質が異なり、passive:trueを必ず指定し、
-    // イベント伝播・デフォルト動作を一切変更しない受動的リスナーである。
-    // 通常操作でも大量発火するため、モーダルclose後10秒間だけ有効にするフラグで頻度制御する
-    // （closePlanModal()のタイマー計装＝計装Dと同じ10秒ウィンドウで連動）。
-    let _globalTouchWatchActive = false;
-    document.addEventListener('touchstart', e => {
-      if (!_globalTouchWatchActive) return;
-      try {
-        // ─── DEBUG: 計装I（原因特定後に削除すること。2026-07-11設計書10）───
-        // タップ座標とその瞬間の.bottom-navの実際のrectを同じログエントリで直接比較できるようにする。
-        const navEl = document.querySelector('.bottom-nav');
-        let navRectAtTapTime = null;
-        if (navEl) {
-          const r = navEl.getBoundingClientRect();
-          navRectAtTapTime = { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
-        }
-        _sendDebugLog('global_touchstart', {
-          targetTag: e.target.tagName,
-          targetId: e.target.id || null,
-          targetClass: (typeof e.target.className === 'string' ? e.target.className : null),
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY,
-          isNavDescendant: !!e.target.closest('.bottom-nav'),
-          navRectAtTapTime,
-        });
-      } catch (_) {}
-    }, { passive: true, capture: true });
-
-    // ─── DEBUG: 「モーダル操作後にタップ全体が効かなくなる」重大バグ調査用の計装（原因特定後に削除すること。2026-07-11追加）───
-    // モーダルclose直後・keyboardWillHide発火時に、主要オーバーレイの残留有無とボトムナビの実際のヒットテスト対象を記録する。
-    function _debugLogModalCloseState(tag) {
-      try {
-        const overlayIds = ['plan-modal-overlay', 'course-sheet-overlay', 'course-detail-overlay', 'title-edit-overlay', 'date-picker-overlay'];
-        const overlays = overlayIds.map(id => {
-          const el = document.getElementById(id);
-          if (!el) return { id, exists: false };
-          const cs = getComputedStyle(el);
-          return { id, exists: true, display: cs.display, opacity: cs.opacity, pointerEvents: cs.pointerEvents, hasVisibleClass: el.classList.contains('visible') };
-        });
-        const navBtn = document.getElementById('nav-plan') || document.querySelector('.bottom-nav .nav-item');
-        let navHitTest = null;
-        if (navBtn) {
-          const r = navBtn.getBoundingClientRect();
-          const cx = r.left + r.width / 2;
-          const cy = r.top + r.height / 2;
-          const hitEl = document.elementFromPoint(cx, cy);
-          navHitTest = {
-            navBtnId: navBtn.id || null,
-            point: { x: cx, y: cy },
-            hitTagName: hitEl?.tagName || null,
-            hitId: hitEl?.id || null,
-            hitClass: (hitEl && typeof hitEl.className === 'string') ? hitEl.className : null,
-            isNavBtnOrDescendant: !!(hitEl && (hitEl === navBtn || navBtn.contains(hitEl))),
-          };
-        }
-        _sendDebugLog('modal_close_hittest', {
-          tag,
-          activeElementId: document.activeElement?.id || null,
-          activeElementTag: document.activeElement?.tagName || null,
-          overlays,
-          navHitTest,
-        });
-      } catch (_) {}
-    }
-
-    // ─── DEBUG: レイアウト・座標系のスナップショット（原因特定後に削除すること。2026-07-11設計書8 計装C）───
-    // 「画面が下がったように見える」というユーザー申告の客観的裏付け用。body/html/#screen-plan/
-    // .bottom-nav の位置情報とvisualViewportの状態を記録する。
-    function _debugLogLayoutSnapshot(tag) {
-      try {
-        const rectOf = el => {
-          if (!el) return null;
-          const r = el.getBoundingClientRect();
-          return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
-        };
-        const body = document.body;
-        const html = document.documentElement;
-        const screenPlan = document.getElementById('screen-plan');
-        const bottomNav = document.querySelector('.bottom-nav');
-        let screenPlanScrollTop = null;
-        if (screenPlan) {
-          const sc = screenPlan.querySelector('.screen-content, .screen-scroll-content');
-          screenPlanScrollTop = sc ? sc.scrollTop : null;
-        }
-        const vv = window.visualViewport;
-        _sendDebugLog('layout_snapshot', {
-          tag,
-          body: { rect: rectOf(body), transform: getComputedStyle(body).transform, position: getComputedStyle(body).position, scrollTop: body.scrollTop },
-          html: { rect: rectOf(html), transform: getComputedStyle(html).transform, position: getComputedStyle(html).position, scrollTop: html.scrollTop },
-          screenPlan: screenPlan ? { rect: rectOf(screenPlan), transform: getComputedStyle(screenPlan).transform, scrollTop: screenPlanScrollTop } : null,
-          bottomNav: bottomNav ? { rect: rectOf(bottomNav) } : null,
-          visualViewport: vv ? { height: vv.height, offsetTop: vv.offsetTop, offsetLeft: vv.offsetLeft, scale: vv.scale } : null,
-          innerHeight: window.innerHeight,
-          scrollY: window.scrollY,
-          scrollLockDepth: _scrollLockDepth,
-        });
-      } catch (_) {}
-    }
-
     // ─── モーダル/シートを閉じる際、内部にフォーカスが残っていたら外す共通ヘルパー ───
     // フォーカスが残ったまま非表示化されたinput/textareaが、iOS WKWebView側のタッチイベント
     // 配送を阻害する可能性があるための対策（2026-07-11、設計書7）。
@@ -169,21 +28,6 @@
         });
         if (isInside) active.blur();
       } catch (_) {}
-    }
-
-    // ─── DEBUG: safe-area-inset-top実測用の非表示計測要素（原因特定後に削除すること）───
-    let _safeAreaProbeEl = null;
-    function _getSafeAreaInsetTop() {
-      try {
-        if (!_safeAreaProbeEl) {
-          _safeAreaProbeEl = document.createElement('div');
-          _safeAreaProbeEl.style.cssText = 'position:fixed;top:0;left:0;width:1px;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none;';
-          document.documentElement.appendChild(_safeAreaProbeEl);
-        }
-        return _safeAreaProbeEl.getBoundingClientRect().height;
-      } catch (_) {
-        return 'n/a';
-      }
     }
 
     // ─── CAPACITOR: GA4スキップ・外部リンク制御・overscroll防止 ───
@@ -228,249 +72,62 @@
     let _touchCapableDetected = false;
     document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
 
-    // ─── 全画面共通: キーボード被り対策（Web版・Capacitor版共通） ───
-    // 表示中のシート（.plan-modal.visible / .plan-sheet.visible ※#title-edit-sheetはplan-modalクラスを持つため含まれる）を
-    // キーボード分だけ縮小＋bottom移動する（シート上端の位置は変えない。詳細は_adjustSheetForKb参照）
-    let _screenH = window.innerHeight; // キーボード表示前の画面高さを保存
-
-    // ボトムシートをキーボード分だけ縮小＋上移動（入力欄がキーボードに隠れなくなる）
-    // シート上端の位置は変えず、下端側だけキーボード分削ることで画面上端へのはみ出しを防ぐ
+    // ─── 設定画面のキーボード被り対策（軽量フォールバックのみ。2026-07-11設計書15で刷新）───
+    // かつての .plan-modal / .plan-sheet を縮小・移動する複雑なJS一式（_adjustSheetForKb等）は撤去した。
+    // ビューポート固着バグの真因は capacitor.config.js の contentInset:'always' 側にあり、
+    // これらのシート操作JSは無害な被害者だったと判明したため（設計書15）。
+    // シート系のキーボード回避は .plan-modal-body{overflow-y:auto} の内部スクロールとネイティブに委ねる。
     //
-    // ⚠️ 冪等化について（2026-07-11）: 同一シート表示中に keyboardWillShow がフィールド間
-    // フォーカス移動のたびに再発火するケースがある（iOSネイティブの一般的挙動）。
-    // 「現在のgetComputedStyle値」を基準に相対的に縮小する方式だと、呼ばれるたびに
-    // 縮小が積み重なり、ガード式（curH <= SAFE_GAP + 80）が効かない条件下でシートが
-    // 際限なく潰れるバグがあった。「縮小前の元の高さ」をdatasetに保存し、常にそこを
-    // 基準に絶対値で計算し直すことで、同じkbHが何度来ても同じ結果に収束する冪等な処理にする。
-    function _adjustSheetForKb(sheet, kbH) {
-      // ─── DEBUG: dataset状態遷移の記録（原因特定後に削除すること。2026-07-11設計書8 計装F/G）───
-      _sendDebugLog('adjust_sheet_kb', {
-        phase: 'enter',
-        sheetId: sheet.id || null,
-        kbH,
-        hadOrigHeight: 'kbOrigHeight' in sheet.dataset,
-        origHeightBefore: sheet.dataset.kbOrigHeight || null,
-        isMaxHBefore: sheet.dataset.kbIsMaxH || null,
-        curMaxHeight: getComputedStyle(sheet).maxHeight,
-        curHeight: getComputedStyle(sheet).height,
-        curBottom: getComputedStyle(sheet).bottom,
-        activeElementId: document.activeElement?.id || null,
-      });
-
-      const MARGIN = 24; // キーボード上に見た目の余白を確保する（縮小量とbottom移動量は必ず同じ値にすること。異なるとオーバーシュート問題が再発する）
-      const SAFE_GAP = kbH + MARGIN;
-      const cs = getComputedStyle(sheet);
-      const hasMaxH = cs.maxHeight !== 'none' && parseFloat(cs.maxHeight) > 0;
-
-      // 初回適用時のみ「縮小前の元の高さ」を保存。2回目以降はこの保存値を基準にする（冪等化）
-      let origH = parseFloat(sheet.dataset.kbOrigHeight);
-      if (!sheet.dataset.kbOrigHeight || Number.isNaN(origH)) {
-        origH = parseFloat(hasMaxH ? cs.maxHeight : cs.height) || 0;
-        sheet.dataset.kbOrigHeight = String(origH);
-        sheet.dataset.kbIsMaxH = hasMaxH ? '1' : '';
-      }
-
-      if (origH <= SAFE_GAP + 80) {
-        // ─── DEBUG（2026-07-11設計書8 計装F/G）───
-        _sendDebugLog('adjust_sheet_kb', {
-          phase: 'exit',
-          sheetId: sheet.id || null,
-          kbH,
-          skippedTooSmall: true,
-          origHeightAfter: sheet.dataset.kbOrigHeight || null,
-          isMaxHAfter: sheet.dataset.kbIsMaxH || null,
-          curMaxHeight: getComputedStyle(sheet).maxHeight,
-          curHeight: getComputedStyle(sheet).height,
-          curBottom: getComputedStyle(sheet).bottom,
-          activeElementId: document.activeElement?.id || null,
-        });
-        return; // 縮めすぎる場合はスキップ（元の高さ基準）
-      }
-      const isMaxH = sheet.dataset.kbIsMaxH === '1';
-      const newH = origH - SAFE_GAP;
-      if (isMaxH) sheet.style.maxHeight = newH + 'px';
-      else        sheet.style.height    = newH + 'px';
-      sheet.style.bottom = SAFE_GAP + 'px';
-
-      // ─── DEBUG: dataset状態遷移の記録（原因特定後に削除すること。2026-07-11設計書8 計装F/G）───
-      _sendDebugLog('adjust_sheet_kb', {
-        phase: 'exit',
-        sheetId: sheet.id || null,
-        kbH,
-        skippedTooSmall: false,
-        newH,
-        origHeightAfter: sheet.dataset.kbOrigHeight || null,
-        isMaxHAfter: sheet.dataset.kbIsMaxH || null,
-        curMaxHeight: getComputedStyle(sheet).maxHeight,
-        curHeight: getComputedStyle(sheet).height,
-        curBottom: sheet.style.bottom,
-        activeElementId: document.activeElement?.id || null,
-      });
-    }
-
-    function _resetSheetAfterKb(sheet) {
-      // ─── DEBUG: dataset状態遷移の記録（原因特定後に削除すること。2026-07-11設計書8 計装F/G）───
-      const _hadKbIsMaxH = 'kbIsMaxH' in sheet.dataset;
-      _sendDebugLog('reset_sheet_kb', {
-        sheetId: sheet.id || null,
-        hadKbIsMaxH: _hadKbIsMaxH,
-        kbIsMaxHValue: sheet.dataset.kbIsMaxH || null,
-        kbOrigHeightValue: sheet.dataset.kbOrigHeight || null,
-        curMaxHeight: getComputedStyle(sheet).maxHeight,
-        curHeight: getComputedStyle(sheet).height,
-        activeElementId: document.activeElement?.id || null,
-        skipped: !_hadKbIsMaxH,
-      });
-
-      if (!_hadKbIsMaxH) return;
-      if (sheet.dataset.kbIsMaxH === '1') sheet.style.maxHeight = '';
-      else sheet.style.height = '';
-      sheet.style.bottom = '';
-      delete sheet.dataset.kbIsMaxH;
-      delete sheet.dataset.kbOrigHeight;
-    }
-
-    function _liftVisibleSheetForKeyboard(kbHeight) {
-      document.querySelectorAll('.plan-modal.visible, .plan-sheet.visible')
-        .forEach(sheet => _adjustSheetForKb(sheet, kbHeight));
-
-      // フォーカス要素を可視範囲に（シート縮小後に実行）
+    // ただし「設定画面直下の入力欄（#feedback-text / #nickname-input など、.plan-modal/.plan-sheetの外側）」は
+    // 内部スクロールコンテナを持たずキーボードに隠れやすいため、この軽量関数だけ温存する（回帰防止）。
+    // フォーカス要素が .plan-modal / .plan-sheet の外にあるときだけスクロールで逃がす。
+    function _scrollFocusedIntoViewOnKb(kbHeight) {
       setTimeout(() => {
         const focused = document.activeElement;
         if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
-        const sheet = focused.closest('.plan-modal, .plan-sheet');
-        if (sheet) {
-          // scrollIntoView({block:'nearest'})だと要素下端がスクロールコンテナ下端に密着し余白が生まれないため、
-          // 縮小後のシート内下端を基準に一定の余白(MARGIN)を確保して手動でスクロールする
-          const MARGIN = 16;
-          const fRect = focused.getBoundingClientRect();
-          const sRect = sheet.getBoundingClientRect();
-          const overflow = fRect.bottom - (sRect.bottom - MARGIN);
-          if (overflow > 0) {
-            let container = focused.parentElement;
-            while (container && container !== sheet && container !== document.body) {
-              const cs = getComputedStyle(container);
-              if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && container.scrollHeight > container.clientHeight) {
-                container.scrollBy({ top: overflow, behavior: 'smooth' });
-                break;
-              }
-              container = container.parentElement;
-            }
-          }
-          return;
-        }
-        // 画面直下の入力欄（設定画面の#feedback-text/#nickname-inputなど）:
-        // resize:'none'下ではビューポート高さが変化せずscrollHeight<=clientHeightと誤判定されるため、
-        // 「スクロール可能かどうか」ではなくフォーカス要素の実際の画面内位置で判定する
+        // シート内の入力欄は対象外（ネイティブ／内部スクロールに委ねる）
+        if (focused.closest('.plan-modal, .plan-sheet')) return;
+
+        const screenH = window.innerHeight;
         const rect = focused.getBoundingClientRect();
-        const visibleBottom = _screenH - kbHeight - 80; // キーボード上に見た目の余白80pxを確保
+        const visibleBottom = screenH - kbHeight - 80; // キーボード上に見た目の余白80pxを確保
         const overflow = rect.bottom - visibleBottom;
-        _sendDebugLog('settings_kb_fallback', {
-          focusedId: focused.id || null,
-          screenH: _screenH,
-          kbHeight,
-          rectBottom: rect.bottom,
-          visibleBottom,
-          overflow,
-        });
-        if (overflow > 0) {
-          let container = focused.parentElement;
-          let foundContainer = null;
-          while (container && container !== document.body) {
-            const cs = getComputedStyle(container);
-            if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
-              foundContainer = container.className || container.id || container.tagName;
-              // .screen-scroll-content の既存padding-bottom(80px)だけでは実際に必要な
-              // スクロール量に足りず、scrollTopがscrollHeight-clientHeightで頭打ちに
-              // なってしまうケースがある。キーボード表示中のみ一時的にpadding-bottomを
-              // kbHeight分拡張し、スクロールの伸びしろを確保してから加算する。
-              if (container.classList.contains('screen-scroll-content')) {
-                if (!container.dataset.kbOrigPaddingBottom) {
-                  container.dataset.kbOrigPaddingBottom = getComputedStyle(container).paddingBottom;
-                }
-                container.style.paddingBottom = (kbHeight + 80) + 'px';
+        if (overflow <= 0) return;
+
+        let container = focused.parentElement;
+        let foundContainer = null;
+        while (container && container !== document.body) {
+          const cs = getComputedStyle(container);
+          if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+            foundContainer = container;
+            // .screen-scroll-content の既存padding-bottom(80px)だけでは実際に必要な
+            // スクロール量に足りず、scrollTopがscrollHeight-clientHeightで頭打ちになるケースがあるため、
+            // キーボード表示中のみ一時的にpadding-bottomを拡張して伸びしろを確保してから加算する。
+            if (container.classList.contains('screen-scroll-content')) {
+              if (!container.dataset.kbOrigPaddingBottom) {
+                container.dataset.kbOrigPaddingBottom = getComputedStyle(container).paddingBottom;
               }
-              container.scrollTop += overflow;
-              break;
+              container.style.paddingBottom = (kbHeight + 80) + 'px';
             }
-            container = container.parentElement;
+            container.scrollTop += overflow;
+            break;
           }
-          _sendDebugLog('settings_kb_fallback_result', { foundContainer, appliedScroll: overflow });
-          if (!foundContainer) {
-            // スクロール可能な祖先が見つからない場合の保険
-            focused.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          }
+          container = container.parentElement;
+        }
+        if (!foundContainer) {
+          focused.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }
       }, 80);
     }
 
-    function _resetSheetKeyboardOffset() {
-      _screenH = window.innerHeight;
-      document.querySelectorAll('.plan-modal, .plan-sheet').forEach(sheet => {
-        _resetSheetAfterKb(sheet);
-      });
-      // .screen-scroll-content に一時付与したpadding-bottomを元に戻す（戻し忘れ防止）
+    // キーボードが閉じたら、上で一時付与した padding-bottom を元に戻す（戻し忘れ防止）
+    function _resetScrollPaddingAfterKb() {
       document.querySelectorAll('.screen-scroll-content').forEach(container => {
         if (container.dataset.kbOrigPaddingBottom) {
           container.style.paddingBottom = container.dataset.kbOrigPaddingBottom;
           delete container.dataset.kbOrigPaddingBottom;
         }
       });
-    }
-
-    function _onCapKeyboardShow(kbHeight) {
-      _liftVisibleSheetForKeyboard(kbHeight);
-    }
-
-    // ─── DEBUG: keyboardWillHide発火時の状態計装（原因特定後に削除すること。2026-07-11追加）───
-    function _onCapKeyboardHide() {
-      // ─── DEBUG: keyboardWillHideネイティブイベント自体の発火有無を確認（2026-07-11設計書8 計装F）───
-      _sendDebugLog('kb_hide_fired', { activeElementId: document.activeElement?.id || null });
-      _debugLogModalCloseState('keyboardWillHide_before');
-      _resetSheetKeyboardOffset();
-      _debugLogModalCloseState('keyboardWillHide_after');
-      _debugLogLayoutSnapshot('keyboardWillHide_after');
-
-      // FIX: ビューポート固着の強制復元試行（選択肢1、設計書11）
-      const expectedH = _normalInnerHeight; // _screenHではなく起動時基準値を使う（設計書11 注意点1参照）
-      setTimeout(() => _attemptViewportRecovery(expectedH), 400);
-    }
-
-    // FIX: ビューポート固着の強制復元試行（選択肢1、設計書11。効果不十分なら削除・選択肢2へ移行）
-    function _viewportRecoveryStep(i, expectedH, steps) {
-      if (window.innerHeight === expectedH) {
-        _sendDebugLog('viewport_recovery_result', { recovered: true, atStep: i, finalHeight: window.innerHeight, expectedH });
-        return;
-      }
-      if (i >= steps.length) {
-        _sendDebugLog('viewport_recovery_result', { recovered: false, atStep: i, finalHeight: window.innerHeight, expectedH });
-        return;
-      }
-      try { steps[i](); } catch (_) {}
-      setTimeout(() => _viewportRecoveryStep(i + 1, expectedH, steps), 150);
-    }
-
-    function _attemptViewportRecovery(expectedH) {
-      if (window.innerHeight === expectedH) return;
-      _sendDebugLog('viewport_recovery_start', { currentHeight: window.innerHeight, expectedH });
-      const steps = [
-        () => { window.scrollTo(0, 1); window.scrollTo(0, 0); },
-        () => {
-          document.body.style.height = '100.1%';
-          void document.body.offsetHeight;
-          requestAnimationFrame(() => { document.body.style.height = ''; });
-        },
-        () => { window.dispatchEvent(new Event('resize')); },
-        () => {
-          try {
-            let kb = null;
-            if (window.Capacitor?.registerPlugin) kb = window.Capacitor.registerPlugin('Keyboard');
-            if (!kb) kb = window.Capacitor?.Plugins?.Keyboard;
-            if (kb?.hide) kb.hide();
-          } catch (_) {}
-        },
-      ];
-      _viewportRecoveryStep(0, expectedH, steps);
     }
 
     if (_isCapacitorApp) {
@@ -484,28 +141,27 @@
       } catch (_) {}
       if (!_CapKB) _CapKB = window.Capacitor?.Plugins?.Keyboard;
       if (_CapKB?.addListener) {
-        _CapKB.addListener('keyboardWillShow', (info) => _onCapKeyboardShow(info.keyboardHeight));
-        _CapKB.addListener('keyboardWillHide', () => _onCapKeyboardHide());
+        _CapKB.addListener('keyboardWillShow', (info) => _scrollFocusedIntoViewOnKb(info.keyboardHeight));
+        _CapKB.addListener('keyboardWillHide', () => _resetScrollPaddingAfterKb());
       } else {
         // フォールバック: keyboardプラグイン未検出時は focusin/focusout で近似
         document.addEventListener('focusin', e => {
           const el = e.target;
           if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
           setTimeout(() => {
-            const kbHeight = _screenH - window.visualViewport.height;
-            if (kbHeight > 50) _liftVisibleSheetForKeyboard(kbHeight);
+            const kbHeight = window.innerHeight - window.visualViewport.height;
+            if (kbHeight > 50) _scrollFocusedIntoViewOnKb(kbHeight);
           }, 350);
         }, true);
         document.addEventListener('focusout', e => {
           if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            setTimeout(_resetSheetKeyboardOffset, 100);
+            setTimeout(_resetScrollPaddingAfterKb, 100);
           }
         }, true);
       }
     } else {
       // Web環境（iOS Safari / Android Chrome 含む）: position:fixed;bottom:0 要素は
-      // モバイルブラウザのネイティブ挙動でvisualViewportに自動追従するため、
-      // JSによるsheet.style.bottomの操作は行わない（二重適用で上がりすぎるため）
+      // モバイルブラウザのネイティブ挙動でvisualViewportに自動追従するため、JS制御は一切行わない
     }
 
     // ─── GENRE MASTER ───
@@ -1817,15 +1473,12 @@
         const btn = document.getElementById('nav-' + s);
         if (!btn) return;
         btn.addEventListener('touchstart', e => {
-          // ─── DEBUG: touchstart到達確認（原因特定後に削除すること。2026-07-11設計書8 計装A）───
-          _sendDebugLog('nav_touchstart', { target: s });
           _navTouchStartX = e.touches[0].clientX;
           _navTouchStartY = e.touches[0].clientY;
         }, { passive: true });
         btn.addEventListener('touchend', e => {
           const dx = Math.abs(e.changedTouches[0].clientX - _navTouchStartX);
           const dy = Math.abs(e.changedTouches[0].clientY - _navTouchStartY);
-          _sendDebugLog('nav_touchend', { target: s, dx, dy, fired: !(dx > 10 || dy > 10), eventDataLoaded: EVENT_DATA.length > 0 });
           if (dx > 10 || dy > 10) return;
           e.preventDefault();
           switchNav(s);
@@ -1851,7 +1504,6 @@
           if (!navBtn) return;
 
           const screen = navBtn.id.replace('nav-', '');
-          _sendDebugLog('bottom_nav_fallback_fired', { target: screen, x: touch.clientX, y: touch.clientY });
           e.preventDefault();
           switchNav(screen);
         }, { passive: false });
@@ -2807,18 +2459,10 @@
     let _loadedCity = getCity();
 
     function switchNav(screen) {
-      if (screen === 'settings') {
-        console.log('[DEBUG switchNav→settings]', new Error().stack);
-        _sendDebugLog('switchNav_settings', { stack: new Error().stack });
-      }
       // 画面遷移直前にフォーカスが残っていれば無条件で外す（モーダル閉じ忘れ等でinput/textareaに
       // フォーカスが残ったまま遷移すると、iOS WKWebViewでボトムナビのタップが効かなくなる不具合の対策。2026-07-11）
       if (document.activeElement && document.activeElement !== document.body && typeof document.activeElement.blur === 'function') {
         document.activeElement.blur();
-      }
-      // FIX: ビューポート固着の保険復元（選択肢1、設計書11）。画面遷移をまたいでも固着が解消しないケースへの対策
-      if (_isCapacitorApp && window.innerHeight !== _normalInnerHeight) {
-        _attemptViewportRecovery(_normalInnerHeight);
       }
       closeAllPopups();
       ['home','course','plan','settings'].forEach(s => {
@@ -2878,23 +2522,6 @@
           initSettingsGenres();
         }
       }
-
-      // ─── DEBUG: ヘッダータイトル位置の実機計測（原因判明後に削除すること）───
-      setTimeout(() => {
-        const titleMap = { home: '.app-header .screen-title', course: '#screen-course .screen-title', plan: '#screen-plan .screen-title', settings: '#screen-settings .screen-title' };
-        const sel = titleMap[screen];
-        const titleEl = sel && document.querySelector(sel);
-        if (titleEl) {
-          const rect = titleEl.getBoundingClientRect();
-          _sendDebugLog('title_position', {
-            screen,
-            titleTop: rect.top,
-            titleBottom: rect.bottom,
-            safeAreaInsetTop: _getSafeAreaInsetTop(),
-            innerHeight: window.innerHeight,
-          });
-        }
-      }, 50);
     }
 
     // ─── COURSE FEATURE ───
@@ -3330,7 +2957,7 @@
       document.getElementById('course-detail-overlay').style.display = 'none';
       document.getElementById('course-detail-overlay').style.opacity = '0';
       document.getElementById('course-detail-sheet').classList.remove('visible');
-      _resetSheetKeyboardOffset();
+      _resetScrollPaddingAfterKb();
     }
 
     // ─── コース生成シート ───
@@ -3449,7 +3076,7 @@
       _unlockCourseScroll();
       unlockScroll();
       window._coursePresetDate = null;
-      _resetSheetKeyboardOffset();
+      _resetScrollPaddingAfterKb();
     }
 
     function showCourseStep(step) {
@@ -3727,7 +3354,7 @@
       document.getElementById('title-edit-sheet').classList.remove('visible');
       document.getElementById('title-edit-sheet').style.bottom = '0px';
       document.getElementById('title-edit-input').blur();
-      _resetSheetKeyboardOffset();
+      _resetScrollPaddingAfterKb();
     }
 
     function saveCourseTitle() {
@@ -3833,7 +3460,7 @@
       document.getElementById('date-picker-modal').classList.remove('visible');
       unlockScroll();
       _datepickerCallback = null;
-      _resetSheetKeyboardOffset();
+      _resetScrollPaddingAfterKb();
     }
 
     function addCourseToScheduleWithDate(course) {
@@ -4070,16 +3697,12 @@
       e.preventDefault();
     }
     function lockScroll() {
-      // ─── DEBUG: _scrollLockDepth推移の記録（原因特定後に削除すること。2026-07-11設計書8 計装E）───
-      _sendDebugLog('scroll_lock', { depth: _scrollLockDepth, stack: new Error().stack });
       if (_scrollLockDepth === 0) {
         document.addEventListener('touchmove', _preventBgScroll, { passive: false });
       }
       _scrollLockDepth++;
     }
     function unlockScroll() {
-      // ─── DEBUG: _scrollLockDepth推移の記録（原因特定後に削除すること。2026-07-11設計書8 計装E）───
-      _sendDebugLog('scroll_unlock', { depthBefore: _scrollLockDepth, stack: new Error().stack });
       if (_scrollLockDepth <= 0) return;
       _scrollLockDepth--;
       if (_scrollLockDepth === 0) {
@@ -4555,7 +4178,6 @@
     }
 
     function closePlanModal() {
-      _debugLogModalCloseState('closePlanModal_before');
       _blurIfFocusInside('plan-event-modal', 'plan-custom-modal', 'plan-detail-modal');
       unlockScroll();
       closePinDropdown();
@@ -4563,39 +4185,11 @@
       document.getElementById('plan-event-modal').classList.remove('visible');
       document.getElementById('plan-custom-modal').classList.remove('visible');
       document.getElementById('plan-detail-modal').classList.remove('visible');
-      _resetSheetKeyboardOffset();
+      _resetScrollPaddingAfterKb();
       _planModalType = null;
       _planModalSelectedDate = null;
       _planModalSelectedStartTime = null;
       _editingGroupIds = [];
-      _debugLogModalCloseState('closePlanModal_after');
-      _debugLogLayoutSnapshot('closePlanModal_after');
-      _startClosePlanModalDebugTimer();
-    }
-
-    // ─── DEBUG: モーダルclose後の時系列タイマー計装（原因特定後に削除すること。2026-07-11設計書8 計装D）───
-    // 1秒おき・計10回（10秒間）、モーダルclose後の状態推移を記録する。closePlanModal()は
-    // closeAllPopups()経由などで多重に呼ばれうるため、直前のタイマーを全てクリアしてから
-    // 新規に張り直す（多重起動防止）。同じ10秒ウィンドウで計装Bのグローバルtouchstart監視も有効化する。
-    let _closePlanModalDebugTimerIds = [];
-    function _startClosePlanModalDebugTimer() {
-      _closePlanModalDebugTimerIds.forEach(id => clearTimeout(id));
-      _closePlanModalDebugTimerIds = [];
-      _globalTouchWatchActive = true;
-      for (let i = 1; i <= 10; i++) {
-        const timerId = setTimeout(() => {
-          const tag = 'closePlanModal_timer_' + i;
-          _debugLogModalCloseState(tag);
-          _debugLogLayoutSnapshot(tag);
-          _sendDebugLog('close_plan_modal_timer_extra', {
-            tag,
-            activeElementId: document.activeElement?.id || null,
-            scrollLockDepth: _scrollLockDepth,
-          });
-          if (i === 10) _globalTouchWatchActive = false;
-        }, i * 1000);
-        _closePlanModalDebugTimerIds.push(timerId);
-      }
     }
 
     // ─── PLAN TAB RENDER ───
