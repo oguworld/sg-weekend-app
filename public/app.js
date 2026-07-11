@@ -1742,6 +1742,31 @@
           switchNav(s);
         }, { passive: false });
       });
+
+      // ─── DEBUG/FIX: .bottom-nav 座標ベースのフォールバックハンドラ（原因特定後に削除を検討すること。2026-07-11設計書9 方針C）───
+      // iOS WKWebView固有の現象: キーボード表示→非表示の過渡期間中、window.innerHeight/visualViewportが
+      // 実際の値に戻るまでの間、ネイティブタッチイベントが .nav-item（個別ボタン）ではなく
+      // 親の <nav class="bottom-nav"> へ配送されることがある（document.elementFromPoint()は常に正確なまま）。
+      // このハンドラは .bottom-nav 自体がタッチイベントのターゲットになった場合のみ、タップ座標から
+      // document.elementFromPoint() で実際の対象ボタンを特定し switchNav() を呼ぶ「保険」。
+      // e.target が既に .nav-item（個別ボタン）自身/子孫の場合は何もしない（上記の個別ハンドラが処理するため、二重発火を防ぐ）。
+      const bottomNavEl = document.querySelector('.bottom-nav');
+      if (bottomNavEl) {
+        bottomNavEl.addEventListener('touchend', e => {
+          // 個別 .nav-item ハンドラが処理するケースはスキップ（二重発火防止）
+          if (e.target.closest && e.target.closest('.nav-item')) return;
+
+          const touch = e.changedTouches[0];
+          const hitEl = document.elementFromPoint(touch.clientX, touch.clientY);
+          const navBtn = hitEl && hitEl.closest ? hitEl.closest('.nav-item') : null;
+          if (!navBtn) return;
+
+          const screen = navBtn.id.replace('nav-', '');
+          _sendDebugLog('bottom_nav_fallback_fired', { target: screen, x: touch.clientX, y: touch.clientY });
+          e.preventDefault();
+          switchNav(screen);
+        }, { passive: false });
+      }
     }
 
     // ─── FAB 即時タップ対応（iOS Safari scroll-offset click mismatch 回避）───
