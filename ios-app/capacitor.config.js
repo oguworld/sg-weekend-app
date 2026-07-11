@@ -13,6 +13,7 @@ const config = {
     },
     SplashScreen: {
       launchShowDuration: 1000,
+      launchFadeOutDuration: 300,
       backgroundColor: '#FFF9F2',
       showSpinner: false,
       launchAutoHide: true,

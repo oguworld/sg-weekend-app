@@ -50,6 +50,23 @@
       } catch (_) {}
     }
 
+    // ─── モーダル/シートを閉じる際、内部にフォーカスが残っていたら外す共通ヘルパー ───
+    // フォーカスが残ったまま非表示化されたinput/textareaが、iOS WKWebView側のタッチイベント
+    // 配送を阻害する可能性があるための対策（2026-07-11、設計書7）。
+    // 渡された要素（複数可）のいずれかの内部に document.activeElement がある場合のみ blur する。
+    function _blurIfFocusInside(...containers) {
+      try {
+        const active = document.activeElement;
+        if (!active || active === document.body) return;
+        const isInside = containers.some(c => {
+          if (!c) return false;
+          const el = typeof c === 'string' ? document.getElementById(c) : c;
+          return el && el.contains(active);
+        });
+        if (isInside) active.blur();
+      } catch (_) {}
+    }
+
     // ─── DEBUG: safe-area-inset-top実測用の非表示計測要素（原因特定後に削除すること）───
     let _safeAreaProbeEl = null;
     function _getSafeAreaInsetTop() {
@@ -1374,6 +1391,7 @@
     }
 
     function closeEventFilterSheet() {
+      _blurIfFocusInside('event-filter-sheet');
       document.getElementById('event-filter-overlay').style.display = 'none';
       document.getElementById('event-filter-sheet').style.display = 'none';
       unlockScroll();
@@ -2561,6 +2579,11 @@
         console.log('[DEBUG switchNav→settings]', new Error().stack);
         _sendDebugLog('switchNav_settings', { stack: new Error().stack });
       }
+      // 画面遷移直前にフォーカスが残っていれば無条件で外す（モーダル閉じ忘れ等でinput/textareaに
+      // フォーカスが残ったまま遷移すると、iOS WKWebViewでボトムナビのタップが効かなくなる不具合の対策。2026-07-11）
+      if (document.activeElement && document.activeElement !== document.body && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
       closeAllPopups();
       ['home','course','plan','settings'].forEach(s => {
         document.getElementById('nav-' + s).classList.remove('active');
@@ -3065,6 +3088,7 @@
     }
 
     function closeCourseDetail() {
+      _blurIfFocusInside('course-detail-sheet');
       _unlockCourseScroll();
       unlockScroll();
       document.getElementById('course-detail-overlay').style.display = 'none';
@@ -3182,6 +3206,7 @@
     }
 
     function closeCourseSheet() {
+      _blurIfFocusInside('course-sheet');
       document.getElementById('course-sheet-overlay').style.display = 'none';
       document.getElementById('course-sheet-overlay').style.opacity = '0';
       document.getElementById('course-sheet').classList.remove('visible');
@@ -3460,6 +3485,7 @@
 
     function closeTitleEdit() {
       _editingCourseId = null;
+      _blurIfFocusInside('title-edit-sheet');
       unlockScroll();
       document.getElementById('title-edit-overlay').classList.remove('visible');
       document.getElementById('title-edit-sheet').classList.remove('visible');
@@ -3566,6 +3592,7 @@
     }
 
     function closeDatePickerSheet() {
+      _blurIfFocusInside('date-picker-modal');
       document.getElementById('date-picker-overlay').classList.remove('visible');
       document.getElementById('date-picker-modal').classList.remove('visible');
       unlockScroll();
@@ -4285,6 +4312,7 @@
 
     function closePlanModal() {
       _debugLogModalCloseState('closePlanModal_before');
+      _blurIfFocusInside('plan-event-modal', 'plan-custom-modal', 'plan-detail-modal');
       unlockScroll();
       closePinDropdown();
       document.getElementById('plan-modal-overlay').classList.remove('visible');

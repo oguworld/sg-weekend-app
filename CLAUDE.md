@@ -512,6 +512,16 @@ const image = post.media_type === 'VIDEO'
 - `pm2 restart sg-weekend` は Web版のみ。iOS版は TestFlight ビルドが必要
 - ビルド時間: GitHub Actions → TestFlight 反映まで約15〜20分
 
+### ✅ モーダルを閉じる際は必ずフォーカスを外す（blur）（2026-07-11）
+
+「予定を追加」モーダル（`#plan-custom-modal`）でタイトル・メモ欄に入力後✕ボタンで閉じると、直後からボトムナビだけがタップに反応しなくなり、約2分後に前触れなく復帰する重大バグが実機ログで確認された。実機ログにより`closePlanModal()`実行時点で`document.activeElement`がメモ欄の`<textarea>`のまま残っていたことが判明。モーダルを閉じる関数群（`closePlanModal`/`closeCourseSheet`/`closeCourseDetail`/`closeTitleEdit`/`closeDatePickerSheet`/`closeEventFilterSheet`等）は`.visible`クラスの除去だけではフォーカスは外れない。フォーカスが残ったまま非表示化された`<input>`/`<textarea>`が、iOS WKWebView側のタッチイベント配送（特に`position:fixed`要素であるボトムナビへのヒットテスト）を阻害している可能性が高い（対症療法であり完全な確証はない）。
+
+**対策（横展開推奨の標準パターン）**:
+- モーダル/シートを閉じる関数の先頭で、「閉じようとしている要素の内部に`document.activeElement`が含まれる場合のみ`blur()`する」ガード付きヘルパーを呼ぶ（`public/app.js`の`_blurIfFocusInside(...containers)`）。無関係な要素のフォーカスを誤って奪わないよう、必ずコンテナ内包チェックを行う
+- `switchNav()`の冒頭でも、画面遷移直前にフォーカスが残っていれば無条件で`blur()`する共通対策を追加し、個別モーダルでの対応漏れを構造的に防止する
+- 新しいモーダル・シートを追加する際、内部にinput/textareaを持つ場合は、close関数に同様のblur処理を入れることをチェックリスト化する
+- **この対策は対症療法であり、根本原因（iOS WKWebViewのタッチイベント配送メカニズム）の完全な解明・確証には至っていない。** TestFlight実機での複数回の開閉検証で有効性を確認すること（詳細は`.claude/next.md`参照）
+
 ### ✅ onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック（2026-07-10）
 
 ボトムナビ・FAB等は応答性向上のため`touchend`にJSハンドラ（`e.preventDefault()`で後続clickを抑制する設計）を登録しつつ、HTML側にも`onclick`属性を残す二重登録になっている箇所が多数ある（元々はネイティブclickイベントの座標がスクロール後にずれて信頼できなかったために`touchend`ハンドラが追加された経緯）。
