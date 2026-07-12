@@ -2711,7 +2711,7 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 ## 背景・経緯
 設計書23フェーズ1.5（未承認）を設計中、Klookカタログ（Sentosa関連商品多数）のエリア分類方法で議論になった。当初案は「Sentosaを内部ラベルとしてWest/Island-wide両方の候補プールに混入させる」という妥協案（フェーズ1.5「B. Sentosaエリアの扱い」節、採用案3）だったが、以下の理由により方針転換し、**Sentosaを本物の7つ目のエリア区分として追加する**ことがユーザーと合意済み（再検討不要）。
 
-- 実データ確認により、既存のSentosa関連イベント3件が、本来Sentosaという独立区分があるべきところを既存6区分に無理やり押し込めている状態だと確認できた
+- 実データ確認（後述d節、98件全件レビュー）により、既存のSentosa関連イベント5件が、本来Sentosaという独立区分があるべきところを既存6区分に無理やり押し込めている状態だと確認できた
 - Sentosaは地理的にも体験的にも独立した「行き先」（ケーブルカー・モノレールで渡る）であり、「西部に行く」ではなく「セントーサに行く」という認識が実態に近い
 - ユニバーサル・スタジオ、S.E.A.アクアリウム、ビーチ、ケーブルカー等、Sentosaだけで1コース分埋まるほど濃いエリアであり、独立区分として扱う価値がある
 
@@ -2736,15 +2736,20 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 - 437行目 `defaultArea = cityKey === 'bkk' ? 'Sukhumvit' : cityKey === 'syd' ? 'CBD' : 'Central'`：AIが`area`を返さなかった場合のフォールバック値（SGは`'Central'`固定）。Sentosa追加後もこのフォールバック挙動は変更不要（Sentosaはあくまで選択肢の1つであり、デフォルトにする理由がない）
 - **結論: `CITY_AREAS.sg`にSentosaを追加しない限り、今後新規に取り込まれるSentosa関連記事も引き続きCentral/West/Island-wide等に誤分類され続ける。** ユーザー要望を満たすには、この一覧値への追加が必須
 
-### d. 既存データの実態（`data/sg/events.json`、98件確認済み）
-- `area`フィールド値の分布: `West:6, North:2, Central:50, Island-wide:32, East:6, North-East:2`（Sentosaは0件、既存6区分に混入済み）
-- Sentosa関連イベント3件を実データで確認:
-  | store | area（現状） | url |
-  |---|---|---|
-  | Sentosa GrillFest 2026 | `Island-wide` | eatbook.sg/sentosa-grillfest-2026 |
-  | Resorts World Sentosa（ドリアンフェス） | `West` | eatbook.sg/rws-durian-festival |
-  | Sentosa Island（ディズニークルーズコラボ） | `Island-wide` | instagram.com/@sentosa_island |
+### d. 既存データの実態（`data/sg/events.json`、98件**全件レビュー実施**、2026-07-13）
+ユーザー指摘を受け、当初の「`Sentosa`という単語を含む3件」だけでなく、**98件全件を対象に、店名(`store`)・本文(`content`/`content_en`)・URL・エリア以外の全フィールドを横断してレビューした**。手順は (1) 全フィールドを文字列化して`sentosa`（大文字小文字無視）を含むレコードの機械的抽出、(2) 明示的に「Sentosa」と書かれていないがSentosa島内の著名施設名（Universal Studios Singapore／S.E.A. Aquarium・Singapore Oceanarium／Adventure Cove Waterpark／Skyline Luge／Wings of Time／Madame Tussauds／Palawan Beach／Siloso Beach／Tanjong Beach／Cable Car／iFly Singapore等）が店名・本文に含まれる98件全件の目視レビュー、の2段階。
+
+- `area`フィールド値の分布（修正前）: `West:6, North:2, Central:50, Island-wide:32, East:6, North-East:2`（Sentosaは0件、既存6区分に混入済み）
+- レビューの結果、**Sentosa関連イベントは3件ではなく5件**と判明:
+  | store | area（現状） | 判定根拠 | url |
+  |---|---|---|---|
+  | Sentosa GrillFest 2026 | `Island-wide` | 店名に"Sentosa"明記 | eatbook.sg/sentosa-grillfest-2026 |
+  | Resorts World Sentosa（ドリアンフェス） | `West` | 店名に"Sentosa"明記 | eatbook.sg/rws-durian-festival |
+  | Sentosa Island（ディズニークルーズコラボ） | `Island-wide` | 店名に"Sentosa"明記 | instagram.com/@sentosa_island |
+  | Adventure Cove Waterpark | `Island-wide` | **新規発見**。Sentosa島内の施設だが店名に"Sentosa"を含まないため機械的抽出のみでは漏れていた。地理的知識に基づく目視レビューで発見 | thenewageparents.com/adventure-cove-park-halloween |
+  | Singapore Oceanarium - Into the Glowcean | `Island-wide` | **新規発見**。Resorts World Sentosa内の施設（旧S.E.A. Aquariumの後継、2025年改称）。本文にも"Sentosa"の記載なし、店名からも判別不能で、地理的知識に基づく目視レビューでのみ発見できた | thenewageparents.com/singapore-oceanarium-halloween |
 - いずれも`location`フィールドも`area`と同一値（`location`は別フィールドだが今回のSGデータでは`area`と同期して埋まっている）
+- **教訓**: 単純な文字列検索（"Sentosa"を含むか）だけでは98件中2件（Adventure Cove Waterpark、Singapore Oceanarium）を見逃していた。今回のような地理的分類の遡及修正では、キーワード抽出に加えて既知のランドマーク名リストでの照合・目視レビューが必要になる
 
 ### e. 未使用の死んだコード（対象外・参考情報）
 - `public/app.js` 2369行目 `const AREAS = ['Central', 'East', 'West', 'North', 'North-East'];`（`Island-wide`すら含まれない不完全な定数）。コードベース全体を`grep`したが**この定数を参照する呼び出し箇所は他に一切存在しない**（宣言のみで未使用）。今回のSentosa追加の対象外とする。将来誰かがこの定数を使い始めた場合に混乱を招く可能性はあるが、今回のスコープでは触らない（別問題として記録のみ）
@@ -2757,7 +2762,7 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 ### b. イベント絞り込みシート（`.ef-chip`）にもSentosa追加 → **対象に含める（推奨）**
 理由:
 - コース作成画面だけSentosaが選べて、イベント絞り込みでは選べないという状態は、UI一貫性の観点から不自然かつユーザー体験として分かりにくい
-- 既存のSentosa関連イベント3件を今回`area:'Sentosa'`に修正する場合、イベント絞り込み側にSentosaチップが無いと**そのイベントをエリア軸で絞り込む手段が一切なくなる**（`filterAreas.has(e.area)`は完全一致判定のため、選択肢にない値のイベントは絞り込み対象からアクセス不能になる。ただし「エリア未選択＝すべて」がデフォルトなので一覧そのものから消えるわけではない）
+- 既存のSentosa関連イベント5件（後述d節、98件全件レビューで判明）を今回`area:'Sentosa'`に修正する場合、イベント絞り込み側にSentosaチップが無いと**そのイベントをエリア軸で絞り込む手段が一切なくなる**（`filterAreas.has(e.area)`は完全一致判定のため、選択肢にない値のイベントは絞り込み対象からアクセス不能になる。ただし「エリア未選択＝すべて」がデフォルトなので一覧そのものから消えるわけではない）
 - 実装コストは小さい（6行のHTML追加のみ、JSロジック変更不要）
 
 ### c. イベント取り込みパイプライン（`CITY_AREAS.sg`）にSentosa追加 → **対象に含める（推奨）**
@@ -2766,13 +2771,16 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 - a・bだけ対応してcを対応しない場合、「エリア区分としてSentosaはUI上存在するが、新規イベントは永遠にSentosaに分類されない」という中途半端な状態になり、b区分を追加した意味が薄れる
 - 実装コストが小さい（プロンプト内の列挙文字列1行の変更のみ）
 
-### d. 既存イベント3件の遡及的修正 → **対象に含める（人力・慎重に、少量修正として許容範囲と判断）**
+### d. 既存イベント全件レビュー＋該当5件の遡及的修正 → **対象に含める（人力・慎重に、少量修正として許容範囲と判断）**
+ユーザー指摘により、当初「Sentosaという単語を含む3件のみ」としていたスコープを「`data/sg/events.json`98件全件のレビュー」に拡大した（実施済み、上記d節参照）。結果、機械的なキーワード抽出だけでは見逃していた2件（Adventure Cove Waterpark、Singapore Oceanarium）を含む**合計5件**が対象と判明した。
+
 判断根拠:
-- CLAUDE.mdの禁止事項は「イベントデータを**大量**削除・破壊的に更新する」こと。今回は3件のみの`area`フィールド値の書き換え（`Island-wide`→`Sentosa`、`West`→`Sentosa`）であり、削除でも大量更新でもない
+- CLAUDE.mdの禁止事項は「イベントデータを**大量**削除・破壊的に更新する」こと。今回は5件のみの`area`フィールド値の書き換えであり、削除でも大量更新でもない
 - `area`フィールドの意味論的訂正であり、他のフィールド（`title`/`content`/`url`等）や件数には一切影響しない
 - 実施しない場合、区分を新設したにもかかわらず初期状態でSentosaに紐づくイベントが0件のままになり、機能追加の効果が体感できない（「Sentosaを選んでも何も出ない」という一見バグに見える状態が本番リリース直後に発生する）
-- **実施方法は`node`スクリプトによる一括置換ではなく、対象3件のみを個別に手動編集する**（大量差分コミットを避け、diffレビューを容易にするため）。バックアップ（`events.json`のコピー）を編集前に取得することを推奨
-- **注意**: この3件はWeb版・App Store版共有データのため、修正時点で両環境に即座に反映される
+- 全件レビューを見送り3件のみ修正した場合、Adventure Cove WaterparkとSingapore Oceanarium（いずれもSentosa島内の主要施設）が`Island-wide`のまま取り残され、「Sentosaを選んでもユニバーサル系の目玉施設が出てこない」という中途半端な状態になっていた
+- **実施方法は`node`スクリプトによる一括置換ではなく、対象5件のみを個別に手動編集する**（大量差分コミットを避け、diffレビューを容易にするため）。バックアップ（`events.json`のコピー）を編集前に取得することを推奨
+- **注意**: この5件はWeb版・App Store版共有データのため、修正時点で両環境に即座に反映される
 
 ## 設計書23フェーズ1.5への差分修正指示
 
@@ -2800,9 +2808,9 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
   - `CITY_AREAS.sg`の文字列に`/"Sentosa"`を追加（例: `'"Central"/"East"/"West"/"North"/"North-East"/"Island-wide"/"Sentosa"'`）
   - `defaultArea`（437行目）は変更不要（`'Central'`のまま）
 
-### データ変更（人力・少量）
+### データ変更（人力・少量、98件全件レビュー済み）
 - `data/sg/events.json`:
-  - 3件の`area`フィールド値を手動修正: "Sentosa GrillFest 2026"（`Island-wide`→`Sentosa`）、"Resorts World Sentosa"（`West`→`Sentosa`）、"Sentosa Island"（`Island-wide`→`Sentosa`）
+  - 5件の`area`フィールド値を手動修正: "Sentosa GrillFest 2026"（`Island-wide`→`Sentosa`）、"Resorts World Sentosa"（`West`→`Sentosa`）、"Sentosa Island"（`Island-wide`→`Sentosa`）、"Adventure Cove Waterpark"（`Island-wide`→`Sentosa`）、"Singapore Oceanarium - Into the Glowcean"（`Island-wide`→`Sentosa`）
   - 同時に`location`フィールドも`area`と同期させる
   - 編集前に`events.json`のバックアップを取得すること
 
@@ -2836,11 +2844,11 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
    - `scripts/filter-events.js`の変更は取り込みパイプライン（サーバー内部処理）のみに影響し、クライアント側のAPI契約には影響しない
 2. **影響範囲**:
    - `public/app.js`・`public/index.html`・`public/sw.js`の変更はCapacitorバンドル対象のため、Web版に`pm2 restart`で即時反映されても、**iOS App Store版（本番）には次回`release`ブランチpush・TestFlightビルドまで反映されない**
-   - `data/sg/events.json`の3件修正、`scripts/filter-events.js`の変更は**Web版・App Store版の両方に即座に影響する**。影響は「Sentosaというエリアで絞り込めるようになる／3件のイベントの分類が変わる」という軽微なもの
-   - **注意**: `public/app.js`側の変更が反映される前のApp Store版ユーザーは、Sentosaに分類された3件のイベントを絞り込みシートでは見つけられなくなる（エリア未選択時は引き続き一覧に表示されるため、完全に見えなくなるわけではない）
+   - `data/sg/events.json`の5件修正、`scripts/filter-events.js`の変更は**Web版・App Store版の両方に即座に影響する**。影響は「Sentosaというエリアで絞り込めるようになる／5件のイベントの分類が変わる」という軽微なもの
+   - **注意**: `public/app.js`側の変更が反映される前のApp Store版ユーザーは、Sentosaに分類された5件のイベントを絞り込みシートでは見つけられなくなる（エリア未選択時は引き続き一覧に表示されるため、完全に見えなくなるわけではない）
 3. **リリースタイミング**:
    - `scripts/filter-events.js`の変更は次回のcron実行から効果が出る。App Storeリリースと同期させる必要はない
-   - `data/sg/events.json`の3件修正は、`public/app.js`側の変更と**同時にデプロイすることを推奨**
+   - `data/sg/events.json`の5件修正は、`public/app.js`側の変更と**同時にデプロイすることを推奨**
    - `public/app.js`側の変更はWeb版なら`pm2 restart`で即時反映可能。App Store版への反映（TestFlightビルド）は、CLAUDE.md記載の通り**ユーザー明示指示時のみ**`release`ブランチへpushする運用のため、この設計書の実装完了後もユーザーの指示を待つこと
 
 ## 受け入れ基準
@@ -2849,8 +2857,8 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 1. コース作成画面のエリアチップに「🏖 Sentosa」が表示され、タップで選択状態になる
 2. `conditions.area = 'Sentosa'`でコース生成すると、`server.js`側でエラーなくプロンプトに`- エリア: Sentosa`が差し込まれる
 3. イベント絞り込みシートの「エリア」セクションに「🏖 Sentosa」チップが表示され、タップで選択・絞り込みが機能する
-4. `data/sg/events.json`内の対象3件の`area`（および`location`）が`Sentosa`に修正されている
-5. 絞り込みシートで「Sentosa」チップのみ選択すると、上記3件が一覧に表示される
+4. `data/sg/events.json`内の対象5件の`area`（および`location`）が`Sentosa`に修正されている
+5. 絞り込みシートで「Sentosa」チップのみ選択すると、上記5件が一覧に表示される
 6. 次回`scripts/filter-events.js`実行時、Sentosa関連の新規記事があればAIが`area: 'Sentosa'`と分類する
 
 ### 失敗系・エッジケース
@@ -2868,7 +2876,7 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 - 設計書23フェーズ1.5の実装そのもの（今回はフェーズ1.5の該当節を書き換えるのみ。フェーズ1.5全体はまだ未承認・未実装）
 - Sentosa以外の新規エリア区分の追加
 - BKK/SYDへのエリア区分追加・変更
-- 既存3件以外の、将来的に見つかるかもしれない「本来Sentosaに分類されるべきだが見逃されているイベント」の網羅的な洗い出し
+- 今回の98件全件レビュー（対象は現時点の`data/sg/events.json`）以降に新規追加されるイベントの遡及チェック（cへの対応でカバーされるため対象外）
 - エリア値のサーバー側バリデーション・ホワイトリストチェックの新規導入
 - `location`フィールドと`area`フィールドの統合・スキーマ整理
 
@@ -2877,8 +2885,9 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 1. **【未解決】旧バージョンApp Storeアプリの`area`値検証ロジックの実態が不明**: 過去にビルド・配信された旧バージョンのバンドルにエリア値のホワイトリスト検証等が存在するかは「不明」。実装時点でこれ以上の確証は得られないため、リリース後の旧バージョンユーザーからの不具合報告に注意を払う運用でカバーする
 2. **【要判断】絵文字選定**: `🏖`（ビーチ）を提案したが、Sentosaはビーチ以外の要素（テーマパーク、ケーブルカー等）も多く含む複合エリアのため、他の絵文字の方が適切という判断もあり得る
 3. **【要判断】チップの挿入位置**: 末尾（`Island-wide`の後）への追加を提案。地理的な並び順として自然かどうかはUI上の見た目次第、機能上の影響はない
-4. **【運用上の留意点】3件のデータ修正とUI変更の同時デプロイ推奨だが、Web版とApp Store版で反映タイミングがずれる**: 意図的な許容と位置づける
+4. **【運用上の留意点】5件のデータ修正とUI変更の同時デプロイ推奨だが、Web版とApp Store版で反映タイミングがずれる**: 意図的な許容と位置づける
 5. **【未確認】`scripts/generate-model-courses.js`・`data/sg/model-courses.json`への影響有無**: 実質未稼働のため実害はないと推測されるが、確証はない
+6. **【軽微リスク】目視レビューの精度**: 今回の98件全件レビューは筆者（Claude）の地理的知識に基づく目視判定であり、機械的な検証（現地API照合等）は行っていない。Adventure Cove WaterparkとSingapore Oceanarium以外にも、店名からは判別できないSentosa関連イベントが見逃されている可能性はゼロではない
 
 ## 承認状況
 未承認（今回新規作成、ユーザー承認待ち）
