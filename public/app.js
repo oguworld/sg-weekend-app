@@ -1248,7 +1248,7 @@
         if (type === 'new')    { filterNew      = true; document.getElementById('new-filter-btn')?.classList.add('active'); }
       }
       updateFilterBadge();
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
       renderEventCards();
     }
 
@@ -1288,7 +1288,7 @@
       _syncCatChips();
       _syncRecommendChip();
       updateFilterBadge();
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
       renderEventCards();
     }
 
@@ -1625,7 +1625,6 @@
         toggleCatFilter(order[next]);
         const chip = document.querySelector(`#filter-row-category .filter-chip[data-cat="${order[next]}"]`);
         chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        window.scrollTo({ top: 0, behavior: 'instant' });
       }
 
       const homeEl = document.getElementById('screen-home');
