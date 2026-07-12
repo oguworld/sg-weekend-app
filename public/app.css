@@ -349,7 +349,7 @@
     #filter-row-category::-webkit-scrollbar { display: none; }
     .filter-chip {
       flex-shrink: 0;
-      padding: 10px 16px 9px;
+      padding: 14px 16px 13px;
       border: none;
       border-bottom: 3px solid transparent;
       margin-bottom: -2px;
