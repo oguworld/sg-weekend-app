@@ -2266,7 +2266,7 @@ StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装す
    **新規スクリプト`scripts/match-affiliate-links.js`（案）の実装方針を確定**:
    - 既存の全コース（`model-courses.json`+`community-courses.json`）からユニークなスポット名を抽出
    - ユーザーが事前にダウンロードしたKlookカタログCSVを読み込む。**2026-07-12、`data/klook-catalog-sg.csv`に238件（全件）を配置済み**（`aff_label1=Odekake Navi`で再エクスポート済み、`data/`はgitignore対象のため非追跡）。実装時はこのファイルをそのまま入力として使ってよい。件数が更新されたら同じパスに上書き配置する運用とする
-   - スポット名（英語表記が多い）とCSVの`Product Name`（日本語）を突き合わせるため、単純な文字列部分一致だけでなく、ローマ字化・カタカナ変換等を考慮した緩めのファジーマッチングで候補をスコアリングして提示する（例: 「Gardens by the Bay」↔「ガーデンズバイザベイ」）
+   - **【2026-07-13マッチング方式を確定】** スポット名（英語表記が多い）とCSVの`Product Name`（日本語）を直接ファジーマッチングするのではなく、**`Affiliate Link`列内の`k_site`パラメータ（URLエンコードされたKlook活動ページURL）をデコードして英語スラッグを抽出し、それをマッチングキーに使う**方式に変更する。例: `k_site=https%3A%2F%2Fwww.klook.com%2Fja%2Factivity%2F127-gardens-by-the-bay-singapore`をデコードすると`.../activity/127-gardens-by-the-bay-singapore`となり、ここから`gardens-by-the-bay-singapore`という英語スラッグが取れる。これを英語スポット名（例:「Gardens by the Bay」）とハイフン区切り・小文字化した上で単語単位の一致度でスコアリングする方が、日本語⇄英語間のローマ字化・カタカナ変換を挟むファジーマッチングより単純かつ確実（実際に5件で検証済み: gardens-by-the-bay-singapore / singapore-night-safari-singapore / singapore-zoo-singapore / skyline-luge-singapore / faber-peak-cable-car-singapore、いずれもスポット名との対応が一目で分かる）。`Product Name`（日本語）は人力確認時の表示用（「これはガーデンズバイザベイのことです」と分かりやすく見せる）として引き続き使う
    - 候補一覧を`--dry-run`でコンソール出力し、人力で確認したもののみ`affiliate-links.json`へ書き込む（既存スクリプト群の慣習に合わせる）
    - `affiliate-links.json`には`Affiliate Link`列の値をそのまま保存する（自前でのURL組み立て・`?aid=`付与処理は不要）
    - 全自動マッチングはしない。スクリプトはあくまで「候補提示・人力確定の支援」に留める（表記ゆれによる誤紐付けリスクのため、方針は変更なし）
