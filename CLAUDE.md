@@ -101,6 +101,17 @@ sg-weekend-app/
 - マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
 - タイトル編集シート（`#title-edit-sheet`）: 2026-07-09に `.plan-modal` クラス方式（`.visible`トグル）に統一。旧インラインstyle（display:block/none）方式は廃止
 
+## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装）
+- コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード、`sponsored-cards.json`関連）は未実装（`.claude/plan.md`設計書23参照、将来の別タスク）
+- **データモデル**: `data/sg/affiliate-links.json`（スポット名をキーにしたマッピング。`{provider, url, title, updatedAt, confirmedBy}`）。コースJSON本体（`model-courses.json`/`community-courses.json`）は無変更、疎結合の別ファイル方式のためコース再生成後も同名スポットならリンクが維持される
+- **紐付けスクリプト**: `node scripts/match-affiliate-links.js [--dry-run]`。全コースのユニークスポット名と`data/klook-catalog-sg.csv`（Klookアフィリエイトダッシュボードからエクスポートした商品カタログ、238件）を突き合わせる半自動フロー。マッチングはCSVの`Affiliate Link`列内`k_site`パラメータをデコードして得た英語スラッグとスポット名を単語単位でスコアリングする方式（日本語`Product Name`は確認表示用のみ）。**インクリメンタル実行**: 既存`affiliate-links.json`に登録済みのスポットは対象外。対話形式（番号選択で確定/Enterでスキップ/qで中断）で人力確認したもののみ書き込む。全自動マッチングは行わない（誤紐付けリスクのため）
+- **サーバー**: `GET /api/courses`（community/popularタブ）のレスポンスに、該当スポットへ`affiliateLink`フィールドを追加（既存フィールドは無変更、追加のみで後方互換）。`loadAffiliateLinks(city)`/`embedAffiliateLinks()`（server.js）。新規`POST /api/affiliate-click`（`{spotName,provider,courseId,city}`、`withFileLock`で`data/affiliate-clicks.json`へ追記、認証なしfire-and-forget）
+- **UI**: ボタンではなく、`course-timeline-meta`（住所表示）に地味なテキストリンク「チケット情報」（`affiliateInfoLink`キー）として住所と同じ行に併記。目立つカラーボタン・アイコン・購入を煽る文言は不使用（「広告と結びつけたくない・さりげなく見せたい」というユーザー方針）。`renderCourseDetail()`と`renderCourseResultHtml()`（生成直後プレビュー）の両方に同じロジックを実装
+- `openAffiliateLink(url, provider, spotName)`: Capacitor環境は`Browser.open()`、Web環境は`window.open()`。開いた後`POST /api/affiliate-click`をfire-and-forget送信。既存の`_touchCapableDetected`ガードパターンを踏襲
+- コース生成AI（`generate-model-courses.js`・`POST /api/courses/generate`・`POST /api/courses/candidates`）には一切手を加えていない。広告要素とコース生成ロジックは意図的に分離（ユーザー明確な方針）
+- 運用: `data/sg/affiliate-links.json`は2026-07-13時点で2件のみ登録（Gardens by the Bay – Supertree Grove、National Orchid Garden）。残りのスポットは`match-affiliate-links.js`を継続実行して段階的に拡充する運用（多くのホーカーセンター等ローカルスポットはKlook対応商品が無く「候補なし」になるのが正常）
+- `data/affiliate-clicks.json`はサイズ上限・ローテーションなし（`_sendDebugLog`と同様の既知の注意点、定期確認が必要）
+
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
 - `server.js` の `/api/chat` エンドポイントは旧App Store版の後方互換のため残置（新規呼び出し元なし）

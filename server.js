@@ -1631,6 +1631,32 @@ app.post('/api/calendar/:groupId/notify', calNotifyLimit, async (req, res) => {
 // COURSE API
 // ─────────────────────────────────────────────
 
+// スポット名 → アフィリエイトリンク情報 のマッピングを読み込む（設計書23フェーズ1）
+// ファイルが存在しない・空でも例外を投げず {} を返す（受け入れ基準5）
+function loadAffiliateLinks(city) {
+  try {
+    const p = path.join(__dirname, 'data', city, 'affiliate-links.json');
+    if (!fs.existsSync(p)) return {};
+    return JSON.parse(fs.readFileSync(p, 'utf8')) || {};
+  } catch {
+    return {};
+  }
+}
+
+// コース配列の各スポットに、該当するアフィリエイトリンクを埋め込んだコピーを返す
+// （既存フィールドは一切変更せず、affiliateLink フィールドを追加するのみ）
+function embedAffiliateLinks(courses, affiliateLinks) {
+  if (!affiliateLinks || Object.keys(affiliateLinks).length === 0) return courses;
+  return courses.map(course => {
+    if (!Array.isArray(course.spots) || course.spots.length === 0) return course;
+    const spots = course.spots.map(s => {
+      const link = s && s.name ? affiliateLinks[s.name] : null;
+      return link ? { ...s, affiliateLink: link.url } : s;
+    });
+    return { ...course, spots };
+  });
+}
+
 // GET /api/courses
 app.get('/api/courses', (req, res) => {
   const city = req.query.city || 'sg';
@@ -1638,16 +1664,18 @@ app.get('/api/courses', (req, res) => {
 
   const communityPath = path.join(__dirname, 'data', city, 'community-courses.json');
   const community = fs.existsSync(communityPath) ? JSON.parse(fs.readFileSync(communityPath)) : [];
+  const affiliateLinks = loadAffiliateLinks(city);
 
   if (tab === 'preset') return res.json([]);
   if (tab === 'community') {
     // 登録日が新しい順
-    return res.json([...community].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+    const sorted = [...community].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return res.json(embedAffiliateLinks(sorted, affiliateLinks));
   }
   if (tab === 'popular') {
     // いいね数降順上位5件
     const sorted = [...community].sort((a, b) => b.likes - a.likes);
-    return res.json(sorted.slice(0, 5));
+    return res.json(embedAffiliateLinks(sorted.slice(0, 5), affiliateLinks));
   }
   res.json([]);
 });
@@ -2214,6 +2242,32 @@ app.post('/api/courses/:id/unpublish', async (req, res) => {
     });
   }
   res.json({ ok: true });
+});
+
+// POST /api/affiliate-click — アフィリエイトリンククリック計測（設計書23フェーズ1）
+// 認証なし・fire-and-forget想定。data/affiliate-clicks.json に1件ずつ追記する
+const AFFILIATE_CLICKS_PATH = path.join(__dirname, 'data', 'affiliate-clicks.json');
+app.post('/api/affiliate-click', async (req, res) => {
+  try {
+    const { spotName, provider, courseId, city } = req.body || {};
+    await withFileLock(AFFILIATE_CLICKS_PATH, () => {
+      let clicks = [];
+      if (fs.existsSync(AFFILIATE_CLICKS_PATH)) {
+        try { clicks = JSON.parse(fs.readFileSync(AFFILIATE_CLICKS_PATH, 'utf8')); } catch { clicks = []; }
+      }
+      clicks.push({
+        spotName: spotName || null,
+        provider: provider || null,
+        courseId: courseId || null,
+        city: city || 'sg',
+        ts: new Date().toISOString(),
+      });
+      fs.writeFileSync(AFFILIATE_CLICKS_PATH, JSON.stringify(clicks, null, 2));
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ─────────────────────────────────────────────

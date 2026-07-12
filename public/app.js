@@ -410,6 +410,7 @@
         courseDetailAttraction: '📝 このコースの魅力',
         courseDetailRoute: '🗺️ コース',
         courseDetailAuthor: '作者:',
+        affiliateInfoLink: 'チケット情報',
         courseAddToPlanBtn: '📅 予定表に追加',
         coursePublishAction: 'みんなに公開する',
         courseUnpublishAction: '🌐 公開中（非公開に）',
@@ -604,6 +605,7 @@
         courseDetailAttraction: '📝 Highlights',
         courseDetailRoute: '🗺️ Route',
         courseDetailAuthor: 'By:',
+        affiliateInfoLink: 'Ticket info',
         courseAddToPlanBtn: '📅 Add to Schedule',
         coursePublishAction: 'Share with everyone',
         courseUnpublishAction: 'Published ✓ &nbsp;(Make private)',
@@ -3095,7 +3097,7 @@
               <div class="course-timeline-body">
                 <div class="course-timeline-name">${s.emoji || ''} ${escapeHtml(s.name)} <span style="font-size:12px;color:var(--light-gray);">[${escapeHtml(s.duration)}]</span></div>
                 <div class="course-timeline-desc">${escapeHtml(s.description || '')}</div>
-                <div class="course-timeline-meta">${escapeHtml(s.address || '')}</div>
+                <div class="course-timeline-meta">${escapeHtml(s.address || '')}${s.affiliateLink ? ` · <a onclick="if(!_touchCapableDetected) openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a>` : ''}</div>
               </div>
             </div>
           `).join('')}
@@ -3145,6 +3147,25 @@
       const detailContent = document.getElementById('course-detail-content');
       detailContent.innerHTML = html;
       detailContent.scrollTop = 0;
+    }
+
+    // コーススポットのアフィリエイトリンク（Klook等）を開く（設計書23フェーズ1）
+    // Capacitor環境ではデバイスブラウザ（Browser.open）、Web環境では新規タブで開く。
+    // クリック計測は fire-and-forget で送信し、遷移はブロックしない。
+    function openAffiliateLink(url, provider, spotName) {
+      if (!url) return;
+      if (_isCapacitorApp && window.Capacitor?.Plugins?.Browser) {
+        window.Capacitor.Plugins.Browser.open({ url });
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+      try {
+        fetch(API_BASE + '/api/affiliate-click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ spotName, provider, city: getCity() }),
+        }).catch(() => {});
+      } catch (_) {}
     }
 
     function closeCourseDetail() {
@@ -3498,6 +3519,7 @@
             <div class="course-timeline-body">
               <div class="course-timeline-name">${s.emoji || ''} ${escapeHtml(s.name)} <span style="font-size:12px;color:var(--light-gray);">[${escapeHtml(s.duration || '')}]</span></div>
               <div class="course-timeline-desc">${escapeHtml(s.description || '')}</div>
+              ${s.affiliateLink ? `<div class="course-timeline-meta"><a onclick="if(!_touchCapableDetected) openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a></div>` : ''}
             </div>
           </div>
         `).join('')}
