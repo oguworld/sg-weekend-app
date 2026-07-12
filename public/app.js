@@ -1600,7 +1600,7 @@
     // _swipeStartX/_swipeStartY/_swipeIntent はPTR（設計書19）からも参照するため、
     // このブロック内に閉じずモジュールスコープの let にしている（2026-07-12）。
     // 既存の横スワイプ機構自体のロジックは変更していない。
-    let _swipeStartX = 0, _swipeStartY = 0, _swipeIntent = null;
+    let _swipeStartX = 0, _swipeStartY = 0, _swipeIntent = null, _swipeOnHeaderScroll = false;
     {
       // 現在DOM上に表示中（display:noneでない）のチップの data-cat を、表示順で取得する。
       // 固定配列を使わないことで、チップの表示/非表示状態の変化に自動追従する。
@@ -1629,20 +1629,24 @@
 
       const homeEl = document.getElementById('screen-home');
       homeEl?.addEventListener('touchstart', e => {
+        // ヘッダーのカテゴリチップ行(#filter-row-category)は独自の横スクロール・タップ判定を持つため、
+        // ここで始まったタッチはカード領域スワイプ判定の対象から除外する（チップ行を横スクロールした
+        // だけでカテゴリが切り替わってしまう誤爆を防ぐ。コース画面の#course-everyone-carouselと同じパターン）
+        _swipeOnHeaderScroll = !!e.target.closest('#filter-row-category');
         _swipeStartX = e.touches[0].clientX;
         _swipeStartY = e.touches[0].clientY;
         _swipeIntent = null;
       }, { passive: true });
 
       homeEl?.addEventListener('touchmove', e => {
-        if (_swipeIntent) return;
+        if (_swipeOnHeaderScroll || _swipeIntent) return;
         const dx = Math.abs(e.touches[0].clientX - _swipeStartX);
         const dy = Math.abs(e.touches[0].clientY - _swipeStartY);
         if (dx > 6 || dy > 6) _swipeIntent = dx > dy ? 'h' : 'v';
       }, { passive: true });
 
       homeEl?.addEventListener('touchend', e => {
-        if (_swipeIntent !== 'h') return;
+        if (_swipeOnHeaderScroll || _swipeIntent !== 'h') return;
         const dx = e.changedTouches[0].clientX - _swipeStartX;
         if (Math.abs(dx) < 50) return;
         _switchCatBySwipe(dx < 0 ? 1 : -1);
