@@ -126,6 +126,96 @@
       });
     }
 
+    // ─── PULL TO REFRESH（設計書19、2026-07-12再実装）───
+    // iOS版のみ有効化。スクロールコンテナ内部の先頭に置いたインジケーター要素の
+    // height/opacityのみをJSで操作する。ヘッダー・スクリーンコンテナ・html/bodyの
+    // position/overflow/heightは一切変更しない。
+    const PTR_THRESHOLD = 60;   // これ以上引っ張って離したらリフレッシュ確定
+    const PTR_MAX_PULL   = 90;  // インジケーターの最大高さ（クランプ）
+
+    // container: スクロールコンテナ要素（#home-scroll-content / #course-screen-content）
+    // indicatorId: インジケーター要素のid
+    // onRefresh: async関数。データ再取得処理
+    // watchSwipeIntent: true の場合のみ、既存の横スワイプ機構（ホーム画面限定の _swipeIntent 変数）を
+    //   参照して衝突を回避する。コース画面には横スワイプ機構自体が存在しないため false にする
+    //   （設計書19 4.1節: コース画面側は _swipeIntent のような共有判定を作らず単独判定にする方針）。
+    function _initPtr(container, indicatorId, onRefresh, watchSwipeIntent) {
+      if (!_isCapacitorApp) return; // Web版は対象外（設計書19、デフォルト方針）
+      if (!container || container._ptrInit) return;
+      container._ptrInit = true;
+
+      const indicator = document.getElementById(indicatorId);
+      if (!indicator) return;
+
+      let startY = 0;
+      let pulling = false;
+      let refreshing = false;
+
+      container.addEventListener('touchstart', e => {
+        if (refreshing) return;
+        // 横スワイプ機構（ホーム画面）と衝突する場合は、そちら側の _swipeIntent 判定に委ねる。
+        // ここでは単純にドラッグ開始位置だけ記録する。
+        startY = e.touches[0].clientY;
+        pulling = false;
+      }, { passive: true });
+
+      container.addEventListener('touchmove', e => {
+        if (refreshing) return;
+        // ホーム画面のみ: 横スワイプと判定された場合はPTR側は即座に何もしない
+        // （既にインジケーターを引っ張り始めていた場合は取り消してリセットする）
+        if (watchSwipeIntent && typeof _swipeIntent !== 'undefined' && _swipeIntent === 'h') {
+          if (pulling) {
+            pulling = false;
+            indicator.style.height = '0px';
+            indicator.style.opacity = '0';
+          }
+          return;
+        }
+
+        const dy = e.touches[0].clientY - startY;
+        if (dy <= 0) { // 上方向 or 動きなし → 通常のスクロールに委ねる
+          if (pulling) {
+            pulling = false;
+            indicator.style.height = '0px';
+            indicator.style.opacity = '0';
+          }
+          return;
+        }
+        if (container.scrollTop > 0) return; // 最上部でない → PTR対象外
+
+        pulling = true;
+        e.preventDefault(); // 引っ張り中はスクロールコンテナのバウンスを起こさない
+        const pull = Math.min(dy, PTR_MAX_PULL);
+        indicator.style.height = pull + 'px';
+        indicator.style.opacity = String(Math.min(pull / PTR_THRESHOLD, 1));
+      }, { passive: false });
+
+      container.addEventListener('touchend', async () => {
+        if (refreshing || !pulling) { pulling = false; return; }
+        pulling = false;
+        const curHeight = parseFloat(indicator.style.height) || 0;
+        if (curHeight >= PTR_THRESHOLD) {
+          refreshing = true;
+          indicator.classList.add('ptr-refreshing');
+          indicator.style.height = PTR_THRESHOLD + 'px';
+          indicator.style.opacity = '1';
+          try {
+            await onRefresh();
+          } catch (_) {
+            // 失敗してもインジケーターは必ず消す（無限ローディング防止）
+          } finally {
+            indicator.classList.remove('ptr-refreshing');
+            indicator.style.height = '0px';
+            indicator.style.opacity = '0';
+            refreshing = false;
+          }
+        } else {
+          indicator.style.height = '0px';
+          indicator.style.opacity = '0';
+        }
+      }, { passive: true });
+    }
+
     if (_isCapacitorApp) {
       // Capacitor環境: @capacitor/keyboard のネイティブイベントで正確なキーボード高さを取得
       // Capacitor 6: Plugins.Keyboard ではなく registerPlugin() 経由でないと addListener が動かない場合があるため優先し、失敗時は従来方式にフォールバック
@@ -1411,9 +1501,11 @@
     }
 
     // ─── カード領域スワイプでタブ切り替え ───
+    // _swipeStartX/_swipeStartY/_swipeIntent はPTR（設計書19）からも参照するため、
+    // このブロック内に閉じずモジュールスコープの let にしている（2026-07-12）。
+    // 既存の横スワイプ機構自体のロジックは変更していない。
+    let _swipeStartX = 0, _swipeStartY = 0, _swipeIntent = null;
     {
-      let _swipeStartX = 0, _swipeStartY = 0, _swipeIntent = null;
-
       // 現在DOM上に表示中（display:noneでない）のチップの data-cat を、表示順で取得する。
       // 固定配列を使わないことで、チップの表示/非表示状態の変化に自動追従する。
       function _visibleCatOrder() {
@@ -1610,6 +1702,11 @@
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
+
+    // Pull to Refresh（設計書19、イベント画面。iOS版のみ有効化。既存の横スワイプ機構と共存させるためwatchSwipeIntent=true）
+    _initPtr(document.getElementById('home-scroll-content'), 'ptr-indicator-home', async () => {
+      await loadEventData();
+    }, true);
 
     // バージョン表示
     (async () => {
@@ -2548,6 +2645,12 @@
           _courseSwipeOnHScroll = !!e.target.closest('#course-everyone-carousel');
         }, { passive: true });
       }
+
+      // Pull to Refresh（設計書19、初回のみ登録。iOS版のみ有効化。
+      // コース画面には横スワイプ機構が存在しないため watchSwipeIntent=false で単独判定）
+      _initPtr(sc, 'ptr-indicator-course', async () => {
+        await switchCourseTab(currentCourseTab);
+      }, false);
     }
 
     // タブ切り替え

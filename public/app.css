@@ -2850,6 +2850,34 @@
       padding: 0 0 160px;
     }
 
+    /* ─── PULL TO REFRESH（設計書19、2026-07-12） ───
+       スクロールコンテナ内部の先頭に置く子要素。height/opacityのみJSで操作する。
+       ヘッダー・スクリーンコンテナ・html/bodyのposition/overflow/heightには一切触れない。 */
+    .ptr-indicator {
+      height: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .ptr-indicator .ptr-spinner {
+      width: 22px;
+      height: 22px;
+      border: 2.5px solid var(--sand-dark);
+      border-top-color: var(--caramel);
+      border-radius: 50%;
+      animation: ptr-spin 0.7s linear infinite;
+    }
+    .ptr-indicator.ptr-refreshing .ptr-spinner {
+      animation: ptr-spin 0.7s linear infinite;
+    }
+    @keyframes ptr-spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* ─── GENRE CHIPS ─── */
     .genre-chips {
       display: flex;

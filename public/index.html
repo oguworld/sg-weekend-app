@@ -37,7 +37,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260711a">
+  <link rel="stylesheet" href="/app.css?v=20260712a">
 </head>
 <body>
   </div>
@@ -74,6 +74,8 @@
       </div>
     </header>
     <div class="screen-scroll-content" id="home-scroll-content">
+    <!-- Pull to Refresh インジケーター（設計書19） -->
+    <div class="ptr-indicator" id="ptr-indicator-home"><div class="ptr-spinner"></div></div>
     <!-- おすすめ設定促進バナー（中央表示） -->
     <!-- Cards -->
     <div class="cards-grid" id="cards-grid">
@@ -141,6 +143,9 @@
       </div>
     </div>
     <div class="screen-content" id="course-screen-content">
+
+      <!-- Pull to Refresh インジケーター（設計書19） -->
+      <div class="ptr-indicator" id="ptr-indicator-course"><div class="ptr-spinner"></div></div>
 
       <!-- コース一覧 -->
       <div id="course-list" style="padding:0 16px;display:flex;flex-direction:column;padding-bottom:120px;"></div>
@@ -927,7 +932,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260711l"></script>
+  <script src="/app.js?v=20260712a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

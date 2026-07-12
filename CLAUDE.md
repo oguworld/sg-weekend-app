@@ -325,8 +325,11 @@ RSS/Instagram取得から`events.json`保存までのバッチ処理は、実行
 
 シート/オーバーレイのペアは「シート本体 ≥ 自身のoverlay」の相対関係を維持。`date-picker`のように親シート（`.plan-modal`/`.plan-sheet`=3100）の内側から開かれるネスト構造を持つ要素は、親より高い値にすること。新規モーダル追加時も原則この3000番台の方針（bottom-nav未満）に合わせる。
 
-**PTR（プルトゥリフレッシュ）を実装しない**
-→ WKWebView でヘッダーずれ・白いステータスバーの原因になる。一度問題になったので永久廃止。
+**PTR（プルトゥリフレッシュ）は2026-07-12に再実装済み（旧「永久廃止」ルールは撤回）**
+→ 旧ルールの経緯: 過去（commit `4f99b9e`）にPTRを実装しWKWebViewでヘッダーずれ・白いステータスバーの問題が発生し、`9fe6bc9`で完全撤去して「永久廃止」としていた。しかしその後`git show`で実差分を確認したところ、**真因はPTRの実装方法自体ではなく「WKWebViewのネイティブオーバースクロール（ゴムバンド）防止の仕組みが当時存在しなかったこと」と「StatusBarのJS実行時設定が不安定だったこと」の2点**だったと判明（設計書19）。この2つは`9fe6bc9`で既に別対応済みで、以降のコードベースに恒久的に組み込まれている（下記「✅ iOS overscroll防止」のグローバル`touchmove`リスナー、`.github/workflows/ios-deploy.yml`のInfo.plist StatusBar設定ステップ）。この2つを一切変更せずに再実装すれば再発しないと判断し、ユーザー承認のもとイベント画面（`#home-scroll-content`）・コース画面（`#course-screen-content`）にPTRを再実装した。
+→ 実装: `public/app.js`の`_initPtr(container, indicatorId, onRefresh, watchSwipeIntent)`共通ヘルパー。スクロールコンテナ内部先頭に置いた`.ptr-indicator`要素の`height`/`opacity`のみをJSで操作し、ヘッダー・スクリーンコンテナ・`html`/`body`のposition/overflow/heightには一切触れない設計。iOS版のみ有効化（`_isCapacitorApp`、Web版は対象外）。リフレッシュ確定閾値60px
+→ イベント画面は既存の横スワイプ機構（カテゴリタブ切替、`_swipeIntent`変数）と衝突するため、`watchSwipeIntent=true`で`_swipeIntent`を共有（`'h'`確定時はPTR側が即座に何もしない、相乗り方式）。コース画面には横スワイプ機構が存在しないため`watchSwipeIntent=false`で単独判定
+→ **今後同種の機能を追加・変更する際も、この2箇所（overscroll防止JS・StatusBar設定）を変更しないことが安全な実装の前提条件**。変更する場合はPTR・ヘッダー位置・ステータスバー色の3点を必ず実機で回帰確認すること
 
 ### ⚠️ `position:fixed`要素は、キーボード表示・非表示の過渡期間中にタッチイベントの配送先が親要素にずれることがある（2026-07-11）
 
