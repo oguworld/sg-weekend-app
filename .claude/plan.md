@@ -2272,18 +2272,17 @@ StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装す
    - 全自動マッチングはしない。スクリプトはあくまで「候補提示・人力確定の支援」に留める（表記ゆれによる誤紐付けリスクのため、方針は変更なし）
    - **`aff_label1`の運用方針（要検討）**: CSVエクスポート時にユーザーが自由に設定できるラベル。今回のテストでは`test`が入っていた。本番運用時は空欄のままか、アプリ識別用の固定値（例: `odekakenavi`）を設定するかは実装時に判断する（Klook側の集計上の区別に使えるのみで、機能的な必須要件ではない）
 3. **表示ロジック**: `renderCourseDetail(course)`（および3493行目付近の重複箇所、実装時に要特定）で、各スポット描画時に`affiliate-links.json`の該当エントリを探し、あれば「チケットを予約」ボタンを追加する。ボタンはコース詳細取得時にサーバー側でJOINして返す方式（`GET /api/courses`側でスポットに`affiliateLink`を埋め込んで返す）を推奨（クライアント側で別途fetchする方式より往復が少なく、キャッシュ・オフライン耐性の観点でも有利）
-4. **UI**: 各`course-timeline-item`内、`course-timeline-meta`（住所）の下に、該当スポットにリンクがある場合のみボタンを追加。
+4. **UI（2026-07-12ユーザー決定により変更）**: ボタン形式ではなく、**`course-timeline-meta`（住所表示）に地味なテキストリンクとして併記する**方式に変更。理由: ユーザーより「コース生成とアフィリエイトを結びつけたくない（＝コース内容自体は広告の影響を受けない）」「チケットリンクは広告だと思わせないさりげない見せ方にしたい」という明確な方針が示された。目立つCTAボタン（カラー背景・太字・アイコン）は「広告っぽさ」が強いため不採用とし、既存の`.card-detail-link`（イベントカードの「🔗 元記事を見る」）と同系統の、地味な文字リンクパターンを踏襲する。
    ```html
-   <button onclick="if(!_touchCapableDetected) openAffiliateLink('...', 'klook', '<spotName>')"
-     style="margin-top:8px;padding:8px 14px;background:var(--caramel);color:#fff;font-size:13px;
-            font-weight:700;border:none;border-radius:var(--radius-btn);cursor:pointer;
-            display:inline-flex;align-items:center;gap:4px;">
-     🎫 <span data-i18n="affiliateBookBtn">チケットを予約</span>
-   </button>
+   <div class="course-timeline-meta">
+     ${escapeHtml(s.address || '')}${affiliateLink ? ` · <a onclick="if(!_touchCapableDetected) openAffiliateLink('${affiliateLink}','klook','${safeSpotName}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">チケット情報</a>` : ''}
+   </div>
    ```
-   - 既存の「onclick属性＋touchendガード」方式（CLAUDE.md記載の`_touchCapableDetected`パターン）に倣うか、新規ボタンとして通常のonclickのみにするかは実装フェーズで判断（既存の17+6箇所の対象リストに追加するか検討）
+   - 文言も「チケットを予約」（購入を煽るCTA文言）から「**チケット情報**」（情報提示のみ、購入を煽らない）に変更する
+   - ボタンではなく住所と同じ行に埋め込むインラインリンクのため、独立した余白・背景色は持たせない
+   - 既存の「onclick属性＋touchendガード」方式（CLAUDE.md記載の`_touchCapableDetected`パターン）を踏襲する
    - Capacitor環境では外部リンクは`Capacitor.Plugins.Browser.open()`経由でデバイスブラウザに渡す既存の仕組み（`a[target="_blank"]`向け）があるため、`window.open()`直呼びではなく同様の分岐が必要（`openAffiliateLink()`内で`_isCapacitorApp`判定）
-   - 「PR」相当の明示は必須ではないが、App Storeガイドライン・広告表示の透明性の観点から、リンク先が外部サイトであることが分かる表示（🎫アイコン＋文言、または小さな「外部サイト」注記）が望ましい
+   - 「PR」バッジ等の明示的な広告表示は行わない（さりげなさを優先する今回の方針のため）。ただしリンク先が外部サイト（Klook）であることは文言・遷移後の画面で自然に分かるため、App Storeガイドライン上の透明性は損なわれないと考えられる
 5. **クリック計測**: 新規エンドポイント`POST /api/affiliate-click`を新設。
    ```json
    { "spotName": "Tekka Centre", "provider": "klook", "courseId": "course_sg_...", "city": "sg" }
@@ -2414,6 +2413,7 @@ StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装す
 - PRカード・アフィリエイトクリックの集計・可視化ダッシュボード（記録のみ行い、集計は将来のCLIスクリプト等で対応）
 - PRカードの管理画面（Web UI）。直接JSON編集運用とする
 - 「スポンサー提供コース」機能（AIのおすすめとしての信頼感を損なうリスクがあるため、以前の相談時点から優先度低のまま今回もスコープ外）
+- **【2026-07-12検討・不採用】Klookカタログをコース生成AIへの参考ネタとして渡し、生成段階からKlook対応スポットを優先的に含める案**: 紐付けヒット率は上がるが、「スポンサー提供コース」と同種の信頼性リスク（AIのおすすめが実質広告主導になる）があるため、ユーザー判断により不採用。**コース生成ロジック（`generate-model-courses.js`・`POST /api/courses/generate`等）は広告要素と一切結びつけない方針を維持する**。今回のフェーズ1は「生成済みコースに事後的にリンクを添える」表示層の変更のみに徹する
 - BKK/SYD都市への対応（現在両都市は一時停止中のため、SGのみを対象とする）
 - クリックログのローテーション・容量管理の自動化（`_sendDebugLog`と同様の注意点として、将来運用しながら手動確認する前提）
 - アフィリエイトリンクのURL有効性チェック（リンク切れ検知の自動化）
