@@ -1609,3 +1609,258 @@ PTR用の新規`touchmove`リスナーは、既存グローバルリスナーと
 
 ## 承認状況
 承認済み（2026-07-12）。R1（実差分未確認）は解決済み。orchestrator実装に進む。
+
+---
+
+# 設計書20 — Google/Apple IDログイン + サブスクリプション基盤（再設計・実現性再検証）
+（2026-07-12 planner再調査。2026-07-11設計書の実装未着手分を、現状コードベースの追加事実を踏まえて全面的に見直す。実装は行わない。設計のみ）
+
+## 0. 背景・経緯
+2026-07-11に本機能の詳細設計を実施したが、`.claude/`ディレクトリがgitignore対象のため、その後別タスクでの`.claude/plan.md`上書きにより設計書本文が失われた（と思われていた）。要約（`.claude/next.md`）のみが残存していたが、調査の結果 `.claude/plan.md.bak-login-design-2026-07-11` に元の設計書全文が退避されていたことが判明し、これを一次資料として発見・回収した。本設計書はその内容を土台に、2026-07-12時点の実コード（`server.js`／`ios-app/capacitor.config.js`／`ios-app/package.json`／`.github/workflows/ios-deploy.yml`）を再確認し、事実誤認がないか検証した上で更新したものである。
+
+## 1. 現状確認（2026-07-12実コード検証で裏付けた事実）
+
+### 1-1. フェーズ0ブロッカー（Apple法人審査待ち）の実態
+- `.github/workflows/ios-deploy.yml`には、APNs対応（2026-07-10実装）用に追加された「Create App.entitlements」「Wire App.entitlements into Xcode project build settings」の2ステップが**現在もコメントアウトされたまま**残っている。コメント内に「Apple Developerアカウントを個人→法人へ切替登録中で、法人審査（D-U-N-S番号確認等）完了までApp ID(app.dosuru)のPush Notifications capabilityを有効化できない」と明記されており、2026-07-12時点でも未解消と確認できた。
+- `ios-app/capacitor.config.js`にはSign in with Apple関連の設定は一切存在しない（未着手のため当然）。
+- **結論**: Push Notifications capabilityが同一Apple Developer Portal・同一App ID（`app.dosuru`）の審査待ちでブロックされている実例が既にCI設定に存在する。Sign in with Apple capability・In-App Purchase capabilityも同じPortal・同じApp IDの操作であるため、同様にブロックされる可能性が高いという前提は、推測ではなく**類似の既知事例による裏付けのある推測**として扱ってよい（完全な確証ではないが、単なる楽観的推測ではない）。
+
+### 1-2. なりすまし脆弱性（実コード確認、過去設計書より深刻と判明）
+`server.js` 2154〜2217行目のコース関連エンドポイントを実際に確認した結果:
+- `POST /api/courses/publish`（2155行目）: `req.body`の`authorId`をそのまま保存。検証なし。
+- `DELETE /api/courses/:id`（2173行目）: リクエストボディの検証は**一切ない**。`id`（URLパス）と`city`（クエリ）のみでコースを削除できる。認証ヘッダー・authorId比較のいずれも存在しない。
+- `POST /api/courses/:id/unpublish`（2206行目）: 同上、認証・所有権チェックなし。
+- クライアント側（`public/app.js` 2961行目）の「自分の投稿か」判定（`course.authorId === getUserId()`）は表示制御（削除ボタンの表示/非表示）のみに使われ、サーバー側では一切検証されない。`getUserId()`（3706行目）は`localStorage.user_id`が無ければ乱数生成する完全な自己申告値。
+- **評価**: 過去設計書は「誰でも他人のコースを削除できる」としていたが、実際には「削除ボタンを直接叩かなくても、`DELETE /api/courses/:id?city=sg`にidとcityさえ分かればcurlで誰でも削除できる」という、UIの制約すら回避可能なレベルの脆弱性であることを確認した。ただし「改ざん」（内容の書き換え）ができるAPIは存在しないため、被害は「削除・非公開化」に限定される。
+
+### 1-3. Stripeコード（`server.js` 116〜260行目、コメントアウト中）の再利用性
+- Webhook受信（`checkout.session.completed`/`customer.subscription.updated`/`customer.subscription.deleted`）、Checkout Session作成（`POST /api/create-checkout-session`）のAPI呼び出しパターン自体は妥当で流用可能。
+- ただし状態保存先が`premiumSessions`という**インメモリMap**（プロセス再起動で消滅、PM2再起動のたびに全ユーザーの課金状態が失われる）であり、そのままでは本番運用に使えない。`data/users.json`の永続データへの置き換えが実装時に必須（過去設計書の評価が正確であることを確認）。
+- ユーザーアカウントの概念がなく、`x-session-id`ヘッダーのみで状態を引く設計だったため、ログイン基盤と接続するには識別子の持ち方から作り直す必要がある。
+
+### 1-4. iOS/CI側の現状（Sign in with Apple・Google Sign-In関連）
+- `ios-app/package.json`（v1.3、依存関係6種）にApple/Google Sign-In系プラグインは存在しない。`jsonwebtoken`パッケージも`package.json`（ルート）に存在しない。
+- CI署名方式は`ios-app/fastlane/Fastfile`を確認した結果、**`fastlane match`は使用しておらず、`DIST_CERT_BASE64`/`PROVISION_PROFILE_BASE64`という手動証明書・プロファイルのBase64エンコード配布方式**（`import_certificate`/`install_provisioning_profile`/`update_code_signing_settings`with`use_automatic_signing: false`）であることを確認した。CLAUDE.mdの「`fastlane match init`」という記載は実態と乖離している（過去設計書の指摘と一致）。
+- entitlements自動生成パターン（APNs対応時に導入、現在コメントアウト中）が既存し、Sign in with Apple capability追加時も同様のPlistBuddy/xcodeprojパターンで実現できる見込みは変わらず妥当。
+- **手動証明書配布方式であることの追加含意**: Sign in with Apple capability・In-App Purchase capabilityをApp IDに追加すると、Provisioning Profileの再生成が必要になる（既存のAPNs対応時と同じ構造）。`fastlane match`を使っていないため、Provisioning Profile再生成のたびに`PROVISION_PROFILE_BASE64`のGitHub Secretsを**手動で**更新する必要があり、この手動更新オペレーション自体もApple Developer Portalへのアクセス（＝フェーズ0の審査完了）が前提になる。
+
+### 1-5. データモデルの実現性
+`data/push-subscriptions.json`（実データ確認済み。配列形式、各要素が`{endpoint, keys:{p256dh, auth}}`または`{platform:'ios', deviceToken, registeredAt}`）と`server.js` 277行目の`withFileLock`（`fileLocks`オブジェクトによる簡易ロック、10ms間隔でのポーリング待機）を確認した。`data/users.json`を同じ「単一JSON配列ファイル+`withFileLock`」パターンで作る設計は、既存コードベースの一貫した実装パターンと完全に整合しており、技術的な障害はない。
+
+## 2. ユーザーストーリー（2026-07-11版から変更なし）
+- iOSアプリユーザーとして、Google/Apple IDでログインし、将来の有料プラン加入に備えたい
+- ログインしなくても引き続き匿名で基本機能を使い続けられてほしい
+- 将来サブスク加入者として、機種変更してもログインし直せば有料プラン状態が引き継がれてほしい（フェーズ3以降）
+- 運営者として、コミュニティコース投稿者を偽装できない形で識別し、不正投稿・なりすまし削除に対処したい（1-2節で確認した通り、現状は削除さえ誰でも可能な状態）
+
+## 3. 受け入れ基準（フェーズ1「認証基盤のみ」想定、変更なし）
+
+### 正常系
+- 設定画面から「Googleでログイン」「Appleでログイン」でネイティブ認証フロー起動、成功後ログイン状態になる
+- 設定画面にユーザー名・メールアドレス表示。アプリ再起動後もログイン状態保持
+- ログアウトで匿名状態（従来のlocalStorageベース動作）に戻る
+
+### 失敗系
+- ネットワークエラー時はエラー表示、匿名状態のまま使い続けられる
+- ユーザーによる認証キャンセル時は何も変化せず元画面に戻る
+- サーバー側トークン検証失敗時は401、クライアントは再ログインを促す
+
+### エッジケース
+- 同一Apple IDで2台目端末からログインした場合の挙動（12節で未解決）
+- 既存localStorage匿名データがある状態でのログイン時の扱い（6-3節で3案比較、変更なし）
+- Appleの「メール非公開」オプション選択時はリレーメールのみ保持
+- 旧バージョンAppは本機能を認識せず従来通り匿名動作（後方互換）
+
+## 4. スコープ外（2026-07-11版から変更なし）
+- Android版ログイン対応、Web版へのログインUI提供（サーバーAPIは将来Web展開しやすい形で設計）
+- 既存匿名データの完全自動移行の保証、決済・サブスク本体の実装（フェーズ1範囲外）
+- 共有カレンダー機能へのログイン必須化、メール+パスワード方式
+- 実装そのもの（本タスクは設計のみ）
+
+## 5. 認証方式の技術選定
+
+### 5-1. クライアント側（iOSアプリ/Capacitor）
+- Sign in with Apple: `@capacitor-community/apple-sign-in`等。`identityToken`/`authorizationCode`/`user`取得
+- Google Sign-In: `@capacitor-community/google-signin`または`@codetrix-studio/capacitor-google-auth`等。iOS用OAuthクライアントID発行が別途必要
+- Appleガイドライン4.8対応: サードパーティログイン提供時はSign in with Appleも同等提供が必須。最初から両方セットで提供するため要件を満たす
+
+### 5-2. サーバー側の認証方式
+- Apple/GoogleのJWT（identityToken/idToken）をそれぞれの公開鍵で検証
+- `sub`を主キーに`data/users.json`をupsert
+- JWT発行方式を推奨（`jsonwebtoken`パッケージは現状未導入のため新規追加が必要。`JWT_SECRET`環境変数、有効期限は要検討）
+- クライアントはCapacitor `Preferences`にJWT保存、`Authorization: Bearer`ヘッダー付与
+- 共通ヘルパー`authedFetch(url, options)`を新設。既存匿名エンドポイントの動作は変更しない
+
+## 6. データモデル設計
+
+### 6-1. `data/users.json`（単一ファイル、既存`data/push-subscriptions.json`と同一の`withFileLock`パターンを踏襲。1-5節で実装パターンの一貫性を確認済み）
+```json
+[{
+  "userId": "usr_XXXXXXXXXX",
+  "provider": "apple",
+  "providerSub": "001234.abcdef...",
+  "email": "example@privaterelay.appleid.com",
+  "displayName": "山田太郎",
+  "avatarEmoji": "🦊",
+  "createdAt": "...", "lastLoginAt": "...",
+  "subscriptions": []
+}]
+```
+
+### 6-2. `provider`+`providerSub`をユニークキーに（同一メールでもApple/Googleは別アカウント扱い）
+
+### 6-3. 既存localStorageデータの移行方針（3案比較、2026-07-11版から変更なし）
+- 案A: ログイン時に自動アップロード・サーバーマージ。機種変更引き継ぎ可だが実装コスト高。フェーズ1には含めない
+- 案B: ログインは識別子取得のみ、マイコース等は端末データのまま。実装コスト最小だが機種変更時引き継ぎ不可
+- 案C（推奨）: フェーズ1は案B、フェーズ2以降でサブスク加入者限定にコース/プロフィールのみ選択的に案Aへ拡張
+
+### 6-4. 既存`authorId`との統合（1-2節の実コード確認結果を反映）
+ログイン中ユーザーのコース公開時、サーバー側でJWTから復元した`userId`で`authorId`を上書き（自己申告値を信用しない）。`DELETE /api/courses/:id`・`POST /api/courses/:id/unpublish`に、ログイン中ユーザーの`userId`と対象コースの`authorId`一致チェックを追加する。
+- **重要な限定**: 1-2節で確認した通り、現状これらのエンドポイントは認証ヘッダーの概念自体を持たない。フェーズ1導入後も**未ログインで投稿されたコース**（`authorId: 'anonymous'`または自己申告の`user_XXXXXXXX`のまま）に対しては、所有権を検証しようがないため対策効果が及ばない。真の対策効果を得るには「コース公開はログイン必須」という運用変更が必要になるが、これは4節スコープ外の「ログインしなくても引き続き匿名で基本機能を使い続けられてほしい」というユーザーストーリーと衝突するため、フェーズ1では**ログイン済みユーザーの投稿のみ保護**という限定的な効果にとどまる。この限定を受け入れるか、フェーズ1の範囲を「コース公開のみログイン必須化」に広げるかは意思決定事項（12節に追加）。
+
+### 6-5. サブスクリプション管理（両チャネル対応、2026-07-11版から変更なし）
+
+前提: ユーザー決定により、**iOSアプリ内課金はStoreKit、Web版はStripeを両方実装する**（8節参照）。
+
+#### 6-5-1. `data/users.json` の `subscriptions` フィールド拡張案
+```json
+{
+  "userId": "usr_XXXXXXXXXX",
+  "provider": "apple",
+  "providerSub": "001234.abcdef...",
+  "subscriptions": [
+    {
+      "source": "app_store",
+      "active": true,
+      "plan": "premium_monthly",
+      "originalTransactionId": "2000000123456789",
+      "latestTransactionId": "2000000123456999",
+      "productId": "app.dosuru.premium.monthly",
+      "expiresAt": "2026-08-11T00:00:00Z",
+      "autoRenewing": true,
+      "status": "active",
+      "environment": "Production",
+      "createdAt": "...", "updatedAt": "..."
+    },
+    {
+      "source": "stripe",
+      "active": false,
+      "plan": "premium_monthly",
+      "stripeCustomerId": "cus_XXXX",
+      "stripeSubscriptionId": "sub_XXXX",
+      "stripePriceId": "price_XXXX",
+      "expiresAt": "2026-06-01T00:00:00Z",
+      "status": "canceled",
+      "createdAt": "...", "updatedAt": "..."
+    }
+  ]
+}
+```
+`subscriptions`（配列）とする理由: Appleガイドライン3.1.3(b)により両チャネル提供が必須のため、同一ユーザーが両方契約しうる。`source`ごとに最新1件のみ保持。
+
+#### 6-5-2. 統一判定ロジック `isSubscriptionActive(user)`
+```javascript
+function isSubscriptionActive(user) {
+  const subs = user.subscriptions || [];
+  return subs.some(s => s.active && (!s.expiresAt || new Date(s.expiresAt) > new Date()));
+}
+function getActiveSubscriptionSources(user) {
+  const now = new Date();
+  return (user.subscriptions || []).filter(s => s.active && (!s.expiresAt || new Date(s.expiresAt) > now)).map(s => s.source);
+}
+```
+プレミアム判定を行う全APIはこの共通関数のみを参照する（StoreKit/Stripeの生データを個別実装で分散させない）。
+
+#### 6-5-3. 二重課金（両チャネル同時active）の検出・扱い方針
+- 検出: `getActiveSubscriptionSources(user).length >= 2`
+- 推奨: フェーズ3時点では「検知時にフラグ記録＋次回ログイン時にユーザーへ通知、手動解約を促す」案を採用、発生頻度を見て自動化を検討
+- 未解決: 異なる`plan`を両チャネルで契約した場合の表示優先順位は未定義（12節）
+
+## 7. APIの変更（新規追加のみ、既存構造は無変更）
+- `POST /api/auth/apple` / `POST /api/auth/google`: トークン検証・upsert・JWT発行
+- `GET /api/auth/me`: JWT検証しユーザー情報返却
+- `POST /api/auth/logout`: 型だけ用意（JWT方式のためサーバー側状態変更は基本不要）
+- `POST /api/courses/publish`: `Authorization`ヘッダーがあればサーバー検証済み`userId`で上書き、なければ従来通り（完全後方互換）
+- `DELETE /api/courses/:id` / `POST /api/courses/:id/unpublish`: `Authorization`ヘッダーがある場合のみ所有権チェックを追加。ヘッダーがない場合（未ログイン・旧バージョンApp）は**現状の挙動を完全に維持**（無検証のまま削除可能）。これにより後方互換性を100%保ちつつ、ログイン済みユーザーの投稿のみ段階的に保護する
+
+### 7-1. 後方互換性・影響範囲（プロジェクトCLAUDE.md必須確認事項）
+- **後方互換性**: 新規APIはすべて追加のみ。既存エンドポイントのレスポンス構造・リクエスト仕様は一切変更しない。旧バージョンApp Store版アプリは`Authorization`ヘッダーを送らないため、サーバー側は「ヘッダーなし＝従来の匿名フロー」として今まで通り処理する。旧バージョンユーザーが本機能により壊れることはない設計。
+- **影響範囲**: `data/users.json`・`/api/auth/*`はiOSアプリ限定機能（4節スコープ外によりWeb版UIは対象外）。ただしAPIエンドポイント自体はサーバー上で1つのため、Web版から`POST /api/auth/apple`等を直接叩くことは技術的には可能（UIを出さないだけ）。コース関連の既存API（`GET /api/courses`等）のレスポンス構造は無変更のため、Web版・iOS両方に影響なし。
+- **リリースタイミング**: フェーズ1（認証基盤）はApp Store版の新バージョンリリースと同時に段階導入する。ヘッダーなしリクエストの互換性を保つ設計のため、サーバー側APIの先行デプロイ自体は安全（新エンドポイントの存在だけでは何も壊れない）。ただし`DELETE /api/courses/:id`等への所有権チェック追加は、ログイン機能を持たない現行App Store版ユーザーの挙動（誰でも削除できる）を変えないため、単独でサーバー先行デプロイしても支障はない。
+
+## 8. サブスク・決済アーキテクチャ（決定事項、2026-07-11版から変更なし）
+
+### 8-0. 決定事項
+StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装する。Appleガイドライン3.1.3(b) "Multiplatform Services"に正面から準拠するため。
+
+### 8-1. StoreKit側の実装要件
+- App Store Connect: Subscription Group「おでかけNaviプレミアム」、Product ID `app.dosuru.premium.monthly`等（価格・トライアル有無はビジネス判断待ち）
+- レシート検証方式: 「App Store Server API」（初回検証）＋「App Store Server Notifications V2」（更新・解約・返金等の非同期Webhook）
+- **Apple Developer Portal側の準備**: In-App Purchase capability追加、App Store Server API用キー（`.p8`）生成。**1-1節で確認した通り、既存のAPNs対応（Push Notifications capability）が同一Portal・同一App IDで審査待ちブロックされている実例があるため、In-App Purchase capabilityも同様にフェーズ0（Apple法人審査）完了待ちになる可能性が高い**
+- Capacitorプラグイン候補: `@capacitor-community/in-app-purchases`等。Capacitor 6対応・メンテ状況は要実装時調査
+
+### 8-2. Stripe側の実装要件
+- 既存コード改修方針: `premiumSessions`（インメモリMap）を廃止し`data/users.json`の`subscriptions`（`source:'stripe'`）へ置き換え。`withFileLock`パターン踏襲。1-3節で確認した通り、Webhook処理パターン自体は流用可能だが状態管理部分の作り直しが必須
+- Web版のユーザー識別手段: 案W1（推奨）は、Web版はログインUIを作らず、Stripe Checkout時のメールアドレスを識別子に（`provider:'email'`, `providerSub:<email>`として`data/users.json`に許容）
+
+## 9. iOS/CI側の変更見込み（1-4節の実コード確認を反映して更新）
+- `ios-app/package.json`: Apple Sign-In・Google Sign-In系プラグイン追加
+- ルート`package.json`: `jsonwebtoken`パッケージ追加（現状未導入と確認済み）
+- **Sign in with Apple capability**: 既存entitlements動的生成パターン（APNs対応時実装、`.github/workflows/ios-deploy.yml`に現存するが現在コメントアウト中）を参考に`com.apple.developer.applesignin`キー追加。**フェーズ0（Apple法人審査）完了待ちの可能性が高い**（1-1節で裏付け）
+- **手動証明書配布方式であることの追加影響（今回新たに確認した事実）**: `fastlane match`不使用のため、capability追加に伴うProvisioning Profile再生成は、Apple Developer Portalへの手動アクセス＋`PROVISION_PROFILE_BASE64` Secretの手動更新が必要。これもフェーズ0完了が前提
+- **Google Sign-In用URL Scheme**: `Info.plist`への`CFBundleURLTypes`追加が新規に必要。Google Cloud ConsoleでのiOS用OAuthクライアントID発行も別途必要。**Apple Developer Portalとは無関係のため、フェーズ0の影響を受けない**
+- GitHub Secrets追加候補: `JWT_SECRET`、Google OAuth関連
+- 既存のCI署名方式（手動証明書配布、`fastlane match`不使用）への影響は見込みなし。ただし証明書更新オペレーション自体が手作業である点は、capability追加のたびに手間とヒューマンエラーリスクを伴う
+
+## 10. 段階的実装フェーズ分け（重要な見直し：フェーズ1の位置づけを修正）
+
+### 10-1. 見直しのポイント
+2026-07-11版設計書は「フェーズ0＝StoreKit/Sign in with Apple双方のブロッカー」としつつも、「フェーズ1（認証基盤のみ、サブスクなし）は低リスクで着手できる」という含意があった（要約に「フェーズ1=認証基盤のみ（サブスクなし）→フェーズ2〜」という記載があり、フェーズ0との依存関係が要約からは曖昧だった）。しかし1-1節・1-4節の実コード確認により、**Sign in with Apple自体がApple Developer Portal側のcapability有効化を必要とし、既存のPush Notifications capabilityと同じ理由（法人審査待ち）でブロックされる可能性が高いことが、CI設定の実例で裏付けられた**。したがって、**フェーズ1（認証基盤のみ）のうち「Sign in with Apple」部分は、フェーズ0完了が事実上の前提条件になる**。
+
+### 10-2. 更新後のフェーズ分け
+- **フェーズ0（最優先ブロッカー、既存のAPNs対応と共通）**: Apple Developerアカウントの個人→法人切替審査完了待ち。2026-07-12時点で未解消（`.github/workflows/ios-deploy.yml`のコメントアウトで裏付け済み）
+- **フェーズ1a: Google Sign-Inのみ先行実装**（新設・今回追加した選択肢）: Apple法人審査と無関係に着手可能。JWT検証・`data/users.json`基盤・コース`authorId`真正性確保（Googleログイン済みユーザーのみ）を、Sign in with Apple抜きで先行実装する。**ただしAppleガイドライン4.8（サードパーティログイン提供時はApple IDログインも同等提供必須）に抵触するリスクがあるため、この状態のままApp Store審査に提出することはできない**。TestFlight内部テストの範囲に限定するか、審査提出直前にフェーズ1bを合流させる前提での先行着手にとどまる
+- **フェーズ1b: Sign in with Apple実装**（依存: フェーズ0完了）: フェーズ0解消後、フェーズ1aと合流させて両方揃った状態で初めて審査提出可能になる
+- **フェーズ2: エンタイトルメント管理**: `subscriptions`配列（6-5節）でのプレミアム判定整備、`isSubscriptionActive(user)`共通ロジック実装
+- **フェーズ3a: Stripe/Web版 先行**（フェーズ0に依存せず着手・検証可能）
+- **フェーズ3b: StoreKit/iOS版**（依存: フェーズ0完了＋In-App Purchase capability準備）
+- 両者共通: フェーズ3b完了後（両チャネル揃った時点）に6-5-3節の二重課金検出ロジックを有効化
+- **フェーズ3a単独稼働期間（Web版のみ課金可能）中は、3.1.3(b)抵触を避けるためWeb版の課金導線をiOSアプリ内に一切露出させないこと**
+
+### 10-3. 実質的な結論
+「フェーズ1＝低リスクでサブスクと無関係に即着手できる」という当初の前提は**部分的に崩れる**。Google Sign-Inのみなら無関係に着手できるが、Sign in with Appleを含む「認証基盤フェーズ1」全体としては、Apple審査提出可能な完成形にするためにフェーズ0の完了を待つ必要がある。純粋な「着手」（コーディング開始）自体はGoogle Sign-In部分・サーバー側JWT基盤・`data/users.json`実装・不正投稿対策ロジックの範囲であれば今すぐ始められるが、**「アプリとしてリリースできる状態」に持っていくにはフェーズ0が事実上のブロッカーであり続ける**点を明確にしておく必要がある。
+
+## 11. フロントエンドの変更（フェーズ1範囲、見込み、2026-07-11版から変更なし）
+- 設定画面に「ログイン」セクション新設（Apple/Googleボタン、ログイン後はユーザー名・ログアウト表示）
+- `_isCapacitorApp`判定でCapacitor環境限定表示（Web版には出さない）
+- i18n必須ルールに従いja/en同時追加
+- 認証状態保持の共通変数・`authedFetch`ヘルパー新設
+
+## 12. リスク・未解決の質問
+
+1. **Apple法人審査完了タイミングへの依存（最重要、10節で再確認）**: フェーズ1b（Sign in with Apple）・フェーズ3b（StoreKit）双方の着手完了がこれに依存する。フェーズ1a（Google Sign-Inのみ）は先行着手可能だが、Appleガイドライン4.8により単独リリースは不可
+2. **フェーズ1aを「先行着手はするがリリースはしない」形にした場合の開発運用リスク**: 未リリースのコードをどれだけの期間メンテナンスし続けるか、フェーズ0解消までの期間が長期化した場合の技術的負債化リスク
+3. 既存匿名ユーザーのデータ扱い（6-3節、機種変更時データ消失の許容度は要議論）
+4. Google Sign-InのiOS向けOAuthクライアントID発行作業（担当・アカウント用意状況は不明）
+5. 同一人物が複数ログイン方法を使った場合、別アカウント扱いになる点（サブスク管理上の懸念）
+6. 2台目端末からの再ログイン時、フェーズ1では各端末のlocalStorageデータは同期されない体験になる（UI文言の検討要）
+7. JWTの有効期限・リフレッシュ方式は未確定
+8. **不正投稿対策の実効性の限界**: 6-4節で確認した通り、未ログインユーザーの投稿には対策が及ばない。「コース公開はログイン必須」への運用変更を検討するか、限定的効果を受け入れるかは意思決定が必要
+9. `data/users.json`の個人情報保護対応（バックアップ運用・アクセス制限の要否）
+10. 二重課金・二重解約のエッジケース: `isSubscriptionActive`は残るチャネルを正しく判定できるが、ユーザーが二重契約に気づかず無駄払いを続けるケースの検知・通知フローは案のみ
+11. チャネル間のポリシー差異によるUX不整合（StoreKit＝Apple主体の返金、Stripe＝運営側で任意返金可）
+12. App Store Server API利用のApple Developer Portal追加設定も法人審査待ちの影響を受ける可能性
+13. `appAccountToken`とuserIdの紐付け設計の詳細化が必要（Capacitorプラグインの対応状況は要実装時確認）
+14. Web版のセッション/状態確認方式が未確定（案W1採用時の再訪問時の購読状態確認方法）
+15. **手動証明書配布方式（`fastlane match`不使用）であることの運用負荷**: Sign in with Apple・In-App Purchase capability追加のたびにProvisioning Profileの手動再生成・GitHub Secrets手動更新が発生する。フェーズ0解消後の作業リストに正式に組み込む必要がある
+
+## 13. 変更するファイル一覧（フェーズ1a: Google Sign-Inのみ先行着手する場合の想定）
+- `package.json`（ルート）: `jsonwebtoken`追加
+- `server.js`: `/api/auth/google`、`GET /api/auth/me`、`data/users.json`読み書き（`withFileLock`パターン）、`/api/courses/publish`・`DELETE /api/courses/:id`・`POST /api/courses/:id/unpublish`への任意Authorizationヘッダー対応（後方互換）
+- `data/users.json`（新規、gitignore対象にするか要検討。個人情報を含むため）
+- `ios-app/package.json`: Google Sign-In系Capacitorプラグイン追加
+- `public/app.js`・`public/index.html`: 設定画面ログインUI、i18n文言追加（`_isCapacitorApp`限定表示）
+- CLAUDE.md: 新機能の記録、フェーズ状況の追記
+
+## 承認状況
+2026-07-12 planner再調査・設計完了。**実装は未着手**。ユーザーのレビュー・意思決定待ち（10節フェーズ分け・フェーズ1a先行着手の是非、6-4節の運用変更要否、8節アーキテクチャ選択等）。
