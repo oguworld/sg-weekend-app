@@ -2687,6 +2687,8 @@
         // チップ行を左端にスクロール
         const chipRow = document.getElementById('filter-row-category');
         if (chipRow) chipRow.scrollLeft = 0;
+        // イベント一覧自体は#home-scroll-contentが内部スクロールしているため、window.scrollTo（上のline 2666）は効かない
+        document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
         else { renderEventCards(); }
       } else {
