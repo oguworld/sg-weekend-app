@@ -3664,7 +3664,7 @@
         subtitle:  course.title || 'コース',
         multi:     false,
         presetKey: window._coursePresetDate || null,
-        onConfirm: (keys) => {
+        onConfirm: async (keys) => {
           const dateStr = keys[0];
           const startTime = course.spots?.[0]?.time || null;
           const entry = {
@@ -3677,7 +3677,7 @@
             courseId: course.id,
           };
           const updated = [...getCustomPlans(), entry];
-          saveCustomPlans(updated);
+          await saveCustomPlans(updated);
           window._coursePresetDate = null;
           renderScheduleTab();
           showToast('📅 コースを予定に追加しました');
@@ -3832,14 +3832,14 @@
     // custom_plans は都市によらず共通（個人カレンダー）
     // event_plans は都市別（イベントIDが都市固有のため）
     function getCustomPlans() { return JSON.parse(localStorage.getItem('custom_plans') || '[]'); }
-    function saveCustomPlans(arr) {
+    async function saveCustomPlans(arr) {
       localStorage.setItem('custom_plans', JSON.stringify(arr));
-      if (getSharedGroupId() && !_calSyncFromServer) syncToServer();
+      if (getSharedGroupId() && !_calSyncFromServer) await syncToServer();
     }
     function getEventPlans() { return JSON.parse(localStorage.getItem(getCity()+'_event_plans') || '[]'); }
-    function saveEventPlans(arr) {
+    async function saveEventPlans(arr) {
       localStorage.setItem(getCity()+'_event_plans', JSON.stringify(arr));
-      if (getSharedGroupId() && !_calSyncFromServer) syncToServer();
+      if (getSharedGroupId() && !_calSyncFromServer) await syncToServer();
     }
 
     function fmtDateKey(d) {
@@ -4213,7 +4213,7 @@
       if (saveBtn) saveBtn.disabled = !(title && hasDate);
     }
 
-    function saveEventPlan() {
+    async function saveEventPlan() {
       const event = EVENT_REGISTRY[_planModalEventId];
       const pin = getPins()[_planModalEventId];
       const title = event?.store || event?.title || pin?.title || '';
@@ -4227,7 +4227,7 @@
       const _evEntry = { id: 'ep_'+Date.now(), eventId: _planModalEventId, emoji, name: title, meta, dateKey: _planModalSelectedDate, startTime: _planModalSelectedStartTime || null, memo, member: _selectedPlanMembers.length ? [..._selectedPlanMembers] : undefined };
       if (_evImp) _evEntry.important = true;
       plans.push(_evEntry);
-      saveEventPlans(plans);
+      await saveEventPlans(plans);
       _notifyGroupIfChecked('plan-event-notify-cb', title, 'added');
       const pins = getPins();
       if (pins[_planModalEventId]) {
@@ -4242,7 +4242,7 @@
 
     let _customPlanSelectedDateKeys = [];
 
-    function saveCustomPlan() {
+    async function saveCustomPlan() {
       const title = document.getElementById('plan-custom-title')?.value?.trim();
       if (!title) return;
       const memo = document.getElementById('plan-custom-memo')?.value?.trim() || '';
@@ -4268,14 +4268,14 @@
         if (important) entry.important = true;
         plans.push(entry);
       });
-      saveCustomPlans(plans);
+      await saveCustomPlans(plans);
       _notifyGroupIfChecked('plan-custom-notify-cb', title, isEdit ? 'updated' : 'added');
       closePlanModal();
       showToast(t(isEdit ? 'toastPlanUpdated' : 'toastPlanAdded'));
       renderScheduleTab();
     }
 
-    function savePlanDetail() {
+    async function savePlanDetail() {
       const memo = document.getElementById('plan-detail-memo')?.value?.trim() || '';
       const dtImportant = document.getElementById('plan-detail-important-cb')?.checked || false;
       let planName = '';
@@ -4293,7 +4293,7 @@
           plans[idx].memo = memo;
           if (_selectedPlanMembers.length) plans[idx].member = [..._selectedPlanMembers]; else delete plans[idx].member;
           if (dtImportant) plans[idx].important = true; else delete plans[idx].important;
-          saveCustomPlans(plans);
+          await saveCustomPlans(plans);
         }
       } else {
         const plans = getEventPlans();
@@ -4305,7 +4305,7 @@
           plans[idx].memo = memo;
           if (_selectedPlanMembers.length) plans[idx].member = [..._selectedPlanMembers]; else delete plans[idx].member;
           if (dtImportant) plans[idx].important = true; else delete plans[idx].important;
-          saveEventPlans(plans);
+          await saveEventPlans(plans);
         }
       }
       _notifyGroupIfChecked('plan-detail-notify-cb', planName, 'updated');
@@ -4314,9 +4314,9 @@
       renderScheduleTab();
     }
 
-    function deleteCustomGroup(idsStr) {
+    async function deleteCustomGroup(idsStr) {
       const ids = new Set(idsStr.split(','));
-      saveCustomPlans(getCustomPlans().filter(p => !ids.has(p.id)));
+      await saveCustomPlans(getCustomPlans().filter(p => !ids.has(p.id)));
       showToast(t('toastPlanDeleted'));
       renderScheduleTab();
     }
@@ -4552,11 +4552,11 @@
       deleteScheduleItem(id, type);
     }
 
-    function deleteScheduleItem(planId, planType) {
+    async function deleteScheduleItem(planId, planType) {
       if (planType === 'custom') {
-        saveCustomPlans(getCustomPlans().filter(p => p.id !== planId));
+        await saveCustomPlans(getCustomPlans().filter(p => p.id !== planId));
       } else {
-        saveEventPlans(getEventPlans().filter(p => p.id !== planId));
+        await saveEventPlans(getEventPlans().filter(p => p.id !== planId));
       }
       showToast(t('toastPlanDeleted'));
       renderScheduleTab();
@@ -5314,6 +5314,14 @@
     let _scannerStream = null;
     let _scannerRafId = null;
 
+    // idベースの和集合マージ（後勝ち＝第2引数bの内容が優先される）。
+    // 設計書22: doJoinGroup()専用だった実装を共通関数として切り出し、fetchFromServer()からも使う。
+    function mergeArr(a, b) {
+      const m = {};
+      [...a, ...b].forEach(p => { if (p && p.id) m[p.id] = p; });
+      return Object.values(m);
+    }
+
     // ─── E2E ENCRYPTION (AES-256-GCM, key lives in URL fragment only) ───
     function getCalKey() { return localStorage.getItem(getCity()+'_shared_cal_key') || null; }
     function setCalKey(k) { if (k) localStorage.setItem(getCity()+'_shared_cal_key', k); else localStorage.removeItem(getCity()+'_shared_cal_key'); }
@@ -5441,6 +5449,8 @@
 
     async function syncToServer() {
       const gid = getSharedGroupId(); if (!gid) return;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 設計書22: 5秒でタイムアウトし、失敗しても静かに諦める（UIをハングさせない）
       try {
         const customPlans = getCustomPlans();
         const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
@@ -5454,9 +5464,15 @@
         await fetch(API_BASE + '/api/calendar/'+gid, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify(body),
+          signal: controller.signal,
         });
-      } catch(e) {}
+      } catch(e) {
+        // タイムアウト・ネットワーク断とも同様に扱う。ローカル保存は既に完了しているため、
+        // ここで例外を投げずに静かに諦める（呼び出し元のUIをブロックしない）。
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
 
     async function fetchFromServer() {
@@ -5468,22 +5484,29 @@
           return false;
         }
         const d = await r.json();
-        let customPlans, eventPlans;
+        let serverCustom, serverEvent;
         if (d.encryptedData) {
           const key = getCalKey();
           if (!key) return false;
           try {
             const dec = await _decryptPlans(key, d.encryptedData);
-            customPlans = dec.customPlans || [];
-            eventPlans  = dec.eventPlans  || [];
+            serverCustom = dec.customPlans || [];
+            serverEvent  = dec.eventPlans  || [];
           } catch(e) { showToast('復号に失敗しました'); return false; }
         } else {
-          customPlans = d.customPlans || [];
-          eventPlans  = d.eventPlans  || [];
+          serverCustom = d.customPlans || [];
+          serverEvent  = d.eventPlans  || [];
         }
+        // 設計書22（案B）: 全置換ではなくidベースの和集合マージ（サーバー優先）にする。
+        // これにより、保存直後のforce quit等でPUTがサーバーに未到達だった場合でも、
+        // 次回同期時にローカルにしかない予定が丸ごと消えることを防ぐ。
+        const localCustom = getCustomPlans();
+        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const customPlans = mergeArr(localCustom, serverCustom);
+        const eventPlans  = mergeArr(localEvent, serverEvent);
         _calSyncFromServer = true;
-        saveCustomPlans(customPlans);
-        saveEventPlans(eventPlans);
+        await saveCustomPlans(customPlans);
+        await saveEventPlans(eventPlans);
         _calSyncFromServer = false;
         return true;
       } catch(e) { _calSyncFromServer = false; return false; }
@@ -5786,7 +5809,6 @@
 
         const localCustom = getCustomPlans();
         const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const mergeArr = (a, b) => { const m={}; [...a,...b].forEach(p=>{ if(p&&p.id) m[p.id]=p; }); return Object.values(m); };
         const merged = { customPlans: mergeArr(serverCustom, localCustom), eventPlans: mergeArr(serverEvent, localEvent) };
 
         let putBody;
@@ -5803,8 +5825,8 @@
 
         if (key) setCalKey(key);
         _calSyncFromServer = true;
-        saveCustomPlans(merged.customPlans);
-        saveEventPlans(merged.eventPlans);
+        await saveCustomPlans(merged.customPlans);
+        await saveEventPlans(merged.eventPlans);
         _calSyncFromServer = false;
         setSharedGroupId(gid);
         if (_hasActivePushSub()) await _registerGroupPush(gid);
