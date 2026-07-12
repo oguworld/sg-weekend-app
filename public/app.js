@@ -997,6 +997,9 @@
     // ─── おでかけデータ読み込み ───
     async function loadEventData() {
       const grid = document.getElementById('cards-grid');
+      // データを丸ごと入れ替えるため、カードDOMキャッシュも破棄する（設計書21: キャッシュ無効化条件）
+      // これから grid.innerHTML を再代入して既存カードを破棄するので、キャッシュ内の参照も併せて捨てる
+      _cardElCache.clear();
       grid.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
         <div style="font-size:28px;margin-bottom:8px;">⏳</div>
         <div style="font-size:15px;">${t('loadingEvents')}</div>
@@ -1145,7 +1148,7 @@
 
       return `
         <article class="spot-card${isEndingSoon ? ' ending-soon' : ''}" data-tab="${e.tab || 'weekend'}" data-age="${eAgeAttr}"
-                 data-id="${e.id}" style="animation-delay:${i * 0.06}s;">
+                 data-id="${e.id}">
           ${igSc ? (() => {
             const igEmbedUrl = (e.url || '').replace(/\/$/, '') + '/?utm_source=ig_embed';
             const igMetaHtml = `
@@ -1203,6 +1206,25 @@
             </div>
           </div>
         </article>`;
+    }
+
+    // イベントカードDOM要素キャッシュ（設計書21: カテゴリタブ切り替え時のInstagram埋め込み再読み込み防止）
+    // key: `${e.id}::${lang}` → 生成済みの <article class="spot-card"> 要素
+    const _cardElCache = new Map();
+    let _cardTmpContainer = null;
+
+    // 既存キャッシュがあれば再利用（新規要素は生成しない）、無ければ renderEventCard() の文字列から新規生成する。
+    // 戻り値: { el, isNew }
+    function _getOrCreateCardEl(e, i, cacheKey) {
+      const cached = _cardElCache.get(cacheKey);
+      if (cached) {
+        return { el: cached, isNew: false };
+      }
+      if (!_cardTmpContainer) _cardTmpContainer = document.createElement('div');
+      _cardTmpContainer.innerHTML = renderEventCard(e, i);
+      const el = _cardTmpContainer.firstElementChild;
+      _cardElCache.set(cacheKey, el);
+      return { el, isNew: true };
     }
 
     let showPinnedOnly = false;
@@ -1403,8 +1425,22 @@
       const grid = document.getElementById('cards-grid');
 
       // おすすめモードON かつジャンル未設定 → グリッド内に案内を表示
+      // 注意: grid.innerHTML を丸ごと再代入すると、キャッシュ済みカード（Instagram埋め込みiframe含む）が
+      // documentから切り離されて破棄されてしまうため、既存カードは display:none で隠すだけに留め、
+      // 専用のバナー要素だけを個別に挿入/更新する（設計書21）
       if (_recommendModeActive && getGenreList().length === 0) {
-        grid.innerHTML = `<div style="padding:48px 24px 32px;text-align:center;">
+        Array.from(grid.children).forEach(child => {
+          if (child.id === '_recommend-genre-banner') return;
+          child.style.display = 'none';
+        });
+        let banner = document.getElementById('_recommend-genre-banner');
+        if (!banner) {
+          banner = document.createElement('div');
+          banner.id = '_recommend-genre-banner';
+          grid.appendChild(banner);
+        }
+        banner.style.display = '';
+        banner.innerHTML = `<div style="padding:48px 24px 32px;text-align:center;">
           <div style="font-size:40px;margin-bottom:16px;">⭐</div>
           <div style="font-size:15px;font-weight:700;color:var(--midnight);margin-bottom:8px;">あなた好みのイベントを表示</div>
           <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;margin-bottom:24px;">
@@ -1417,6 +1453,9 @@
         document.getElementById('event-count-label') && (document.getElementById('event-count-label').textContent = '');
         return;
       }
+      // バナーが残っていれば隠す（おすすめモード解除後の再描画時）
+      const _existingBanner = document.getElementById('_recommend-genre-banner');
+      if (_existingBanner) _existingBanner.style.display = 'none';
 
       const filtered = EVENT_DATA.filter(e => {
         // ピン留めフィルター
@@ -1471,11 +1510,51 @@
         if (fb !== fa) return fb.localeCompare(fa);
         return (CATEGORY_ORDER[a.type] ?? 99) - (CATEGORY_ORDER[b.type] ?? 99);
       });
-      grid.innerHTML = filtered.map((e, i) => renderEventCard(e, i)).join('');
+
+      // 設計書21: DOM要素キャッシュによる差分更新（Instagram埋め込みiframeの再読み込み防止）
+      // キャッシュキーは id + 言語（言語切替時は必ず作り直す）
+      const lang = getLang();
+      const usedKeys = new Set();
+      let hasNewCard = false;
+      let anchor = null; // 直前に配置した可視カード（この直後に次のカードを挿入する）
+
+      filtered.forEach((e, i) => {
+        const cacheKey = e.id + '::' + lang;
+        const { el, isNew } = _getOrCreateCardEl(e, i, cacheKey);
+        usedKeys.add(cacheKey);
+        el.style.display = '';
+        if (isNew) {
+          hasNewCard = true;
+          el.classList.remove('spot-card--reused');
+          el.style.animationDelay = (i * 0.06) + 's';
+        } else {
+          // 既存カードは即時表示（再アニメーションしない）
+          el.classList.add('spot-card--reused');
+          el.style.animationDelay = '';
+        }
+        // 直前の可視カードの直後に配置（非表示カードやバナーの位置は無視し、可視順序だけを基準にする）
+        // 既に正しい位置にあれば insertBefore/appendChild はノードの再生成を伴わない = iframe維持
+        const desiredNext = anchor ? anchor.nextSibling : grid.firstChild;
+        if (desiredNext !== el) {
+          grid.insertBefore(el, desiredNext);
+        }
+        anchor = el;
+      });
+
+      // フィルタで表示対象から外れたカードは破棄せず display:none であとに残す
+      Array.from(grid.children).forEach(child => {
+        if (!child.classList || !child.classList.contains('spot-card')) return;
+        const id = child.dataset.id;
+        const key = id + '::' + lang;
+        if (!usedKeys.has(key)) {
+          child.style.display = 'none';
+        }
+      });
+
       resultCount.textContent = filtered.length + t('countSuffix');
       emptyState.classList.toggle('visible', filtered.length === 0);
       updatePinButtons();
-      loadInstagramEmbeds();
+      if (hasNewCard) loadInstagramEmbeds();
     }
 
     function applyFilters() {

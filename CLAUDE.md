@@ -178,6 +178,15 @@ sg-weekend-app/
 - 「非表示化」と「状態を強制的に戻すガード」を同じcommitで同時に導入する場合、両者の呼び出し順序・再入（同一関数呼び出しの流れの中で状態が書き換わって戻る）が無いか、変更後にシミュレーションする
 - 上記スワイプ機構は2026-07-11に修正済み: `CAT_ORDER`固定配列を廃止し、`_visibleCatOrder()`（`#filter-row-category .filter-chip`をDOM順・`offsetParent !== null`でフィルタして動的算出）に置き換え。`toggleCatFilter('recommend')`もジャンル未設定時は入口で早期returnする方式に変更し、「一度ONにしてから戻す」二段構えを廃止
 
+## イベントカードのDOM差分更新（2026-07-12実装、設計書21）
+`renderEventCards()`（`public/app.js`）は、カテゴリタブ切り替え等のたびにInstagram埋め込み（`<blockquote>` → `embed.js`が`<iframe>`化）が再読み込みされる問題を解消するため、`grid.innerHTML`一括再代入をやめ、**イベントID+言語をキーにしたDOM要素キャッシュによる差分更新**方式を採用している。
+- `_cardElCache`（Map、キー`e.id + '::' + lang`）に生成済みの`<article class="spot-card">`要素を保持。既存キャッシュがあれば`renderEventCard()`を呼ばずそのDOM要素をそのまま再利用し（iframeも維持される）、`insertBefore`によるノード移動のみで並び替える。新規イベントのみ`renderEventCard()`で新規生成する（`_getOrCreateCardEl()`）
+- フィルタで除外されたカードは破棄せず`display:none`で保持（再度そのカテゴリに戻った際に再利用するため）
+- キャッシュ無効化: `loadEventData()`（データ再フェッチ・都市切替時）冒頭で`_cardElCache.clear()`。言語切替はキャッシュキーに`lang`を含むため自動的に別要素として再生成される
+- 新規生成カードのみ`fadeUp`アニメーション適用。再利用カードは`.spot-card--reused`クラス（`animation:none`、`public/app.css`）で即時表示・非アニメーション化
+- **既知の制約（2026-07-12時点、未解決）**: `toggleCardTips()`はDOM要素を直接書き換える実装のため、既存カードが再利用されるとtips展開状態がタブ切り替え後もリセットされない可能性がある（意図した仕様は「閉じた状態にリセット」）。言語切替を繰り返すと旧言語ぶんのカードが`display:none`のまま`_cardElCache`とDOMに蓄積する（都市切替等でクリアされるまで）
+- **今後同様の「DOM要素キャッシュで差分更新」パターンを他画面に導入する際の注意**: `grid.innerHTML`の丸ごと再代入がどこか別の分岐に残っていると、そこでキャッシュ済みノード（iframe含む）がdocumentから切り離されて破棄される。`renderEventCards()`内のおすすめモード×ジャンル未設定時の案内バナー分岐も、この理由で`grid.innerHTML`丸ごと破棄から「既存カードを`display:none`で隠すのみ・専用バナー要素を個別追加/更新」方式に変更済み
+
 ## i18n対応（2026-06-24実装）
 - 言語切り替え: STRINGS オブジェクト（ja/en）+ `t(key)` 関数 + `applyI18n()`
 - 対応済み: イベントタブ（旧称「期間限定」）・コース機能全体・設定画面・予定表モーダル・ボトムナビ
