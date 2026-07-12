@@ -119,7 +119,11 @@ jobs:
         run: |
           NOTES=$(node -p "require('./ios-app/package.json').releaseNotes || 'バグ修正とパフォーマンス改善'")
           VER=$(node -p "require('./ios-app/package.json').version")
-          echo "release_notes=${NOTES}" >> $GITHUB_OUTPUT
+          {
+            echo "release_notes<<RELEASE_NOTES_EOF"
+            echo "$NOTES"
+            echo "RELEASE_NOTES_EOF"
+          } >> $GITHUB_OUTPUT
           echo "app_version=${VER}" >> $GITHUB_OUTPUT
 
       - name: Deploy to App Store
