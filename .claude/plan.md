@@ -2265,7 +2265,7 @@ StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装す
 
    **新規スクリプト`scripts/match-affiliate-links.js`（案）の実装方針を確定**:
    - 既存の全コース（`model-courses.json`+`community-courses.json`）からユニークなスポット名を抽出
-   - ユーザーが事前にダウンロードしたKlookカタログCSV（例: `data/klook-catalog-sg.csv`、手動配置想定）を読み込む
+   - ユーザーが事前にダウンロードしたKlookカタログCSVを読み込む。**2026-07-12、`data/klook-catalog-sg.csv`に238件（全件）を配置済み**（`aff_label1=Odekake Navi`で再エクスポート済み、`data/`はgitignore対象のため非追跡）。実装時はこのファイルをそのまま入力として使ってよい。件数が更新されたら同じパスに上書き配置する運用とする
    - スポット名（英語表記が多い）とCSVの`Product Name`（日本語）を突き合わせるため、単純な文字列部分一致だけでなく、ローマ字化・カタカナ変換等を考慮した緩めのファジーマッチングで候補をスコアリングして提示する（例: 「Gardens by the Bay」↔「ガーデンズバイザベイ」）
    - 候補一覧を`--dry-run`でコンソール出力し、人力で確認したもののみ`affiliate-links.json`へ書き込む（既存スクリプト群の慣習に合わせる）
    - `affiliate-links.json`には`Affiliate Link`列の値をそのまま保存する（自前でのURL組み立て・`?aid=`付与処理は不要）
