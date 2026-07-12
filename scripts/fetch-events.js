@@ -136,6 +136,24 @@ function purgeExpiredData(eventsPath) {
   console.log(`🗑  古いデータを削除: ${deleted}件`);
 }
 
+// ─── ハイウォーターマーク方式（ソースごとの既知GUID管理） ──────
+const SOURCE_FETCH_STATE_PATH = path.join(__dirname, '..', 'data', 'source-fetch-state.json');
+
+function loadSourceFetchState() {
+  if (!fs.existsSync(SOURCE_FETCH_STATE_PATH)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(SOURCE_FETCH_STATE_PATH, 'utf8'));
+  } catch (e) {
+    console.error(`  ⚠️  source-fetch-state.json 読み込み失敗: ${e.message}`);
+    return {};
+  }
+}
+
+function saveSourceFetchState(state) {
+  fs.mkdirSync(path.dirname(SOURCE_FETCH_STATE_PATH), { recursive: true });
+  fs.writeFileSync(SOURCE_FETCH_STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
+}
+
 // ─── ステップ2: RSS取得 ─────────────────────────────────────────
 async function fetchRssItems(feeds, cityKey = 'sg') {
   const daysBack        = 7;
@@ -147,6 +165,9 @@ async function fetchRssItems(feeds, cityKey = 'sg') {
 
   const allItems = [];
 
+  const state = loadSourceFetchState();
+  const cityState = state[cityKey] || (state[cityKey] = {});
+
   for (const feed of feeds) {
     const minDescLen    = feed.minDescLen !== undefined ? feed.minDescLen : globalMinDescLen;
     const skipDateFilter = feed.skipDateFilter !== undefined ? feed.skipDateFilter : false;
@@ -157,12 +178,23 @@ async function fetchRssItems(feeds, cityKey = 'sg') {
       const result = await parser.parseURL(feedUrl);
       const raw = result.items || [];
 
+      // ハイウォーターマーク: 前回取得時に見た GUID（無ければ link）の集合
+      const prevState = cityState[feed.name];
+      const prevSeenGuids = prevState ? new Set(prevState.lastSeenGuids || []) : null;
+
       const filtered = raw
         .slice(0, maxPerFeed)
         .filter(item => {
           if (!skipDateFilter) {
             const pub = item.pubDate ? new Date(item.pubDate) : new Date();
             if (pub < cutoff) return false;
+          }
+
+          // 初回（該当ソースの状態が未保存）は daysBack カットオフのみに委ねる。
+          // 2回目以降は「前回未確認のGUID/linkのみ新着」をAND条件で追加適用する。
+          if (prevSeenGuids) {
+            const guid = item.guid || item.link || '';
+            if (guid && prevSeenGuids.has(guid)) return false;
           }
 
           const text = `${item.title || ''} ${item.contentSnippet || item.summary || ''}`.toLowerCase();
@@ -186,10 +218,20 @@ async function fetchRssItems(feeds, cityKey = 'sg') {
 
       console.log(`  ✅ ${raw.length}件取得 → 粗いフィルター後${filtered.length}件`);
       allItems.push(...filtered);
+
+      // フィード取得が成功した場合のみ、このフェッチで見た全GUID/linkで状態を更新する
+      const seenGuids = raw.map(item => item.guid || item.link || '').filter(Boolean);
+      cityState[feed.name] = {
+        lastSeenGuids: seenGuids,
+        lastFetchedAt: new Date().toISOString(),
+      };
     } catch (e) {
       console.error(`  ❌ フェッチ失敗: ${feed.name} — ${e.message}`);
+      // フィード取得自体が失敗した場合は該当ソースの状態を更新しない（cityStateに触れない）
     }
   }
+
+  saveSourceFetchState(state);
 
   return allItems;
 }

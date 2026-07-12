@@ -98,7 +98,7 @@ async function filterBatch(batch, cityKey = 'sg', categoryStats = null) {
   const cityName = CITY_NAMES[cityKey] || 'シンガポール';
   const cityLocation = CITY_LOCATIONS[cityKey] || 'Singapore';
   const cityAreas = CITY_AREAS[cityKey] || CITY_AREAS.sg;
-  const scoreThreshold = 5;
+  const scoreThreshold = 6;
 
   let categoryBalanceNote = '';
   if (categoryStats) {
@@ -111,7 +111,7 @@ async function filterBatch(batch, cityKey = 'sg', categoryStats = null) {
     }
     const dist = Object.entries(categoryStats).map(([t, n]) => `${t}:${n}件`).join(', ');
     if (thinCategories.length > 0) {
-      categoryBalanceNote = `\n【カテゴリ補完】現在のDB分布: ${dist}。${thinCategories.join('・')}が目標比率を下回っています。これらカテゴリの記事はscore 4以上で採用してよい（品質は維持、具体性・期間限定性の基準は変えない）。他カテゴリは引き続きscore 5以上。`;
+      categoryBalanceNote = `\n【カテゴリ補完】現在のDB分布: ${dist}。${thinCategories.join('・')}が目標比率を下回っています。これらカテゴリの記事はscore 5以上で採用してよい（品質は維持、具体性・期間限定性の基準は変えない）。他カテゴリは引き続きscore ${scoreThreshold}以上。`;
     }
   }
 
@@ -119,7 +119,11 @@ async function filterBatch(batch, cityKey = 'sg', categoryStats = null) {
 - 日本文化・日本ブランドとの関連で加点
 - ファミリー・子連れ対応で加点
 - 発見感・意外性で加点（major_scoreが低いほど加点）
-- 情報が具体的（日時・場所・価格）で加点${categoryBalanceNote}`;
+- 情報が具体的（日時・場所・価格）で加点${categoryBalanceNote}
+- 【厳格化】以下は加点要素があっても採用を見送ること:
+  - 既存の定番スポット・チェーン店の「よくある」プロモーション（同種の告知が頻繁に繰り返されているもの）
+  - 情報の具体性が低い（日時・場所・価格のいずれか2つ以上が不明確）
+  - 対象読者（在住日本人ファミリー・カップル）にとって新規性・独自性が乏しく、単なる日常商品紹介の域を出ないもの`;
 
   const instructionText = `あなたは${cityName}在住の日本人向けおでかけアプリのコンテンツ編集者です。
 以下の記事を評価し、採用するもののみJSON配列で返してください。
