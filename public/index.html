@@ -64,13 +64,13 @@
 
       <!-- Category Filter (new horizontal scroll) -->
       <div id="filter-row-category">
-        <button class="filter-chip active" data-cat="all" data-i18n="catAll" onclick="toggleCatFilter('all')">すべて</button>
-        <button class="filter-chip" data-cat="recommend" data-i18n="catRecommend" style="display:none;" onclick="toggleCatFilter('recommend')">おすすめ</button>
-        <button class="filter-chip" data-cat="event" data-i18n="catEvent" onclick="toggleCatFilter('event')">イベント</button>
-        <button class="filter-chip" data-cat="show" data-i18n="catShow" onclick="toggleCatFilter('show')">展示・公演</button>
-        <button class="filter-chip" data-cat="gourmet" data-i18n="catGourmet" onclick="toggleCatFilter('gourmet')">グルメ・フェア</button>
-        <button class="filter-chip" data-cat="sale" data-i18n="catSale" onclick="toggleCatFilter('sale')">プロモ・お得</button>
-        <button class="filter-chip" data-cat="opening" data-i18n="catOpening" onclick="toggleCatFilter('opening')">新規オープン</button>
+        <button class="filter-chip active" data-cat="all" data-i18n="catAll" onclick="if(!_touchCapableDetected) toggleCatFilter('all')">すべて</button>
+        <button class="filter-chip" data-cat="recommend" data-i18n="catRecommend" style="display:none;" onclick="if(!_touchCapableDetected) toggleCatFilter('recommend')">おすすめ</button>
+        <button class="filter-chip" data-cat="event" data-i18n="catEvent" onclick="if(!_touchCapableDetected) toggleCatFilter('event')">イベント</button>
+        <button class="filter-chip" data-cat="show" data-i18n="catShow" onclick="if(!_touchCapableDetected) toggleCatFilter('show')">展示・公演</button>
+        <button class="filter-chip" data-cat="gourmet" data-i18n="catGourmet" onclick="if(!_touchCapableDetected) toggleCatFilter('gourmet')">グルメ・フェア</button>
+        <button class="filter-chip" data-cat="sale" data-i18n="catSale" onclick="if(!_touchCapableDetected) toggleCatFilter('sale')">プロモ・お得</button>
+        <button class="filter-chip" data-cat="opening" data-i18n="catOpening" onclick="if(!_touchCapableDetected) toggleCatFilter('opening')">新規オープン</button>
       </div>
     </header>
     <div class="screen-scroll-content" id="home-scroll-content">
