@@ -2248,11 +2248,29 @@ StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装す
    }
    ```
    - `provider`フィールドを最初から持たせることで、将来GetYourGuide・Agoda等を追加する際も同一ファイル・同一表示ロジックで拡張可能（拡張性の担保）
-2. **紐付けフロー（半自動）**: 新規スクリプト`scripts/match-affiliate-links.js`（案）を作成。
+2. **紐付けフロー（半自動、2026-07-12実物確認により具体化）**: Klookアフィリエイトダッシュボードの「製品」検索画面から**都市（シンガポール）でフィルタした商品カタログをCSVで一括エクスポートできる**ことを実機確認した。ライブAPI呼び出しは不要で、このCSVをオフラインでの突き合わせ元データとして使う。
+
+   **実際にエクスポートされたCSVの列構成（確認済み）**:
+   ```
+   Country Name, City Name, Product Name (Activity name or Hotel name), Product Image,
+   Currency, Sell Price, Commission Rate, Instant Confirmation tag, Affiliate Link
+   ```
+   - `Product Name`は日本語（例: 「ガーデンズバイザベイ チケット（シンガポール）」「ナイトサファリ チケット | マンダイ・ワイルドライフ・リザーブ（シンガポール）」）
+   - `Affiliate Link`列には**既に完成した状態のリンクがそのまま入っている**（自分でURLを組み立てる必要はない）。実際の形式:
+     ```
+     https://affiliate.klook.com/redirect?aid=127020&_currency=SGD&k_site=https%3A%2F%2Fwww.klook.com%2Fja%2Factivity%2F127-gardens-by-the-bay-singapore&aff_label1=test
+     ```
+     （`affiliate.klook.com/redirect`という専用リダイレクトサービス経由。`k_site`パラメータにURLエンコードされた実際の遷移先、`aff_label1`はエクスポート時に自由に設定できるラベル。前節で確認した「`www.klook.com`URLの末尾に`?aid=`を足すだけ」というシンプルな方式とは別の、より高機能な形式。**どちらも有効だが、カタログエクスポートで得られるこちらの形式をそのまま使うのが最も確実**）
+   - `Commission Rate`（商品ごとのコミッション率、0.02〜0.05等バラつきあり）・`Sell Price`・`Instant Confirmation tag`（即時予約可否）も同時に取得できるため、将来的に「即時予約可能なスポットのみボタンを出す」「価格を一緒に表示する」等の拡張にも使える
+
+   **新規スクリプト`scripts/match-affiliate-links.js`（案）の実装方針を確定**:
    - 既存の全コース（`model-courses.json`+`community-courses.json`）からユニークなスポット名を抽出
-   - Klook検索API（フェーズ0で確定した仕様に依存、詳細不明）または人力検索を通じて候補URLを提示
-   - 人力で確定した候補のみ`affiliate-links.json`に書き込む（`--dry-run`オプションで確認のみも可能にする、既存スクリプト群の慣習に合わせる）
-   - 全自動マッチングはしない。スクリプトはあくまで「候補提示・人力確定の支援」に留める
+   - ユーザーが事前にダウンロードしたKlookカタログCSV（例: `data/klook-catalog-sg.csv`、手動配置想定）を読み込む
+   - スポット名（英語表記が多い）とCSVの`Product Name`（日本語）を突き合わせるため、単純な文字列部分一致だけでなく、ローマ字化・カタカナ変換等を考慮した緩めのファジーマッチングで候補をスコアリングして提示する（例: 「Gardens by the Bay」↔「ガーデンズバイザベイ」）
+   - 候補一覧を`--dry-run`でコンソール出力し、人力で確認したもののみ`affiliate-links.json`へ書き込む（既存スクリプト群の慣習に合わせる）
+   - `affiliate-links.json`には`Affiliate Link`列の値をそのまま保存する（自前でのURL組み立て・`?aid=`付与処理は不要）
+   - 全自動マッチングはしない。スクリプトはあくまで「候補提示・人力確定の支援」に留める（表記ゆれによる誤紐付けリスクのため、方針は変更なし）
+   - **`aff_label1`の運用方針（要検討）**: CSVエクスポート時にユーザーが自由に設定できるラベル。今回のテストでは`test`が入っていた。本番運用時は空欄のままか、アプリ識別用の固定値（例: `odekakenavi`）を設定するかは実装時に判断する（Klook側の集計上の区別に使えるのみで、機能的な必須要件ではない）
 3. **表示ロジック**: `renderCourseDetail(course)`（および3493行目付近の重複箇所、実装時に要特定）で、各スポット描画時に`affiliate-links.json`の該当エントリを探し、あれば「チケットを予約」ボタンを追加する。ボタンはコース詳細取得時にサーバー側でJOINして返す方式（`GET /api/courses`側でスポットに`affiliateLink`を埋め込んで返す）を推奨（クライアント側で別途fetchする方式より往復が少なく、キャッシュ・オフライン耐性の観点でも有利）
 4. **UI**: 各`course-timeline-item`内、`course-timeline-meta`（住所）の下に、該当スポットにリンクがある場合のみボタンを追加。
    ```html
@@ -2413,6 +2431,7 @@ StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装す
    - URL形式: 任意のKlookページURLの末尾に`?aid=127020`を追加するだけ（例: `https://www.klook.com/activity/xxxx/?aid=127020`）。専用のショートリンク発行APIは不要
    - **⚠️重要な制約**: `s.klook.com`形式の短縮URLは計測できないため、アフィリエイトリンクには必ず`www.klook.com`形式の完全URLを使用すること（Klook公式の注意書きより）。`scripts/match-affiliate-links.js`実装時、候補として拾ってきたURLが`s.klook.com`形式だった場合は`www.klook.com`形式に正規化するか、そのまま使わないよう実装時に注意する
    - **実例で確認済みの個別アクティビティURL形式**: `https://www.klook.com/ja-JP/activity/127-gardens-by-the-bay-singapore/?aid=127020`（`/activity/{id}-{slug}/`パターン、`/ja-JP/`言語コードを含む）。日本語向けアプリのため、紐付けスクリプトでは`/ja-JP/`ロケールのURLを優先的に採用する
+   - **【上書き・最終確定】採用する実装方式**: 上記の「`?aid=`を手動で末尾追加する」簡易方式は不採用とし、**1-2節で確認したCSVカタログエクスポートの`Affiliate Link`列（`affiliate.klook.com/redirect?aid=...&k_site=...`形式）をそのまま使う**方式を正式採用する。理由: (1)カタログエクスポートで商品名・画像・価格・コミッション率・即時予約可否も同時に取得でき情報量が多い (2)リンクが既に完成した状態で提供されるため自前でのURL組み立て・エンコード処理が一切不要 (3)`s.klook.com`短縮URL誤用のリスクも構造的に発生しない。詳細な運用フローは1-2節（紐付けフロー）を参照
 8. **軽微リスク: `affiliate-links.json`のキーがスポット名の完全一致に依存**: AIコース生成のたびに微妙に異なる表記（例: 「Tekka Centre」と「Tekka Market」）で生成されると、既存のリンク紐付けが引き継がれない可能性がある。運用初期は件数が少なく人力で対応可能だが、コース数が増えた場合は正規化・部分一致等の改善が将来必要になる可能性がある
 9. **軽微リスク: クリックログファイルの肥大化**: `_sendDebugLog`基盤に関するCLAUDE.mdの既存注意点（サイズ上限・ローテーションなし）と同様の懸念が新規クリックログファイルにも当てはまる。運用しながら定期確認が必要
 
