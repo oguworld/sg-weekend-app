@@ -1670,7 +1670,6 @@
 
     // ─── オーバーレイ・モーダル閉じる 即時タップ対応 ───
     [
-      ['install-overlay',    () => closeInstallModal()],
       ['pin-detail-overlay', () => closePinDetail()],
       ['pin-picker-overlay',   () => closePinPicker()],
       ['emoji-picker-overlay',    () => closeEmojiPicker()],
@@ -2269,11 +2268,6 @@
     applyI18n();
     updateCityUI();
     applyTheme();
-    function closeInstallModal() {
-      document.getElementById('install-modal').classList.remove('visible');
-      document.getElementById('install-overlay').classList.remove('visible');
-      unlockScroll();
-    }
 
     async function doShare() {
       const cityMeta = CITY_META[getCity()] || CITY_META.sg;
@@ -2532,7 +2526,6 @@
 
     // ─── NAV LOGIC ───
     function closeAllPopups() {
-      closeInstallModal();
       closeCalPopup();
       closePinDetail();
       closePinPicker();

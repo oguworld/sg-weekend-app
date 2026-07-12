@@ -384,47 +384,6 @@
     </div><!-- /screen-scroll-content -->
   </div><!-- /screen-settings -->
 
-  <!-- ─── INSTALL MODAL ─── -->
-  <div class="pin-detail-overlay" id="install-overlay" onclick="if(!_touchCapableDetected) closeInstallModal()"></div>
-  <div class="pin-detail-modal" id="install-modal">
-    <div class="pin-detail-header">
-      <div class="pin-detail-emoji">📱</div>
-      <button class="pin-detail-close" data-close onclick="closeInstallModal()">✕</button>
-    </div>
-    <div class="pin-detail-body">
-      <div class="pin-detail-title">ホーム画面に追加する</div>
-      <div style="font-size:14px;color:var(--warm-gray);margin-bottom:16px;line-height:1.65;">
-        アプリとして使えるようになります。毎回ブラウザを開く必要がなくなって便利です！
-      </div>
-
-      <div id="install-android-btn-wrap" style="display:none;margin-bottom:16px;">
-        <button onclick="handleInstall()" style="width:100%;padding:13px;border-radius:var(--radius-btn);background:var(--caramel);color:white;border:none;font-family:'Noto Sans JP',sans-serif;font-size:15px;font-weight:700;cursor:pointer;">
-          📲 ホーム画面に追加する
-        </button>
-      </div>
-
-      <div style="background:var(--caramel-pale);border-radius:16px;padding:16px;">
-        <div style="font-size:14px;font-weight:700;color:var(--caramel);margin-bottom:12px;">手順</div>
-
-        <div style="font-size:14px;color:var(--warm-gray);margin-bottom:8px;font-weight:600;">iPhone（Safari）</div>
-        <div style="font-size:15px;color:var(--warm-gray);line-height:1.9;margin-bottom:14px;">
-          1. Safari でこのページを開く<br>
-          2. 下部の <strong>共有ボタン（□↑）</strong> をタップ<br>
-          3. 「<strong>ホーム画面に追加</strong>」を選択<br>
-          4. 「追加」をタップして完了！
-        </div>
-
-        <div style="font-size:14px;color:var(--warm-gray);margin-bottom:8px;font-weight:600;">Android（Chrome）</div>
-        <div style="font-size:15px;color:var(--warm-gray);line-height:1.9;">
-          1. Chrome でこのページを開く<br>
-          2. 右上の <strong>⋮メニュー</strong> をタップ<br>
-          3. 「<strong>ホーム画面に追加</strong>」を選択<br>
-          4. 「追加」をタップして完了！
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- ─── HOWTO MODAL（使い方） ─── -->
   <!-- ─── 共有カレンダー MODAL ─── -->
   <div class="pin-detail-overlay" id="cal-sync-overlay" onclick="closeCalSync()"></div>
@@ -932,7 +891,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260712a"></script>
+  <script src="/app.js?v=20260712b"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
