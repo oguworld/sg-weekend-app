@@ -1521,6 +1521,7 @@
       filtered.forEach((e, i) => {
         const cacheKey = e.id + '::' + lang;
         const { el, isNew } = _getOrCreateCardEl(e, i, cacheKey);
+        el.dataset.lang = lang;
         usedKeys.add(cacheKey);
         el.style.display = '';
         if (isNew) {
@@ -1531,6 +1532,17 @@
           // 既存カードは即時表示（再アニメーションしない）
           el.classList.add('spot-card--reused');
           el.style.animationDelay = '';
+          // tips展開状態はタブ切り替えのたびに閉じた状態へリセットする（2026-07-12ユーザー決定）
+          const tipsBox = document.getElementById('tips-' + e.id);
+          if (tipsBox && tipsBox.style.display !== 'none') {
+            tipsBox.style.display = 'none';
+            const tipsBtn = document.getElementById('tips-btn-' + e.id);
+            if (tipsBtn) {
+              tipsBtn.classList.remove('active');
+              const arrow = tipsBtn.querySelector('.tips-arrow');
+              if (arrow) arrow.textContent = '▽';
+            }
+          }
         }
         // 直前の可視カードの直後に配置（非表示カードやバナーの位置は無視し、可視順序だけを基準にする）
         // 既に正しい位置にあれば insertBefore/appendChild はノードの再生成を伴わない = iframe維持
@@ -1541,12 +1553,17 @@
         anchor = el;
       });
 
-      // フィルタで表示対象から外れたカードは破棄せず display:none であとに残す
+      // フィルタで表示対象から外れたカードは破棄せず display:none であとに残す（同一言語の場合のみ再利用対象として保持）。
+      // 言語切替で無効化された旧言語のカードは、貯まり続けないようDOM・キャッシュ双方から完全に削除する
       Array.from(grid.children).forEach(child => {
         if (!child.classList || !child.classList.contains('spot-card')) return;
         const id = child.dataset.id;
         const key = id + '::' + lang;
-        if (!usedKeys.has(key)) {
+        if (usedKeys.has(key)) return;
+        if (child.dataset.lang && child.dataset.lang !== lang) {
+          _cardElCache.delete(id + '::' + child.dataset.lang);
+          child.remove();
+        } else {
           child.style.display = 'none';
         }
       });
