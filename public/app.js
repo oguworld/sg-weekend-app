@@ -713,6 +713,7 @@
         { val: 'North',       label: '🌿 North' },
         { val: 'North-East',  label: '🌳 North-East' },
         { val: 'Island-wide', label: '🗺️ Island-wide' },
+        { val: 'Sentosa',     label: '🏖 Sentosa' },
       ],
       bkk: [
         { val: 'Sukhumvit',   label: '🌆 Sukhumvit' },

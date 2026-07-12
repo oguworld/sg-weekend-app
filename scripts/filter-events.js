@@ -14,7 +14,7 @@ const CATEGORY_CAP_BUFFER = 1.2;
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
 const CITY_LOCATIONS = { sg: 'Singapore', bkk: 'Bangkok', syd: 'Sydney' };
 const CITY_AREAS = {
-  sg:  '"Central"/"East"/"West"/"North"/"North-East"/"Island-wide"',
+  sg:  '"Central"/"East"/"West"/"North"/"North-East"/"Island-wide"/"Sentosa"',
   bkk: '"Sukhumvit"/"Silom"/"Sathorn"/"Siam"/"Riverside"/"Thonglor"/"Ekkamai"/"Asok"/"On Nut"/"City-wide"',
   syd: '"CBD"/"Inner West"/"Eastern Suburbs"/"North Shore"/"Northern Beaches"/"Western Sydney"/"South"/"City-wide"',
 };

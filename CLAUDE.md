@@ -267,6 +267,13 @@ BKK/SYD 停止箇所:
 3. `run-source-analysis.sh` の `--city=sg` を `--city=all` に戻す
 4. crontabの `refresh-courses.js --city=sg` を `--city=all` に戻す
 
+## SGエリア区分に「Sentosa」追加（2026-07-13実装、設計書24）
+SGのエリア区分がCentral/East/West/North/North-East/Island-wideの6区分から、**Sentosa追加で7区分**になった。Sentosaはケーブルカー・モノレールで渡る独立した「行き先」であり、ユニバーサル・スタジオ／S.E.A.水族館（→Singapore Oceanarium）／ビーチ等、単独でコース1本分埋まる濃さのエリアのため独立区分化。
+- 変更箇所: `public/app.js`の`CITY_COURSE_AREAS.sg`（コース作成画面のエリアチップ）、`public/index.html`の`#event-filter-sheet`内`.ef-chip`（イベント絞り込みシート、こちらはHTML直書きの別実装でJS定数とは独立）、`scripts/filter-events.js`の`CITY_AREAS.sg`（取り込みパイプラインのAI分類プロンプト用列挙値）
+- `data/sg/events.json`のうち、既存でSentosa関連ながら`Island-wide`/`West`に誤分類されていた5件（Sentosa GrillFest 2026 / Resorts World Sentosa / Sentosa Island / Adventure Cove Waterpark / Singapore Oceanarium - Into the Glowcean）を`area`/`location`とも`Sentosa`に遡及修正済み
+- `server.js`にエリア値のホワイトリスト検証は存在せず（`conditions.area`はAIプロンプトへの自由文字列埋め込みのみ）、追加にあたりサーバー側の変更は不要だった
+- BKK/SYDのエリア区分は無変更（Sentosaはシンガポール固有地名のため対象外）
+
 ## イベント取り込みパイプライン構成（2026-07-12改訂・設計書18）
 
 RSS/Instagram取得から`events.json`保存までのバッチ処理は、実行頻度の異なる3つのジョブに分離してcron管理している（旧: `run-fetch-all.sh`1本に全処理が同居していたが、フィード取得の取りこぼし対策として毎日実行化する際、頻度を変えるべきでない処理を分離した）。
