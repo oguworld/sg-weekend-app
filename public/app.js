@@ -1280,10 +1280,14 @@
         filterCats.clear();
         _recommendModeActive = !_recommendModeActive;
       } else {
+        if (filterCats.has(val) && !_recommendModeActive) {
+          // 既にアクティブなカテゴリを再タップしても何もしない（タブとして選択状態を維持する。
+          // 「すべて」に戻ってしまうトグル解除の挙動は意図しない誤動作だったため撤回）
+          return;
+        }
         _recommendModeActive = false;
-        const already = filterCats.has(val);
         filterCats.clear();
-        if (!already) filterCats.add(val);
+        filterCats.add(val);
       }
       _syncCatChips();
       _syncRecommendChip();
