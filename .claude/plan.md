@@ -2438,3 +2438,272 @@ StoreKit（iOSアプリ内課金）とStripe（Web版課金）を両方実装す
 
 ## 承認状況
 承認済み（2026-07-13）。フェーズ0（Klookアフィリエイトプログラム登録）完了、AID発行済み（127020）、商品カタログCSV全件（238件）取得済み（`data/klook-catalog-sg.csv`）。UI方針はボタンではなく住所行併記の地味なテキストリンク「チケット情報」に確定。マッチングはURLスラッグベース方式に確定。`match-affiliate-links.js`はインクリメンタル実行対応。コース生成AIへの広告バイアスは明確に不採用。フェーズ1の実装（orchestrator）を開始する。他アフィリエイト先（GetYourGuide・楽天トラベル・Shopee）は`provider`フィールドの拡張性を活かした将来候補として保留、Shopeeは不採用。
+
+---
+
+# 設計書23 フェーズ1.5 — 「定番」スタイル限定・コース生成時のKlookスポット組み込み
+
+## 背景・経緯
+設計書23フェーズ1（Klookアフィリエイトリンクの後付け表示）は実装済み・稼働中（2026-07-13時点、Web版確認済み、iOS版はTestFlight未反映）。以下の追加相談によりユーザー承認済み（再検討不要）:
+
+1. コース作成条件「こだわり条件」に既存の`style`選択肢（`定番`/`ローカル`/`ニッチ`）があり、`定番`は「王道・安心定番コース」という意味で定義されている
+2. `style === '定番'`が選ばれた場合に限り、Klookカタログから該当エリアの商品をAIへの参考候補として渡し、コースの1スポットとして自然に選ばせる案が承認された。「ローカル」「ニッチ」は一切対象外（設計書23で不採用となった「全コースにKlookを混ぜる」案とは異なり、"定番"というコンセプト自体がKlookカタログ＝有名観光地と概念的に合致するため、AIのおすすめが広告主導になる信頼性リスクを限定的にできる、という判断）
+3. Klookカタログ（`data/klook-catalog-sg.csv`）にはシンガポール国内のエリア情報がなく（`Country Name`/`City Name`列は全行"Singapore"固定）、コース生成が`CITY_COURSE_AREAS.sg`の6エリア単位で行われるため、地理的に破綻した組み合わせを避けるには一度限りのエリアタグ付けエンリッチメント処理が必要という結論に至った
+
+## 現状確認（実コード、2026-07-13時点）
+
+### コース生成のエリア・スタイルの扱い（`server.js`）
+- `POST /api/courses/generate`（1815行目〜）: `resolvedArea = cond.area || area`。**エリアはユーザーがシート上で選択した場合のみ値が入る。未選択の場合は`resolvedArea`が`null`/`undefined`になり、プロンプトの`- エリア: ...`行自体が出現しない**（1924行目 `${resolvedArea ? '\n- エリア: ${resolvedArea}' : ''}`）。つまり「エリア未指定でコース生成」は現行仕様上ごく普通に起こりうるケースであり、フェーズ1.5の設計はこのケースを必ず考慮する必要がある
+- `resolvedStyle = cond.style || style`。値は`'定番'`/`'ローカル'`/`'ニッチ'`の3値（または未選択で`null`）。1851〜1857行目の`styleNote`で分岐し、プロンプトに1行追記される形。この`styleNote`変数への追記という同一パターンを、フェーズ1.5のKlook候補注入にも踏襲できる
+- `POST /api/courses/candidates`（1721行目〜、Haikuによる3択候補生成）も同様に`resolvedStyle`/`resolvedArea`を持つが、**こちらはタイトル・タグライン・説明のみを生成する軽量フローであり、スポット配列は生成しない**。Klook候補の注入は「フルコース生成」である`/api/courses/generate`側のみに行えばよく、`/api/courses/candidates`は変更不要と判断する
+- `scripts/generate-model-courses.js`は`mood`/`pace`ベースの旧世代の条件形式を使っており、現行`style`（定番/ローカル/ニッチ）とは体系が異なる。現在`data/sg/model-courses.json`は空配列で実質未稼働のため、**フェーズ1.5は`server.js`の`POST /api/courses/generate`のみを対象とし、`generate-model-courses.js`は対象外**とする（旧スクリプトへの追随はスコープ外・別タスク）
+
+### コース生成レスポンス構造（`spots`配列）
+```json
+{
+  "time": "09:00",
+  "name": "スポット名（英語正式名称）",
+  "type": "観光|グルメ|ショッピング|公園|文化",
+  "duration": "90分",
+  "description": "おすすめポイント",
+  "address": "エリア・場所",
+  "emoji": "🌿"
+}
+```
+既存フィールドのみ。フェーズ1で追加された`affiliateLink`はAI生成時点では付与されず、`GET /api/courses`のレスポンス時に`embedAffiliateLinks()`（server.js 1648行目）でスポット名の完全一致マッチにより事後的に埋め込まれる方式（`data/sg/affiliate-links.json`をキーにJOIN）。
+
+### `match-affiliate-links.js`のマッチング方式（フェーズ1実装済み、流用可能と確認）
+- CSVの`Affiliate Link`列内`k_site`パラメータをデコードしてKlook活動ページURL末尾の英語スラッグを抽出（`extractSlug()`）
+- スラッグを`-`区切りの単語配列に変換（`slugToWords()`、先頭の数字ID部分は除去）
+- スポット名（英語）も同様に単語配列化（`spotNameToWords()`、ストップワード除去）
+- Jaccard風スコアリング（`scoreMatch()`）で上位候補を提示し、人力確認を経て`data/sg/affiliate-links.json`に確定保存
+- インクリメンタル実行対応済み（既存キーはスキップ）
+- **このスコアリングロジック（`extractSlug`/`slugToWords`/`spotNameToWords`/`scoreMatch`）はフェーズ1.5のエリアタグ付けスクリプトでも流用可能**だが、目的が異なる（フェーズ1=スポット名↔Klook商品のマッチング、フェーズ1.5=Klook商品↔エリア分類）ため、コードの共有は「参考にする」程度に留め、新規スクリプトとして独立させる（後述）
+
+### `fill-genres.js`の実装パターン（参考にした点）
+- Haiku、バッチサイズ20件、`--dry-run`フラグ対応
+- 対象抽出は「未処理のもののみ」フィルタ（`!Array.isArray(e.genres) || e.genres.length === 0`）→そのままインクリメンタル実行の土台になっている
+- プロンプトに選択肢の列挙（ジャンルID一覧）＋JSON配列での一括バッチ回答形式（`{"index":0,"genres":[...]}`）
+- バッチごとに`try/catch`し、失敗時は空配列でスキップ（全体を止めない設計）
+- 最後に`id`をキーにマージして全件上書き保存
+
+### `CITY_COURSE_AREAS.sg`（`public/app.js` 708〜716行目）
+```js
+sg: [
+  { val: 'Central',     label: '🏙 Central' },
+  { val: 'East',        label: '🌅 East' },
+  { val: 'West',        label: '🌇 West' },
+  { val: 'North',       label: '🌿 North' },
+  { val: 'North-East',  label: '🌳 North-East' },
+  { val: 'Island-wide', label: '🗺️ Island-wide' },
+],
+```
+6区分。コース生成の`conditions.area`もこの文字列（`'Central'`等）がそのまま送られる。
+
+### CSVカタログの実データ傾向（238件、抜粋確認）
+Gardens by the Bay（Central）、Night Safari／Singapore Zoo／River Wonders／Rainforest Wild（Mandai＝North）、Skyline Luge／Cable Car／Sentosa各種（Sentosa＝South、6区分に厳密には存在しない）、Marina Bay Sands／ArtScience Museum／National Gallery（Central）等、地理的に判別可能な有名観光地が中心。ただし**Sentosaは`CITY_COURSE_AREAS.sg`の6区分に直接対応する値がない**（強いて言えば"Island-wide"または独自に"South"を追加するかの判断が必要、後述リスク）。
+
+## 検討した案
+
+### A. エリアタグ付けの粒度・実行方式
+1. **CSV全238件を毎回Haikuで判定**（キャッシュなし）: 実行コスト・API課金が生成のたびに発生し無駄。不採用
+2. **一度だけバッチ処理してJSONにキャッシュ、以降は差分のみ処理**（`fill-genres.js`踏襲、推奨）: 初回のみコストがかかり、以降のコース生成時は読み込むだけで済む
+3. **商品名のキーワードルールベースで機械的に分類**（Haiku不使用、正規表現等）: 「Mandai」「Sentosa」等の地名キーワードが商品名に含まれる場合は高精度だが、含まれない商品（例: "Kayak, Stand Up Paddleboard at Ola Beach Club"）の判別ができない。実際にCSVを確認したところ地名を含まない商品名が一定数あり、ルールベース単独では網羅できないと判断
+
+**採用: 案2**。ただし前処理として案3のキーワードルール（Mandai→North、Sentosa→South相当、Marina Bay/Orchard/CBD→Central等）で機械的に確定できるものは先に処理し、判別できない残りのみHaikuに投げるハイブリッド方式にすることで、API呼び出し件数とコストを削減できる（実装フェーズでの最適化判断に委ねる。必須要件ではない）。
+
+### B. Sentosaエリアの扱い
+`CITY_COURSE_AREAS.sg`の6区分（Central/East/West/North/North-East/Island-wide）に「Sentosa」に直接対応する値がない。CSVにはSentosa関連の著名アクティビティ（Skyline Luge、Cable Car、Universal Studios、Adventure Cove等）が多数含まれる。
+1. Sentosaを`West`に寄せる（地理的には南西部だが、既存6区分に強引に当てはめる）
+2. Sentosaを`Island-wide`に分類する（「アイランドワイドの目玉」として扱う）
+3. Klookエリアタグの値として6区分に加えて`Sentosa`という7つ目の値を独自に許容する（`CITY_COURSE_AREAS`定数自体は変更せず、Klook候補の内部分類ラベルとしてのみ使う）
+
+**採用: 案3（内部分類ラベルとしてのみ`Sentosa`を許容）**。ユーザーが選択できる`CITY_COURSE_AREAS`定数自体は変更しない（既存のコース作成UIに影響を与えないため）。ただし`conditions.area === 'West'`や`'Island-wide'`が選ばれた場合、Sentosa分類のKlook候補も参考候補に含める（West/Island-wideどちらのコース生成でもSentosaは自然に組み込みうるため）というマッピングルールを設ける。詳細は実装フェーズでの候補抽出ロジックに委ねるが、設計時点でこの対応関係を明記しておく必要がある。
+
+### C. AIへのKlook候補の渡し方
+1. **候補リスト全件（該当エリアの全商品）をプロンプトに列挙**: 該当エリアに商品が多い場合（例: Central）プロンプトが肥大化し、トークンコスト・レイテンシが増える
+2. **上位N件（例: 5〜8件）に絞って提示**: プロンプト肥大化を防ぎつつ選択の余地を残す
+
+**採用: 案2（上位N件、Nは実装時に5前後で調整）**。エリアが未選択の場合（`resolvedArea`が`null`）は、全エリア横断でランダムまたは著名度順に上位N件を提示する（後述リスク欄で扱う未解決事項）。
+
+### D. AIが選んだ場合のaffiliateLink付与タイミング
+1. **生成時点でサーバー側が直接`affiliateLink`をスポットデータに埋め込む**（プロンプトに候補として渡したURLを、AIが採用したスポット名と突き合わせてその場で埋め込む）
+2. **生成後は何もせず、既存のフェーズ1マッチング処理（`GET /api/courses`の`embedAffiliateLinks()`によるスポット名の完全一致JOIN）に委ねる**
+3. **ハイブリッド: 生成直後にサーバー側で「渡した候補と生成されたスポット名」を突き合わせ、一致度が高ければ`affiliate-links.json`への自動登録を提案（人力確認は省略しない）**
+
+**比較**:
+- 案1は「AIが確実にカタログの商品名をそのまま使う」という前提に依存する。実際にはプロンプト内で英語正式名称を使うよう既存ルール（`"スポット名（必ず英語の正式名称で...）"`）があるため一致しやすいと想定されるが、AIが微妙に表記を変える可能性（例: "Gardens by the Bay Ticket" → "Gardens by the Bay"のようにサフィックスを落とす）は残る。誤って別の商品のURLを埋め込むリスクもゼロではない
+- 案2は既存のフェーズ1インフラ（`embedAffiliateLinks()`のスポット名完全一致）にそのまま乗る。**ただし現状の`match-affiliate-links.js`は「既存コースのスポット名」を対象にする設計であり、新規生成されたコースのスポットが自動的に拾われるには次回のスクリプト手動実行を待つ必要がある**（運用上のタイムラグが生じる。設計書23フェーズ1の運用実態＝手動実行ベースとも整合する）
+- 案3は誤登録防止と即時性のバランスを取るが、「生成直後にサーバー側で自動登録」は`match-affiliate-links.js`が前提とする人力確認フローの原則（表記ゆれによる誤紐付けリスクのため常に人力確定を挟む、設計書23で明記済み）と矛盾する
+
+**採用: 案2をベースに、生成直後の一致判定のみ即時反映する軽量な折衷案（案2＋部分的な案1）**。具体的には:
+- AIへのプロンプトでは「Klook候補として渡した商品の`Product Name`（英語表記済みのものを渡す想定）」を**スポット名の参考例としてそのまま使うよう明示的に指示**する（プロンプト内で「以下の候補から選ぶ場合は名称を変更しないこと」という指示を追加する設計。既存の「スポット名は英語正式名称で」という指示と自然に整合する）
+- 生成直後、サーバー側で「今回渡したKlook候補リスト」と「実際に生成された`spots[].name`」を**完全一致（またはごく単純な正規化: 前後空白除去・大文字小文字無視程度）で突き合わせ**、一致したスポットには生成レスポンスの時点で`affiliateLink`を直接埋め込む（案1相当だが、渡した候補との照合という限定条件がある分、誤爆リスクは低い）
+- この即時埋め込みとは**別に**、`match-affiliate-links.js`による定期的な半自動マッチングも従来通り継続する（新規スポット名がカタログ内の別商品と一致するケースを拾うため、両者は排他ではなく併用）
+- 完全一致しない場合（AIが表記を変えた場合）は何も埋め込まず、次回`match-affiliate-links.js`実行時の人力確認フローに委ねる（フォールバックとして機能）
+
+この折衷案は「ローカル/ニッチスタイルには一切コードパスが触れない」設計（後述）とも矛盾しない。あくまで`style === '定番'`の生成処理内で完結する追加ロジックである。
+
+## 推奨案（全体設計）
+
+### 1. エリアタグ付けエンリッチメント処理
+
+**新規スクリプト**: `scripts/enrich-klook-areas.js`
+
+- 入力: `data/klook-catalog-sg.csv`（既存、238件）
+- 出力: `data/klook-catalog-sg-areas.json`（新規）
+  ```json
+  {
+    "127-gardens-by-the-bay-singapore": {
+      "productName": "Gardens by the Bay Ticket",
+      "area": "Central",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
+    },
+    "3928-singapore-night-safari-singapore": {
+      "productName": "Night Safari Ticket | Mandai Wildlife Reserve, Singapore",
+      "area": "North",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
+    }
+  }
+  ```
+  - **キーは`match-affiliate-links.js`と同じ`extractSlug()`ロジックで抽出したスラッグ**（商品名ではなくスラッグをキーにする）。理由: CSVの`Product Name`列は表記ゆれ・重複の可能性がある一方、スラッグはKlook側の商品IDを含み一意性が高く、`match-affiliate-links.js`が既に確立した抽出ロジックと完全に同じキー体系を使うことで、将来的にこの2つのJSONファイル（`affiliate-links.json`はスポット名キー、`klook-catalog-sg-areas.json`はスラッグキー）を`Affiliate Link`列経由で相互参照しやすくなる
+  - `area`の値は`CITY_COURSE_AREAS.sg`の6値（`Central`/`East`/`West`/`North`/`North-East`/`Island-wide`）＋内部分類ラベル`Sentosa`の7値のいずれか
+- 処理方式: `fill-genres.js`を参考にしたHaikuバッチ処理（バッチサイズ20件程度）。プロンプトに6+1エリアの定義と代表エリアの例（Mandai地区→North、Sentosa島→Sentosa、Marina Bay/Orchard/CBD→Central等）を明記し、商品名から分類させる
+- **インクリメンタル設計**: スクリプト開始時に既存の`klook-catalog-sg-areas.json`を読み込み、スラッグが既に存在する商品はスキップ。CSVが更新されて新商品が追加された場合のみ、その差分だけをHaikuに送る（`fill-genres.js`の「`genres`未設定のみ対象」パターンを踏襲）
+- 実行方法: `node scripts/enrich-klook-areas.js [--dry-run]`（一度だけ実行する運用想定。CSVを再エクスポート・上書きした場合に再実行）
+- **`--dry-run`でコンソールに分類結果一覧を出力し、目視確認してから本実行する運用**（`fill-genres.js`と同様、Haiku分類なので誤判定の可能性がある。特にSentosa/Central境界のような曖昧な商品は人力チェックが有効）
+
+### 2. コース生成プロンプトへの組み込み（`server.js`の`POST /api/courses/generate`のみ対象）
+
+#### 2-1. 変更箇所の限定（最重要方針）
+既存の`styleNote`分岐（1851〜1857行目）の**すぐ後**に、`resolvedStyle === '定番'`の場合のみ実行される新規ブロックを追加する。**`resolvedStyle`が`'ローカル'`または`'ニッチ'`または未選択の場合、新規コードパスは一切実行されない**ことをコード構造上明確にする（`if (resolvedStyle === '定番') { ... }`という単一のガード節の中に処理を閉じ込め、既存の`styleNote`三項演算子チェーンとは独立した変数・独立したプロンプト差し込み文字列として実装する。既存の`styleNote`自体の文言・分岐は一切変更しない）。
+
+#### 2-2. Klook候補抽出ロジック（新規、`server.js`内関数）
+```
+function getKlookCandidatesForArea(resolvedArea, limit = 5) {
+  // klook-catalog-sg-areas.json + affiliate-links.json 相当のデータを読み込み
+  // resolvedArea に一致する（Sentosaマッピングルール含む）商品を上位N件返す
+  // resolvedArea が null の場合は全エリアから上位N件（著名度順 or ランダム）を返す
+}
+```
+- データソースは新規`data/klook-catalog-sg-areas.json`（エリア情報）と、既存`data/klook-catalog-sg.csv`または`data/sg/affiliate-links.json`（商品名・URL）を組み合わせる。**具体的にどちらのファイルから商品名・URLを取得するかは実装時に確定**（CSVを都度パースするか、`enrich-klook-areas.js`の出力に`productName`を持たせて自己完結させるか。上記データモデル例では`productName`を含めているため、実装時はこの1ファイルのみで完結させる方式を推奨）
+- `resolvedArea === 'West'`または`'Island-wide'`の場合、`Sentosa`分類の候補も候補プールに含める（B案の対応関係）
+
+#### 2-3. プロンプトへの差し込み文言（案）
+```
+【定番スタイル: Klook予約可能スポットの参考候補】
+以下は今回のエリアで、外国人観光客・駐在員に人気の定番アクティビティです。
+コースの1スポットとして自然に組み込める場合は、名称を変更せずそのまま採用してください（無理に入れる必要はありません。コース全体のテーマに合わなければ使わなくてよい）。
+- Gardens by the Bay Ticket
+- Marina Bay Sands Skypark Observation Deck Ticket
+...(上位5件)
+```
+- **「無理に入れる必要はない」という一文を必ず含める**（Klook候補が地理的・テーマ的に不自然な場合まで強制的に組み込ませないため。設計書23フェーズ1で確立した「AIのおすすめが広告主導にならない」という信頼性方針を踏襲するため必須の文言）
+- この差し込みブロックは`resolvedStyle === '定番'`の場合のみ`prompt`テンプレート文字列に連結される。`'ローカル'`/`'ニッチ'`/未選択時は空文字列（何も連結されない）
+
+#### 2-4. 生成直後の即時マッチング（前述D案の折衷案）
+- `POST /api/courses/generate`のレスポンス構築処理（1957〜2034行目付近）に、`resolvedStyle === '定番'`かつ今回Klook候補を渡した場合のみ実行される後処理を追加
+- `course.spots[].name`と、プロンプトに渡した候補リストの`productName`を単純比較（trim + 大文字小文字無視）
+- 一致した場合、該当スポットに`affiliateLink`フィールドを直接埋め込む（値は候補データが持つ`Affiliate Link`のURL）
+- 一致しない場合は何もしない（`match-affiliate-links.js`の次回実行に委ねる）
+
+### 3. `match-affiliate-links.js`との関係
+- 既存の`match-affiliate-links.js`は無変更（フェーズ1のインクリメンタル半自動フローはそのまま継続運用）
+- フェーズ1.5の即時マッチング（2-4）は、`match-affiliate-links.js`の役割を代替するものではなく、**「AIが候補をそのまま採用した明白なケースのみ」を対象にした限定的な即時反映**という位置づけ。それ以外の表記ゆれケースは引き続き人力確認フローに委ねる
+
+## 変更するファイル一覧
+
+### 新規
+- `data/klook-catalog-sg-areas.json`（エリアタグ付け結果のキャッシュ、スラッグキー）
+- `scripts/enrich-klook-areas.js`（エリアタグ付けエンリッチメントスクリプト、インクリメンタル対応、`--dry-run`対応）
+
+### 変更
+- `server.js`:
+  - 新規関数`getKlookCandidatesForArea(resolvedArea, limit)`追加
+  - `POST /api/courses/generate`内、`resolvedStyle === '定番'`の場合のみ実行される新規ガード節を追加（プロンプト差し込み＋生成直後の即時マッチング）
+  - **`'ローカル'`/`'ニッチ'`分岐・既存`styleNote`変数・既存プロンプトテンプレートの他の部分は一切変更しない**
+- 変更なし（明示）: `public/app.js`（フロントエンドの表示ロジックはフェーズ1の`renderCourseDetail`/`renderCourseResultHtml`の仕組みをそのまま使う。`affiliateLink`フィールドが生成時点で既に付与されているスポットも、フェーズ1で実装済みの「チケット情報」テキストリンク表示ロジックがそのまま機能するため、フロントエンド側の変更は不要と想定される）
+- 変更なし: `public/index.html`・`public/sw.js`（サーバーサイドのみの変更のため、キャッシュバスティングは今回不要。ただし実装フェーズで表示側に軽微な調整が必要になった場合はこの限りではない）
+- 変更なし: `scripts/match-affiliate-links.js`、`scripts/generate-model-courses.js`（対象外）
+
+## データモデルの変更
+- 新規ファイル`data/klook-catalog-sg-areas.json`の追加のみ。既存ファイル（`events.json`・`model-courses.json`・`community-courses.json`・`affiliate-links.json`）の構造変更なし
+- `POST /api/courses/generate`のレスポンス（`spots[]`）に、`style === '定番'`かつ即時マッチング成立時のみ`affiliateLink`フィールドが追加される場合がある。これは既存フェーズ1で`GET /api/courses`のレスポンスに対して行われている拡張と**同じフィールド名・同じ意味**であり、後方互換性の考え方も同一（未知フィールドとして無視される）
+
+## APIの変更
+- `POST /api/courses/generate`のリクエスト構造: 変更なし（既存の`conditions.style`をそのまま読むだけ）
+- `POST /api/courses/generate`のレスポンス構造: 拡張のみ（`style === '定番'`時、条件が揃えば`spots[].affiliateLink`が追加される場合がある）。非破壊的追加のため後方互換
+- `POST /api/courses/candidates`: 変更なし
+- `GET /api/courses`: 変更なし（既存の`embedAffiliateLinks()`が引き続き機能。生成時点で既に`affiliateLink`が付与されているスポットも、`community-courses.json`に保存された後は同じ仕組みで読み出される）
+
+## フロントエンドの変更
+- 想定上は変更不要（前述の通り）。ただし実装フェーズで以下を確認すること:
+  - コース生成直後のプレビュー画面（`renderCourseResultHtml`、`public/app.js` 3509行目〜）で、生成直後に`affiliateLink`が付与されたスポットに「チケット情報」リンクが正しく表示されるか（フェーズ1で該当箇所に実装済みのはずだが、生成直後フローでの表示は未検証のため確認が必要）
+  - 新規UI文字列は今回発生しない想定（既存の`affiliateInfoLink`キーをそのまま使うため）。万一新規文言が必要になった場合はi18nルール（`STRINGS.ja`/`STRINGS.en`同時追加）に従うこと
+
+## ⚠️ データ共有（Web版/App Store版）への影響（CLAUDE.md必須確認事項）
+
+1. **後方互換性**:
+   - `POST /api/courses/generate`のレスポンスへの`spots[].affiliateLink`拡張は非破壊的追加のみ。旧App Store版アプリはこの新規フィールドを単に無視する（フェーズ1で確立済みの考え方をそのまま踏襲）
+   - リクエスト構造は変更しないため、旧App Store版が送るリクエストにも影響なし
+2. **影響範囲**:
+   - `server.js`の変更は**Web版・App Store版の両方に即座に影響する**（データ層共有のため）。ただし新規追加ロジックは`style === '定番'`かつコース新規生成時のみ発火するため、影響範囲は限定的
+   - 新規ファイル`data/klook-catalog-sg-areas.json`はサーバーローカルの参照データであり、クライアントに直接配信されない（`GET /api/courses`等のレスポンスには含まれない）ため、旧App Store版への影響はゼロ
+   - フロントエンド変更が不要と想定される（想定通りなら）App Store版への新規TestFlightビルド・審査は不要
+3. **リリースタイミング**:
+   - サーバーサイドのみの変更（想定通りフロントエンド変更が不要な場合）は、非破壊的追加のためWeb版先行デプロイで問題なく、`pm2 restart`のみで即時Web版・App Store版両方に反映される
+   - **エンリッチメントスクリプト（`enrich-klook-areas.js`）の実行はデプロイ作業とは独立した一度限りの人力オペレーション**。実行タイミングはコード配置後、`POST /api/courses/generate`の変更を有効化する前に済ませておく必要がある（`data/klook-catalog-sg-areas.json`が存在しない状態でも`getKlookCandidatesForArea()`が例外を投げずフォールバック動作する設計にすること、下記受け入れ基準参照）
+
+## 受け入れ基準
+
+### 正常系
+1. `conditions.style === '定番'`かつ`conditions.area`が`CITY_COURSE_AREAS.sg`の6値いずれかで指定されている状態でコース生成すると、該当エリア（Sentosaマッピング含む）のKlook候補がプロンプトに含まれる
+2. AIが渡された候補の商品名をそのまま採用した場合、生成レスポンスの該当スポットに`affiliateLink`が即時付与される
+3. AIが候補を採用しなかった場合（コーステーマに合わないと判断した場合）でもコース生成自体は正常に完了する（強制組み込みではない）
+4. `node scripts/enrich-klook-areas.js`を実行すると、`data/klook-catalog-sg-areas.json`が生成され、238件（CSV件数）すべてに`area`が付与される
+5. `enrich-klook-areas.js`を再実行した場合、CSVに変更がなければ処理対象0件で即座に終了する（インクリメンタル動作）
+
+### 失敗系・エッジケース
+6. `conditions.area`が未指定（null）の状態で`style === '定番'`が選ばれた場合でもコース生成はエラーなく完了する（エリア横断の候補提示、または候補提示自体をスキップするフォールバックのいずれかで対応。実装時にどちらを採るか確定すること、後述リスク欄）
+7. `data/klook-catalog-sg-areas.json`が存在しない場合（`enrich-klook-areas.js`未実行の状態）でも、`POST /api/courses/generate`はエラーを起こさず、Klook候補なしの従来通りの生成を行う（フェーズ1の`loadAffiliateLinks()`と同様、ファイル未存在時は空扱いで握りつぶすフェイルセーフ設計とする）
+8. `conditions.style`が`'ローカル'`または`'ニッチ'`の場合、Klook候補抽出関数`getKlookCandidatesForArea()`が一切呼ばれないこと（コード上のガード節の外側にあるため呼びようがない構造だが、実装レビューで明示的に確認する）
+9. `conditions.style`が未選択（null）の場合も同様にKlook候補が一切登場しないこと
+10. `enrich-klook-areas.js`実行中にHaiku APIが一部バッチで失敗しても、他のバッチの処理は継続し、失敗分は次回実行時に再試行対象として残る（`fill-genres.js`の「バッチごとのtry/catch」パターンを踏襲）
+11. Sentosa関連商品が`area: 'West'`または`'Island-wide'`のコース生成でのみ候補プールに入り、`'Central'`/`'East'`/`'North'`/`'North-East'`のコース生成には混入しないこと
+
+### 共通
+12. 旧バージョンのApp Storeアプリが、サーバー変更後も一切のクラッシュ・表示崩れなく従来通り動作し続ける
+13. Web版・App Store版どちらでも既存のコース生成・閲覧機能（`定番`以外のスタイル含む）に回帰がない
+
+## ⚠️ checker向け重点確認観点（「ローカル」「ニッチ」への非影響保証）
+
+builderの実装完了後、checkerは特に以下を重点的に確認すること:
+
+1. **`grep`等で`getKlookCandidatesForArea`の呼び出し箇所を洗い出し、それが`if (resolvedStyle === '定番')`（またはそれと同義の単一条件）の内側にのみ存在することをコードレビューで直接確認する**（実行してみて偶然通らなかった、ではなく、コード構造として物理的に到達不可能であることを確認する）
+2. `resolvedStyle`の三項演算子チェーン（既存の`styleNote`生成部分）自体の文言・分岐ロジックが一切変更されていないことを`git diff`で確認する（"ローカル"/"ニッチ"のプロンプト文言に1文字の差分もないこと）
+3. `conditions.style = 'ローカル'`および`'ニッチ'`を指定した実際のコース生成リクエストを最低1回ずつ試行し、レスポンスの`spots[]`に`affiliateLink`フィールドが（フェーズ1の事後マッチング経由以外で）一切含まれていないことを確認する
+4. `conditions.style`未指定（デフォルト動作）でも同様にKlook候補が混入しないことを確認する
+5. 新規追加コード（Klook候補抽出・プロンプト差し込み・即時マッチング）が、既存の`resolvedPurpose`/`resolvedOccasion`/`resolvedFood`/`resolvedTransport`等、他の条件分岐処理に一切触れていない（変数名の衝突・意図しない上書きがない）ことを確認する
+
+## スコープ外（今回作らないもの）
+- `scripts/generate-model-courses.js`（旧世代の条件体系、`model-courses.json`は現状空配列で実質未稼働）への対応
+- `POST /api/courses/candidates`（Haikuによる3択候補生成）へのKlook候補注入。スポット配列を持たないため対象外
+- BKK/SYD都市への対応（現在両都市は一時停止中）
+- Klookカタログの継続的な自動更新（CSVの再エクスポート自体は引き続き人力オペレーション。フェーズ1と同様）
+- エリアタグの精度検証・修正のための管理画面やCLI編集ツール（誤判定が見つかった場合は`data/klook-catalog-sg-areas.json`を直接編集する運用とする）
+- `定番`スタイル以外のスタイルへのKlook要素拡大（将来的な拡大があっても本設計書のスコープには含まれない。改めてユーザー判断・別設計が必要）
+- Klook候補の「AIが実際に採用したかどうか」の集計・分析（採用率のモニタリング等は将来課題）
+- 生成後の即時マッチングが失敗した場合の自動リトライ・自動修正（`match-affiliate-links.js`の次回実行に委ねるフォールバックのみ）
+
+## リスク・未解決の質問
+
+1. **【未解決・実装時要判断】`conditions.area`未指定時のKlook候補提示方針**: エリア指定なしで`定番`スタイルが選ばれた場合、(a)全エリア横断で上位N件を提示する、(b)候補提示自体をスキップする（エリア不明な状態でKlook候補を混ぜるとAIが地理的に不整合なコースを作るリスクがあるため）、のどちらを採るか未確定。設計時点では(b)の方が安全側に倒せると考えられるが、実装フェーズで判断すること
+2. **【未解決】Sentosaのエリアマッピングルールの妥当性**: `West`/`Island-wide`双方にSentosa候補を混入させる設計としたが、実際にAIが「Westエリア」コース生成でSentosa（本土から離れた島）を組み込むと地理的にやや不自然な提案になるリスクがある。運用してみて不自然さが目立つ場合、Sentosaは`Island-wide`専用に絞る等の調整が必要になる可能性がある
+3. **【未解決】Haikuによるエリア分類の精度**: 商品名だけから正確なエリア判定ができない商品（地名を含まない体験系商品等）が一定数存在すると想定される。`enrich-klook-areas.js`の`--dry-run`結果を人力で全件チェックすることが望ましいが、238件を人力で全チェックする運用コストは軽くない。誤判定の許容度（どの程度なら許容するか）は未確定
+4. **【未解決】即時マッチングの一致率**: AIが「候補の商品名をそのまま使う」指示にどれだけ忠実に従うかは実装・運用してみないと分からない。一致率が低い場合、即時マッチングの価値が薄く、結局`match-affiliate-links.js`の定期実行頼みになる可能性がある（それ自体は許容範囲だが、期待値としては認識しておくべき）
+5. **【未解決】プロンプト肥大化によるコース生成品質への影響**: Klook候補ブロックの追加により`定番`スタイルのプロンプトが長くなる。既存の生成品質（他の条件との整合性チェック含む、1970〜2010行目の乖離チェックロジック）に悪影響がないか、実装後に複数回のコース生成で品質確認が必要
+6. **軽微リスク: `data/klook-catalog-sg-areas.json`のメンテナンス漏れ**: CSV（`data/klook-catalog-sg.csv`）が将来再エクスポートされて件数・内容が更新された場合、`enrich-klook-areas.js`の再実行を忘れると新商品にエリアタグが付かず候補プールから漏れ続ける。運用上の注意点として記録するのみで、自動化の対象外（スコープ外に明記済み）
+7. **軽微リスク: `Product Name`が英語表記ではない商品が混在する可能性**: 2026-07-12時点で確認したCSVは英語版に差し替え済みとのことだが、仮に一部商品名が日本語のまま残っている場合、プロンプト内でAIに「英語正式名称のまま使う」よう指示しても不整合が起きる可能性がある。実装時にCSV全件が英語表記であることを再確認すること
+
+## 承認状況
+未承認（今回新規作成、ユーザー承認待ち）
