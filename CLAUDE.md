@@ -633,3 +633,10 @@ document.addEventListener('touchstart', () => { _touchCapableDetected = true; },
 @planner → 設計書作成 → ユーザー承認
 「承認します。@orchestrator 実行して」
 → builder→checker→closerが自動で動く
+
+## `.claude/plan.md`の扱い（2026-07-12ルール化）
+`.claude/`ディレクトリは基本的にgitignore対象だが、**`plan.md`だけは例外的にgit管理下に置く**（`.gitignore`に`.claude/*` + `!.claude/plan.md`で明示）。理由: 過去に「設計だけして実装未着手」のまま別タスクの設計に押されて`plan.md`が上書きされ、2026-07-11のGoogle/Apple IDログイン設計書が実物ごと失われる事故が発生したため。
+
+- **`plan.md`は必ず末尾に追記する。既存の設計書（実装済み・未実装問わず）を削除・上書きしない。** 新しい設計書は「設計書N」という連番見出しで追記していく
+- 実装未着手のまま長期間放置される設計書があっても構わない（`.claude/next.md`に要約とステータスを記録しておけば十分）。`plan.md`自体は削除しない
+- ファイルが肥大化してきたら、削除ではなく「古い設計書を`.claude/plan-archive.md`のような別ファイルに移す」形で対応する（移す場合も内容は保持したままにする）

@@ -2,7 +2,8 @@
 node_modules/
 logs/
 *.log
-.claude/
+.claude/*
+!.claude/plan.md
 data/
 
 # iOS署名関連（絶対にコミットしない）
