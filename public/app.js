@@ -1003,7 +1003,7 @@
       // データを丸ごと入れ替えるため、カードDOMキャッシュも破棄する（設計書21: キャッシュ無効化条件）
       // これから grid.innerHTML を再代入して既存カードを破棄するので、キャッシュ内の参照も併せて捨てる
       _cardElCache.clear();
-      grid.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
+      grid.innerHTML = `<div id="_events-loading-placeholder" style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
         <div style="font-size:28px;margin-bottom:8px;">⏳</div>
         <div style="font-size:15px;">${t('loadingEvents')}</div>
       </div>`;
@@ -1430,6 +1430,10 @@
 
     function renderEventCards() {
       const grid = document.getElementById('cards-grid');
+
+      // loadEventData() が表示したローディングプレースホルダーは .spot-card クラスを持たないため
+      // 下記の差分更新クリーンアップ処理の対象外になり、放置すると一覧の末尾に永久に残ってしまう（要削除）
+      document.getElementById('_events-loading-placeholder')?.remove();
 
       // おすすめモードON かつジャンル未設定 → グリッド内に案内を表示
       // 注意: grid.innerHTML を丸ごと再代入すると、キャッシュ済みカード（Instagram埋め込みiframe含む）が
@@ -3098,7 +3102,7 @@
               <div class="course-timeline-body">
                 <div class="course-timeline-name">${s.emoji || ''} ${escapeHtml(s.name)} <span style="font-size:12px;color:var(--light-gray);">[${escapeHtml(s.duration)}]</span></div>
                 <div class="course-timeline-desc">${escapeHtml(s.description || '')}</div>
-                <div class="course-timeline-meta">${escapeHtml(s.address || '')}${s.affiliateLink ? ` · <a onclick="if(!_touchCapableDetected) openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a>` : ''}</div>
+                <div class="course-timeline-meta">${escapeHtml(s.address || '')}${s.affiliateLink ? ` · <a onclick="openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a>` : ''}</div>
               </div>
             </div>
           `).join('')}
@@ -3520,7 +3524,7 @@
             <div class="course-timeline-body">
               <div class="course-timeline-name">${s.emoji || ''} ${escapeHtml(s.name)} <span style="font-size:12px;color:var(--light-gray);">[${escapeHtml(s.duration || '')}]</span></div>
               <div class="course-timeline-desc">${escapeHtml(s.description || '')}</div>
-              ${s.affiliateLink ? `<div class="course-timeline-meta"><a onclick="if(!_touchCapableDetected) openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a></div>` : ''}
+              ${s.affiliateLink ? `<div class="course-timeline-meta"><a onclick="openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a></div>` : ''}
             </div>
           </div>
         `).join('')}
