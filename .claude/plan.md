@@ -3229,3 +3229,55 @@ Klook公式ウィジェット埋め込みコード（`<ins class="klk-aff-widget
 - クリック計測（フェーズ1の`POST /api/affiliate-click`に相当する仕組み）
 - ウィジェット自体の表示位置カスタマイズ（Klook側テンプレートの見た目はダッシュボード側の設定に依存し、本実装からは制御しない）
 - 変数を計算しておきながらHTML生成で使っていない（`const liked = ...`のみでその後未使用）ようなデッドコードは、機能欠落の隠れたサインになりうる。今回のように「変数は残っているのにUIに反映されていない」箇所は、リファクタリング時に見つけたら疑いの目を向けると良い
+
+# 設計書31 — 広告表示機能・Klookアフィリエイトウィジェットの表示改善（カード化・PRラベル・カード間差し込み）
+
+## 背景
+直前に実装したKlook公式ウィジェット（設計書30、`_insertKlookWidget()`、イベント一覧最下部固定）が「素のiframeが浮いて見えて味気ない」とフィードバックがあり、以下3点の改善を実施した:
+1. 他のイベントカードと揃えたラッパースタイル（角丸・背景・余白）
+2. 小さな「PR」ラベル（既存i18nキー`prBadgeLabel`を再利用、新規キー追加なし）
+3. 挿入位置を最下部固定から「他のカードの間」へ変更
+
+自前PRカード機能（設計書29、`sponsored-cards.json`ベース、現在データ空で実質非表示）との同時表示時の間隔調整は、今回はユーザー判断により考慮不要（データが実際に入る段階で改めて調整する）。
+
+## 実装内容
+
+### `public/app.css`
+`.spot-card`定義の直後に新規クラスを追加。`.spot-card`自体は付与しない（`fadeUp`アニメーション・`:active`時の`transform`等、iframeを含む要素に適用したくない既存ルールが多いため独立クラスとした）。
+```css
+.klook-widget-card { background: white; border-radius: var(--radius-card); box-shadow: var(--shadow-card); overflow: hidden; padding: 14px 14px 16px; }
+.klook-widget-card__label { font-size: 11px; font-weight: 700; color: var(--warm-gray); letter-spacing: 0.05em; margin-bottom: 8px; }
+.klook-widget-card__body { display: flex; justify-content: center; }
+```
+
+### `public/app.js`
+- `_insertKlookWidget(containerEl)`を`_createKlookWidgetEl()`に置き換え。ラッパー`<div class="klook-widget-card">`＋ラベル`<div class="klook-widget-card__label" data-i18n="prBadgeLabel">`＋`<div class="klook-widget-card__body">`を生成し、bodyの中にKlook公式の`<ins>`+`<script>`（属性値は無変更）を`appendChild`する
+- 「1回だけ生成し使い回す」方式に変更: `_klookWidgetInserted`フラグに加え、モジュールレベル変数`let _klookWidgetEl = null;`を新設。初回のみ`_createKlookWidgetEl()`を実行して`_klookWidgetEl`に保存し、以降は再生成せず`insertBefore`で位置を動かすだけにする（`_getOrCreateCardEl()`のパターンに近い）
+- 挿入位置: `renderEventCards()`末尾の最下部固定挿入処理（旧1718〜1729行目）を削除。代わりに設計書29のPRカード位置決めロジックと同じパターンで、`filtered`配列に新規マーカーキー`__klookWidget`を`Math.min(7, filtered.length)`（8番目あたり）で`splice`挿入する。`filtered.forEach`のDOM構築ループに`__klookWidget`判定の分岐を追加し、未生成なら生成して`insertBefore`、生成済みならそのまま同じ要素を`insertBefore`で位置移動するだけ（再生成しない）
+- おすすめモード中（`_recommendModeActive`が`true`）はKlookウィジェットのマーカー挿入自体をスキップし非表示にする（PRカードと同じ方針）
+- 表示されなかった回（`klookWidgetUsed`が`false`）は`_klookWidgetEl`を`display:none`にするのみで、DOM要素・iframeは破棄しない
+- `eventOnlyCount`の算出（件数表示・空状態判定）を`__sponsored`に加え`__klookWidget`も除外するよう修正（設計書30時点では最下部固定挿入で`filtered`に含まれなかったため対象外だったが、`filtered`に混入する方式へ変更したことに伴う必須修正）
+- **既存の潜在バグの同時修正**: `loadEventData()`が都市切替・再フェッチ時に`grid.innerHTML`を再代入してDOM要素を破棄するが、`_klookWidgetInserted`フラグと`_klookWidgetEl`変数がクリアされない問題があった。`_cardElCache.clear()`と同じ箇所に`_klookWidgetInserted = false; _klookWidgetEl = null;`のリセット処理を追加
+
+## キャッシュバスティング
+- `public/index.html`: `app.js?v=20260713g→20260713h`、`app.css?v=20260712e→20260713h`
+- `public/sw.js`: `CACHE_NAME`: `sg-weekend-v605→v606`
+
+## 厳守事項（遵守済み）
+- Klookの埋め込みコード自体（`data-wid`等の属性値、外部スクリプトURL）は無変更
+- `.spot-card`クラス自体は付与していない（独立クラス`klook-widget-card`として実装）
+- 設計書29のコード（`renderSponsoredCard()`等）・データは無変更（`git diff`で確認済み）
+
+## 検証結果（checker実施済み）
+- `git diff`で`_insertKlookWidget()`→`_createKlookWidgetEl()`関連以外の無関係な既存ロジック（`renderSponsoredCard()`等）が変更されていないことを確認
+- `prBadgeLabel`が`STRINGS.ja`/`STRINGS.en`両方に既存定義済みであることを確認（新規i18nキー追加不要、i18n欠落なし）
+- `.klook-widget-card`が`.spot-card`クラスを持たないため、既存の差分更新クリーンアップループ（`.spot-card`限定で判定）の対象外であることをコードレビューで確認
+- `node --check public/app.js`で構文エラーなし
+- `pm2 restart sg-weekend`後エラーログなし（既存の無関係な警告〈APNs未設定・course-validateスキップ〉のみ、新規エラーなし）
+- 新バージョンの`app.js`/`app.css`が200 OKで配信され、更新後の`app.js`に`_createKlookWidgetEl`/`klook-widget-card`/`__klookWidget`が含まれることを確認
+- **未検証（サーバー環境の制約、設計書30と同様）**: サーバーにヘッドレスChromium実行に必要な共有ライブラリが不足しており実ブラウザでの目視確認ができなかったため、カード風の見た目・PRラベルの表示位置・カード間差し込み位置の実際の見え方はユーザー自身のブラウザ確認が必要
+- **未検証（実機）**: iOS版（Capacitor/TestFlight）での見た目・タップ挙動は未検証。iOS版への反映には別途TestFlightビルドが必要
+
+## スコープ外（今回未実装）
+- 自前PRカード（設計書29）とKlookウィジェット同時表示時の間隔調整（データが実際に入る段階で改めて調整）
+- 複数スポンサーのローテーション、クリック計測、カテゴリ一致判定（設計書30から継続してスコープ外）

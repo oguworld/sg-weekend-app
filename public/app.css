@@ -447,6 +447,26 @@
     .spot-card:active {
       transform: scale(0.99);
     }
+    /* Klookアフィリエイトウィジェット用ラッパー（設計書31: カード風の見た目に統一）
+       .spot-card は付与しない（fadeUp/:activeのtransform等、iframeを含む要素に適用したくないルールが多いため独立クラス） */
+    .klook-widget-card {
+      background: white;
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      padding: 14px 14px 16px;
+    }
+    .klook-widget-card__label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--warm-gray);
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .klook-widget-card__body {
+      display: flex;
+      justify-content: center;
+    }
     .ending-soon-banner {
       font-size: 14px;
       font-weight: 700;

@@ -1006,6 +1006,9 @@
       // データを丸ごと入れ替えるため、カードDOMキャッシュも破棄する（設計書21: キャッシュ無効化条件）
       // これから grid.innerHTML を再代入して既存カードを破棄するので、キャッシュ内の参照も併せて捨てる
       _cardElCache.clear();
+      // Klookウィジェット（設計書31）もこの再代入で破棄されるため、フラグ・保持していたDOM要素参照をリセットする
+      _klookWidgetInserted = false;
+      _klookWidgetEl = null;
       grid.innerHTML = `<div id="_events-loading-placeholder" style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
         <div style="font-size:28px;margin-bottom:8px;">⏳</div>
         <div style="font-size:15px;">${t('loadingEvents')}</div>
@@ -1282,11 +1285,23 @@
     let _cardTmpContainer = null;
     let _sponsoredCardTmpContainer = null; // PRカード（設計書29）専用の使い回しDOMコンテナ
 
-    // Klookアフィリエイトウィジェット（設計書30、軽量な試験導入）
-    // 公式ダッシュボードが提供する <ins> + <script> をそのまま埋め込む。ローテーション等は行わず1回だけ挿入する
+    // Klookアフィリエイトウィジェット（設計書30、軽量な試験導入 → 設計書31でカード風の見た目・カード間差し込みに改善）
+    // 公式ダッシュボードが提供する <ins> + <script> をそのまま埋め込む。ローテーション等は行わず1回だけ生成し使い回す
     let _klookWidgetInserted = false;
-    function _insertKlookWidget(containerEl) {
-      if (!containerEl) return;
+    let _klookWidgetEl = null; // 生成済みのラッパーDOM要素（.klook-widget-card）。以降は再生成せず insertBefore で位置を動かすだけにする
+    function _createKlookWidgetEl() {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'klook-widget-card';
+      wrapper.id = '_klook-widget-container';
+
+      const label = document.createElement('div');
+      label.className = 'klook-widget-card__label';
+      label.setAttribute('data-i18n', 'prBadgeLabel');
+      label.textContent = t('prBadgeLabel');
+
+      const body = document.createElement('div');
+      body.className = 'klook-widget-card__body';
+
       const ins = document.createElement('ins');
       ins.className = 'klk-aff-widget';
       ins.setAttribute('data-wid', '127020');
@@ -1308,8 +1323,12 @@
       script.async = true;
       script.src = 'https://affiliate.klook.com/widget/fetch-iframe-init.js';
 
-      containerEl.appendChild(ins);
-      containerEl.appendChild(script);
+      body.appendChild(ins);
+      body.appendChild(script);
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(body);
+      return wrapper;
     }
 
     // 既存キャッシュがあれば再利用（新規要素は生成しない）、無ければ renderEventCard() の文字列から新規生成する。
@@ -1630,6 +1649,13 @@
         filtered.splice(insertAt, 0, { __sponsored: true, card: _sponsoredCard });
       }
 
+      // Klookアフィリエイトウィジェット（設計書31）: おすすめモード中は非表示。8枚目あたりに1件だけ差し込む
+      // 設計書29のPRカードと同時表示時の間隔調整は今回スコープ外（ユーザー判断、データが実際に入る段階で改めて調整）
+      if (!_recommendModeActive && filtered.length > 0) {
+        const klookInsertAt = Math.min(7, filtered.length);
+        filtered.splice(klookInsertAt, 0, { __klookWidget: true });
+      }
+
       // 設計書21: DOM要素キャッシュによる差分更新（Instagram埋め込みiframeの再読み込み防止）
       // キャッシュキーは id + 言語（言語切替時は必ず作り直す）
       const lang = getLang();
@@ -1637,6 +1663,7 @@
       let hasNewCard = false;
       let anchor = null; // 直前に配置した可視カード（この直後に次のカードを挿入する）
       let sponsoredUsed = false;
+      let klookWidgetUsed = false;
 
       filtered.forEach((e, i) => {
         // PRカード用マーカー: 専用のDOM要素1つを毎回再生成して使い回す（_cardElCache非対象）
@@ -1650,6 +1677,21 @@
           const desiredNext = anchor ? anchor.nextSibling : grid.firstChild;
           grid.insertBefore(el, desiredNext);
           anchor = el;
+          return;
+        }
+        // Klookウィジェット用マーカー: 初回のみ生成し、以降は同じDOM要素を insertBefore で位置移動するだけ（再生成しない）
+        if (e && e.__klookWidget) {
+          if (!_klookWidgetEl) {
+            _klookWidgetEl = _createKlookWidgetEl();
+          }
+          klookWidgetUsed = true;
+          _klookWidgetEl.style.display = '';
+          const desiredNext = anchor ? anchor.nextSibling : grid.firstChild;
+          if (desiredNext !== _klookWidgetEl) {
+            grid.insertBefore(_klookWidgetEl, desiredNext);
+          }
+          _klookWidgetInserted = true;
+          anchor = _klookWidgetEl;
           return;
         }
         const cacheKey = e.id + '::' + lang;
@@ -1691,6 +1733,11 @@
         grid.querySelectorAll('.sponsored-card').forEach(n => n.remove());
       }
 
+      // Klookウィジェットが今回表示されなかった場合（おすすめモード中等）、DOM要素は破棄せず display:none で隠すのみ（iframe維持）
+      if (!klookWidgetUsed && _klookWidgetEl) {
+        _klookWidgetEl.style.display = 'none';
+      }
+
       // フィルタで表示対象から外れたカードは破棄せず display:none であとに残す（同一言語の場合のみ再利用対象として保持）。
       // 言語切替で無効化された旧言語のカードは、貯まり続けないようDOM・キャッシュ双方から完全に削除する
       // PRカード（.sponsored-card）は _cardElCache の対象外・別ロジックで管理しているためこのループの対象外
@@ -1708,25 +1755,12 @@
         }
       });
 
-      // 件数表示・空状態判定は PR カードマーカーを除いたイベント件数のみを対象にする
-      const eventOnlyCount = filtered.filter(e => !(e && e.__sponsored)).length;
+      // 件数表示・空状態判定は PR カードマーカー・Klookウィジェットマーカーを除いたイベント件数のみを対象にする
+      const eventOnlyCount = filtered.filter(e => !(e && (e.__sponsored || e.__klookWidget))).length;
       resultCount.textContent = eventOnlyCount + t('countSuffix');
       emptyState.classList.toggle('visible', eventOnlyCount === 0);
       updatePinButtons();
       if (hasNewCard) loadInstagramEmbeds();
-
-      // Klookアフィリエイトウィジェット（設計書30、軽量な試験導入）: 一覧最下部に1回だけ挿入する
-      if (!_klookWidgetInserted) {
-        let klookContainer = document.getElementById('_klook-widget-container');
-        if (!klookContainer) {
-          klookContainer = document.createElement('div');
-          klookContainer.id = '_klook-widget-container';
-          klookContainer.style.cssText = 'display:flex;justify-content:center;padding:16px 0;';
-          grid.appendChild(klookContainer);
-        }
-        _insertKlookWidget(klookContainer);
-        _klookWidgetInserted = true;
-      }
     }
 
     function applyFilters() {
