@@ -1647,6 +1647,7 @@ app.post('/api/calendar/:groupId/notify', calNotifyLimit, async (req, res) => {
 
 // スポット名 → アフィリエイトリンク情報 のマッピングを読み込む（設計書23フェーズ1）
 // ファイルが存在しない・空でも例外を投げず {} を返す（受け入れ基準5）
+// 【設計書32】呼び出し元（GET /api/courses）は一時停止中。関数自体は削除せず残置（復活時はそのまま呼び出しを戻せる）。
 function loadAffiliateLinks(city) {
   try {
     const p = path.join(__dirname, 'data', city, 'affiliate-links.json');
@@ -1659,6 +1660,7 @@ function loadAffiliateLinks(city) {
 
 // コース配列の各スポットに、該当するアフィリエイトリンクを埋め込んだコピーを返す
 // （既存フィールドは一切変更せず、affiliateLink フィールドを追加するのみ）
+// 【設計書32】呼び出し元（GET /api/courses）は一時停止中。関数自体は削除せず残置（復活時はそのまま呼び出しを戻せる）。
 function embedAffiliateLinks(courses, affiliateLinks) {
   if (!affiliateLinks || Object.keys(affiliateLinks).length === 0) return courses;
   return courses.map(course => {
@@ -1678,18 +1680,21 @@ app.get('/api/courses', (req, res) => {
 
   const communityPath = path.join(__dirname, 'data', city, 'community-courses.json');
   const community = fs.existsSync(communityPath) ? JSON.parse(fs.readFileSync(communityPath)) : [];
-  const affiliateLinks = loadAffiliateLinks(city);
+  // アフィリエイトリンク埋め込みは設計書32によりUI側の判断で一時停止中。
+  // 関数（loadAffiliateLinks/embedAffiliateLinks）・データ・スクリプトは削除せず残置。
+  // 復活する場合はこの呼び出し（loadAffiliateLinksの取得と、下記2箇所のembedAffiliateLinks呼び出し）を戻す。
+  // const affiliateLinks = loadAffiliateLinks(city);
 
   if (tab === 'preset') return res.json([]);
   if (tab === 'community') {
     // 登録日が新しい順
     const sorted = [...community].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    return res.json(embedAffiliateLinks(sorted, affiliateLinks));
+    return res.json(sorted);
   }
   if (tab === 'popular') {
     // いいね数降順上位5件
     const sorted = [...community].sort((a, b) => b.likes - a.likes);
-    return res.json(embedAffiliateLinks(sorted.slice(0, 5), affiliateLinks));
+    return res.json(sorted.slice(0, 5));
   }
   res.json([]);
 });

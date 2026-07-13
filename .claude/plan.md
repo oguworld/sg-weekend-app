@@ -3281,3 +3281,43 @@ Klook公式ウィジェット埋め込みコード（`<ins class="klk-aff-widget
 ## スコープ外（今回未実装）
 - 自前PRカード（設計書29）とKlookウィジェット同時表示時の間隔調整（データが実際に入る段階で改めて調整）
 - 複数スポンサーのローテーション、クリック計測、カテゴリ一致判定（設計書30から継続してスコープ外）
+
+# 設計書32 — 広告表示機能フェーズ1「Klookアフィリエイトリンク」の一時停止（案A→案Bへ方針変更）
+
+## 背景
+コース詳細の「チケット情報」テキストリンク（フェーズ1、設計書23）について、当初はUI表示のみを非表示化しバックエンドは無変更とする案（案A）で進める予定だった。しかしユーザーが最終確認で「裏側のロジックは消さなくていいけど止めてください」と修正指示。これを受け、**バックエンドの処理自体（`GET /api/courses`が毎回`affiliateLink`を埋め込む計算・ファイル読み込み）を止める**方針（案B）に変更した。ただし関数定義・データファイル・スクリプトは削除しない。
+
+## 実装内容（`server.js`）
+`GET /api/courses`ハンドラ内、`community`/`popular`タブのレスポンス構築処理（1687行目・1692行目付近）で行われていた`embedAffiliateLinks(sorted, affiliateLinks)`の呼び出し2箇所を、単に`sorted`（`sorted.slice(0, 5)`）を返すよう変更した。`loadAffiliateLinks(city)`の呼び出し自体もコメントアウトし、無駄なファイル読み込みI/Oを止めた。
+
+**関数定義は削除していない**:
+- `loadAffiliateLinks(city)`（1650行目付近）: 関数定義そのまま残置。呼び出し元のみ停止
+- `embedAffiliateLinks(courses, affiliateLinks)`（1662行目付近）: 関数定義そのまま残置。呼び出し元のみ停止
+- 各関数の直前・呼び出し元コメントアウト箇所に「【設計書32】呼び出し元（GET /api/courses）は一時停止中。関数自体は削除せず残置（復活時はそのまま呼び出しを戻せる）。」というコメントを追加
+
+### `public/app.js`は無変更
+バックエンド側で`affiliateLink`フィールド自体がレスポンスに含まれなくなるため、フロントエンド側の既存の条件分岐（`renderCourseDetail()` 3293行目付近、`renderCourseResultHtml()` 3721行目付近の`s.affiliateLink ? ... : ''`）は自然に「リンクなし」側の分岐を通るようになり、コード変更なしで表示が消える。
+
+## 変更しないもの（削除・変更しなかったもの）
+- `loadAffiliateLinks()`/`embedAffiliateLinks()`の関数定義自体
+- `POST /api/affiliate-click`エンドポイント（2297行目付近）
+- `data/sg/affiliate-links.json`
+- `scripts/match-affiliate-links.js`
+- `public/app.js`の`openAffiliateLink()`関数、i18nキー`affiliateInfoLink`
+- イベント一覧側のKlook公式ウィジェット関連コード（設計書30・31、別物のため対象外）
+
+## 検証結果（checker実施済み）
+- 🔴Critical: なし
+- `GET /api/courses?city=sg&tab=community`・`?tab=popular`をcurlで確認、レスポンス内のスポットに`affiliateLink`フィールドが含まれなくなったことを確認（該当コース件数0件）
+- 住所表示（`s.address`）は従来通り表示されることを確認
+- `git diff`で`loadAffiliateLinks()`/`embedAffiliateLinks()`の関数定義が削除されておらずコメント追加のみであることを確認
+- `data/sg/affiliate-links.json`・`scripts/match-affiliate-links.js`・`public/app.js`/`index.html`/`sw.js`が無変更であることを確認
+- `POST /api/affiliate-click`をcurlで直接叩き、引き続き200応答・`data/affiliate-clicks.json`への追記が行われることを確認（検証用テストエントリは検証後に削除し元の状態へ復元済み）
+- 他都市（bkk）の`GET /api/courses`にも回帰なし（200応答）
+- 変更箇所（1650〜1695行目付近）がStripe無効化コメントブロック（47〜200行目付近）の外にあることを確認
+- `node --check server.js`で構文エラーなし、`pm2 restart sg-weekend`後エラーログなし（既存の無関係な警告〈trust proxy, APNs未設定, course-validateスキップ〉のみ）
+
+## デプロイ・申し送り
+- `pm2 restart sg-weekend`実行済み
+- ローカル`main`へのコミットのみ。**releaseブランチへのpush・TestFlightビルドはユーザーの明示指示があるまで実施しない**（今回の依頼にも含まれていない）
+- CLAUDE.mdの「広告表示機能フェーズ1: Klookアフィリエイトリンク」セクションを、「バックエンド側の埋め込み処理を一時停止中（関数・データ・スクリプトは残置、復活は`embedAffiliateLinks()`呼び出しを戻すだけ）」という正確な状態に更新済み
