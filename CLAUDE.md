@@ -126,6 +126,14 @@ sg-weekend-app/
 - コース生成AI・アフィリエイトリンク機能（フェーズ1）には一切手を加えていない。両フェーズとも広告要素とコース/イベント生成ロジックは意図的に分離
 - スコープ外（今回未実装）: PRカードのクリック計測（フェーズ1の`POST /api/affiliate-click`相当の仕組み）、`priority`フィールドを使った複数カード同時掲載・重み付け抽選、広告主向け管理画面・入稿フロー（`sponsored-cards.json`の直接編集が現状唯一の運用手段）
 
+## 広告表示機能: Klookアフィリエイトウィジェット試験導入（2026-07-13実装、設計書30）
+- フェーズ1（アフィリエイトリンク）・フェーズ2（自前PRカード、`sponsored-cards.json`）とは別に、ユーザーが「Klookアフィリエイトダッシュボードで生成した公式アクティビティバナーウィジェットをそのまま埋め込みたい」と方針転換したことを受けて追加した軽量な試験導入。複数スポンサーのローテーション・カテゴリ一致判定・クリック計測などのフル実装は行っていない
+- **実装**: `public/app.js`の`_insertKlookWidget(containerEl)`関数が、Klook公式ダッシュボードが発行した埋め込みコード（`<ins class="klk-aff-widget" data-wid="127020" data-adid="1337601" data-actids="117,127,119" data-prod="mul_act" data-price="true" data-width="336" data-height="280" data-currency="SGD">` + `https://affiliate.klook.com/widget/fetch-iframe-init.js`を読み込む`<script>`）をそのまま`document.createElement`で動的生成する。`renderEventCards()`末尾で`_klookWidgetInserted`フラグ（初回のみ）ガード付きに呼び出し、イベント一覧最下部（`#cards-grid`末尾）の専用コンテナ`#_klook-widget-container`へ挿入する
+- **設計方針**: カテゴリタブ切替のたびに再生成しない（フラグ＋コンテナ存在チェックの二重ガードで重複防止）。挿入位置は一覧最下部固定（`grid.appendChild()`）で、フェーズ2のPRカード（`grid.insertBefore()`でカード間に挿入）とは別ロジック・別位置のため競合しない。`#_klook-widget-container`は`.spot-card`クラスを持たないため、設計書21の差分更新クリーンアップループ（`.spot-card`クラス限定判定）の対象外
+- **フェーズ2との共存**: フェーズ2の`renderSponsoredCard()`/`_matchesCurrentCategory()`/`_pickSponsoredCardForToday()`/`openSponsoredCardLink()`は無変更のまま共存。`data/sg/sponsored-cards.json`が空配列のままなら実害なし。今回は両方式（自前PRカード＋Klook公式ウィジェット）が同時に有効な状態
+- `_isCapacitorApp`による分岐は実装していない（ウィジェット自体のリンク処理はKlook側のiframe内で完結する想定のため独自クリックハンドラは追加せず）。**iOS版（Capacitor/TestFlight）でのiframe内リンクタップの挙動は2026-07-13時点で未検証**
+- スコープ外（今回未実装）: 複数スポンサーのローテーション、日替わり選択ロジック、カテゴリ一致判定、クリック計測、ウィジェット表示位置のカスタマイズ
+
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
 - `server.js` の `/api/chat` エンドポイントは旧App Store版の後方互換のため残置（新規呼び出し元なし）

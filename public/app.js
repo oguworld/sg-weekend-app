@@ -1282,6 +1282,36 @@
     let _cardTmpContainer = null;
     let _sponsoredCardTmpContainer = null; // PRカード（設計書29）専用の使い回しDOMコンテナ
 
+    // Klookアフィリエイトウィジェット（設計書30、軽量な試験導入）
+    // 公式ダッシュボードが提供する <ins> + <script> をそのまま埋め込む。ローテーション等は行わず1回だけ挿入する
+    let _klookWidgetInserted = false;
+    function _insertKlookWidget(containerEl) {
+      if (!containerEl) return;
+      const ins = document.createElement('ins');
+      ins.className = 'klk-aff-widget';
+      ins.setAttribute('data-wid', '127020');
+      ins.setAttribute('data-adid', '1337601');
+      ins.setAttribute('data-actids', '117,127,119');
+      ins.setAttribute('data-prod', 'mul_act');
+      ins.setAttribute('data-price', 'true');
+      ins.setAttribute('data-lang', '');
+      ins.setAttribute('data-width', '336');
+      ins.setAttribute('data-height', '280');
+      ins.setAttribute('data-currency', 'SGD');
+      const insLink = document.createElement('a');
+      insLink.href = '//www.klook.com/';
+      insLink.textContent = 'Klook.com';
+      ins.appendChild(insLink);
+
+      const script = document.createElement('script');
+      script.type = 'text/javascript';
+      script.async = true;
+      script.src = 'https://affiliate.klook.com/widget/fetch-iframe-init.js';
+
+      containerEl.appendChild(ins);
+      containerEl.appendChild(script);
+    }
+
     // 既存キャッシュがあれば再利用（新規要素は生成しない）、無ければ renderEventCard() の文字列から新規生成する。
     // 戻り値: { el, isNew }
     function _getOrCreateCardEl(e, i, cacheKey) {
@@ -1684,6 +1714,19 @@
       emptyState.classList.toggle('visible', eventOnlyCount === 0);
       updatePinButtons();
       if (hasNewCard) loadInstagramEmbeds();
+
+      // Klookアフィリエイトウィジェット（設計書30、軽量な試験導入）: 一覧最下部に1回だけ挿入する
+      if (!_klookWidgetInserted) {
+        let klookContainer = document.getElementById('_klook-widget-container');
+        if (!klookContainer) {
+          klookContainer = document.createElement('div');
+          klookContainer.id = '_klook-widget-container';
+          klookContainer.style.cssText = 'display:flex;justify-content:center;padding:16px 0;';
+          grid.appendChild(klookContainer);
+        }
+        _insertKlookWidget(klookContainer);
+        _klookWidgetInserted = true;
+      }
     }
 
     function applyFilters() {

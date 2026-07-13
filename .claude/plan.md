@@ -3192,3 +3192,40 @@ CLAUDE.mdに記載のonclick/touchend二重登録問題や、直近commit `3294e
 - 複数PRカード同時掲載・優先度（`priority`フィールド）による重み付け抽選は未実装（現状`priority`フィールドはデータに存在するが選択ロジックには未使用、将来の拡張余地として温存）
 - 広告主向け管理画面・入稿フローは未整備（`sponsored-cards.json`の直接編集が現状唯一の運用手段）
 - 変数を計算しておきながらHTML生成で使っていない（`const liked = ...`のみでその後未使用）ようなデッドコードは、機能欠落の隠れたサインになりうる。今回のように「変数は残っているのにUIに反映されていない」箇所は、リファクタリング時に見つけたら疑いの目を向けると良い
+
+# 設計書30 — 広告表示機能・Klookアフィリエイトウィジェット試験導入（公式埋め込みコードそのまま利用）
+
+## 背景・方針転換
+直前に実装した設計書29（自前PRカード、`sponsored-cards.json`ベース）とは別に、ユーザーが「Klookアフィリエイトダッシュボードで生成した公式アクティビティバナーウィジェットをそのまま埋め込みたい」と方針転換。今回は「1回試してみる」という軽量な検証目的であり、複数スポンサーのローテーション・カテゴリ一致判定・クリック計測などのフル実装は行わない。設計書29のコード（`renderSponsoredCard()`/`_matchesCurrentCategory()`/`_pickSponsoredCardForToday()`/`openSponsoredCardLink()`）は削除・変更せず、そのまま共存させる方針（`data/sg/sponsored-cards.json`が空配列のままなら実害なし）。
+
+## 埋め込み対象コード（ユーザー提供、そのまま使用）
+Klook公式ウィジェット埋め込みコード（`<ins class="klk-aff-widget" data-wid="127020" data-adid="1337601" data-actids="117,127,119" data-prod="mul_act" data-price="true" data-lang="" data-width="336" data-height="280" data-currency="SGD">` + `https://affiliate.klook.com/widget/fetch-iframe-init.js`をロードする`<script>`）。
+
+## 実装内容（`public/app.js`）
+- `_klookWidgetInserted`（モジュールレベル`let`フラグ、1283行目付近）+ `_insertKlookWidget(containerEl)`関数（1286〜1313行目付近）を新規追加。`document.createElement`で`<ins>`・`<script>`をKlook提供仕様通りに動的生成し、引数のコンテナへ`appendChild`する
+- `renderEventCards()`末尾、`if (hasNewCard) loadInstagramEmbeds();`の直後（1717〜1727行目付近）に、`!_klookWidgetInserted`ガード付きで一覧最下部（`#cards-grid`末尾）に専用コンテナ`#_klook-widget-container`を生成し、`_insertKlookWidget()`を呼ぶ処理を追加。フラグにより挿入は初回の1回のみ（カテゴリタブ切替のたびに再生成しない）
+- 挿入位置は一覧グリッドの最下部固定（`grid.appendChild()`）。設計書29のPRカード（`grid.insertBefore()`でカード間に挿入）とは異なる位置・別ロジックのため競合しない
+- `#_klook-widget-container`は`.spot-card`クラスを持たないため、既存の差分更新クリーンアップループ（1697〜1709行目付近、`.spot-card`クラス限定で判定）の対象外。フィルタ操作で誤って非表示・削除されることはない
+- `_isCapacitorApp`による分岐は実装していない（ウィジェット自体のリンク処理はKlook側のiframe内で完結する想定のため、独自クリックハンドラは追加していない）
+
+## キャッシュバスティング
+- `public/index.html`: `app.js?v=20260713f` → `20260713g`
+- `public/sw.js`: `CACHE_NAME`: `sg-weekend-v604` → `sg-weekend-v605`
+
+## 厳守事項（遵守済み）
+- 設計書29のコードは削除・変更していない（`git diff`で無変更を確認済み）
+- `server.js`・データファイルは無変更（純粋にフロントエンドのみの変更）
+
+## 検証結果（checker実施済み）
+- コードレビューにより、重複生成防止（フラグ＋コンテナ存在チェックの二重ガード）・既存差分更新への非干渉・設計書29コードの無変更・外部リクエスト失敗時の非依存性を確認
+- `pm2 restart sg-weekend`後エラーログなし、`app.js`/`sw.js`とも新バージョンで配信されていることを確認
+- `affiliate.klook.com/widget/fetch-iframe-init.js`への疎通自体は200 OKを確認
+- **未検証（サーバー環境の制約）**: サーバーにヘッドレスChromium実行に必要な共有ライブラリが不足しており実ブラウザでの目視確認ができなかったため、ウィジェットの実際の表示崩れの有無・タップ時の挙動（新規タブが開くかiframe内で完結するか）はユーザー自身のブラウザ確認が必要
+- **未検証（実機）**: iOS版（Capacitor/TestFlight）でのiframe内リンクタップの挙動は未検証。iOS版への反映には別途TestFlightビルドが必要（Web版のみpm2再起動で反映済み）
+
+## スコープ外（今回未実装）
+- 複数スポンサーのローテーション、日替わり選択ロジック
+- カテゴリ一致判定（設計書29の`_matchesCurrentCategory`相当の仕組み）
+- クリック計測（フェーズ1の`POST /api/affiliate-click`に相当する仕組み）
+- ウィジェット自体の表示位置カスタマイズ（Klook側テンプレートの見た目はダッシュボード側の設定に依存し、本実装からは制御しない）
+- 変数を計算しておきながらHTML生成で使っていない（`const liked = ...`のみでその後未使用）ようなデッドコードは、機能欠落の隠れたサインになりうる。今回のように「変数は残っているのにUIに反映されていない」箇所は、リファクタリング時に見つけたら疑いの目を向けると良い
