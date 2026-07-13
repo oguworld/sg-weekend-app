@@ -3127,4 +3127,68 @@ CLAUDE.mdに記載のonclick/touchend二重登録問題や、直近commit `3294e
 ## 再発防止策
 - カード描画関数を複数用意する設計（`renderCourseCard`/`renderCompactCourseCard`/`renderPopularCourseCard`のように同じ「いいね」機能を持つべきカードが複数の関数に分散している）は、機能追加・削除時の当て漏れが起きやすい。将来的には、いいねボタン部分だけでも`renderLikeButton(course)`のような共通ヘルパー関数に切り出し、各カード関数はそれを呼び出すだけにすることを検討する（当て漏れの構造的なリスクを下げる）
 - UIレイアウトの再設計（今回でいう2026-07-07のアクションボタン行変更）を行う際は、削除・置換する既存要素が持っていた**機能**（今回はいいねボタンのonclick）を、見た目の再設計と同時に失っていないか、diffを見て機能単位でチェックリスト化して確認する運用を徹底する
+
+# 設計書29 — 広告表示機能フェーズ2: PRカード（スポンサー広告枠）実装
+
+設計書23フェーズ2（2293〜2429行目付近に元設計あり）を、現在のコード行番号に合わせてplannerが再検証し、ユーザーが未決定事項2件・追加確認事項2件に回答して確定した設計。フェーズ1（Klookアフィリエイトリンク、`server.js`1636〜1681行目・`openAffiliateLink()`3176行目付近）は実装済み・稼働中で、参考パターンとして活用した。2026-07-13実装・完了。
+
+## 決定事項（ユーザー回答）
+- 表示位置: イベント一覧の3〜5枚目あたりに1件だけ差し込む（フィルタ・ソート確定後、DOM構築ループの前に`filtered`配列へ挿入）
+- カテゴリ限定表示: `category`フィールドが`null`ならどのカテゴリ絞り込みでも常に対象、値ありなら`filterCats`との一致時のみ対象
+- 選択ロジック: 日替わり固定（当日日付をシードに候補配列から`seed % length`で1件選択、リロードのたびに変わらない）
+- おすすめモード中は非表示（`_recommendModeActive`時はPRカードの選択処理自体を呼ばない）
+
+## データモデル（新規）
+`data/{city}/sponsored-cards.json`（`data/`はgitignore対象、コミットしない）。配列。各要素:
+```json
+{
+  "id": "string",
+  "sponsorName": "string",
+  "title": "string",
+  "content": "string",
+  "imageUrl": "string（空文字可、その場合フォールバックアイコン表示）",
+  "url": "string（タップ時に開く遷移先）",
+  "category": "event/show/gourmet/opening/sale のいずれか、または null（全カテゴリ共通枠）",
+  "startDate": "YYYY-MM-DD",
+  "endDate": "YYYY-MM-DD",
+  "priority": 1,
+  "active": true
+}
+```
+`data/sg/events.json`の実際の`type`値は`event/show/gourmet/opening/sale`の5種（`category`フィールドが取りうる値はこの5種＋`null`）。
+
+## サーバー側（`server.js`）
+`GET /api/sponsored-cards?city=sg`（528〜541行目、`GET /api/events`の直後・`GET /api/sales`の直前に配置）。既存の`resolveCity(req)`パターンを踏襲。`data/{city}/sponsored-cards.json`が存在しない場合は空配列を返す（エラーにしない）。既存`GET /api/events`は無変更。
+
+## フロントエンド（`public/app.js`）
+- `SPONSORED_CARDS`変数（985行目）: `loadEventData()`内（1019〜1023行目）で`/api/sponsored-cards`から取得
+- `openSponsoredCardLink(url)`（1226行目）: フェーズ1の`openAffiliateLink()`と同じ`_isCapacitorApp`分岐（Capacitor環境は`Browser.open()`、Web環境は`window.open()`）
+- `_matchesCurrentCategory(card)`（1237行目）: `category`がnull/undefinedなら常にtrue、`filterCats`が空（「すべて」）なら常にtrue、それ以外は`filterCats.has(card.category)`
+- `_pickSponsoredCardForToday(cards)`（1244行目）: 有効期間（`startDate`/`endDate`）・`active`・`_matchesCurrentCategory`で候補を絞り込み、日付シード（`年*10000+月*100+日`）で`候補配列[seed % length]`を1件選択
+- `renderSponsoredCard(card)`（1259行目）: `spot-card`ベースの見た目、左上に半透明黒背景の「PR」バッジ（`data-i18n="prBadgeLabel"`）、タップで`openSponsoredCardLink()`
+- `renderEventCards()`内（1591〜1601行目）: ソート確定後、`!_recommendModeActive`ガード付きで`_pickSponsoredCardForToday()`を呼び、選ばれたカードを`{__sponsored:true, card}`マーカーとして`filtered`配列の4番目（0-indexed 3、配列長を超えない）に挿入
+- DOM構築ループ（1613〜1631行目）: `forEach`内で`e.__sponsored`を検出したら専用の使い回しDOMコンテナ`_sponsoredCardTmpContainer`（1284行目）で`renderSponsoredCard()`から新規生成・挿入（既存のイベントIDベース`_cardElCache`とは完全に別系統、混在させない設計）
+- PRカードが今回選ばれなかった場合、前回挿入分の`.sponsored-card`要素をDOMから除去（1661〜1663行目）
+- 言語切替クリーンアップループ（1667〜1678行目）は`.sponsored-card`を対象外に除外（`_cardElCache`との誤混同防止）
+- 件数表示・空状態判定（1680〜1683行目）はPRカードマーカーを除いた実イベント件数のみを対象に修正（実装時に発見・対応した設計外の考慮点）
+- `STRINGS.ja`（411〜412行目）・`STRINGS.en`（607〜608行目）に`prBadgeLabel`（ja: "PR", en: "PR"）を同時追加
+
+## キャッシュバスティング
+- `public/index.html`: `app.js?v=20260713e` → `20260713f`
+- `public/sw.js`: `CACHE_NAME`: `sg-weekend-v603` → `sg-weekend-v604`
+
+## 厳守事項（遵守済み）
+- `renderEventCard()`・`GET /api/events`・`_cardElCache`本体のロジックは無変更（新規関数の追加のみ、checkerが`git diff`で削除行2行のみ＝件数集計修正のみと確認済み）
+- 動作確認完了後、`data/sg/sponsored-cards.json`のテストデータ（`sponsor_test_001`/`sponsor_test_002`）は空配列`[]`に戻し、本番ユーザーにダミーPR広告が見えたままにならないようにする
+
+## 検証結果（checker実施済み）
+- `GET /api/sponsored-cards?city=sg`が正しくJSON配列を返却、ファイル不在都市（bkk/syd）では`[]`を返却しエラーにならないことを確認
+- Node上でロジックを切り出して再現テスト。「すべて」「グルメ・フェア」タブでは`category:null`と`category:"gourmet"`両方が候補になり日替わり選択、他カテゴリタブでは`category:null`のカードのみが候補になることを確認
+- おすすめモードガードが正しく機能し、`_recommendModeActive`時はPRカード自体が生成されないことを確認
+- PM2再起動後エラーログなし、既存イベント一覧・カテゴリ絞り込み・Instagram埋め込みに回帰なし
+
+## スコープ外（今回未実装）
+- PRカードのクリック計測（フェーズ1の`POST /api/affiliate-click`に相当する仕組み）は今回のスコープに含まれない
+- 複数PRカード同時掲載・優先度（`priority`フィールド）による重み付け抽選は未実装（現状`priority`フィールドはデータに存在するが選択ロジックには未使用、将来の拡張余地として温存）
+- 広告主向け管理画面・入稿フローは未整備（`sponsored-cards.json`の直接編集が現状唯一の運用手段）
 - 変数を計算しておきながらHTML生成で使っていない（`const liked = ...`のみでその後未使用）ようなデッドコードは、機能欠落の隠れたサインになりうる。今回のように「変数は残っているのにUIに反映されていない」箇所は、リファクタリング時に見つけたら疑いの目を向けると良い

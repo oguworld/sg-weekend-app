@@ -525,6 +525,20 @@ app.get('/api/events', (req, res) => {
   }
 });
 
+// GET /api/sponsored-cards — PRカード（スポンサー広告枠）一覧（設計書23フェーズ2・設計書29）
+// data/{city}/sponsored-cards.json が存在しない場合は空配列を返す（エラーにしない）
+app.get('/api/sponsored-cards', (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const p = path.join(__dirname, 'data', city, 'sponsored-cards.json');
+    if (!fs.existsSync(p)) return res.json([]);
+    const cards = JSON.parse(fs.readFileSync(p, 'utf8'));
+    res.json(Array.isArray(cards) ? cards : []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/sales — セール情報一覧（events.json の type==='sale' のみ返す）
 app.get('/api/sales', (req, res) => {
   try {

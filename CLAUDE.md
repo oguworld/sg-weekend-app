@@ -105,7 +105,7 @@ sg-weekend-app/
 - **時刻重複の機械チェック（ログのみ、2026-07-13実装、設計書27）**: `POST /api/courses/generate`のレスポンス構築時、生成された`spots`配列を順に走査し、前のスポットの終了予定時刻（`time`+`duration`から算出）が次のスポットの開始時刻を超えている場合`console.warn()`で`[course-generate] time overlap detected: ...`ログを出力する。**APIレスポンス自体には一切影響しない（ログのみ、生成・保存フローを止めない）**。プロンプト側の注意文はあくまでAIへの努力目標であり強制力がないため、実際に重複が起きているかどうかを事後的に運用モニタリングできるようにする目的。`duration`のパース失敗時は例外を投げずスキップする
 
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装）
-- コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード、`sponsored-cards.json`関連）は未実装（`.claude/plan.md`設計書23参照、将来の別タスク）
+- コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - **データモデル**: `data/sg/affiliate-links.json`（スポット名をキーにしたマッピング。`{provider, url, title, updatedAt, confirmedBy}`）。コースJSON本体（`model-courses.json`/`community-courses.json`）は無変更、疎結合の別ファイル方式のためコース再生成後も同名スポットならリンクが維持される
 - **紐付けスクリプト**: `node scripts/match-affiliate-links.js [--dry-run]`。全コースのユニークスポット名と`data/klook-catalog-sg.csv`（Klookアフィリエイトダッシュボードからエクスポートした商品カタログ、238件）を突き合わせる半自動フロー。マッチングはCSVの`Affiliate Link`列内`k_site`パラメータをデコードして得た英語スラッグとスポット名を単語単位でスコアリングする方式（日本語`Product Name`は確認表示用のみ）。**インクリメンタル実行**: 既存`affiliate-links.json`に登録済みのスポットは対象外。対話形式（番号選択で確定/Enterでスキップ/qで中断）で人力確認したもののみ書き込む。全自動マッチングは行わない（誤紐付けリスクのため）
 - **サーバー**: `GET /api/courses`（community/popularタブ）のレスポンスに、該当スポットへ`affiliateLink`フィールドを追加（既存フィールドは無変更、追加のみで後方互換）。`loadAffiliateLinks(city)`/`embedAffiliateLinks()`（server.js）。新規`POST /api/affiliate-click`（`{spotName,provider,courseId,city}`、`withFileLock`で`data/affiliate-clicks.json`へ追記、認証なしfire-and-forget）
@@ -114,6 +114,17 @@ sg-weekend-app/
 - コース生成AI（`generate-model-courses.js`・`POST /api/courses/generate`・`POST /api/courses/candidates`）には広告目的の変更は一切加えていない（設計書27〈営業時間・実在性の品質改善〉による変更は別件、無関係）。広告要素とコース生成ロジックは意図的に分離（ユーザー明確な方針）
 - 運用: `data/sg/affiliate-links.json`は2026-07-13時点で2件のみ登録（Gardens by the Bay – Supertree Grove、National Orchid Garden）。残りのスポットは`match-affiliate-links.js`を継続実行して段階的に拡充する運用（多くのホーカーセンター等ローカルスポットはKlook対応商品が無く「候補なし」になるのが正常）
 - `data/affiliate-clicks.json`はサイズ上限・ローテーションなし（`_sendDebugLog`と同様の既知の注意点、定期確認が必要）
+
+## 広告表示機能フェーズ2: PRカード（スポンサー広告枠）（2026-07-13実装、設計書29）
+- イベント一覧に、Klookアフィリエイトとは別枠のスポンサー広告カード（PRカード）を条件付きで1件差し込む機能。設計書23フェーズ2の元設計を、plannerが現在の行番号ベースで再検証・確定した内容
+- **データモデル**: `data/{city}/sponsored-cards.json`（配列。`data/`はgitignore対象）。各要素: `id`/`sponsorName`/`title`/`content`/`imageUrl`/`url`/`category`（`event/show/gourmet/opening/sale`のいずれか、または`null`=全カテゴリ共通枠）/`startDate`/`endDate`/`priority`（現状未使用、将来の重み付け抽選用に温存）/`active`。**本番運用時は空配列`[]`が正常状態**（2026-07-13実装完了時点でテストデータは削除済み、掲載する広告主が決まり次第人力で追記する運用）
+- **サーバー**: `GET /api/sponsored-cards?city=sg`（`server.js`、`GET /api/events`の直後）。ファイル不存在時は空配列を返す（エラーにしない）。既存`GET /api/events`は無変更
+- **選択ロジック**（`public/app.js`）: `_pickSponsoredCardForToday(cards)`が、有効期間（`startDate`/`endDate`）・`active`・`_matchesCurrentCategory()`（`category`がnullなら常時対象、値ありなら`filterCats`一致時のみ対象）で候補を絞り込み、当日日付をシードにした`候補配列[seed % length]`で日替わり固定選択する（リロードのたびに変わらない）
+- **表示**: `renderEventCards()`内、フィルタ・ソート確定後に、選ばれたPRカードを`filtered`配列の4番目あたり（0-indexed 3）に`{__sponsored:true, card}`マーカーとして挿入し、DOM構築ループ内で`renderSponsoredCard()`から生成した専用DOM要素（`_sponsoredCardTmpContainer`使い回し）を差し込む。`renderEventCard()`本体・`GET /api/events`・設計書21の`_cardElCache`（イベントIDベースのDOM差分キャッシュ）とは完全に別系統・無関係のデータソースとして分離実装（意図的に混在させない設計）
+- **おすすめモード中は非表示**（ユーザー承認済み方針）: `_recommendModeActive`が`true`の間は`_pickSponsoredCardForToday()`の呼び出し自体をスキップする
+- **見た目**: `spot-card`ベース、左上に半透明黒背景の「PR」バッジ（`prBadgeLabel`キー、ja/en共に"PR"）。タップでスポンサー先`url`を開く（`openSponsoredCardLink()`、フェーズ1の`openAffiliateLink()`と同じ`_isCapacitorApp`分岐: Capacitor環境は`Browser.open()`、Web環境は`window.open()`）
+- コース生成AI・アフィリエイトリンク機能（フェーズ1）には一切手を加えていない。両フェーズとも広告要素とコース/イベント生成ロジックは意図的に分離
+- スコープ外（今回未実装）: PRカードのクリック計測（フェーズ1の`POST /api/affiliate-click`相当の仕組み）、`priority`フィールドを使った複数カード同時掲載・重み付け抽選、広告主向け管理画面・入稿フロー（`sponsored-cards.json`の直接編集が現状唯一の運用手段）
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み

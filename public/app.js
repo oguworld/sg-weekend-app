@@ -411,6 +411,7 @@
         courseDetailRoute: '🗺️ コース',
         courseDetailAuthor: '作者:',
         affiliateInfoLink: 'チケット情報',
+        prBadgeLabel: 'PR',
         courseAddToPlanBtn: '📅 予定表に追加',
         coursePublishAction: 'みんなに公開する',
         courseUnpublishAction: '🌐 公開中（非公開に）',
@@ -606,6 +607,7 @@
         courseDetailRoute: '🗺️ Route',
         courseDetailAuthor: 'By:',
         affiliateInfoLink: 'Ticket info',
+        prBadgeLabel: 'PR',
         courseAddToPlanBtn: '📅 Add to Schedule',
         coursePublishAction: 'Share with everyone',
         courseUnpublishAction: 'Published ✓ &nbsp;(Make private)',
@@ -980,6 +982,7 @@
 
     let EVENT_DATA = [];
     let EVENT_REGISTRY = {};
+    let SPONSORED_CARDS = []; // PRカード（スポンサー広告枠）一覧（設計書29）
     let eventSortOrder = 'desc'; // desc = 新しい開始日が上
     let calSortOrder = 'desc';
 
@@ -1012,6 +1015,12 @@
         EVENT_DATA = res.ok ? await res.json() : [];
       } catch(e) {
         EVENT_DATA = [];
+      }
+      try {
+        const spRes = await fetch(API_BASE + `/api/sponsored-cards?city=${getCity()}`);
+        SPONSORED_CARDS = spRes.ok ? await spRes.json() : [];
+      } catch (e) {
+        SPONSORED_CARDS = [];
       }
       EVENT_DATA.forEach(e => { EVENT_REGISTRY[e.id] = e; });
       if (EVENT_DATA.length > 0) {
@@ -1211,10 +1220,67 @@
         </article>`;
     }
 
+    // ─── PRカード（スポンサー広告枠、設計書29） ───
+
+    // PRカードを開く（Klookアフィリエイトリンクの openAffiliateLink() と同じ分岐パターン）
+    function openSponsoredCardLink(url) {
+      if (!url) return;
+      if (_isCapacitorApp && window.Capacitor?.Plugins?.Browser) {
+        window.Capacitor.Plugins.Browser.open({ url });
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+    }
+
+    // カードのcategoryが現在の絞り込み条件（filterCats）にマッチするか
+    // category が null/undefined ならどのカテゴリでも常に対象（全カテゴリ共通枠）
+    function _matchesCurrentCategory(card) {
+      if (card.category === null || card.category === undefined) return true;
+      if (filterCats.size === 0) return true;
+      return filterCats.has(card.category);
+    }
+
+    // 日替わり固定選択: 当日の日付をシードに、有効期間内・カテゴリ一致の候補から1件だけ選ぶ
+    function _pickSponsoredCardForToday(cards) {
+      const todayStr = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+      const candidates = cards.filter(c =>
+        c.active &&
+        (!c.startDate || c.startDate <= todayStr) &&
+        (!c.endDate || c.endDate >= todayStr) &&
+        _matchesCurrentCategory(c)
+      );
+      if (candidates.length === 0) return null;
+      const today = new Date();
+      const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+      return candidates[seed % candidates.length];
+    }
+
+    // PRカード1件のHTML生成（spot-card ベースの見た目を踏襲、左上に「PR」バッジ）
+    function renderSponsoredCard(card) {
+      const safeUrl = (card.url || '').replace(/'/g, "\\'");
+      const imgHtml = card.imageUrl
+        ? `<img src="${card.imageUrl}" alt="${(card.sponsorName || '').replace(/"/g, '&quot;')}"
+                style="width:100%;height:220px;object-fit:cover;display:block;" />`
+        : `<div class="card-image-bg" style="height:220px;display:flex;align-items:center;justify-content:center;background:var(--sand);">📢</div>`;
+      return `
+        <article class="spot-card sponsored-card" data-sponsored="1" data-id="${card.id}" onclick="openSponsoredCardLink('${safeUrl}')" style="cursor:pointer;">
+          <div class="card-hero" style="position:relative;overflow:hidden;">
+            ${imgHtml}
+            <div style="position:absolute;top:10px;left:10px;font-size:11px;font-weight:700;color:white;background:rgba(0,0,0,0.55);border-radius:4px;padding:2px 8px;letter-spacing:0.05em;" data-i18n="prBadgeLabel">${t('prBadgeLabel')}</div>
+          </div>
+          <div class="card-body" style="padding-top:12px;">
+            <div style="font-size:12px;color:var(--warm-gray);margin-bottom:4px;">${escapeHtml(card.sponsorName || '')}</div>
+            <h2 style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;color:var(--midnight);margin:0 0 8px;line-height:1.3;">${escapeHtml(card.title || '')}</h2>
+            ${card.content ? `<p style="font-size:14px;color:var(--warm-gray);line-height:1.6;margin:0;">${escapeHtml(card.content)}</p>` : ''}
+          </div>
+        </article>`;
+    }
+
     // イベントカードDOM要素キャッシュ（設計書21: カテゴリタブ切り替え時のInstagram埋め込み再読み込み防止）
     // key: `${e.id}::${lang}` → 生成済みの <article class="spot-card"> 要素
     const _cardElCache = new Map();
     let _cardTmpContainer = null;
+    let _sponsoredCardTmpContainer = null; // PRカード（設計書29）専用の使い回しDOMコンテナ
 
     // 既存キャッシュがあれば再利用（新規要素は生成しない）、無ければ renderEventCard() の文字列から新規生成する。
     // 戻り値: { el, isNew }
@@ -1522,14 +1588,40 @@
         return (CATEGORY_ORDER[a.type] ?? 99) - (CATEGORY_ORDER[b.type] ?? 99);
       });
 
+      // PRカード（スポンサー広告枠、設計書29）: おすすめモード中は非表示。3〜5枚目あたりに1件だけ差し込む
+      // 独自のマーカーオブジェクトとして filtered に挿入し、下の forEach 内で分岐処理する
+      // （イベントIDベースの _cardElCache とは無関係の別データソースのため、専用のDOM要素1つを使い回す）
+      let _sponsoredCard = null;
+      if (!_recommendModeActive) {
+        _sponsoredCard = _pickSponsoredCardForToday(SPONSORED_CARDS);
+      }
+      if (_sponsoredCard && filtered.length > 0) {
+        const insertAt = Math.min(3, filtered.length);
+        filtered.splice(insertAt, 0, { __sponsored: true, card: _sponsoredCard });
+      }
+
       // 設計書21: DOM要素キャッシュによる差分更新（Instagram埋め込みiframeの再読み込み防止）
       // キャッシュキーは id + 言語（言語切替時は必ず作り直す）
       const lang = getLang();
       const usedKeys = new Set();
       let hasNewCard = false;
       let anchor = null; // 直前に配置した可視カード（この直後に次のカードを挿入する）
+      let sponsoredUsed = false;
 
       filtered.forEach((e, i) => {
+        // PRカード用マーカー: 専用のDOM要素1つを毎回再生成して使い回す（_cardElCache非対象）
+        if (e && e.__sponsored) {
+          if (!_sponsoredCardTmpContainer) _sponsoredCardTmpContainer = document.createElement('div');
+          _sponsoredCardTmpContainer.innerHTML = renderSponsoredCard(e.card);
+          const el = _sponsoredCardTmpContainer.firstElementChild;
+          sponsoredUsed = true;
+          el.style.display = '';
+          el.style.animationDelay = (i * 0.06) + 's';
+          const desiredNext = anchor ? anchor.nextSibling : grid.firstChild;
+          grid.insertBefore(el, desiredNext);
+          anchor = el;
+          return;
+        }
         const cacheKey = e.id + '::' + lang;
         const { el, isNew } = _getOrCreateCardEl(e, i, cacheKey);
         el.dataset.lang = lang;
@@ -1564,10 +1656,17 @@
         anchor = el;
       });
 
+      // PRカードが今回表示されなかった場合、前回挿入されたPRカードDOM要素が残っていれば除去する
+      if (!sponsoredUsed) {
+        grid.querySelectorAll('.sponsored-card').forEach(n => n.remove());
+      }
+
       // フィルタで表示対象から外れたカードは破棄せず display:none であとに残す（同一言語の場合のみ再利用対象として保持）。
       // 言語切替で無効化された旧言語のカードは、貯まり続けないようDOM・キャッシュ双方から完全に削除する
+      // PRカード（.sponsored-card）は _cardElCache の対象外・別ロジックで管理しているためこのループの対象外
       Array.from(grid.children).forEach(child => {
         if (!child.classList || !child.classList.contains('spot-card')) return;
+        if (child.classList.contains('sponsored-card')) return;
         const id = child.dataset.id;
         const key = id + '::' + lang;
         if (usedKeys.has(key)) return;
@@ -1579,8 +1678,10 @@
         }
       });
 
-      resultCount.textContent = filtered.length + t('countSuffix');
-      emptyState.classList.toggle('visible', filtered.length === 0);
+      // 件数表示・空状態判定は PR カードマーカーを除いたイベント件数のみを対象にする
+      const eventOnlyCount = filtered.filter(e => !(e && e.__sponsored)).length;
+      resultCount.textContent = eventOnlyCount + t('countSuffix');
+      emptyState.classList.toggle('visible', eventOnlyCount === 0);
       updatePinButtons();
       if (hasNewCard) loadInstagramEmbeds();
     }
