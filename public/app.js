@@ -2981,6 +2981,7 @@
     // 人気のコース専用カード（フルワイドカルーセル・左バーランク）
     const _rankBarColor = ['#C0903A','#9BA5B0','#B07040','#C8A97A','#C8A97A'];
     function renderPopularCourseCard(c, rank) {
+      const liked = isLiked(c.id);
       const cond = c.conditions || {};
       const tags = [cond.with, cond.area, cond.style].filter(Boolean);
       const barColor = _rankBarColor[rank] || 'var(--sand-dark)';
@@ -3001,7 +3002,16 @@
             ${tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">
               ${tags.map(t=>`<span style="padding:2px 8px;background:var(--sand);border-radius:20px;font-size:11px;color:var(--warm-gray);">${t}</span>`).join('')}
             </div>` : ''}
-            <div style="font-size:12px;color:var(--light-gray);">❤️ ${c.likes||0} · ${t('courseSpotsCount').replace('{n}', c.spots?.length||0)} · ${c.authorAvatar||''}${c.authorName||'AI'}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--light-gray);">
+              <span>${t('courseSpotsCount').replace('{n}', c.spots?.length||0)} · ${c.authorAvatar||''}${c.authorName||'AI'}</span>
+              <button onclick="event.stopPropagation();toggleLike('${c.id}')" data-like-id="${c.id}" data-likes="${c.likes||0}"
+                style="font-size:12px;flex-shrink:0;padding:2px 4px;background:none;border:none;cursor:pointer;
+                       border-radius:6px;font-family:inherit;line-height:1;"
+                ontouchstart="this.style.transform='scale(0.85)'"
+                ontouchend="this.style.transform='scale(1)'">
+                ${liked ? '❤️' : '🤍'} ${c.likes||0}
+              </button>
+            </div>
           </div>
         </div>`;
     }
@@ -3107,8 +3117,14 @@
             </div>
           `).join('')}
 
-          <div style="font-size:14px;color:var(--light-gray);margin:12px 0;">
-            ❤️ ${course.likes || 0}&nbsp;&nbsp;${t('courseDetailAuthor')} ${course.authorName || 'AI'}&nbsp;&nbsp;${(course.createdAt||'').slice(0,10)}
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:14px;color:var(--light-gray);margin:12px 0;">
+            <span>${t('courseDetailAuthor')} ${course.authorName || 'AI'}&nbsp;&nbsp;${(course.createdAt||'').slice(0,10)}</span>
+            <button onclick="event.stopPropagation();toggleLike('${course.id}')" id="like-btn-${course.id}"
+              data-like-id="${course.id}" data-likes="${course.likes||0}"
+              style="font-size:16px;flex-shrink:0;padding:4px 8px;background:none;border:none;cursor:pointer;
+                     border-radius:8px;font-family:inherit;line-height:1;"
+              ontouchstart="this.style.transform='scale(0.85)'"
+              ontouchend="this.style.transform='scale(1)'">${liked ? '❤️' : '🤍'}</button>
           </div>
 
           <div style="display:flex;justify-content:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--sand);">
