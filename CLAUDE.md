@@ -101,6 +101,8 @@ sg-weekend-app/
 - マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
 - タイトル編集シート（`#title-edit-sheet`）: 2026-07-09に `.plan-modal` クラス方式（`.visible`トグル）に統一。旧インラインstyle（display:block/none）方式は廃止
 - **コース詳細のスポット表示順は`spots`配列順そのまま（`time`昇順の自動ソートは行っていない）**（2026-07-13設計書26で判明）: `renderCourseDetail()`/`renderCourseResultHtml()`（`public/app.js`）はいずれも`(course.spots || []).map(...)`で配列順に描画する。そのため`community-courses.json`/`model-courses.json`のスポット時刻(`time`)を手動修正して訪問順序を変える場合、配列内の要素順序自体も`time`の昇順に合わせて並び替えないと、表示上の訪問順が時刻と矛盾する
+- **コース生成プロンプトへの品質ガード追加（2026-07-13実装、設計書27）**: 設計書25・26で判明した「営業時間・見学可能時間帯との不整合」「開店時間より前の訪問」「実在しない施設名の生成（ハルシネーション）」の再発防止として、`POST /api/courses/generate`（`server.js`）の【スポット選定ルール】末尾と、`scripts/generate-model-courses.js`のSG/BKK/SYD各SYSTEM_PROMPT（都市が現在停止中のBKK/SYDも一貫性のため対応済み）に、営業時間配慮・早朝訪問回避・実在確信スポット名限定を促す注意文を追加。`POST /api/courses/candidates`（タイトル・タグライン・説明のみ生成、時刻・スポット名を含まない設計）は対象外
+- **時刻重複の機械チェック（ログのみ、2026-07-13実装、設計書27）**: `POST /api/courses/generate`のレスポンス構築時、生成された`spots`配列を順に走査し、前のスポットの終了予定時刻（`time`+`duration`から算出）が次のスポットの開始時刻を超えている場合`console.warn()`で`[course-generate] time overlap detected: ...`ログを出力する。**APIレスポンス自体には一切影響しない（ログのみ、生成・保存フローを止めない）**。プロンプト側の注意文はあくまでAIへの努力目標であり強制力がないため、実際に重複が起きているかどうかを事後的に運用モニタリングできるようにする目的。`duration`のパース失敗時は例外を投げずスキップする
 
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード、`sponsored-cards.json`関連）は未実装（`.claude/plan.md`設計書23参照、将来の別タスク）
@@ -109,7 +111,7 @@ sg-weekend-app/
 - **サーバー**: `GET /api/courses`（community/popularタブ）のレスポンスに、該当スポットへ`affiliateLink`フィールドを追加（既存フィールドは無変更、追加のみで後方互換）。`loadAffiliateLinks(city)`/`embedAffiliateLinks()`（server.js）。新規`POST /api/affiliate-click`（`{spotName,provider,courseId,city}`、`withFileLock`で`data/affiliate-clicks.json`へ追記、認証なしfire-and-forget）
 - **UI**: ボタンではなく、`course-timeline-meta`（住所表示）に地味なテキストリンク「チケット情報」（`affiliateInfoLink`キー）として住所と同じ行に併記。目立つカラーボタン・アイコン・購入を煽る文言は不使用（「広告と結びつけたくない・さりげなく見せたい」というユーザー方針）。`renderCourseDetail()`と`renderCourseResultHtml()`（生成直後プレビュー）の両方に同じロジックを実装
 - `openAffiliateLink(url, provider, spotName)`: Capacitor環境は`Browser.open()`、Web環境は`window.open()`。開いた後`POST /api/affiliate-click`をfire-and-forget送信。既存の`_touchCapableDetected`ガードパターンを踏襲
-- コース生成AI（`generate-model-courses.js`・`POST /api/courses/generate`・`POST /api/courses/candidates`）には一切手を加えていない。広告要素とコース生成ロジックは意図的に分離（ユーザー明確な方針）
+- コース生成AI（`generate-model-courses.js`・`POST /api/courses/generate`・`POST /api/courses/candidates`）には広告目的の変更は一切加えていない（設計書27〈営業時間・実在性の品質改善〉による変更は別件、無関係）。広告要素とコース生成ロジックは意図的に分離（ユーザー明確な方針）
 - 運用: `data/sg/affiliate-links.json`は2026-07-13時点で2件のみ登録（Gardens by the Bay – Supertree Grove、National Orchid Garden）。残りのスポットは`match-affiliate-links.js`を継続実行して段階的に拡充する運用（多くのホーカーセンター等ローカルスポットはKlook対応商品が無く「候補なし」になるのが正常）
 - `data/affiliate-clicks.json`はサイズ上限・ローテーションなし（`_sendDebugLog`と同様の既知の注意点、定期確認が必要）
 

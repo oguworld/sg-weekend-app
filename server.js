@@ -1934,6 +1934,7 @@ ${upcomingEvents.map(e => `- ${e.store || e.title_ja || ''}（${e.start_date}〜
 - 食事スポットは${foodSpotRule}
 - 食事スポットは上記イベントデータに掲載されているか、著名な老舗のみに限定する
 - ショッピングは特定の小規模ショップより、モール・マーケット・エリア全体を推奨する形にする
+- 訪問時刻は施設の一般的な営業時間内に収まるよう配慮すること。公園・自然施設・宗教施設は早朝閉園や断続的な休止（礼拝等）があるため、早朝（9時より前）・閉園間際の訪問は避けること。スポット名は実在が確信できる正式名称のみを使用し、確信が持てない場合は創作せず、より確実に実在する近隣の代替スポットを選ぶこと
 
 以下のJSON形式で返してください（余分な説明不要、JSONのみ）:
 {
@@ -2015,8 +2016,38 @@ ${spotList}
     const imageUrl = await fetchUnsplashImage(course.imageSearch || cityFallbacks[city] || 'singapore weekend')
       || await fetchUnsplashImage(cityFallbacks[city] || 'singapore weekend');
 
+    const generatedCourseId = `course_${city}_${Date.now()}`;
+
+    // 時刻重複の機械チェック（ログのみ、レスポンスには影響しない）
+    try {
+      const parseTimeToMinutes = (t) => {
+        const m = /^(\d{1,2}):(\d{2})$/.exec((t || '').trim());
+        if (!m) return null;
+        return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+      };
+      const parseDurationToMinutes = (d) => {
+        const m = /(\d+)/.exec((d || '').trim());
+        return m ? parseInt(m[1], 10) : null;
+      };
+      const spotsForCheck = course.spots || [];
+      for (let i = 0; i < spotsForCheck.length - 1; i++) {
+        const prev = spotsForCheck[i];
+        const next = spotsForCheck[i + 1];
+        const prevStart = parseTimeToMinutes(prev.time);
+        const prevDur = parseDurationToMinutes(prev.duration);
+        const nextStart = parseTimeToMinutes(next.time);
+        if (prevStart === null || prevDur === null || nextStart === null) continue;
+        const prevEnd = prevStart + prevDur;
+        if (prevEnd > nextStart) {
+          console.warn(`[course-generate] time overlap detected: courseId=${generatedCourseId}, spot="${prev.name}"の終了予定時刻が次の"${next.name}"の開始時刻を超えています`);
+        }
+      }
+    } catch (te) {
+      console.warn('[course-generate] time overlap check skipped:', te.message);
+    }
+
     const result = {
-      id: `course_${city}_${Date.now()}`,
+      id: generatedCourseId,
       city,
       type: 'ai',
       ...course,
