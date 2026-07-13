@@ -2928,3 +2928,65 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 
 ## 承認状況
 承認済み・実装完了（2026-07-13）
+
+---
+
+# 設計書26 — コミュニティコース4件の営業時間・開店時間・施設名不整合修正
+
+## 発端
+全18コース・60スポットを監査し、営業時間・開店時間・施設名の不整合4件をユーザーが承認。残った2つの確認事項もユーザーが回答済み。
+
+## 対象
+`data/sg/community-courses.json` の以下4コース（他14コースは無変更）:
+- `course_sg_1783204698563`（Haji Lane、壁画と仲間のアート午後）
+- `course_sg_1782614605087`（VivoCity×ハーバーフロントで家族アート探検）
+- `course_sg_1782859119879`（Yishunの闇市で、夜の雑貨狩り）
+- `course_sg_1782614507916`（Labrador Parkで夕日、Gillmanで現代アート → タイトル変更）
+
+## 修正内容
+
+### ①Haji Laneコース: Sultan Mosqueの見学時間帯（10:00-12:00/14:00-16:00、12:00-14:00は礼拝のため閉鎖）と訪問時刻の重複を解消
+| スポット | 修正前 | 修正後 |
+|---|---|---|
+| Arab Street Area & Lunch | 12:00／60分 | 変更なし |
+| Haji Lane Mural Walk | 13:45／75分 | **13:00**／75分 |
+| Sultan Mosque (Masjid Sultan) | 13:00／45分 | **14:15**／45分（見学可能時間帯14:00-16:00内に収まる） |
+| Malay Heritage Centre | 15:00／75分 | 変更なし |
+
+結果: 12:00→13:00→14:15→15:00の順。**確認事項への回答**: `renderCourseDetail()`/`renderCourseResultHtml()`（`public/app.js`）はいずれも`(course.spots || []).map(...)`で配列順そのまま表示しており、`time`昇順ソートは行っていない。そのため`time`値の変更に加え、配列内のHaji Lane Mural WalkとSultan Mosqueの要素順序自体も入れ替えた（表示順が視覚的に正しくなるよう対応）。
+
+### ②VivoCityコース: モール開店時刻（10:00）前の訪問を解消
+| スポット | 修正前 | 修正後 |
+|---|---|---|
+| VivoCity (Rooftop Plaza & In-mall Art Tour) | 09:00 | **10:00** |
+| Maritime Experiential Museum | 10:30 | **11:15** |
+| VivoCity Food Court (Food Republic) | 12:00 | **12:30** |
+
+duration・順序・descriptionは無変更。description内「午前中の」「朝の清涼な」等の文言、tagline「朝を楽しむ」は10:00開始でも許容範囲としてユーザー承認済み・変更なし。
+
+### ③Yishunコース: 実在しない施設名の誤りを修正
+3つ目のスポット`name`を`"Eunos Park Hawker Centre Night Walk & Craft Market Scout"`から`"Yishun Park Hawker Centre Night Walk & Craft Market Scout"`に修正。`time`/`duration`/`address`/`description`は無変更。他フィールドに「Eunos」の記載は無いことを確認済み（この1箇所のみで修正完結）。
+
+### ④Labrador/Gillmanコース: Gillman Barracksの営業時間（火〜土11:00-19:00）に対し18:15到着では閉館直前だったため訪問順序を入れ替え
+| スポット | 修正前 | 修正後 |
+|---|---|---|
+| Gillman Barracks | 18:15（2番目） | **16:00**（**1番目**、営業時間内） |
+| Labrador Nature Reserve (Labrador Coast) | 17:00（1番目） | **17:15**（**2番目**） |
+| VivoCity Food Republic | 19:45（3番目） | **18:15**（3番目のまま） |
+
+結果: 16:00 Gillman[75分](〜17:15) → 17:15 Labrador[60分](〜18:15、日没18:45-19:15にはやや届かないが夕方の時間帯としてユーザー承認済み) → 18:15 VivoCity[75分](〜19:30)。配列順もGillman→Labrador→VivoCityに並び替え済み（①と同じ理由、配列順=表示順のため）。
+
+**タイトル変更（ユーザー承認済み）**: `title`を「Labrador Parkで夕日、Gillmanで現代アート」→「Gillmanで現代アート、Labrador Parkで夕日」に変更。
+
+**description変更**: コース本体`description`内の訪問順序の言及を、新しい訪問順（Gillman→Labrador→VivoCity）に合わせて並び替え。「まずシンガポール随一の夕日スポット・Labrador Nature Reserveで...その後、...Gillman Barracksへ」→「まずは...Gillman Barracksへ。...その後、シンガポール随一の夕日スポット・Labrador Nature Reserveで...」の順に書き換え。tagline「地元民だけが知る、静かな芸術の夕べ」は順序に言及していないため変更なし。
+
+## 実装メモ
+- `data/`ディレクトリは`.gitignore`で全体除外のため、`community-courses.json`の修正はgit管理外・コミット対象外
+- サーバー側`GET /api/courses`は`fs.readFileSync`都度読み込み方式のためpm2再起動不要。`curl`で本番API（`GET /api/courses?city=sg&tab=community`）を確認し4件とも反映済み
+- 修正対象4コース以外の14コース・コース総数18件は無変更（JSON全体のdiff検証で確認）
+- JSON構文検証OK（`node -e "JSON.parse(require('fs').readFileSync('data/sg/community-courses.json'))"`）
+- `generate-model-courses.js`等のコース生成ロジック・スクリプトへの変更は一切なし。データファイルの直接修正のみ
+- `data/sg/affiliate-links.json`は調査済みで今回対象スポットの登録なし、変更なし
+
+## 承認状況
+承認済み・実装完了（2026-07-13）

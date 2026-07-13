@@ -100,6 +100,7 @@ sg-weekend-app/
 - コース詳細ボタン: 予定表追加（メイン）/ 公開+タイトル変更（横2列）/ 削除（テキストリンク）
 - マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
 - タイトル編集シート（`#title-edit-sheet`）: 2026-07-09に `.plan-modal` クラス方式（`.visible`トグル）に統一。旧インラインstyle（display:block/none）方式は廃止
+- **コース詳細のスポット表示順は`spots`配列順そのまま（`time`昇順の自動ソートは行っていない）**（2026-07-13設計書26で判明）: `renderCourseDetail()`/`renderCourseResultHtml()`（`public/app.js`）はいずれも`(course.spots || []).map(...)`で配列順に描画する。そのため`community-courses.json`/`model-courses.json`のスポット時刻(`time`)を手動修正して訪問順序を変える場合、配列内の要素順序自体も`time`の昇順に合わせて並び替えないと、表示上の訪問順が時刻と矛盾する
 
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード、`sponsored-cards.json`関連）は未実装（`.claude/plan.md`設計書23参照、将来の別タスク）
