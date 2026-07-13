@@ -2891,3 +2891,40 @@ builderの実装完了後、checkerは特に以下を重点的に確認するこ
 
 ## 承認状況
 承認済み・実装完了（2026-07-13）
+
+---
+
+# 設計書25 — コミュニティコース「Sembawang、北の隠れ家で夜雑貨さんぽ」の時刻不整合修正
+
+## 発端
+ユーザーがアプリのスクリーンショットで、Sembawangエリアのコース「Sembawang、北の隠れ家で夜雑貨さんぽ」に含まれる Sembawang Hot Spring Park（19:00閉園）が18:45開始・45分予定（〜19:30終了想定）になっており、実質15分しか滞在できない不具合を発見。
+
+## 対象
+`data/sg/community-courses.json` の `id: "course_sg_1783463896514"`（`authorName: "おでかけNavi"`、`createdAt: "2026-07-07T22:38:16.514Z"`、タイトルに"Sembawang"を含む唯一のコース）。
+
+同名スポット「Sembawang Hot Spring Park」を含む別コース `course_sg_1783463855242`（08:30開始の朝コース）は対象外・無変更。
+
+## 原因
+コース生成時、3スポットの巡回順序（Shopping Centre → Hot Spring Park → Hawker Centre）に沿って単純に時刻を積み上げただけで、各スポットの実際の営業時間（Hot Spring Parkの19:00閉園）が考慮されていなかった。
+
+## 修正内容
+スポットの中身・順序ロジック・durationの合計は維持したまま、時刻の組み方のみ入れ替え。
+
+| スポット | 修正前 | 修正後 |
+|---|---|---|
+| Sembawang Hot Spring Park | 18:45／45分 | **17:00／60分** |
+| Sembawang Shopping Centre | 17:00／90分（維持） | **18:15**／90分（維持） |
+| Canberra Plaza Hawker Centre | 19:45／75分（維持） | 19:45／75分（変更なし） |
+
+結果のタイムライン: 17:00 Hot Spring Park[60分](〜18:00) → 18:15 Shopping Centre[90分](〜19:45) → 19:45 Hawker Centre[75分](〜21:00)。Hot Spring Parkの19:00閉園に対し余裕を持って収まる。
+
+**説明文の微調整**: Hot Spring Parkの`description`内「夕暮れ時に二人で足湯気分を楽しめる幻想的なスポット。」を、17:00開始（シンガポールの日没は年間通じて19:00前後のためまだ明るい時間帯）という実態に合わせ、「夕方のひととき、二人で足湯気分を楽しめる幻想的なスポット。」に変更（時間帯を限定しすぎない自然な表現への言い回し調整のみ、大幅な書き換えなし）。
+
+## 実装メモ
+- `data/`ディレクトリは`.gitignore`で全体除外されているため、`community-courses.json`はそもそもgit管理外。今回の修正はgit差分としては現れず、コミット対象にもならない
+- サーバー側`GET /api/courses`（`server.js`）はリクエストの都度`fs.readFileSync`でファイルを直接読み込む方式（メモリキャッシュなし）のため、pm2再起動は不要。本番API (`https://dosuru.app/api/courses?city=sg&tab=community`) で修正内容が即座に反映されていることを確認済み
+- `generate-model-courses.js`等のコース生成ロジック・スクリプトへの変更は一切なし。データファイルの直接修正のみ
+- `data/sg/affiliate-links.json`は無関係（該当スポット未登録）のため無変更
+
+## 承認状況
+承認済み・実装完了（2026-07-13）
