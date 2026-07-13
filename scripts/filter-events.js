@@ -429,6 +429,14 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
       if (i + 1 < enrichBatches.length) await new Promise(r => setTimeout(r, 1000));
     } catch (e) {
       console.error(`    ❌ 記事生成エラー: ${e.message}`);
+      console.log(`    🔁 記事生成をリトライします...`);
+      try {
+        const retryResults = await enrichBatch(batch, cityKey);
+        for (const r of retryResults) enriched.set(r.index, r);
+      } catch (e2) {
+        console.error(`    ❌ 記事生成リトライも失敗: ${e2.message}`);
+      }
+      if (i + 1 < enrichBatches.length) await new Promise(r => setTimeout(r, 1000));
     }
   }
 
@@ -436,8 +444,13 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
   const defaultLocation = CITY_LOCATIONS[cityKey] || 'Singapore';
   const defaultArea = cityKey === 'bkk' ? 'Sukhumvit' : cityKey === 'syd' ? 'CBD' : 'Central';
 
+  let enrichFailedCount = 0;
   for (const { filtered: f, original } of filtered) {
-    const enrich = enriched.get(f._enrichPos) || {};
+    if (!enriched.has(f._enrichPos)) {
+      enrichFailedCount++;
+      continue;
+    }
+    const enrich = enriched.get(f._enrichPos);
     const id = `e_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const validType = ['event', 'show', 'gourmet', 'sale', 'opening'].includes(f.type) ? f.type : 'event';
     const endDate = validType === 'opening' ? oneMonthLater(f.start_date) : f.end_date;
@@ -474,6 +487,10 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
     if (sourceStats[src]) sourceStats[src].accepted++;
     console.log(`    ✅ 採用: ${enrich.title_ja || f.store} (score: ${f.score}, type: ${f.type}, source: ${src})`);
     newItems.push(item);
+  }
+
+  if (enrichFailedCount > 0) {
+    console.log(`  ⚠️ 記事生成に失敗したため${enrichFailedCount}件のイベントを除外しました`);
   }
 
   // OGP画像の取得（imageがnullのものだけ）

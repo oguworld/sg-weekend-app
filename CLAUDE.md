@@ -315,6 +315,18 @@ RSS/Instagram取得から`events.json`保存までのバッチ処理は、実行
 - **ユーザー向けWebプッシュ通知は完全停止済み**（2026-07-12）: `notify-fetch-summary.js`は開発者向けLINE通知のみ送信し、`sendPushToAll()`を呼ぶ`/api/notify-events-updated`へのfetch呼び出しは削除済み。`server.js`側の同エンドポイント・`sendPushToAll()`関数自体は将来の手動再送信用に残置（呼び出し元がなくなっただけ）
 - 上記変更の経緯・実測データ（8ソースの投稿ペース等）は`.claude/plan.md`「設計書18」参照
 
+### `data/sources.json`の`status`フィールド運用（2026-07-14確定、設計書33）
+`scripts/fetch-events.js`の`loadActiveSources()`は`status === 'active'`の1フィールドのみで取得可否を判定する（`feeds`・`instagramAccounts`共通）。`pausedAt`/`pausedReason`/`rejectedAt`/`rejectedReason`は記録用メタデータのみで、`fetch-events.js`からは一切参照されない（設定しても`status`自体を変えなければ取得は止まらない）。
+- 正規サポート値は3つ: `"active"`（取得対象）/ `"paused"`（一時停止、将来の復活余地あり）/ `"rejected"`（永久除外）。`analyze-sources.js`側の命名慣習と統一されている
+- `analyze-sources.js`の自動停止ロジックは`status`と`pausedAt`/`pausedReason`を**同時に**セットする実装になっている。`data/sources.json`を人力編集する際も、この3値+付随メタデータのセット漏れがないよう必ず両方同時に更新すること（過去に`pausedAt`のみ追記され`status`が`active`のまま残り、実際には停止していなかった不整合が発生した実例あり。`pinned:true`のソースは`analyze-sources.js`の自動停止対象外のため、この種の人力編集漏れが特に起きやすい）
+- IGアカウント運用（2026-07-14時点）: `uniqlosg`は累計採用率4%のため`status:"rejected"`で永久除外。`mujisg`は`status:"paused"`（既存`pausedAt`/`pausedReason`はそのまま活用、値の再設定は不要だった）。`singaporezoo`→`mandaiwildlifereserve`、`nationalgallerysg`→`nationalgallerysingapore`、`TheProjectorSG`→`theprojectorsg`はユーザー名の誤り（実際の公式ハンドルと不一致）と判明し訂正。`artscience_museum`・`birdparadise_sg`は正しいユーザー名が特定できず配列から削除済み
+
+### `scripts/filter-events.js` Sonnet記事生成失敗時のリトライ・除外ロジック（2026-07-14実装、設計書33）
+`enrichBatch()`呼び出しループ（Sonnetでのバッチ記事生成）が失敗した場合、同じバッチで1回だけリトライする。リトライも失敗した場合、そのバッチに含まれるイベントは`enriched` Mapに登録しない。
+- 結合ループ側は`enriched.get(f._enrichPos) || {}`（空オブジェクトへの無条件フォールバック）ではなく`enriched.has(f._enrichPos)`で判定し、登録されていない（＝記事生成に最終的に失敗した）イベントは`newItems`に追加せず`events.json`へ保存しない。バッチ丸ごと失敗・一部indexだけの部分的欠落のどちらのケースも同じ経路で除外される
+- 除外件数は`⚠️ 記事生成に失敗したため${n}件のイベントを除外しました`としてログ出力する
+- 既知の副次効果: `notify-fetch-summary.js`のLINE通知「◯件採用」の合計値はHaikuフィルタ通過数（`totalAccepted`）ベースのままで、この除外分は反映されない（通知ロジック自体は今回変更対象外）。ソース別内訳（`accepted/sent`）の方はSonnet失敗分がカウントされなくなり、より正確になった
+
 ## 環境構成と注意事項（2026-07-07）
 
 ### Web版 = テスト環境 / iOS App Store版 = 本番環境

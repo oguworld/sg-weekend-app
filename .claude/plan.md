@@ -3321,3 +3321,218 @@ Klook公式ウィジェット埋め込みコード（`<ins class="klk-aff-widget
 - `pm2 restart sg-weekend`実行済み
 - ローカル`main`へのコミットのみ。**releaseブランチへのpush・TestFlightビルドはユーザーの明示指示があるまで実施しない**（今回の依頼にも含まれていない）
 - CLAUDE.mdの「広告表示機能フェーズ1: Klookアフィリエイトリンク」セクションを、「バックエンド側の埋め込み処理を一時停止中（関数・データ・スクリプトは残置、復活は`embedAffiliateLinks()`呼び出しを戻すだけ）」という正確な状態に更新済み
+
+---
+
+# 設計書33: SGインスタグラム取り込みソースのトラブル調査（status制御バグ・履歴ゼロ9アカウント・filter-events.jsリトライ設計）
+
+## 調査日
+2026-07-14（デバッガーによる調査のみ、コード変更なし）
+
+## 症状の説明
+ユーザーから3件の依頼が発生した:
+1. `uniqlosg`を正式に取得対象から外したい（累計106送信・採用4件、採用率4%）
+2. `mujisg`に`pausedAt`/`pausedReason`が設定されているのに実際には07-08・07-12も取得され続けている（一時停止のつもりが機能していないバグ）
+3. `data/source-history.json`に一度も登場しない9アカウント（`otokoramen_alexandra` `singaporezoo` `nationalgallerysg` `artscience_museum` `birdparadise_sg` `TheProjectorSG` `esplanadesingapore` `singaporeflyer` `marinabaysands`）の原因調査
+
+加えて、`scripts/filter-events.js`のSonnet記事生成失敗時のリトライ・除外ロジック追加に向けた事前調査。
+
+---
+
+## A. ステータス制御ロジックの調査結果
+
+### A-1. `status`フィールドの扱い（確定）
+`scripts/fetch-events.js`の`loadActiveSources()`（91〜109行目）が全ソースの取得可否を決定している。
+
+```js
+const feeds = (cityConf.feeds || [])
+  .filter(f => f.status === 'active')          // 100行目
+  .map(f => ({ url: f.url, name: f.name, ...(f.options || {}) }));
+
+const instagramAccounts = (cityConf.instagramAccounts || [])
+  .filter(a => a.status === 'active')           // 104行目
+  .map(a => a.username);
+```
+
+- 判定条件は**`status === 'active'`の1フィールドのみ**。それ以外の値（`'paused'`・`'retired'`・`'rejected'`・未設定等）はすべて取得対象から除外される
+- `pausedAt`/`pausedReason`は`fetch-events.js`ではまったく参照されていない（grep結果でも該当なし）。**記録用メタデータであり、動作には一切影響しない設計**（ユーザーの推測どおり）
+- `discover-sources.js`は`status`/`pausedAt`等を参照する処理が存在しない（grep結果0件、無関係）
+- `scripts/analyze-sources.js`は`'active'`（175-176, 226-227行目）・`'paused'`（204-205行目）・`'rejected'`（226-227行目）の3値を正式にサポートしている。**つまり`"paused"`は本システムにおいて既存の正規サポート値**であり、新設不要
+- `analyze-sources.js`の自動停止ロジック（298〜303行目）は、不良ソースを検出すると`status: 'paused'`・`pausedAt`・`pausedReason`の3つを**同時に**セットする実装になっている（バグの実装ではなく、正しい参照実装）
+- 停止後7日経過かつ通算採用0件のソースは`analyze-sources.js`のStep0（206〜222行目）で自動的に`status: 'rejected'`へ昇格する仕組みも存在する
+
+### A-2. mujisg/uniqlosgが止まらなかった理由（確定）
+`data/sources.json`を確認したところ、両アカウントとも:
+```json
+{
+  "username": "uniqlosg",
+  "status": "active",       // ← 'paused'ではなくactiveのまま
+  "pinned": true,
+  "pausedAt": "2026-07-01",
+  "pausedReason": "採用率ゼロ継続（0/8）プロモ投稿ばかり"
+}
+```
+`status`が`"active"`のままなので、`fetch-events.js`の`loadActiveSources()`のフィルタを素通りし続けていた。
+
+さらに、両アカウントとも`"pinned": true`が設定されている。`analyze-sources.js`の自動停止ロジック（Step1、252〜256行目）は`if (obj.pinned) { ... continue; }`で**pinnedなソースを自動停止の対象外**にしている。つまり:
+- `analyze-sources.js`の自動処理によって`pausedAt`/`pausedReason`だけがセットされた可能性は構造上ありえない（pinnedゆえにこのロジックが素通りする）
+- **推測**: 過去のセッションで人力（AIエージェントによる`data/sources.json`の直接編集、または類似の手動運用）により`pausedAt`/`pausedReason`のみが追記され、本来同時にセットすべき`status: 'paused'`の書き換えが漏れたと考えられる。ログ・コミット履歴等の直接証拠は確認していないため、この経緯自体は推測である
+
+### A-3. 修正方針（推奨）
+- 独自の新しい`status`値（例: `"stopped"`）を導入する必要はない。**既存の`"paused"`（一時停止・将来的な復活余地あり）または`"rejected"`（永久除外・analyze-sources.jsの命名慣習に合わせる）のいずれかを流用すれば足りる**
+- **uniqlosg**（ユーザー意図: 正式に取得対象から外す・累計採用率4%と明確に不良）→ `status: "rejected"`が適切。`rejectedAt`・`rejectedReason`も併せて設定するとanalyze-sources.js側の記録慣習（217〜219行目）と一貫性が取れる
+- **mujisg**（ユーザー意図: 一時停止のバグを直す。ユーザー文言は「一時停止バグを直す」であり永久除外とは言っていない点に注意）→ `status: "paused"`に修正するのがユーザー意図に忠実。既存の`pausedAt`/`pausedReason`はそのまま活かせる（値の再設定は不要、`status`フィールドの追加・修正のみで足りる）
+- いずれの修正も`data/sources.json`内の該当2オブジェクトの`status`値を書き換えるだけで完結し、`fetch-events.js`/`analyze-sources.js`のロジック自体には変更不要（設計は健全で、単純なデータ側の入力漏れが原因のため）
+- **再発防止の論点**: `pausedAt`/`pausedReason`を手動追記する運用がある場合、`status`とのセット漏れが今後も起こりうる。将来的な改善として、`analyze-sources.js`または別の軽量スクリプトに「`pausedAt`/`rejectedAt`等の日付メタデータが存在するのに`status`が`active`のまま」という不整合を検知するチェック処理を追加する案が考えられる（今回はユーザー依頼の範囲外のため、対応要否は次工程の判断に委ねる）
+
+---
+
+## B. 履歴ゼロ9アカウントの実地調査結果
+
+`.env`のInstagram認証情報を用い、`fetch-events.js`の`fetchInstagramPosts()`と同じBusiness Discovery APIエンドポイント・パラメータで9アカウントすべてを実地確認した（認証情報の値自体は非出力）。
+
+### B-1. API呼び出し結果一覧
+
+| アカウント | API結果 | 判定 |
+|---|---|---|
+| `otokoramen_alexandra` | 成功（media 25件） | 投稿頻度の問題（詳細はB-2） |
+| `singaporezoo` | エラー `Invalid user id` (subcode 2207013) | ユーザー名誤り（詳細はB-3） |
+| `nationalgallerysg` | エラー `Invalid user id` | ユーザー名誤り（詳細はB-3） |
+| `artscience_museum` | エラー `Invalid user id` | 原因不明（正しいユーザー名を特定できず） |
+| `birdparadise_sg` | エラー `Invalid user id` | 原因不明（正しいユーザー名を特定できず） |
+| `TheProjectorSG` | エラー `Invalid user id` | ユーザー名誤り（詳細はB-3） |
+| `esplanadesingapore` | 成功（media 25件） | 正常稼働中（下記参照） |
+| `singaporeflyer` | 成功（media 25件） | 正常稼働中（下記参照） |
+| `marinabaysands` | 成功（media 25件） | 投稿頻度の問題（詳細はB-2） |
+| （参考）`sciencecentresg` | 成功（media 25件） | 正常稼働の対照群 |
+
+### B-2. API成功だが「0件取得」ログになっているアカウント（実地確認済み）
+`fetch-events.js`の`fetchInstagramPosts()`（276〜277行目）は**直近4日以内**（`cutoff.setDate(cutoff.getDate() - 4)`）かつcaption必須で投稿をフィルタしている。
+
+- **`otokoramen_alexandra`**: 取得した直近10投稿のtimestampは2026-05-25が最新で、以降2026-03、2026-01…と数ヶ月おきの低頻度更新。4日以内の投稿が構造的にほぼ存在しない。**アカウント自体の更新頻度が低いことが原因**。API・実装いずれの不具合でもない
+- **`marinabaysands`**: 直近10投稿は2026-07-08が最新で、その後2026-07-02・07-01…とおよそ週1〜2本ペース。実行日（2026-07-13/14）から見て2026-07-08は5〜6日前となり、4日cutoffをわずかに外れている。**投稿頻度と実行タイミングの兼ね合いでたまたま連続してcutoff外になっている状態**。今後も同程度の投稿頻度が続く場合、恒常的にcutoff境界を外れやすい構造的リスクがある
+
+実際に`logs/run-fetch-all.log`でも両アカウントとも「`✅ 0件取得`」（エラーではなく正常応答の0件）となっており、上記の実地確認結果と整合する。
+
+### B-3. ユーザー名誤りと判定したアカウント（正しいユーザー名を特定・確認済み）
+
+| 誤り（sources.json記載） | 正しいと推測されるユーザー名 | 確認結果 |
+|---|---|---|
+| `singaporezoo` | `mandaiwildlifereserve` | followers 191,427 / media 2,692件で正常応答 |
+| `nationalgallerysg` | `nationalgallerysingapore` | followers 111,142 / media 2,973件で正常応答 |
+| `TheProjectorSG` | `theprojectorsg`（大文字小文字違いの可能性） | followers 52,997 / media 5,237件で正常応答 |
+
+これらは各施設の現行の公式Instagramハンドルが`sources.json`登録時と異なっている（またはリブランディング等でユーザー名が変更された）ものと推測される。**確度は高いが、これらが「本当にその施設の公式アカウントである」という最終確認はfollower数・投稿内容からの状況証拠であり、100%の確証ではない**（次工程で実際にInstagram上で公式アカウントであることを目視確認することを推奨）。
+
+### B-4. 原因不明のアカウント
+- **`artscience_museum`**（ArtScience Museum） / **`birdparadise_sg`**（Bird Paradise）
+- 複数のユーザー名バリエーション（`artsciencemuseum`、`asmsingapore`、`birdparadise`、`mandaibirdparadise`、`mandai.birdparadise`等）を試したが、いずれも`Invalid user id`エラーで正しいユーザー名を特定できなかった
+- 存在しない／非公開／Business・Creatorアカウントでない／単なる登録時のタイプミス、のいずれが真因かは今回の調査範囲では**不明**。断定は避ける
+
+### B-5. 正常稼働している3アカウント（削除不要）
+`esplanadesingapore`・`singaporeflyer`は`logs/run-fetch-all.log`で実際に投稿取得・スコアリングされている記録があり（例: `✅ 採用: ダーク演劇「Multiple Bad Things」...source: Instagram / @esplanadesingapore`）、正常に機能している。`data/source-history.json`に「一度も登場しない」というユーザー認識と実態がやや異なっており、直近のfetch実行では既に履歴が生成され始めている可能性がある（`source-history.json`の集計タイミング・範囲は今回未確認、次工程で要確認）。
+
+### B-6. logs/配下のエラーログ確認結果
+`logs/run-fetch-all.log`で9アカウント名をgrep確認:
+- `singaporezoo`・`nationalgallerysg`・`artscience_museum`・`birdparadise_sg`・`TheProjectorSG`: 「⚠️ 取得失敗」ログあり（`fetchInstagramPosts()`309〜314行目の`catch`ブロック相当のログ出力パターンではなく、294〜297行目の`business_discovery.media.data`不在時の分岐ログ）。ただし**エラーメッセージの詳細（`Invalid user id`等）自体はログに出力されていない**（`console.log('取得失敗')`のみでAPIエラー内容を握りつぶしている）
+- `otokoramen_alexandra`・`marinabaysands`: 「✅ 0件取得」の正常終了ログのみ、エラーログなし
+
+### B-7. 削除推奨/様子見推奨の判定まとめ
+
+| アカウント | 推奨 | 理由 |
+|---|---|---|
+| `singaporezoo` | **修正推奨**（削除ではなくユーザー名訂正） | `mandaiwildlifereserve`に訂正すれば取得可能と推定される |
+| `nationalgallerysg` | **修正推奨**（削除ではなくユーザー名訂正） | `nationalgallerysingapore`に訂正すれば取得可能と推定される |
+| `TheProjectorSG` | **修正推奨**（削除ではなくユーザー名訂正） | `theprojectorsg`に訂正すれば取得可能と推定される |
+| `artscience_museum` | **様子見 or ユーザー本人による正しいハンドル確認待ち** | 正しいユーザー名が特定できず、削除するには判断材料不足 |
+| `birdparadise_sg` | **様子見 or ユーザー本人による正しいハンドル確認待ち** | 同上 |
+| `otokoramen_alexandra` | **様子見**（削除は時期尚早） | API疎通は正常。単に投稿頻度が低いだけで、アカウント自体は生きている。ただし4日cutoffとの相性が悪く実質的に取得され続けない可能性が高い点はユーザーに情報共有すべき |
+| `marinabaysands` | **様子見**（削除は時期尚早） | API疎通は正常。投稿頻度がcutoff境界ギリギリで、実行タイミング次第では取得できる可能性が残る |
+| `esplanadesingapore` | **削除不要（正常稼働）** | 実際に投稿取得・採用実績あり |
+| `singaporeflyer` | **削除不要（正常稼働、ただし採用率は要観察）** | 取得実績はあるが07-13時点のログでは0/1・0/2と採用ゼロ継続。まだ判断するには早い（`analyze-sources.js`の`minRuns`閾値未達の可能性、閾値自体は今回未確認） |
+
+---
+
+## C. filter-events.js リトライ・除外ロジックの追加箇所（事前調査のみ）
+
+ユーザー要望: 「Sonnet記事生成が失敗したら1回リトライし、それでもダメならイベント自体を保存しない」
+
+### 現状のコード構造（確定・行番号はすべて`scripts/filter-events.js`）
+
+1. **`enrichBatch(batch, cityKey)`関数**（235〜300行目）: Sonnetへバッチ単位でリクエストを送り、JSON配列をパースして返す。失敗時（API例外、JSON解析失敗等）は呼び出し元に例外がthrowされる（298行目`if (!match) return [];`のケースのみ空配列を返し例外にならない点に注意）
+2. **呼び出しループ**（423〜433行目）:
+   ```js
+   for (let i = 0; i < enrichBatches.length; i++) {
+     const batch = enrichBatches[i];
+     try {
+       const results = await enrichBatch(batch, cityKey);
+       for (const r of results) enriched.set(r.index, r);
+       if (i + 1 < enrichBatches.length) await new Promise(r => setTimeout(r, 1000));
+     } catch (e) {
+       console.error(`    ❌ 記事生成エラー: ${e.message}`);   // ← 431行目、エラーを握りつぶすのみ
+     }
+   }
+   ```
+   catch節（430〜432行目）はエラーログを出すだけで、リトライも例外の再送出も行っていない。バッチ全体が丸ごと失敗すると、そのバッチに含まれる全`_enrichPos`が`enriched` Mapに登録されないまま処理が次バッチへ進む
+3. **結合ループ**（439〜477行目）: `filtered`配列（Haiku採否済みの全採用イベント）を無条件にすべて`newItems`へ積む。440行目`const enrich = enriched.get(f._enrichPos) || {};`により、enrichBatchが失敗して未登録だった`_enrichPos`は**空オブジェクト`{}`にフォールバック**し、462〜465行目で`content`/`content_en`/`tips`/`tips_en`が空文字・空配列のまま`newItems`に積まれ、507〜513行目で無条件に`events.json`へ書き込まれる。**これが「Sonnet失敗イベントが空contentのまま保存される」現象の直接原因**
+
+### リトライ・除外ロジックを追加すべき箇所（要点）
+
+- **リトライの追加**: 423〜433行目のループ内、`catch (e)`節（431行目）に1回リトライを追加する形が自然（`enrichBatch()`自体は副作用なしの純粋なAPI呼び出しなので再実行が安全）。実装方式としては「catch内でもう一度`await enrichBatch(batch, cityKey)`を試み、それも失敗したら諦める」という単純な形が既存コードの構造に最も馴染む
+- **除外ロジックの追加**: 439行目の結合ループ内、440行目`enriched.get(f._enrichPos) || {}`の直後に、**enrichが空（＝リトライしても失敗した`_enrichPos`）の場合は`continue`でそのイベント自体を`newItems`にpushしない**分岐を追加するのが最小変更。ただし「空オブジェクト」と「Sonnetが返した結果だが偶然空文字だった」を区別する必要があるため、`enriched.has(f._enrichPos)`で判定する方が`|| {}`のフォールバック方式より安全（Mapに存在するかどうかで「試行して失敗したか」を正確に判定できる）
+- **バッチ単位 vs イベント単位の粒度の注意点**: 現状`enrichBatch`は`ENRICH_BATCH_SIZE`件まとめて1回のAPI呼び出しをしている。バッチ全体を1回リトライしても、リトライ後も特定の1件だけJSON形式が崩れる／Sonnetが一部indexを返し忘れる、といった部分的失敗はありうる（298行目の`if (!match) return [];`は全滅パターンのみを扱っており、一部のindexだけ欠落するケースは現状の`enriched.set(r.index, r)`ループで自然に「該当indexだけ`enriched`未登録」になる）。「除外ロジック」を440行目・`enriched.has()`判定で実装しておけば、バッチ丸ごと失敗・一部index欠落のどちらのケースも自動的に同じ経路で「保存しない」扱いにできるため、対応漏れが少ない設計と考えられる
+- **変更が必要な関数**: `enrichBatch()`（235行目、変更不要・現状のまま再利用可能）、呼び出しループ（423〜433行目、リトライ追加）、結合ループ（439〜477行目、除外判定追加）の3箇所。`filterBatch()`（Haiku側フィルタ、397〜408行目）は今回のユーザー要望の対象外（Sonnet段階のみが対象）
+- 詳細な実装方式（リトライ回数・待機時間・ログ出力形式等）はここでは決定しない。後続のplanner/orchestratorフェーズで設計する前提
+
+---
+
+## 全体を通じた推奨対応（次工程への申し送り）
+
+### 即実施可能（データ修正のみ、ロジック変更不要）
+1. `data/sources.json`の`uniqlosg`の`status`を`"active"`→`"rejected"`に変更（`rejectedAt`/`rejectedReason`も追記推奨）
+2. `data/sources.json`の`mujisg`の`status`を`"active"`→`"paused"`に変更（既存の`pausedAt`/`pausedReason`はそのまま活用）
+3. `data/sources.json`の`singaporezoo`→`mandaiwildlifereserve`、`nationalgallerysg`→`nationalgallerysingapore`、`TheProjectorSG`→`theprojectorsg`へユーザー名訂正（訂正前に、これらが本当に該当施設の公式アカウントかInstagram上で目視確認することを推奨）
+
+### 判断保留・様子見
+4. `artscience_museum`・`birdparadise_sg`は正しいユーザー名が不明のため、ユーザー本人に正しいInstagramハンドルの確認を仰ぐか、削除するか判断が必要
+5. `otokoramen_alexandra`・`marinabaysands`は技術的には正常だが、4日cutoffと投稿頻度の相性が悪く実質的に機能しにくい。cutoff日数の緩和（4日→7日等）を検討するか、このまま様子見するかはユーザー判断が必要（cutoff変更は他の全Instagramアカウントに影響する全体設定のため、変更する場合は影響範囲の検討が別途必要）
+
+### 別タスクとして今後着手（設計要）
+6. `filter-events.js`のSonnet記事生成リトライ・除外ロジック（C節の調査結果に基づき、次のplannerフェーズで詳細設計）
+
+### 参考: 今回の調査で判明した副次的な設計事実（バグではないが記録推奨）
+- `analyze-sources.js`は`status`に`active`/`paused`/`rejected`の3値運用が既に確立されている。今後`data/sources.json`を手動編集する際は、この3値の整合性（`status`と`pausedAt`/`rejectedAt`等のメタデータのセット漏れがないか）を毎回確認すべき
+- `fetchInstagramPosts()`のBusiness Discovery APIエラー時、`console.log('取得失敗')`のみでエラー詳細（`Invalid user id`等）をログに残していないため、今回のような「なぜ取得できないか」の調査が都度API実地確認を要する状態になっている。エラーメッセージ自体をログ出力するよう改善すれば、今後同種の調査コストを下げられる（今回のユーザー依頼範囲外、次工程での検討事項として記録）
+
+---
+
+## 実装完了（2026-07-14、builder/checker/closer実施）
+
+上記A・B節の調査結果に基づき、以下3タスクを実装した。
+
+### タスク1: IGソースのステータス修正（`data/sources.json`）
+- `uniqlosg`: `status: "active"` → `"rejected"`（`rejectedAt: "2026-07-14"`・`rejectedReason`追記）
+- `mujisg`: `status: "active"` → `"paused"`（既存`pausedAt`/`pausedReason`はそのまま維持）
+- `singaporezoo` → `mandaiwildlifereserve`、`nationalgallerysg` → `nationalgallerysingapore`、`TheProjectorSG` → `theprojectorsg`にusername訂正
+- `artscience_museum`・`birdparadise_sg`は配列から削除（正しいユーザー名が特定できなかったため）
+- `otokoramen_alexandra`・`marinabaysands`・`esplanadesingapore`・`singaporeflyer`は無変更
+- `sg.instagramAccounts`は22件→20件に
+
+### タスク2: `scripts/filter-events.js`にリトライ・除外ロジックを追加
+- Sonnet記事生成ループの`catch`節に1回リトライを追加（`enrichBatch()`自体は無変更）
+- 結合ループの判定を`enriched.get(f._enrichPos) || {}`（空オブジェクトへの無条件フォールバック）から`enriched.has(f._enrichPos)`に変更し、記事生成に最終的に失敗したイベントは`newItems`に追加せず除外するように修正
+- 除外件数をログ出力（`⚠️ 記事生成に失敗したため${n}件のイベントを除外しました`）
+
+### タスク3: 既存の空説明イベント6件の修復
+- 使い捨てスクリプト`scripts/repair-empty-content.js`を作成し、`fetchArticleContent()`（OGP取得）+ Sonnet記事生成（1回リトライ込み）で6件全てを修復（削除0件）
+- 対象6件（JOFA Coffee Shop Bedok / Xiang Xiang Hunan Cuisine / JUMBOREE Tai Seng / Four Points Eatery / QT Singapore・Cygnet Bar / Peach Garden）すべて`content`/`content_en`/`tips`/`tips_en`が正しく埋まったことを確認
+- 対象外の102件は完全無変更（diffで確認済み）
+
+### 検証結果（checker）
+- `data/sources.json`・`data/sg/events.json`ともJSON構文OK
+- `node -c scripts/filter-events.js`構文OK、diffは指示の3箇所のみに限定
+- `GET /api/events?city=sg`はHTTP 200で正常応答
+- `discover-sources.js`・`analyze-sources.js`・bkk/sydデータは無変更を確認
+- 🔴Criticalなし。🟢Minor1件: `notify-fetch-summary.js`のLINE通知「◯件採用」合計値はHaikuフィルタ通過数ベースのままでSonnet失敗除外分が反映されない（通知ロジック自体は今回のスコープ外、対応不要）
+- CLAUDE.mdの「イベント取り込みパイプライン構成」セクションに、`status`値運用の正しい意味とリトライ・除外ロジックを恒久情報として追記済み
+- ローカル`main`へのコミットのみ実施。GitHubへのpush・iOSリリースは含まない（`filter-events.js`はcronから直接実行されるスクリプトのためpm2再起動不要、`data/sources.json`・`data/sg/events.json`は`fs.readFileSync`都度読み込みのため即座に反映済み）
