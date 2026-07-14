@@ -164,6 +164,7 @@ sg-weekend-app/
   - 「Googleでログイン中」ラベルは現状固定文言（プロバイダがGoogleのみのため）。次回Sign in with Apple追加時は`provider`に応じた動的表示への変更が必要
   - iOS版のGoogle Sign-In用URL Scheme（`Info.plist`の`CFBundleURLTypes`）は、実際の`GOOGLE_IOS_CLIENT_ID`確定後でないと正しい値を設定できないため、`.github/workflows/ios-deploy.yml`への追加は今回見送り。Google Cloud ConsoleでのクライアントID発行後、CIワークフローへのPlistBuddyステップ追加が別途必要（詳細は`.claude/next.md`参照）
   - Google Cloud ConsoleでのOAuthクライアントID（Web用・iOS用の両方）実発行はユーザーが別途行う想定。発行完了・`.env`及び`capacitor.config.js`への実値設定・CIワークフロー更新が揃うまで、実際のGoogleログインのエンドツーエンド動作は未検証
+- **2026-07-15修正（設計書38）**: 「Googleでログイン」「ログアウト」ボタンがタッチ操作（スマホ・タブレット）で反応しない不具合を修正。CLAUDE.md下記「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節のパターンのうち、touchend側の登録が新規ボタン`#google-login-btn`/`#logout-btn`にのみ漏れていたのが原因。既存の設定画面touchendハンドラ（`public/app.js`）に2行追加して解消済み
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み

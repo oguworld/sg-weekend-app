@@ -1949,6 +1949,8 @@
         if (e.target.closest('#feedback-send-btn')) { e.preventDefault(); sendFeedback(); return; }
         if (e.target.closest('#lang-toggle-btn'))   { e.preventDefault(); setLang(getLang() === 'ja' ? 'en' : 'ja'); return; }
         if (e.target.closest('#push-toggle-btn'))   { e.preventDefault(); togglePush(); return; }
+        if (e.target.closest('#google-login-btn'))  { e.preventDefault(); handleGoogleLoginClick(); return; }
+        if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
       }, { passive: false });
     }
 
