@@ -464,6 +464,13 @@
         supportBtn: '$5 を贈る',
         scheduleMakePlan: '予定を立てる',
         courseCreateBtn: '🗺 コース作成',
+        secLogin: 'ログイン',
+        loginWithGoogle: 'Googleでログイン',
+        loginStatusGoogle: 'Googleでログイン中',
+        logoutBtn: 'ログアウト',
+        toastLoginSuccess: 'ログインしました',
+        toastLoginError: 'ログインに失敗しました。もう一度お試しください',
+        toastLogoutSuccess: 'ログアウトしました',
       },
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
@@ -660,6 +667,13 @@
         supportBtn: 'Gift $5',
         scheduleMakePlan: 'Plan a trip',
         courseCreateBtn: '🗺 Course',
+        secLogin: 'Login',
+        loginWithGoogle: 'Sign in with Google',
+        loginStatusGoogle: 'Signed in with Google',
+        logoutBtn: 'Log out',
+        toastLoginSuccess: 'Signed in',
+        toastLoginError: 'Sign-in failed. Please try again',
+        toastLogoutSuccess: 'Signed out',
       }
     };
 
@@ -1989,6 +2003,7 @@
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
+    refreshLoginUI();
 
     // Pull to Refresh（設計書19、イベント画面。iOS版のみ有効化。既存の横スワイプ機構と共存させるためwatchSwipeIntent=true）
     _initPtr(document.getElementById('home-scroll-content'), 'ptr-indicator-home', async () => {
@@ -2386,6 +2401,128 @@
         btn.classList.toggle('selected', next.includes(btn.dataset.genre));
       });
       _syncRecommendChip();
+    }
+
+    // ─── AUTH（Google Sign-In。iOS版・Web版共通。設計書20/35/36。今回はGoogle Sign-Inのみ、Apple・予定表紐づけは次回） ───
+    const AUTH_TOKEN_KEY = 'app_auth_token';
+    let _googleWebClientId = null; // GET /api/config で起動時に取得（Web版GISの初期化用）
+    let _googleAuthInited = false; // Web/iOS共通、各プラットフォームの初期化を一度だけ行うためのフラグ
+
+    function getAuthToken() {
+      return localStorage.getItem(AUTH_TOKEN_KEY);
+    }
+    function setAuthToken(token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    }
+    function clearAuthToken() {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+
+    // Authorizationヘッダーを自動付与するfetchヘルパー（未ログイン時は通常のfetchと同じ挙動）
+    async function authedFetch(url, options = {}) {
+      const token = getAuthToken();
+      const headers = Object.assign({}, options.headers || {});
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, Object.assign({}, options, { headers }));
+    }
+
+    // サーバーに idToken を送信し、自前JWTを保存する共通処理（iOS/Web共通）
+    async function _submitGoogleIdToken(idToken) {
+      try {
+        const res = await fetch(API_BASE + '/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        });
+        if (!res.ok) throw new Error('auth failed');
+        const data = await res.json();
+        if (!data.token) throw new Error('no token');
+        setAuthToken(data.token);
+        showToast(t('toastLoginSuccess'));
+        await refreshLoginUI();
+      } catch (e) {
+        showToast(t('toastLoginError'));
+      }
+    }
+
+    // 設定画面のログインセクション表示をログイン状態に合わせて更新する
+    async function refreshLoginUI() {
+      const loggedOutEl = document.getElementById('login-section-logged-out');
+      const loggedInEl = document.getElementById('login-section-logged-in');
+      if (!loggedOutEl || !loggedInEl) return;
+      const token = getAuthToken();
+      if (!token) {
+        loggedOutEl.style.display = '';
+        loggedInEl.style.display = 'none';
+        return;
+      }
+      try {
+        const res = await authedFetch(API_BASE + '/api/auth/me');
+        if (!res.ok) throw new Error('invalid session');
+        // メールアドレス・氏名は一切表示しない（認証情報最小化方針）。プロバイダのみ表示
+        loggedOutEl.style.display = 'none';
+        loggedInEl.style.display = '';
+      } catch (e) {
+        // トークン失効時は匿名状態に戻す
+        clearAuthToken();
+        loggedOutEl.style.display = '';
+        loggedInEl.style.display = 'none';
+      }
+    }
+
+    function handleLogoutClick() {
+      clearAuthToken();
+      showToast(t('toastLogoutSuccess'));
+      refreshLoginUI();
+    }
+
+    // iOS版: Capacitorネイティブプラグイン経由でGoogleサインインを起動
+    async function _handleGoogleLoginIOS() {
+      try {
+        let GoogleAuthPlugin = null;
+        try {
+          if (window.Capacitor?.registerPlugin) GoogleAuthPlugin = window.Capacitor.registerPlugin('GoogleAuth');
+        } catch (_) {}
+        if (!GoogleAuthPlugin) GoogleAuthPlugin = window.Capacitor?.Plugins?.GoogleAuth;
+        if (!GoogleAuthPlugin) { showToast(t('toastLoginError')); return; }
+        if (!_googleAuthInited) {
+          try { await GoogleAuthPlugin.initialize?.(); } catch (_) {}
+          _googleAuthInited = true;
+        }
+        const result = await GoogleAuthPlugin.signIn();
+        const idToken = result?.authentication?.idToken || result?.idToken;
+        if (!idToken) { showToast(t('toastLoginError')); return; }
+        await _submitGoogleIdToken(idToken);
+      } catch (e) {
+        showToast(t('toastLoginError'));
+      }
+    }
+
+    // Web版: Google Identity Services（GIS）JS SDKでサインインを起動
+    async function _handleGoogleLoginWeb() {
+      try {
+        if (!_googleWebClientId) {
+          const res = await fetch(API_BASE + '/api/config');
+          const conf = await res.json();
+          _googleWebClientId = conf.googleWebClientId;
+        }
+        if (!_googleWebClientId || !window.google?.accounts?.id) { showToast(t('toastLoginError')); return; }
+        if (!_googleAuthInited) {
+          window.google.accounts.id.initialize({
+            client_id: _googleWebClientId,
+            callback: (response) => { _submitGoogleIdToken(response.credential); },
+          });
+          _googleAuthInited = true;
+        }
+        window.google.accounts.id.prompt();
+      } catch (e) {
+        showToast(t('toastLoginError'));
+      }
+    }
+
+    function handleGoogleLoginClick() {
+      if (_isCapacitorApp) _handleGoogleLoginIOS();
+      else _handleGoogleLoginWeb();
     }
 
     function initSettingsGenres() {
@@ -3809,7 +3946,7 @@
       // 公開済みならサーバーからも削除
       if (target?.published) {
         try {
-          await fetch(API_BASE + `/api/courses/${courseId}?city=${city}`, { method: 'DELETE' });
+          await authedFetch(API_BASE + `/api/courses/${courseId}?city=${city}`, { method: 'DELETE' });
         } catch(e) {}
       }
 
@@ -3981,7 +4118,7 @@
       }
 
       try {
-        await fetch(API_BASE + '/api/courses/publish', {
+        await authedFetch(API_BASE + '/api/courses/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...course, isPublic: true })
@@ -4009,7 +4146,7 @@
     async function unpublishCourseById(courseId) {
       const city = getCity();
       try {
-        await fetch(API_BASE + `/api/courses/${courseId}/unpublish`, {
+        await authedFetch(API_BASE + `/api/courses/${courseId}/unpublish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ city })

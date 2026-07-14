@@ -137,6 +137,34 @@ sg-weekend-app/
 - `_isCapacitorApp`による分岐は実装していない（ウィジェット自体のリンク処理はKlook側のiframe内で完結する想定のため独自クリックハンドラは追加せず）。**iOS版（Capacitor/TestFlight）でのカード風の見た目・PRラベル・カード間差し込み位置・iframe内リンクタップの挙動は2026-07-13時点で未検証**
 - スコープ外（今回未実装）: 複数スポンサーのローテーション、日替わり選択ロジック、カテゴリ一致判定、クリック計測、ウィジェット表示位置の詳細カスタマイズ（Klook側テンプレートの見た目自体はダッシュボード側の設定に依存）
 
+## Google Sign-In認証基盤（2026-07-14実装、設計書20/35/36。iOS版+Web版。Sign in with Apple・予定表紐づけは次回）
+`.claude/plan.md`の設計書20（元設計）・35（認証情報最小化・フェーズ再評価）・36（Web版追加）に基づき、Google Sign-Inのみ（iOS+Web両方）を実装。Sign in with Apple（設計書20/36）・予定表データ/共有カレンダーのユーザー紐づけ（設計書37）は今回スコープ外、未着手のまま。
+
+- **認証情報最小化方針を厳守**: Googleから取得するのは`idToken`の`sub`クレームのみ。`email`/`name`/`picture`等は一切保存・利用しない。`data/users.json`のスキーマは`userId`/`provider`/`providerSub`/`createdAt`/`lastLoginAt`/`subscriptions`のみ（`email`・`displayName`・`avatarEmoji`は含まない）
+- **`data/users.json`**: 新規（gitignore対象、既存`data/`ルールでカバー済み）。`provider`+`providerSub`をユニークキーにupsert。既存の`data/push-subscriptions.json`と同じ`withFileLock`パターンを踏襲
+- **サーバー**: `server.js`に以下を追加
+  - `POST /api/auth/google`: `idToken`を`google-auth-library`の`OAuth2Client.verifyIdToken()`で検証。`audience`に`[GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID]`の配列を渡し、iOS/WebどちらのクライアントID発行トークンも許容。検証成功後`sub`のみ取り出し`data/users.json`をupsert、自前JWT（`jsonwebtoken`、`JWT_SECRET`署名、payloadは`{userId}`のみ、有効期限30日）を発行して返す
+  - `GET /api/auth/me`: `Authorization: Bearer <JWT>`を検証し`{userId, provider, createdAt}`のみ返す（`requireAppAuth`ミドルウェア、ヘッダーなし/不正は401）
+  - `GET /api/config`: 認証不要、`{googleWebClientId}`のみ返す軽量エンドポイント（Web版のGoogle Identity Services初期化用、`.env`の値を動的反映するため）
+  - `verifyAppJwtOptional(req)`: ヘッダーなし/不正時は例外を投げずnullを返す（任意認証用の共通ヘルパー）
+- **コース関連エンドポイントの後方互換認証対応**: `POST /api/courses/publish`・`DELETE /api/courses/:id`・`POST /api/courses/:id/unpublish`に`verifyAppJwtOptional()`を追加。`Authorization`ヘッダーがあり有効なJWTなら、そのuserIdを`authorId`として使う（publishはリクエストボディの`authorId`より優先、delete/unpublishは対象コースの`authorId`と一致する場合のみ許可、不一致は403）。**ヘッダーがない場合は現状の挙動を完全維持**（無検証のまま動作、旧バージョンApp・未ログインユーザーの後方互換）
+- **CORS設定変更**: `/api`向けミドルウェアの`Access-Control-Allow-Headers`に`Authorization`を追加、`Access-Control-Allow-Methods`に`DELETE`を追加（既存の`Content-Type`のみの許可では`Authorization`ヘッダー付きリクエストがCapacitorアプリ等のクロスオリジンからブロックされるため）
+- **iOS版（Capacitor）**: `ios-app/package.json`に`@codetrix-studio/capacitor-google-auth@^3.4.0-rc.4`を追加（**注意**: 同パッケージの安定版3.3.6系はpeerDependencyが`@capacitor/core@^5.0.0`でCapacitor 6非対応。Capacitor 6に正式対応しているのは`3.4.0-rc.1`以降のプレリリース版のみで、`latest`npmタグも`3.4.0-rc.4`を指している。今後関連パッケージのバージョンを見直す際は必ず`npm view <pkg> peerDependencies`でCapacitorバージョンとの整合を確認すること）。`ios-app/capacitor.config.js`に`GoogleAuth`プラグイン設定（`scopes:['openid']`のみ要求、`iosClientId`はプレースホルダー`REPLACE_WITH_YOUR_GOOGLE_IOS_CLIENT_ID`）を追加
+- **Web版**: `public/index.html`に Google Identity Services SDK（`https://accounts.google.com/gsi/client`）の`<script>`タグを追加
+- **`.env`新規変数（プレースホルダー状態、2026-07-14時点）**: `JWT_SECRET`（実際にランダム生成済み、`crypto.randomBytes(32).toString('hex')`）、`GOOGLE_WEB_CLIENT_ID`・`GOOGLE_IOS_CLIENT_ID`（いずれも`REPLACE_WITH_YOUR_...`のプレースホルダー、既存`OPENWEATHER_API_KEY`と同じ運用パターン。Google Cloud Consoleでの実発行はユーザーが別途行う）。値がプレースホルダーのままでもサーバーはクラッシュせず起動する設計（`POST /api/auth/google`は`audience`配列が空の場合500を返すのみ）
+- **フロントエンド（`public/app.js`）共通実装**:
+  - `authedFetch(url, options)`: `localStorage`の`app_auth_token`があれば`Authorization: Bearer`ヘッダーを自動付与するfetchラッパー。コース公開/削除/非公開化の既存fetch呼び出し（`publishCourseById`/`unpublishCourseById`/`deleteMyCourse`）を`authedFetch`に置き換え済み
+  - `handleGoogleLoginClick()`: `_isCapacitorApp`で分岐。iOS版は`_handleGoogleLoginIOS()`（`registerPlugin('GoogleAuth')`優先→`Plugins.GoogleAuth`フォールバックの防御的取得パターンを踏襲、既存Keyboardプラグインの取得パターンと同様）、Web版は`_handleGoogleLoginWeb()`（GIS `initialize()`+`prompt()`、`client_id`は起動時に`GET /api/config`から取得しキャッシュ）
+  - `_submitGoogleIdToken(idToken)`: 共通処理。`POST /api/auth/google`に送信し、成功時`localStorage.app_auth_token`に自前JWTを保存、`refreshLoginUI()`で画面表示更新
+  - `refreshLoginUI()`: 起動時（`init`シーケンス内`initPushState()`等と並んで呼び出し）および認証状態変化時に、設定画面のログインセクション表示を切り替え。未ログイン時は`GET /api/auth/me`を呼ばない（トークンなしなら即座に未ログイン表示、無駄な401を出さない設計）。トークン失効時（401）は自動的に匿名状態に戻す
+  - `handleLogoutClick()`: `localStorage`からJWTを削除するのみ（サーバー側の状態変更は不要という設計書20 §7の方針通り）
+- **設定画面UI**: 「ログイン」セクションをプロフィールセクションの直後に新設。`_isCapacitorApp`による表示/非表示分岐はしない（Web・iOS共通表示、押下後の処理のみプラットフォーム分岐）。未ログイン時は「Googleでログイン」ボタン（Apple版ボタンは今回未実装）、ログイン時は「Googleでログイン中」固定表示＋ログアウトボタン（**メールアドレス・氏名は一切表示しない**）。既存の`.settings-section`/`.settings-item`クラスをそのまま使用、CSS変更なし
+- **i18n**: `secLogin`/`loginWithGoogle`/`loginStatusGoogle`/`logoutBtn`/`toastLoginSuccess`/`toastLoginError`/`toastLogoutSuccess`の7キーをja/en同時追加
+- **既知の制約・次回フォロー事項**:
+  - 「Googleでログイン中」ラベルは現状固定文言（プロバイダがGoogleのみのため）。次回Sign in with Apple追加時は`provider`に応じた動的表示への変更が必要
+  - iOS版のGoogle Sign-In用URL Scheme（`Info.plist`の`CFBundleURLTypes`）は、実際の`GOOGLE_IOS_CLIENT_ID`確定後でないと正しい値を設定できないため、`.github/workflows/ios-deploy.yml`への追加は今回見送り。Google Cloud ConsoleでのクライアントID発行後、CIワークフローへのPlistBuddyステップ追加が別途必要（詳細は`.claude/next.md`参照）
+  - Google Cloud ConsoleでのOAuthクライアントID（Web用・iOS用の両方）実発行はユーザーが別途行う想定。発行完了・`.env`及び`capacitor.config.js`への実値設定・CIワークフロー更新が揃うまで、実際のGoogleログインのエンドツーエンド動作は未検証
+
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
 - `server.js` の `/api/chat` エンドポイントは旧App Store版の後方互換のため残置（新規呼び出し元なし）

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const axios = require('axios');
 const webpush = require('web-push');
 const rateLimit = require('express-rate-limit');
@@ -282,6 +283,78 @@ async function withFileLock(filePath, fn) {
 }
 
 // ─────────────────────────────────────────────
+// AUTH（Google Sign-In、設計書20/35/36。認証情報最小化方針: sub のみ保存、email/氏名/画像は一切保存しない）
+// ─────────────────────────────────────────────
+const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+const JWT_SECRET = process.env.JWT_SECRET;
+const GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = process.env.GOOGLE_IOS_CLIENT_ID;
+const googleOAuthClient = new OAuth2Client();
+
+const USERS_PATH = path.join(__dirname, 'data', 'users.json');
+function loadUsers() {
+  try { return JSON.parse(fs.readFileSync(USERS_PATH, 'utf8')); } catch { return []; }
+}
+function saveUsers(users) {
+  fs.writeFileSync(USERS_PATH, JSON.stringify(users, null, 2), 'utf8');
+}
+function genUserId() {
+  return 'usr_' + crypto.randomBytes(12).toString('hex');
+}
+
+// provider + providerSub をユニークキーに data/users.json を upsert する（email/displayName等は一切扱わない）
+async function upsertUser(provider, providerSub) {
+  let user;
+  await withFileLock(USERS_PATH, () => {
+    const users = loadUsers();
+    const now = new Date().toISOString();
+    const existing = users.find(u => u.provider === provider && u.providerSub === providerSub);
+    if (existing) {
+      existing.lastLoginAt = now;
+      user = existing;
+    } else {
+      user = {
+        userId: genUserId(),
+        provider,
+        providerSub,
+        createdAt: now,
+        lastLoginAt: now,
+        subscriptions: [],
+      };
+      users.push(user);
+    }
+    saveUsers(users);
+  });
+  return user;
+}
+
+function issueAppJwt(userId) {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
+}
+
+// Authorization: Bearer <JWT> を検証し userId を返す。不正・欠如時は null（例外を投げない、任意認証用）
+function verifyAppJwtOptional(req) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return null;
+  const token = header.slice('Bearer '.length).trim();
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return payload.userId || null;
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/auth/me 等、認証必須エンドポイント用ミドルウェア
+function requireAppAuth(req, res, next) {
+  const userId = verifyAppJwtOptional(req);
+  if (!userId) return res.status(401).json({ error: 'unauthorized' });
+  req.authUserId = userId;
+  next();
+}
+
+// ─────────────────────────────────────────────
 // MIDDLEWARE
 // ─────────────────────────────────────────────
 app.use(express.json());
@@ -297,8 +370,8 @@ app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
@@ -537,6 +610,11 @@ app.get('/api/sponsored-cards', (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// GET /api/config — 認証不要、公開情報のみを返す軽量エンドポイント（Web版のGoogle Identity Services初期化用）
+app.get('/api/config', (req, res) => {
+  res.json({ googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID || null });
 });
 
 // GET /api/sales — セール情報一覧（events.json の type==='sale' のみ返す）
@@ -1376,6 +1454,46 @@ app.post('/api/line-webhook', async (req, res) => {
       console.error('LINE webhook error:', e.message);
     }
   }
+});
+
+// ─────────────────────────────────────────────
+// AUTH ROUTES（Google Sign-In。設計書20/35/36、今回はGoogle Sign-Inのみ実装。Apple・予定表紐づけは次回）
+// ─────────────────────────────────────────────
+
+// POST /api/auth/google — Google idToken を検証し、自前JWTを発行する
+// iOS版（GOOGLE_IOS_CLIENT_ID）・Web版（GOOGLE_WEB_CLIENT_ID）どちらのクライアントIDが発行したトークンでも検証を通す
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { idToken } = req.body || {};
+    if (!idToken) return res.status(400).json({ error: 'idToken required' });
+
+    const audience = [GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID].filter(Boolean);
+    if (audience.length === 0) {
+      console.error('auth/google: GOOGLE_WEB_CLIENT_ID / GOOGLE_IOS_CLIENT_ID が未設定です');
+      return res.status(500).json({ error: 'server not configured' });
+    }
+
+    const ticket = await googleOAuthClient.verifyIdToken({ idToken, audience });
+    const payload = ticket.getPayload();
+    const sub = payload?.sub;
+    if (!sub) return res.status(401).json({ error: 'invalid token' });
+
+    // 認証情報最小化方針: email/name/picture等は一切保存・利用しない。sub のみ使用
+    const user = await upsertUser('google', sub);
+    const token = issueAppJwt(user.userId);
+    res.json({ token, userId: user.userId });
+  } catch (e) {
+    console.error('auth/google error:', e.message);
+    res.status(401).json({ error: 'verification failed' });
+  }
+});
+
+// GET /api/auth/me — 自前JWTを検証し、ユーザー情報（userId/provider/createdAt のみ）を返す
+app.get('/api/auth/me', requireAppAuth, (req, res) => {
+  const users = loadUsers();
+  const user = users.find(u => u.userId === req.authUserId);
+  if (!user) return res.status(401).json({ error: 'user not found' });
+  res.json({ userId: user.userId, provider: user.provider, createdAt: user.createdAt });
 });
 
 // ─────────────────────────────────────────────
@@ -2230,9 +2348,13 @@ app.post('/api/courses/chat', courseChatLimit, async (req, res) => {
 });
 
 // POST /api/courses/publish
+// Authorizationヘッダーがあり有効なJWTなら、そのuserIdをauthorIdとして優先する（ヘッダーなしなら従来通りリクエストボディのauthorIdを使用、完全後方互換）
 app.post('/api/courses/publish', async (req, res) => {
   const course = req.body;
   if (!course?.id || !course?.city) return res.status(400).json({ error: 'invalid' });
+
+  const authedUserId = verifyAppJwtOptional(req);
+  const authorId = authedUserId || course.authorId;
 
   const filePath = path.join(__dirname, 'data', course.city, 'community-courses.json');
 
@@ -2240,7 +2362,7 @@ app.post('/api/courses/publish', async (req, res) => {
     const courses = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath)) : [];
     // 重複チェック
     if (courses.find(c => c.id === course.id)) return;
-    courses.unshift({ ...course, isPublic: true, publishedAt: new Date().toISOString() });
+    courses.unshift({ ...course, authorId, isPublic: true, publishedAt: new Date().toISOString() });
     fs.writeFileSync(filePath, JSON.stringify(courses, null, 2));
   });
 
@@ -2248,15 +2370,26 @@ app.post('/api/courses/publish', async (req, res) => {
 });
 
 // POST /api/courses/:id/like
+// Authorizationヘッダーがある場合のみ、対象コースのauthorIdと一致するか確認する（ヘッダーなしなら従来通り無検証、完全後方互換）
 app.delete('/api/courses/:id', async (req, res) => {
   const { id } = req.params;
   const city = req.query.city || 'sg';
+  const authedUserId = verifyAppJwtOptional(req);
   const filePath = path.join(__dirname, 'data', city, 'community-courses.json');
   if (fs.existsSync(filePath)) {
+    let forbidden = false;
     await withFileLock(filePath, async () => {
       const courses = JSON.parse(fs.readFileSync(filePath));
+      if (authedUserId) {
+        const target = courses.find(c => c.id === id);
+        if (target && target.authorId && target.authorId !== authedUserId) {
+          forbidden = true;
+          return;
+        }
+      }
       fs.writeFileSync(filePath, JSON.stringify(courses.filter(c => c.id !== id), null, 2));
     });
+    if (forbidden) return res.status(403).json({ error: 'forbidden' });
   }
   res.json({ ok: true });
 });
@@ -2281,15 +2414,26 @@ app.post('/api/courses/:id/like', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Authorizationヘッダーがある場合のみ、対象コースのauthorIdと一致するか確認する（ヘッダーなしなら従来通り無検証、完全後方互換）
 app.post('/api/courses/:id/unpublish', async (req, res) => {
   const { id } = req.params;
   const city = req.body.city || 'sg';
+  const authedUserId = verifyAppJwtOptional(req);
   const filePath = path.join(__dirname, 'data', city, 'community-courses.json');
   if (fs.existsSync(filePath)) {
+    let forbidden = false;
     await withFileLock(filePath, async () => {
       const courses = JSON.parse(fs.readFileSync(filePath));
+      if (authedUserId) {
+        const target = courses.find(c => c.id === id);
+        if (target && target.authorId && target.authorId !== authedUserId) {
+          forbidden = true;
+          return;
+        }
+      }
       fs.writeFileSync(filePath, JSON.stringify(courses.filter(c => c.id !== id), null, 2));
     });
+    if (forbidden) return res.status(403).json({ error: 'forbidden' });
   }
   res.json({ ok: true });
 });
