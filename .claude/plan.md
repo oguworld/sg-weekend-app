@@ -3535,4 +3535,46 @@ const instagramAccounts = (cityConf.instagramAccounts || [])
 - `discover-sources.js`・`analyze-sources.js`・bkk/sydデータは無変更を確認
 - 🔴Criticalなし。🟢Minor1件: `notify-fetch-summary.js`のLINE通知「◯件採用」合計値はHaikuフィルタ通過数ベースのままでSonnet失敗除外分が反映されない（通知ロジック自体は今回のスコープ外、対応不要）
 - CLAUDE.mdの「イベント取り込みパイプライン構成」セクションに、`status`値運用の正しい意味とリトライ・除外ロジックを恒久情報として追記済み
+
+---
+
+# 設計書34 — iOS Push通知entitlements自動生成処理の復元
+
+## 背景
+`おでかけNavi`プロジェクトのiOS Push通知対応「フェーズ0」（Apple Developer PortalでのAPNs Auth Key発行・App ID `app.dosuru`のPush Notifications capability有効化・配布用Provisioning Profile再生成・GitHub Secrets `PROVISION_PROFILE_BASE64`更新・VPSの`.env`へのAPNs設定追加）が2026-07-14に全て完了した。これに伴い、`.github/workflows/ios-deploy.yml`内でコメントアウトされていたentitlements自動生成2ステップを復元する。
+
+## 変更するファイル
+`/home/masahiko/sg-weekend-app/.github/workflows/ios-deploy.yml` のみ。他のファイル（`capacitor.config.js`・`Fastfile`・`Appfile`・`package.json`・`server.js`）への変更は不要（plannerが調査済み、整合性確認済み）。
+
+## 具体的な変更内容
+1. **60〜78行目**: `Create App.entitlements (Push Notifications capability)` ステップのコメントアウトを解除する
+   - 60〜68行目は「⚠️ 2026-07-11 一時無効化」という無効化理由の説明コメント（このコメントブロックは削除するか、「2026-07-14復元済み」という履歴コメントに書き換えるかはbuilderの裁量でよい）
+   - 69〜78行目はステップ本体（`# - name: Create App.entitlements...` から `#     cat "$ENTITLEMENTS_PATH"` まで）。行頭の`#`（コメントアウト）を除去し、有効なYAMLステップとして復活させる
+   - 配置位置: 「Set camera usage description in Info.plist」ステップの直後、「Select Xcode 26」ステップの直前（既存の位置のまま、移動不要）
+
+2. **98〜115行目**: `Wire App.entitlements into Xcode project build settings` ステップのコメントアウトを解除する
+   - 98〜100行目は無効化理由の説明コメント（同様に削除または書き換えはbuilder裁量）
+   - 101〜115行目はステップ本体（`# - name: Wire App.entitlements...` から `#     '` まで）。行頭の`#`を除去する
+   - 配置位置: 「Setup Ruby」ステップの直後、「Extract release notes from package.json」ステップの直前（既存の位置のまま、移動不要）
+
+3. コメントを解除した後、YAMLとして正しくインデント・構文が保たれているか確認すること（元々有効なYAMLとして書かれていたものをコメントアウトしただけなので、単純に`#`とインデントを除去すれば有効なYAMLに戻るはずだが、必ず確認する）
+
+## 受け入れ基準
+- `.github/workflows/ios-deploy.yml`がYAMLとして正しくパースできること（`yamllint`や`python3 -c "import yaml; yaml.safe_load(open('...'))"`等で検証）
+- 2つのステップが有効なステップとして復元されていること（`name:`フィールドがコメントでなくなっている）
+- 他の既存ステップ（Info.plist操作、Xcode選択、Ruby setup、fastlane deploy等）の内容・順序は一切変更しないこと
+- entitlementsファイルパス`ios/App/App/App.entitlements`、Xcodeプロジェクトパス`ios/App/App.xcodeproj`、ターゲット名`App`は変更しない（plannerが既存のFastfile等と整合していることを確認済み）
+
+## スコープ外（今回変更しないこと）
+- `ios-app/fastlane/Appfile`・`ios-app/README.md`に残る古い`app.dosuru.odenavi`表記の修正（既知の乖離だが実害なし、別タスク）
+- `release`ブランチへのpush（今回は`main`ブランチでのコメントアウト解除のみ。実際にTestFlightビルドをトリガーするのは別途ユーザーの明示指示が必要というプロジェクトルールがあるため、pushしない）
+- サーバー側（server.js）・フロントエンド（public/app.js）のAPNs関連コード変更（2026-07-10実装済み、無変更）
+
+## 実装完了（2026-07-14、builder/checker/closer実施）
+- `.github/workflows/ios-deploy.yml`の2箇所のコメントアウトを解除。無効化理由の説明コメントは「2026-07-11に一時無効化していたが、2026-07-14 フェーズ0完了に伴い復元済み（設計書34）」という趣旨の履歴コメントに書き換えた
+- YAML構文検証済み（`python3 -c "import yaml; yaml.safe_load(...)"`でパース成功）。ステップ数13→15、`Create App.entitlements (Push Notifications capability)`・`Wire App.entitlements into Xcode project build settings`が有効なステップ名として復元されていることを確認
+- 配置位置・entitlementsファイルパス・Xcodeプロジェクトパス・ターゲット名は変更なし。他の既存ステップの内容・順序も無変更（`git diff`で確認済み、変更ファイルは本ファイルのみ）
+- checkerで🔴🟡🟢いずれもなし
+- サーバーサイド（server.js）・フロントエンド（public/app.js）は無変更のため`pm2 restart`不要・未実施
+- ローカル`main`へのコミットのみ。`release`ブランチへのpush・TestFlightビルドのトリガーは実施していない（次回のビルド時、このワークフローが自動的に使われる）
 - ローカル`main`へのコミットのみ実施。GitHubへのpush・iOSリリースは含まない（`filter-events.js`はcronから直接実行されるスクリプトのためpm2再起動不要、`data/sources.json`・`data/sg/events.json`は`fs.readFileSync`都度読み込みのため即座に反映済み）

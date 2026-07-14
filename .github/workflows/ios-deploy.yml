@@ -57,25 +57,20 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist || \
           /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist
 
-      # ⚠️ 2026-07-11 一時無効化: Apple Developerアカウントを個人→法人へ切替登録中で、
-      # 法人審査（D-U-N-S番号確認等）完了までApp ID(app.dosuru)のPush Notifications
-      # capabilityを有効化できないため。この状態でentitlementsがaps-environmentを
-      # リクエストすると、Provisioning Profile側にPush capabilityが無くcodesign段階で
-      # ビルド失敗する可能性があるため、審査完了までの間コメントアウトする。
-      # 復元方法: 以下2ステップのコメントを解除するだけ（コード自体は変更していない）。
-      # 復元の前提条件: Apple法人審査完了 → APNs Auth Key発行 → App IDでPush capability
-      # 有効化 → 配布用Provisioning Profile再生成 → GitHub Secrets
-      # PROVISION_PROFILE_BASE64 更新（詳細は.claude/next.md参照）
-      # - name: Create App.entitlements (Push Notifications capability)
-      #   run: |
-      #     cd ios-app
-      #     ENTITLEMENTS_PATH="ios/App/App/App.entitlements"
-      #     if [ ! -f "$ENTITLEMENTS_PATH" ]; then
-      #       printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n' > "$ENTITLEMENTS_PATH"
-      #     fi
-      #     /usr/libexec/PlistBuddy -c "Add :aps-environment string production" "$ENTITLEMENTS_PATH" || \
-      #     /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$ENTITLEMENTS_PATH"
-      #     cat "$ENTITLEMENTS_PATH"
+      # 2026-07-11に一時無効化（Apple Developerアカウント法人審査完了待ちのため）していたが、
+      # 2026-07-14 フェーズ0完了（APNs Auth Key発行・App ID(app.dosuru)のPush Notifications
+      # capability有効化・配布用Provisioning Profile再生成・GitHub Secrets
+      # PROVISION_PROFILE_BASE64更新・VPSの.env設定）に伴い復元済み（設計書34）。
+      - name: Create App.entitlements (Push Notifications capability)
+        run: |
+          cd ios-app
+          ENTITLEMENTS_PATH="ios/App/App/App.entitlements"
+          if [ ! -f "$ENTITLEMENTS_PATH" ]; then
+            printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n' > "$ENTITLEMENTS_PATH"
+          fi
+          /usr/libexec/PlistBuddy -c "Add :aps-environment string production" "$ENTITLEMENTS_PATH" || \
+          /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$ENTITLEMENTS_PATH"
+          cat "$ENTITLEMENTS_PATH"
 
       - name: Select Xcode 26
         run: |
@@ -95,24 +90,22 @@ jobs:
           bundler-cache: true
           working-directory: ios-app
 
-      # 上記と同じ理由（Push capability未使用時のcodesign失敗回避）で一時無効化。
-      # CODE_SIGN_ENTITLEMENTSがXcodeプロジェクトに設定されないままビルドされるため、
-      # 生成されるアプリはentitlements無し（Push capability要求なし）の状態になる。
-      # - name: Wire App.entitlements into Xcode project build settings
-      #   run: |
-      #     cd ios-app
-      #     bundle exec ruby -e '
-      #       require "xcodeproj"
-      #       project_path = "ios/App/App.xcodeproj"
-      #       project = Xcodeproj::Project.open(project_path)
-      #       target = project.targets.find { |t| t.name == "App" }
-      #       raise "App target not found" unless target
-      #       target.build_configurations.each do |config|
-      #         config.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements"
-      #       end
-      #       project.save
-      #       puts "CODE_SIGN_ENTITLEMENTS set for #{target.build_configurations.map(&:name).join(%q{, })}"
-      #     '
+      # 上記と同じ理由で2026-07-11に一時無効化していたが、2026-07-14 フェーズ0完了に伴い復元済み（設計書34）。
+      - name: Wire App.entitlements into Xcode project build settings
+        run: |
+          cd ios-app
+          bundle exec ruby -e '
+            require "xcodeproj"
+            project_path = "ios/App/App.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.find { |t| t.name == "App" }
+            raise "App target not found" unless target
+            target.build_configurations.each do |config|
+              config.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements"
+            end
+            project.save
+            puts "CODE_SIGN_ENTITLEMENTS set for #{target.build_configurations.map(&:name).join(%q{, })}"
+          '
 
       - name: Extract release notes from package.json
         id: notes

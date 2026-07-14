@@ -185,13 +185,14 @@ sg-weekend-app/
 - iOS/CI: `ios-app/package.json`に`@capacitor/push-notifications@^6.0.0`追加。`.github/workflows/ios-deploy.yml`に以下2ステップを追加
   1. `App.entitlements`を新規生成しPlistBuddyで`aps-environment: production`を設定（Info.plist向けPlistBuddyパターンと同様の手法だが、対象ファイルが異なる新規ファイル）
   2. Ruby/Bundler設定後（`xcodeproj`gemが使える状態になった後）に`bundle exec ruby`で`xcodeproj`gemを使い、Xcodeプロジェクトの`CODE_SIGN_ENTITLEMENTS`ビルド設定を`App/App.entitlements`に紐付け。Capacitorの`ios/`はCIで`npx cap add ios`により毎回生成されるためデフォルトで`.entitlements`ファイルもビルド設定紐付けも存在しない。手順の順序（Ruby setup後に実行必須）を変えると`xcodeproj` gemが見つからず失敗する
-  - ⚠️ **2026-07-11時点、上記2ステップは`ios-deploy.yml`内でコメントアウトして一時無効化中**（Apple Developerアカウントを個人→法人へ切替登録中で、法人審査完了までPush Notifications capabilityを有効化できず、entitlements付きでビルドするとcodesign失敗の懸念があるため）。復元条件・手順はフェーズ0参照
-- **フェーズ0（ユーザー手動作業、実装済みコードの動作に必須）**: 2026-07-10時点で未実施。TestFlight配信・実機での通知送受信にはこれらの完了が前提
-  1. Apple Developer PortalでAPNs Auth Key（.p8）発行
-  2. App ID（`app.dosuru`）でPush Notifications capability有効化
-  3. 配布用Provisioning Profile再生成（capability変更に伴い必須）→ GitHub Secrets `PROVISION_PROFILE_BASE64`更新
-  4. VPSの`.env`に`.p8`の中身と`APNS_KEY_ID`/`APNS_TEAM_ID`/`APNS_BUNDLE_ID`/`APNS_PRODUCTION=true`を追記（`.p8`はGit管理下に絶対に置かない）
-  5. フェーズ0完了後、`ios-deploy.yml`のentitlements自動生成2ステップ（上記iOS/CI 1・2）のコメントアウトを解除して復元する
+  - ✅ **2026-07-14、フェーズ0完了に伴い上記2ステップを`ios-deploy.yml`内で復元済み（設計書34）**。2026-07-11〜07-14の間はApple Developerアカウントの個人→法人切替審査待ちのためコメントアウトして一時無効化していたが、審査完了・フェーズ0完了を受けてコメントアウトを解除し、有効なステップとして復活させた
+- **フェーズ0（ユーザー手動作業、実装済みコードの動作に必須）**: 2026-07-14時点で全て完了済み
+  1. Apple Developer PortalでAPNs Auth Key（.p8）発行 ✅完了
+  2. App ID（`app.dosuru`）でPush Notifications capability有効化 ✅完了
+  3. 配布用Provisioning Profile再生成（capability変更に伴い必須）→ GitHub Secrets `PROVISION_PROFILE_BASE64`更新 ✅完了
+  4. VPSの`.env`に`.p8`の中身と`APNS_KEY_ID`/`APNS_TEAM_ID`/`APNS_BUNDLE_ID`/`APNS_PRODUCTION=true`を追記（`.p8`はGit管理下に絶対に置かない） ✅完了
+  5. `ios-deploy.yml`のentitlements自動生成2ステップ（上記iOS/CI 1・2）のコメントアウト解除・復元 ✅完了（2026-07-14、設計書34）
+  - 次回`release`ブランチへのpushでTestFlightビルドがentitlements付きでトリガーされる（ユーザー明示指示があるまでpushしない、既存プロジェクトルール通り）。実機でのPush通知送受信確認は次回のTestFlightビルド後に実施予定
 - スコープ外（設計時点で明示）: Android版対応、通知既読管理・一覧UI、ジャンル/エリア別配信パーソナライズ、FCM導入、Web版・iOS版購読者の名寄せ、サイレントプッシュ、通知文言の多言語化
 
 ## ジャンル・興味機能（2026-07-02実装、おすすめモード周りは2026-07-11刷新）
