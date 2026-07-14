@@ -4186,3 +4186,134 @@ if (e.target.closest('#logout-btn'))       { e.preventDefault(); handleLogoutCli
 
 ## 承認状況
 2026-07-15 planner設計。2026-07-15 ユーザー承認済み。
+
+# 設計書39 — Google Sign-Inのスコープ最小化に関する技術的制約の訂正
+
+## 0. 本設計書の位置づけ
+
+実装後、実機でGoogleの同意画面を確認したところ、設計書35 §3-1「Google Sign-In: scopeは`openid`のみ要求する。`email`・`profile`スコープは要求しない」という記述が、Google Identity Servicesという製品の仕様上、実現不可能であることが判明した。本設計書は、この事実誤りを訂正する差分パッチとして追記する。**設計書35・36本文は削除・上書きせず保持し、本設計書はその上に乗る訂正として扱う。**
+
+## 1. 実コード監査結果（2026-07-15時点）
+
+### 1-1. Web版（`public/app.js` `_handleGoogleLoginWeb()`、2504〜2523行目）
+
+```javascript
+window.google.accounts.id.initialize({
+  client_id: _googleWebClientId,
+  callback: (response) => { _submitGoogleIdToken(response.credential); },
+});
+window.google.accounts.id.prompt();
+```
+
+- 実装は`google.accounts.id.initialize()`（Google Identity Services「Sign In With Google」ボタン/One Tap方式のAPI）を使用しており、渡しているオプションは`client_id`と`callback`のみ。**`scope`パラメータは実装上そもそも指定されていない。**
+- これはコードの実装漏れではなく、**`google.accounts.id.initialize()`というAPI自体に`scope`オプションが存在しない**ため（Google公式ドキュメントで確認済み）。このAPIを使う限り、開発者側がスコープを制御する余地がそもそもない。
+- Google公式ドキュメントによれば、`email`・`profile`・`openid`は「サインインスコープ」としてバンドルされており、アプリがこれらのみを要求する場合は粒度の細かい許可画面ではなく、ユーザーは全体をまとめて許可/拒否するのみになる。より低レベルの`google.accounts.oauth2.initTokenClient`に切り替え`scope: 'openid'`のみを指定しても、同じ「サインインスコープはバンドル」という制約が適用され、email/profileへのアクセス許可表示は回避できないとGoogle公式ドキュメントに明記されている。
+- **結論: どのGoogle Identity Services APIを使っても、「Sign In With Google」機能を使う限り、同意画面での名前・メールへのアクセス許可表示は回避不可能。** 設計書35 §3-1の「scopeは`openid`のみ要求する」という表現は、実現不可能な誤った前提だったことになる。
+
+### 1-2. iOS版（`ios-app/capacitor.config.js` `GoogleAuth`プラグイン設定）
+
+```javascript
+GoogleAuth: {
+  // scopes: 認証情報最小化方針（設計書35）により openid のみ要求（email/profileは要求しない）
+  scopes: ['openid'],
+  iosClientId: '928776929755-...apps.googleusercontent.com',
+  grantOfflineAccess: false,
+},
+```
+
+- `@codetrix-studio/capacitor-google-auth`プラグインの`scopes: ['openid']`設定自体は、Web版と異なり実際に`scopes`というオプションが存在するAPI（プラグインがラップするネイティブGoogle Sign-In SDK、`GIDSignIn`系）に渡されている。
+- ただし、**ネイティブGoogle Sign-In SDK側も、Web版のGISと同根の「サインインスコープ（openid, email, profile）はバンドル」という仕様上の制約が及ぶ可能性が高い**と推測される（Web版とAndroid/iOSネイティブSDKはいずれもGoogle Identity Platformという同一の認証基盤上に構築されているため）。
+- **しかし、この推測はコードレビューのみでは検証できない。** プラグイン内部のネイティブ実装は本リポジトリの`node_modules`が未インストール状態のため確認できず、**iOS版実機での同意画面の表示内容は2026-07-15時点で未確認**。
+- **本設計書での結論: iOS版についても「同意画面でemail/profileへのアクセス許可表示が出る可能性が高い」という前提で運用し、`capacitor.config.js`のコメント（「openidのみ要求のため email/profile は求めない」）は事実と異なる可能性がある前提として扱う。実機確認済みになるまでは未確定情報として扱うこと。**
+
+### 1-3. サーバー側（`server.js` `POST /api/auth/google`・`upsertUser()`）の再監査結果
+
+- `POST /api/auth/google`（1465〜1489行目）: `idToken`を`googleOAuthClient.verifyIdToken()`で検証し、`payload.sub`のみを取り出して`upsertUser('google', sub)`に渡している。`payload`の他のクレーム（`email`・`name`・`picture`等、`idToken`に含まれていたとしても）は一切参照・保存していないことをコードで確認した。
+- `upsertUser()`（307〜330行目）: 新規ユーザー作成時のオブジェクトは`{ userId, provider, providerSub, createdAt, lastLoginAt, subscriptions }`のみで構成されており、`email`/`displayName`/`avatarEmoji`等のフィールドは存在しない。既存ユーザー更新時も`lastLoginAt`の更新のみ。
+- **結論: 設計書35 §3-1の「サーバー側は`sub`のみ保存・利用する」という約束は、実装後のコードにおいても完全に守られている。** ここは訂正不要（既に正しく実装済み）。
+
+## 2. 訂正内容（設計書35 §3-1・§5への差分）
+
+### 2-1. 撤回する記述
+
+設計書35 §3-1のうち、以下の2文を**撤回**する（誤りだったため）。
+
+> - **Google Sign-In**: scopeは`openid`のみ要求する。`email`・`profile`スコープは要求しない。取得できるのは`sub`（Googleアカウントの一意識別子）のみになる
+
+### 2-2. 訂正後の記述(設計書35 §3-1の置き換え)
+
+- **Google Sign-In**: Google Identity Servicesの仕様上、「Sign In With Google」機能を使う限り、**同意画面には`email`・`profile`スコープへのアクセス許可（「名前とプロフィール写真」「メールアドレス」）が表示されることは技術的に回避不可能**である（`google.accounts.id.initialize()`にはそもそも`scope`パラメータ自体が存在せず、より低レベルの`google.accounts.oauth2.initTokenClient`を使っても、Google公式ドキュメントに明記された「サインインスコープ（openid, email, profile）はバンドル」という仕様上の制約により回避できない）。
+- **一方、サーバー側（`POST /api/auth/google`）は、受け取ったIDトークンのペイロードから`sub`のみを取り出し、`email`・`name`・`picture`等の他クレームは一切保存・ログ出力・利用しない実装を維持する**（本設計書1-3節でコード監査済み、既に実装済みで訂正不要）。
+- 方針の転換: 「(Googleに)取得させない」ことは技術的に不可能なため断念し、代わりに「(サーバー側で)保存・利用しない」ことを個人情報保護の実質的な担保手段とする。**データそのものへのアクセス経路（Googleの同意画面表示）は避けられないが、サーバー側で保存・利用されない、漏洩リスクの起点にならない、という実質的な保護効果は維持される。**
+
+### 2-3. `data/users.json`のスキーマ例（設計書35 §3-1、変更なし・再確認のみ）
+
+設計書35 §3-1が示した以下のスキーマ例は、本設計書1-3節のコード監査により**実装済みのコードと完全に一致していることを確認した。訂正不要。**
+
+```json
+[{
+  "userId": "usr_XXXXXXXXXX",
+  "provider": "apple",
+  "providerSub": "001234.abcdef...",
+  "createdAt": "...", "lastLoginAt": "...",
+  "subscriptions": []
+}]
+```
+
+### 2-4. 設計書35 §5（変更するファイル一覧）への差分
+
+設計書35 §5の以下の記述は、実装済みのコードと照合したところ**そのまま実現されている**ことを確認した（訂正不要、再確認事項として記録）。
+
+> `server.js`: ... トークン検証時は`sub`クレームのみを取り出して使用し、`email`・`name`・`picture`等の他クレームは受け取っても保存・利用しない実装にする。
+
+## 3. ユーザーとの合意事項（記録）
+
+上記の技術的制約をユーザーに説明したところ、以下の回答を得た。
+
+> 「しょうがないね。個人情報は当面持ちたくないです」
+
+これにより、以下の方針が確定した。
+
+1. **同意画面の表示自体（Googleが「名前・メールへのアクセスを許可します」と表示すること）は、Google製品の仕様上の制約として受け入れる。** これ以上の回避策（例: 独自のOAuth 2.0フローを`google.accounts.oauth2`ベースで完全に自前実装する等）は、本設計書時点では検討・提案しない（Google Identity Services自体の仕様である以上、代替APIに切り替えても同じ制約に当たることが確認済みのため、追加の技術検討をしても解決しない可能性が高いとplannerは判断する）。
+2. **一方、dosuru.appのサーバー側（`POST /api/auth/google`）は、既存の実装通り、受け取ったペイロードから`sub`のみを取り出し、`email`・`name`・`picture`は一切保存・ログ出力・利用しない方針を維持する。** この部分は本設計書1-3節の監査により、既にコード変更不要でそのまま実装済みであることを確認済み。
+3. 方針転換のまとめ: 「(Googleに)取得させない」から「(サーバー側で)保存・利用しない」に変更する。データそのものへのアクセス経路（同意画面での許可要求）は技術的に避けられないが、実質的な個人情報保護の効果（サーバーに保存されない・利用されない・漏洩リスクの起点にならない）は維持される。
+
+## 4. iOS版（`@codetrix-studio/capacitor-google-auth`）への言及
+
+- `ios-app/capacitor.config.js`の`GoogleAuth.scopes: ['openid']`設定は、Web版のGIS `google.accounts.id.initialize()`とは異なり、実際に`scopes`オプションが存在するAPI（プラグインがラップするネイティブGoogle Sign-In SDK）に渡されている。
+- しかし、ネイティブGoogle Sign-In SDKも同一のGoogle Identity Platform基盤上にあるため、**Web版と同様に「サインインスコープ（openid, email, profile）はバンドル」という制約が及び、`scopes: ['openid']`のみを指定していても同意画面にemail/profileへのアクセス許可が表示される可能性が高い**と推測される。
+- **ただし、この推測は本設計書執筆時点で実機・プラグイン内部実装のいずれによっても検証できていない。**
+- **未解決事項として明記**: iOS版（TestFlight実機）でのGoogle同意画面の表示内容が2026-07-15時点で未検証である。次回のTestFlightビルド時に、実際に同意画面でemail/profileへのアクセス許可が表示されるかどうかを確認する必要がある。表示される場合、`capacitor.config.js`の`scopes: ['openid']`設定コメント（「email/profileは要求しない」という趣旨）も、本設計書2-2節と同様の訂正が必要になる。
+
+## 5. Apple Sign-In（設計書35 §3-1、未実装）への言及
+
+- Apple Sign-In（Sign in with Apple）は、Googleとは異なる認可モデルを採用しており、**アプリ側が要求するスコープ（`email`・`fullName`）をそれぞれ個別に指定でき、ユーザーは同意画面上でこれらを個別にオン/オフ可能、かつ`email`については「実メールアドレスを共有」または「メールを非公開（Appleのプライベートリレーメールアドレスを使用）」を選択できる**、というのが一般に知られているAppleの認可フローの仕様である。これはGoogleの「サインインスコープはバンドルで一括許可/拒否のみ」という制約とは異なる設計思想である。
+- **ただし、この認識は本設計書時点でApple公式ドキュメントを一次情報として調査・確認したものではなく、一般的な技術知識に基づく記述である。実際にAppleの`ASAuthorizationAppleIDProvider`（iOSネイティブ）・"Sign in with Apple JS"（Web版、設計書36 §2）の`requestedScopes`設定でどこまで個別制御可能か、また現行のApple仕様が変わっていないかは、本設計書では未確認であり、Apple Sign-In実装着手時に公式ドキュメントで再確認が必要な事項として明記する。**
+- Apple Sign-Inは設計書35 §2-1・§2-3で「フェーズ1」の対象として位置づけられているが、2026-07-15時点で**実装未着手**。実装時には、本設計書で指摘した「Googleとは異なりスコープを個別制御できる可能性が高い」という前提が実際に成立するか、着手前にApple公式ドキュメントで検証することを推奨する。もし成立するなら、Apple Sign-InはGoogle Sign-Inよりも「認証情報最小化」を同意画面レベルでも実現しやすい認証方式ということになり、設計書35 §3全体の説明にも「GoogleとAppleで同意画面の挙動が異なる」という非対称性を明記した方がよい。
+
+## 6. スコープ外（今回訂正しないもの）
+
+- Google Identity Servicesの代替実装（完全自前のOAuth 2.0フロー等）の検討・提案は行わない（1-1節参照、制約の根本回避にならないと判断）
+- iOS版の実機確認自体（本設計書はあくまで技術的制約の記述訂正であり、実機確認作業は次回のTestFlightビルド時に別途実施）
+- Apple Sign-Inの実装そのもの（設計書36の対象、未着手のまま）
+- サーバー側コードの変更（本設計書の監査により変更不要と判明したため）
+
+## 7. リスク・未解決の質問
+
+28. **iOS版のGoogle同意画面表示内容が未検証（4節）**: 次回TestFlightビルド時に実機確認が必要。表示内容次第で`capacitor.config.js`のコメントも訂正が必要になる
+29. **Apple Sign-Inのスコープ個別制御可否が一次情報で未確認（5節）**: 実装着手前にApple公式ドキュメントでの再確認を推奨。仮に「Googleはバンドル、Appleは個別制御可能」という非対称性が事実なら、ユーザー向け説明（プライバシーポリシー等）にも反映すべき論点になりうる
+30. **プライバシーポリシー等ユーザー向け説明文への反映要否**: 「Googleでログイン」ボタン利用時、同意画面にemail/profileへのアクセス許可が表示されるがサーバーには保存されない、という説明を、アプリ内のどこか（設定画面のログインセクション付近、あるいはプライバシーポリシーページ）にユーザー向けに明記すべきか否かは、本設計書では検討していない未解決の論点として残す
+
+## 変更するファイル一覧
+
+本設計書は**ドキュメント（`.claude/plan.md`）の訂正のみ**であり、コード変更は伴わない。
+
+- `.claude/plan.md`: 本設計書（設計書39）を末尾に追記
+- CLAUDE.mdの「Google Sign-In認証基盤」相当セクション: 本設計書の訂正内容（同意画面の表示は回避不可能、サーバー側保存方針は維持）を反映する追記が今後必要
+
+## データモデルの変更・APIの変更
+
+なし。本設計書はコード変更を伴わない、既存設計書の記述訂正のみ。
+
+## 承認状況
+2026-07-15 planner設計。**実装は不要（ドキュメント訂正のみ）**。設計書35・36本文は削除・上書きせず保持。2026-07-15 ユーザー承認済み。
