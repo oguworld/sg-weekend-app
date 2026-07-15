@@ -15,12 +15,13 @@
     "@capacitor/push-notifications": "^6.0.0",
     "@capacitor/splash-screen": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
-    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4"
+    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
+    "@capacitor-community/apple-sign-in": "^6.0.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "・Googleアカウントでのログイン機能を追加"
+  "releaseNotes": "・Googleアカウントでのログイン機能を追加\n・Appleアカウントでのログイン機能を追加\n・Googleログインボタンが表示されない不具合を修正"
 }

@@ -87,7 +87,9 @@ jobs:
       # 2026-07-14 フェーズ0完了（APNs Auth Key発行・App ID(app.dosuru)のPush Notifications
       # capability有効化・配布用Provisioning Profile再生成・GitHub Secrets
       # PROVISION_PROFILE_BASE64更新・VPSの.env設定）に伴い復元済み（設計書34）。
-      - name: Create App.entitlements (Push Notifications capability)
+      # 2026-07-15 Sign in with Apple capability（com.apple.developer.applesignin）を追加（設計書44）。
+      # 配列値のため既存aps-environment（PlistBuddy）と共存させつつplistlibで安全に追記する。
+      - name: Create App.entitlements (Push Notifications + Sign in with Apple capabilities)
         run: |
           cd ios-app
           ENTITLEMENTS_PATH="ios/App/App/App.entitlements"
@@ -96,6 +98,16 @@ jobs:
           fi
           /usr/libexec/PlistBuddy -c "Add :aps-environment string production" "$ENTITLEMENTS_PATH" || \
           /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$ENTITLEMENTS_PATH"
+          python3 - <<'PYEOF'
+          import plistlib
+          path = "ios/App/App/App.entitlements"
+          with open(path, "rb") as f:
+              ent = plistlib.load(f)
+          ent["com.apple.developer.applesignin"] = ["Default"]
+          with open(path, "wb") as f:
+              plistlib.dump(ent, f)
+          print(f"entitlements now: {ent}")
+          PYEOF
           cat "$ENTITLEMENTS_PATH"
 
       - name: Select Xcode 26

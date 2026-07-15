@@ -11,6 +11,7 @@
     "@anthropic-ai/sdk": "^0.98.0",
     "@parse/node-apn": "^8.1.0",
     "@playwright/test": "^1.60.0",
+    "apple-signin-auth": "^2.0.0",
     "axios": "^1.16.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

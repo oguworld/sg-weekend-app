@@ -21,6 +21,9 @@
   <script async src="https://www.instagram.com/embed.js"></script>
   <!-- Google Identity Services（Web版Google Sign-In用。iOS版はCapacitorネイティブプラグインを使うため未使用だが読み込み自体は無害） -->
   <script async src="https://accounts.google.com/gsi/client"></script>
+  <!-- Sign in with Apple JS（Web版Apple Sign-In用。設計書44。iOS版はCapacitorネイティブプラグインを使うため未使用だが読み込み自体は無害） -->
+  <script type="text/javascript" async src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
+  <script type="text/javascript" async src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid-button/1/en_US/appleid-button.js"></script>
   <!-- Safari / iOS ホーム画面アイコン（manifest.jsonは参照されないため必須） -->
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
   <!-- ブラウザタブ用 favicon -->
@@ -297,12 +300,15 @@
 
     </div>
 
-    <!-- 2. ログイン（Google Sign-In、iOS/Web共通表示。設計書20/35/36） -->
+    <!-- 2. ログイン（Google/Apple Sign-In、iOS/Web共通表示。設計書20/35/36/44） -->
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secLogin">ログイン</div>
 
-      <div id="login-section-logged-out" class="settings-item" style="padding:14px 18px;">
+      <div id="login-section-logged-out" class="settings-item" style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
         <div id="google-login-btn-container" style="display:flex;justify-content:center;width:100%;"></div>
+        <div id="apple-login-btn-container" style="display:flex;justify-content:center;width:100%;">
+          <div id="appleid-signin" data-color="black" data-border="true" data-type="sign in" data-width="280" data-height="40"></div>
+        </div>
       </div>
 
       <div id="login-section-logged-in" class="settings-item" style="padding:12px 18px;display:none;">

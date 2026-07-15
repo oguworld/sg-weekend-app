@@ -466,7 +466,9 @@
         courseCreateBtn: '🗺 コース作成',
         secLogin: 'ログイン',
         loginWithGoogle: 'Googleでログイン',
+        loginWithApple: 'Appleでログイン',
         loginStatusGoogle: 'Googleでログイン中',
+        loginStatusApple: 'Appleでログイン中',
         logoutBtn: 'ログアウト',
         toastLoginSuccess: 'ログインしました',
         toastLoginError: 'ログインに失敗しました。もう一度お試しください',
@@ -669,7 +671,9 @@
         courseCreateBtn: '🗺 Course',
         secLogin: 'Login',
         loginWithGoogle: 'Sign in with Google',
+        loginWithApple: 'Sign in with Apple',
         loginStatusGoogle: 'Signed in with Google',
+        loginStatusApple: 'Signed in with Apple',
         logoutBtn: 'Log out',
         toastLoginSuccess: 'Signed in',
         toastLoginError: 'Sign-in failed. Please try again',
@@ -1949,6 +1953,8 @@
         if (e.target.closest('#feedback-send-btn')) { e.preventDefault(); sendFeedback(); return; }
         if (e.target.closest('#lang-toggle-btn'))   { e.preventDefault(); setLang(getLang() === 'ja' ? 'en' : 'ja'); return; }
         if (e.target.closest('#push-toggle-btn'))   { e.preventDefault(); togglePush(); return; }
+        if (e.target.closest('#google-login-btn'))  { e.preventDefault(); handleGoogleLoginClick(); return; }
+        if (e.target.closest('#apple-login-btn'))    { e.preventDefault(); handleAppleLoginClick();  return; }
         if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
       }, { passive: false });
     }
@@ -2005,8 +2011,8 @@
     initSettingsProfile();
     initSettingsGenres();
     refreshLoginUI();
-    // Web版のみ: Google公式ログインボタンを描画。GISは<script async>読み込みのため
-    // 未ロードの場合に備えて一定回数リトライする（iOS版はネイティブフローのため対象外）。
+    // Web版: Google/Apple公式ログインボタンを描画。各SDKは<script async>読み込みのため
+    // 未ロードの場合に備えて一定回数リトライする（iOS版はネイティブフローのため対象外、下記else分岐で自前ボタンを挿入する）。
     if (!_isCapacitorApp) {
       let _googleBtnRetries = 0;
       const _tryInitGoogleBtn = () => {
@@ -2014,6 +2020,30 @@
         if (_googleBtnRetries++ < 20) setTimeout(_tryInitGoogleBtn, 300);
       };
       _tryInitGoogleBtn();
+
+      let _appleBtnRetries = 0;
+      const _tryInitAppleBtn = () => {
+        if (window.AppleID?.auth) { _initAppleButtonWeb(); return; }
+        if (_appleBtnRetries++ < 20) setTimeout(_tryInitAppleBtn, 300);
+      };
+      _tryInitAppleBtn();
+    } else {
+      // iOS版: #google-login-btn-container / #apple-login-btn-container はWeb版のみが使う
+      // 公式SDK描画用の空コンテナのため、iOS版では自前ボタンを動的に挿入する（設計書44、Googleボタン非表示バグの修正）
+      const gc = document.getElementById('google-login-btn-container');
+      if (gc) {
+        gc.innerHTML = `<button id="google-login-btn" onclick="if(!_touchCapableDetected) handleGoogleLoginClick()"
+          style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;width:100%;justify-content:center;">
+          <span data-i18n="loginWithGoogle">${t('loginWithGoogle')}</span>
+        </button>`;
+      }
+      const ac = document.getElementById('apple-login-btn-container');
+      if (ac) {
+        ac.innerHTML = `<button id="apple-login-btn" onclick="if(!_touchCapableDetected) handleAppleLoginClick()"
+          style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;width:100%;justify-content:center;">
+          <span data-i18n="loginWithApple">${t('loginWithApple')}</span>
+        </button>`;
+      }
     }
 
     // Pull to Refresh（設計書19、イベント画面。iOS版のみ有効化。既存の横スワイプ機構と共存させるためwatchSwipeIntent=true）
@@ -2414,10 +2444,13 @@
       _syncRecommendChip();
     }
 
-    // ─── AUTH（Google Sign-In。iOS版・Web版共通。設計書20/35/36。今回はGoogle Sign-Inのみ、Apple・予定表紐づけは次回） ───
+    // ─── AUTH（Google/Apple Sign-In。iOS版・Web版共通。設計書20/35/36/44） ───
     const AUTH_TOKEN_KEY = 'app_auth_token';
     let _googleWebClientId = null; // GET /api/config で起動時に取得（Web版GISの初期化用）
     let _googleAuthInited = false; // Web/iOS共通、各プラットフォームの初期化を一度だけ行うためのフラグ
+    let _appleServiceId = null; // GET /api/config で起動時に取得（Web版Sign in with Apple JSの初期化用）
+    let _appleRedirectUri = null; // GET /api/config で起動時に取得（Web版のredirectURI）
+    let _appleAuthInited = false; // Web版のみ、AppleID.auth.init()を一度だけ行うためのフラグ
 
     function getAuthToken() {
       return localStorage.getItem(AUTH_TOKEN_KEY);
@@ -2456,10 +2489,30 @@
       }
     }
 
+    // サーバーに identityToken を送信し、自前JWTを保存する共通処理（iOS版のみ。Web版はform_postリダイレクト経由のため別経路）
+    async function _submitAppleIdentityToken(identityToken) {
+      try {
+        const res = await fetch(API_BASE + '/api/auth/apple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identityToken }),
+        });
+        if (!res.ok) throw new Error('auth failed');
+        const data = await res.json();
+        if (!data.token) throw new Error('no token');
+        setAuthToken(data.token);
+        showToast(t('toastLoginSuccess'));
+        await refreshLoginUI();
+      } catch (e) {
+        showToast(t('toastLoginError'));
+      }
+    }
+
     // 設定画面のログインセクション表示をログイン状態に合わせて更新する
     async function refreshLoginUI() {
       const loggedOutEl = document.getElementById('login-section-logged-out');
       const loggedInEl = document.getElementById('login-section-logged-in');
+      const labelEl = document.getElementById('login-status-label');
       if (!loggedOutEl || !loggedInEl) return;
       const token = getAuthToken();
       if (!token) {
@@ -2470,7 +2523,13 @@
       try {
         const res = await authedFetch(API_BASE + '/api/auth/me');
         if (!res.ok) throw new Error('invalid session');
+        const data = await res.json();
         // メールアドレス・氏名は一切表示しない（認証情報最小化方針）。プロバイダのみ表示
+        if (labelEl) {
+          const key = data.provider === 'apple' ? 'loginStatusApple' : 'loginStatusGoogle';
+          labelEl.setAttribute('data-i18n', key);
+          labelEl.textContent = t(key);
+        }
         loggedOutEl.style.display = 'none';
         loggedInEl.style.display = '';
       } catch (e) {
@@ -2550,6 +2609,72 @@
       if (_isCapacitorApp) _handleGoogleLoginIOS();
       // Web版はrenderButton()が描画したGoogle公式ボタンがクリックを直接処理するため、ここでは何もしない
     }
+
+    // iOS版: Capacitorネイティブプラグイン経由でSign in with Appleを起動。スコープは要求しない（同意画面を出さずsub相当のみ取得、設計書44）
+    async function _handleAppleLoginIOS() {
+      try {
+        let AppleAuthPlugin = null;
+        try {
+          if (window.Capacitor?.registerPlugin) AppleAuthPlugin = window.Capacitor.registerPlugin('SignInWithApple');
+        } catch (_) {}
+        if (!AppleAuthPlugin) AppleAuthPlugin = window.Capacitor?.Plugins?.SignInWithApple;
+        if (!AppleAuthPlugin) { showToast(t('toastLoginError')); return; }
+        const result = await AppleAuthPlugin.authorize({
+          clientId: 'app.dosuru',
+          redirectURI: 'https://dosuru.app/api/auth/apple/callback',
+          scopes: '',
+        });
+        const identityToken = result?.response?.identityToken;
+        if (!identityToken) { showToast(t('toastLoginError')); return; }
+        await _submitAppleIdentityToken(identityToken);
+      } catch (e) {
+        showToast(t('toastLoginError'));
+      }
+    }
+
+    // Web版: Sign in with Apple JS SDKを初期化し、公式ボタン（appleid-signin-button）をコンテナ内に描画する。
+    // response_mode:'form_post'によるフルページリダイレクト方式（設計書44）。scopeは要求しない。
+    async function _initAppleButtonWeb() {
+      try {
+        if (!_appleServiceId) {
+          const res = await fetch(API_BASE + '/api/config');
+          const conf = await res.json();
+          _appleServiceId = conf.appleServiceId;
+          if (conf.appleRedirectUri) _appleRedirectUri = conf.appleRedirectUri;
+        }
+        if (!_appleServiceId || !window.AppleID?.auth) return;
+        const stateRes = await fetch(API_BASE + '/api/auth/apple/state');
+        const stateData = await stateRes.json();
+        if (!stateData.state) return;
+        window.AppleID.auth.init({
+          clientId: _appleServiceId,
+          scope: '',
+          redirectURI: _appleRedirectUri || (API_BASE + '/api/auth/apple/callback'),
+          state: stateData.state,
+          usePopup: false,
+        });
+        _appleAuthInited = true;
+      } catch (e) {
+        // Sign in with Apple JS SDK未ロード等の失敗時はコンテナが空のまま残るだけで実害なし
+      }
+    }
+
+    function handleAppleLoginClick() {
+      if (_isCapacitorApp) { _handleAppleLoginIOS(); return; }
+      // Web版はAppleID公式ボタン（<div id="apple-login-btn-container">に描画されたappleid-signin-button）が
+      // クリックを検知しAppleID.auth.init()済みの設定でリダイレクトを開始するため、初期化未完了時のみ再試行する
+      if (!_appleAuthInited) _initAppleButtonWeb();
+    }
+
+    // Web版起動時、URLフラグメントに auth_token が含まれる場合（Apple form_post callbackからの中継後）保存して除去する
+    (function _consumeAppleAuthTokenFromHash() {
+      if (_isCapacitorApp) return;
+      const hash = window.location.hash || '';
+      const m = hash.match(/auth_token=([^&]+)/);
+      if (!m) return;
+      setAuthToken(decodeURIComponent(m[1]));
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    })();
 
     function initSettingsGenres() {
       const container = document.getElementById('genre-chips-container');

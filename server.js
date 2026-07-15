@@ -283,14 +283,44 @@ async function withFileLock(filePath, fn) {
 }
 
 // ─────────────────────────────────────────────
-// AUTH（Google Sign-In、設計書20/35/36。認証情報最小化方針: sub のみ保存、email/氏名/画像は一切保存しない）
+// AUTH（Google/Apple Sign-In、設計書20/35/36/44。認証情報最小化方針: sub のみ保存、email/氏名/画像は一切保存しない）
 // ─────────────────────────────────────────────
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const appleSignin = require('apple-signin-auth');
 const JWT_SECRET = process.env.JWT_SECRET;
 const GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID;
 const GOOGLE_IOS_CLIENT_ID = process.env.GOOGLE_IOS_CLIENT_ID;
 const googleOAuthClient = new OAuth2Client();
+
+// Apple Sign-In（設計書44）。Services ID・App IDのどちらも未設定なら機能を無効化するフェイルセーフ（APNs実装と同パターン）
+const APPLE_SERVICE_ID = process.env.APPLE_SERVICE_ID;
+const APPLE_APP_ID = process.env.APPLE_APP_ID;
+const APPLE_AUTH_ENABLED = !!(APPLE_SERVICE_ID && APPLE_APP_ID);
+if (!APPLE_AUTH_ENABLED) {
+  console.warn('[auth] APPLE_SERVICE_ID / APPLE_APP_ID が未設定のため Sign in with Apple は無効化されています');
+}
+
+// Apple Sign-In Web版CSRF対策のstateパラメータ（サーバー側インメモリMap＋5分TTL）
+const appleAuthStates = new Map();
+const APPLE_STATE_TTL_MS = 5 * 60 * 1000;
+function issueAppleAuthState() {
+  const state = crypto.randomBytes(16).toString('hex');
+  appleAuthStates.set(state, { createdAt: Date.now() });
+  return state;
+}
+function verifyAndConsumeAppleAuthState(state) {
+  const entry = appleAuthStates.get(state);
+  appleAuthStates.delete(state);
+  if (!entry) return false;
+  return (Date.now() - entry.createdAt) < APPLE_STATE_TTL_MS;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [state, entry] of appleAuthStates.entries()) {
+    if (now - entry.createdAt >= APPLE_STATE_TTL_MS) appleAuthStates.delete(state);
+  }
+}, 60 * 1000).unref();
 
 const USERS_PATH = path.join(__dirname, 'data', 'users.json');
 function loadUsers() {
@@ -612,9 +642,13 @@ app.get('/api/sponsored-cards', (req, res) => {
   }
 });
 
-// GET /api/config — 認証不要、公開情報のみを返す軽量エンドポイント（Web版のGoogle Identity Services初期化用）
+// GET /api/config — 認証不要、公開情報のみを返す軽量エンドポイント（Web版のGoogle Identity Services / Sign in with Apple JS初期化用）
 app.get('/api/config', (req, res) => {
-  res.json({ googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID || null });
+  res.json({
+    googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID || null,
+    appleServiceId: process.env.APPLE_SERVICE_ID || null,
+    appleRedirectUri: 'https://dosuru.app/api/auth/apple/callback',
+  });
 });
 
 // GET /api/sales — セール情報一覧（events.json の type==='sale' のみ返す）
@@ -1494,6 +1528,66 @@ app.get('/api/auth/me', requireAppAuth, (req, res) => {
   const user = users.find(u => u.userId === req.authUserId);
   if (!user) return res.status(401).json({ error: 'user not found' });
   res.json({ userId: user.userId, provider: user.provider, createdAt: user.createdAt });
+});
+
+// ─────────────────────────────────────────────
+// Sign in with Apple（設計書44。iOS版はidentityTokenを直接POST、Web版はresponse_mode:'form_post'経由のcallback）
+// ─────────────────────────────────────────────
+
+// Apple idToken を検証し upsertUser する共通コアロジック（iOS/Web両経路から呼ぶ）
+async function verifyAppleTokenAndUpsert(identityToken) {
+  const audience = [APPLE_APP_ID, APPLE_SERVICE_ID].filter(Boolean);
+  const payload = await appleSignin.verifyIdToken(identityToken, { audience, ignoreExpiration: false });
+  const sub = payload?.sub;
+  if (!sub) throw new Error('invalid apple token: no sub');
+  // 認証情報最小化方針: email等は一切保存・利用しない。sub のみ使用
+  const user = await upsertUser('apple', sub);
+  return user;
+}
+
+// POST /api/auth/apple — iOS版ネイティブSign in with AppleのidentityTokenを検証し、自前JWTを発行する
+app.post('/api/auth/apple', async (req, res) => {
+  try {
+    const { identityToken } = req.body || {};
+    if (!identityToken) return res.status(400).json({ error: 'identityToken required' });
+    if (!APPLE_AUTH_ENABLED) {
+      console.error('auth/apple: APPLE_SERVICE_ID / APPLE_APP_ID が未設定です');
+      return res.status(500).json({ error: 'server not configured' });
+    }
+    const user = await verifyAppleTokenAndUpsert(identityToken);
+    const token = issueAppJwt(user.userId);
+    res.json({ token, userId: user.userId });
+  } catch (e) {
+    console.error('auth/apple error:', e.message);
+    res.status(401).json({ error: 'verification failed' });
+  }
+});
+
+// GET /api/auth/apple/state — Web版CSRF対策用のワンタイムstateを発行する
+app.get('/api/auth/apple/state', (req, res) => {
+  res.json({ state: issueAppleAuthState() });
+});
+
+// POST /api/auth/apple/callback — Web版 response_mode:'form_post' のリダイレクト先。
+// AppleサーバーがブラウザのフルページPOSTでここに戻ってくる。JSON応答ではなくHTML中継でJWTをURLフラグメント経由で渡す
+app.post('/api/auth/apple/callback', express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const { id_token, state } = req.body || {};
+    if (!state || !verifyAndConsumeAppleAuthState(state)) {
+      return res.redirect('https://dosuru.app/?auth_error=state_mismatch');
+    }
+    if (!id_token) return res.redirect('https://dosuru.app/?auth_error=no_token');
+    if (!APPLE_AUTH_ENABLED) {
+      console.error('auth/apple/callback: APPLE_SERVICE_ID / APPLE_APP_ID が未設定です');
+      return res.redirect('https://dosuru.app/?auth_error=server_not_configured');
+    }
+    const user = await verifyAppleTokenAndUpsert(id_token);
+    const token = issueAppJwt(user.userId);
+    res.send(`<script>location.replace('https://dosuru.app/#auth_token=${token}');</script>`);
+  } catch (e) {
+    console.error('auth/apple/callback error:', e.message);
+    res.redirect('https://dosuru.app/?auth_error=verification_failed');
+  }
 });
 
 // ─────────────────────────────────────────────

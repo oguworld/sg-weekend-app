@@ -4612,3 +4612,307 @@ SG_SYSTEM_PROMPTのみ、この段落の後に既存の「8コースは以下の
 
 ## 承認状況
 2026-07-15 ユーザー承認済み（言い回しは「長く」で確定）。
+
+# 設計書44 — Sign in with Apple実装（iOS版＋Web版）
+
+（2026-07-15 planner設計。設計書20〈1615〜1869行目〉・設計書35・設計書36・設計書39本文は削除・上書きせず、本設計書はこれらの続き・実装詳細化として追記する）
+
+## 0. 本設計書の位置づけ
+
+設計書20/35/36で「フェーズ1: 認証基盤（Google Sign-In + Sign in with Apple 一体実装）」として設計され、2026-07-14〜15にGoogle Sign-In（iOS版＋Web版）が実装・動作確認済み（`data/users.json`に実データ1件、`GOOGLE_WEB_CLIENT_ID`/`GOOGLE_IOS_CLIENT_ID`とも`.env`に実値設定済み）。本設計書は、フェーズ1の残り半分であるSign in with Appleについて、Google実装のコードパターンとの一貫性を保ちながら実装レベルまで詳細化する。
+
+## 1. 実コード確認結果（既存Google実装パターン）
+
+- `server.js`: `USERS_PATH`・`loadUsers()`/`saveUsers()`/`genUserId()`・`upsertUser(provider, providerSub)`・`issueAppJwt(userId)`・`verifyAppJwtOptional(req)`・`requireAppAuth`はすべてプロバイダ非依存の共通実装で、Apple追加時も無変更でそのまま呼べる
+- `POST /api/auth/google`が唯一プロバイダ固有の実装。`idToken`受信→`googleOAuthClient.verifyIdToken({idToken, audience})`→`payload.sub`抽出→`upsertUser('google', sub)`→`issueAppJwt`→JSON応答
+- `GET /api/auth/me`・コース関連の所有権チェック（`POST /api/courses/publish`・`DELETE /api/courses/:id`・`POST /api/courses/:id/unpublish`）はプロバイダ非依存で無変更のまま流用可能
+- `GET /api/config`は現在`googleWebClientId`のみ返す軽量エンドポイント
+- `public/app.js`: `AUTH_TOKEN_KEY`＝`localStorage`の`app_auth_token`、`authedFetch()`はプロバイダ非依存、`_submitGoogleIdToken(idToken)`が唯一プロバイダ固有、`refreshLoginUI()`はプロバイダ非依存（`login-section-logged-out`/`login-section-logged-in`のDOM表示切替）
+- `_handleGoogleLoginIOS()`: Capacitorネイティブプラグイン経由、`_initGoogleButtonWeb()`: Web版のみ`renderButton()`描画、`handleGoogleLoginClick()`: `_isCapacitorApp`で分岐
+- `ios-app/package.json`: `@codetrix-studio/capacitor-google-auth@^3.4.0-rc.4`のみ
+- `.github/workflows/ios-deploy.yml`: 「Set Google Sign-In URL scheme in Info.plist」（Python plistlib方式、設計書41）・「Create App.entitlements (Push Notifications capability)」（PlistBuddy）・「Wire App.entitlements into Xcode project build settings」（Ruby xcodeproj gem）が存在
+
+## 2. ユーザーストーリー
+
+- iOSアプリユーザーとして、既にGoogleアカウントでログインできる設定画面から、Appleアカウントでも同様にログインできるようにしたい
+- Web版ユーザーとして、Googleボタンの隣にAppleボタンがあり、同じように使えるようにしたい
+- 運営者として、Appleガイドライン4.8（サードパーティログイン提供時はSign in with Appleも同等提供必須）に準拠したい
+- 運営者として、Apple Sign-Inでも認証情報最小化方針（`sub`のみ保存）を維持し、可能であれば同意画面レベルでもGoogleより踏み込んだ最小化（スコープ非要求）を実現したい
+
+## 3. 受け入れ基準
+
+### 正常系
+- iOS版設定画面で「Appleでログイン」ボタンをタップ→ネイティブSign in with Appleダイアログ表示→認証成功→ログイン状態表示に切り替わる
+- Web版設定画面で「Appleでログイン」ボタンをクリック→Apple認証画面へリダイレクト→認証成功後`https://dosuru.app`に戻り、ログイン状態になる
+- どちらの経路でも`data/users.json`に`provider:'apple'`のレコードが作成され、`providerSub`のみが保存される。メール・氏名は一切保存されない
+- 同一Apple IDでiOS版→Web版とログインした場合、`providerSub`が一致し同一`userId`として扱われる
+
+### 失敗系
+- ネットワークエラー時: トースト表示、匿名状態のまま使い続けられる
+- 認証キャンセル時: 何も変化せず元の画面に戻る
+- サーバー側JWT検証失敗時: 401、再ログインを促す
+- Web版CSRF対策の`state`不一致時: 認証を拒否しエラー表示
+
+### エッジケース
+- Apple Services ID・ドメイン確認・リダイレクトURL登録が未完了の状態でコードだけ先行デプロイした場合、`APPLE_AUTH_ENABLED=false`のフェイルセーフにより安全に失敗する
+- 旧バージョンAppは従来通り匿名動作を継続
+
+## 4. スコープ外
+
+Android版対応、既存匿名データの自動移行、予定表・共有カレンダーのユーザー紐づけ（設計書37）、サブスク・決済機能、サポート用識別子UI、Apple Services IDドメイン確認ファイルの実際の設置・Apple Developer Portalでの実際の発行作業自体（手順は明記するが実際のポータル操作は別途）、プライバシーポリシー文言変更、Apple Sign-Inの「アカウント削除時のrevocation通知」受信処理。
+
+## 5. iOS版技術要件
+
+### 5-1. Capacitorプラグイン選定
+候補: `@capacitor-community/apple-sign-in`。実装時に`npm view @capacitor-community/apple-sign-in peerDependencies`で必ずCapacitor 6系との互換性を確認すること（Google実装時に`@codetrix-studio/capacitor-google-auth`のバージョン不整合があった前例があるため、同じ確認ミスを繰り返さないこと）。
+
+### 5-2. Apple Developer Portal: Sign in with Apple capability有効化（ユーザーが別途実施、手順のみ記録）
+1. Identifiers → App ID (`app.dosuru`) → Capabilities → 「Sign in with Apple」にチェック
+2. 配布用Provisioning Profileの再生成
+3. 新しいProvisioning Profileをbase64化しGitHub Secrets `PROVISION_PROFILE_BASE64`を更新
+4. フェーズ0は完了済みのため今すぐ実施可能
+
+**Google Sign-In用URL Scheme設定と異なり、Sign in with Apple自体はURL Scheme登録が不要**（`ASAuthorizationController`で完結するため）。
+
+### 5-3. entitlements自動生成ステップへのキー追加
+既存の「Create App.entitlements (Push Notifications capability)」ステップに、`com.apple.developer.applesignin`（文字列配列`["Default"]`）を追加する。配列値のため、設計書41で確立したPython plistlib方式を使い、既存の`aps-environment`（PlistBuddy）と共存させる:
+
+```yaml
+- name: Create App.entitlements (Push Notifications + Sign in with Apple capabilities)
+  run: |
+    cd ios-app
+    ENTITLEMENTS_PATH="ios/App/App/App.entitlements"
+    if [ ! -f "$ENTITLEMENTS_PATH" ]; then
+      printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n' > "$ENTITLEMENTS_PATH"
+    fi
+    /usr/libexec/PlistBuddy -c "Add :aps-environment string production" "$ENTITLEMENTS_PATH" || \
+    /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$ENTITLEMENTS_PATH"
+    python3 - <<'PYEOF'
+    import plistlib
+    path = "ios/App/App/App.entitlements"
+    with open(path, "rb") as f:
+        ent = plistlib.load(f)
+    ent["com.apple.developer.applesignin"] = ["Default"]
+    with open(path, "wb") as f:
+        plistlib.dump(ent, f)
+    print(f"entitlements now: {ent}")
+    PYEOF
+    cat "$ENTITLEMENTS_PATH"
+```
+「Wire App.entitlements into Xcode project build settings」ステップは変更不要。
+
+### 5-4. クライアント側スコープ非要求
+`requestedScopes`に何も設定しない（`nil`/未指定）ことで、Googleと違い同意画面自体を出さずに`sub`相当の識別子のみ取得する設計にする。
+
+## 6. Web版技術要件
+
+### 6-1. Apple Developer Portal: Services ID発行（ユーザーが別途実施、手順のみ記録）
+1. Identifiers → 「+」→ Services IDs → 新規発行（Identifier例: `app.dosuru.web`）
+2. 「Sign in with Apple」を有効化、Primary App IDとして`app.dosuru`を紐付け
+3. Domains: `dosuru.app`、Return URLs: `https://dosuru.app/api/auth/apple/callback`
+4. ドメイン確認ファイルを`public/.well-known/`配下に配置（既存の`express.static`でそのまま配信可能と推定）
+
+### 6-2. Sign in with Apple JS SDK読み込み
+```html
+<script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
+```
+`AppleID.auth.init({clientId, redirectURI, state, usePopup:false})`で初期化。**`scope`は指定しない**（5-4節と同じ理由）。`response_mode:'form_post'`によるフルページリダイレクト方式を採用。
+
+### 6-3. `response_mode:'form_post'`フローとJWT受け渡し
+Appleサーバーがブラウザ経由で`https://dosuru.app/api/auth/apple/callback`へ`application/x-www-form-urlencoded`のPOSTを行う。サーバー側はこれを受信し検証・upsert後、**JSONではなくHTML中継レスポンス**でJWTをURLフラグメント経由でクライアントに渡す:
+
+```javascript
+res.send(`<script>location.replace('https://dosuru.app/#auth_token=${token}');</script>`);
+```
+
+フロントエンド起動時にURLフラグメントの`auth_token`を検出し`localStorage`（`AUTH_TOKEN_KEY`）に保存後、URLから除去する処理を追加する。
+
+### 6-4. CSRF対策の`state`パラメータ
+**採用方式: サーバー側インメモリMap＋5分TTL**（Cookie方式はAppleのform_postがクロスサイトPOSTになるためsameSite設定が複雑になる懸念があり不採用）:
+
+```javascript
+const appleAuthStates = new Map();
+const APPLE_STATE_TTL_MS = 5 * 60 * 1000;
+function issueAppleAuthState() {
+  const state = crypto.randomBytes(16).toString('hex');
+  appleAuthStates.set(state, { createdAt: Date.now() });
+  return state;
+}
+function verifyAndConsumeAppleAuthState(state) {
+  const entry = appleAuthStates.get(state);
+  appleAuthStates.delete(state);
+  if (!entry) return false;
+  return (Date.now() - entry.createdAt) < APPLE_STATE_TTL_MS;
+}
+```
+PM2再起動時、ログイン試行中のstateは失われるが影響は「その1回のログイン試行が失敗するだけ」で許容範囲とする。`state`発行用の軽量エンドポイント`GET /api/auth/apple/state`を新設し、クライアントがログイン開始前にこれを呼ぶ設計にする。定期クリーンアップ（`setInterval`で期限切れエントリを削除）も実装すること。
+
+### 6-5. Google/Apple両ボタンの配置
+`google-login-btn-container`と並べて`apple-login-btn-container`を追加する。Apple公式ボタン描画は別スクリプト:
+```html
+<script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid-button/1/en_US/appleid-button.js"></script>
+```
+カスタムエレメント`<div id="apple-login-btn-container" data-color="black" data-border="true" data-type="sign in" data-width="280" data-height="40"></div>`。Googleボタンとサイズ感を揃えること。
+
+**iOS版はWeb版と異なり自作ボタン**（Google側も同様の非対称構成、`_handleGoogleLoginIOS()`と対になる`_handleAppleLoginIOS()`を呼ぶ）。
+
+## 7. サーバー側実装設計
+
+### 7-1〜7-3. 共通コアロジック・エンドポイント
+```javascript
+async function verifyAppleTokenAndUpsert(identityToken) {
+  const payload = await verifyAppleIdentityToken(identityToken); // apple-signin-authで実装
+  const sub = payload?.sub;
+  if (!sub) throw new Error('invalid apple token: no sub');
+  const user = await upsertUser('apple', sub);
+  return user;
+}
+
+app.post('/api/auth/apple', async (req, res) => {
+  try {
+    const { identityToken } = req.body || {};
+    if (!identityToken) return res.status(400).json({ error: 'identityToken required' });
+    if (!APPLE_AUTH_ENABLED) return res.status(500).json({ error: 'server not configured' });
+    const user = await verifyAppleTokenAndUpsert(identityToken);
+    const token = issueAppJwt(user.userId);
+    res.json({ token, userId: user.userId });
+  } catch (e) {
+    res.status(401).json({ error: 'verification failed' });
+  }
+});
+
+app.get('/api/auth/apple/state', (req, res) => {
+  res.json({ state: issueAppleAuthState() });
+});
+
+app.post('/api/auth/apple/callback', express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const { id_token, state } = req.body || {};
+    if (!state || !verifyAndConsumeAppleAuthState(state)) {
+      return res.redirect('https://dosuru.app/?auth_error=state_mismatch');
+    }
+    if (!id_token) return res.redirect('https://dosuru.app/?auth_error=no_token');
+    if (!APPLE_AUTH_ENABLED) return res.redirect('https://dosuru.app/?auth_error=server_not_configured');
+    const user = await verifyAppleTokenAndUpsert(id_token);
+    const token = issueAppJwt(user.userId);
+    res.send(`<script>location.replace('https://dosuru.app/#auth_token=${token}');</script>`);
+  } catch (e) {
+    res.redirect('https://dosuru.app/?auth_error=verification_failed');
+  }
+});
+```
+
+### 7-2. Apple公開鍵検証パッケージ
+`apple-signin-auth`を新規導入（npmで`identityToken`検証・`sub`抽出を提供）。実装時に`npm view apple-signin-auth`でメンテ状況・複数`aud`対応可否を確認すること。もし複数`aud`（iOS App ID `app.dosuru`・Web Services ID `app.dosuru.web`の両方）対応が難しい場合、検証後に`payload.aud`が`[APPLE_APP_ID, APPLE_SERVICE_ID]`のいずれかに含まれるか手動チェックを追加する。
+
+### 7-5. 環境変数フェイルセーフ（APNs実装と同パターン）
+```javascript
+const APPLE_SERVICE_ID = process.env.APPLE_SERVICE_ID;
+const APPLE_APP_ID = process.env.APPLE_APP_ID; // 'app.dosuru'
+const APPLE_AUTH_ENABLED = !!(APPLE_SERVICE_ID && APPLE_APP_ID);
+```
+どちらか欠けていれば無効化、Google Sign-Inや他の全機能には一切影響しない。`.env`に`APPLE_SERVICE_ID`（プレースホルダー、Services ID発行後にユーザーが手動更新）・`APPLE_APP_ID=app.dosuru`（既知の値、これはプレースホルダーではなく確定値）を追加すること。
+
+### 7-6. `GET /api/config`への追加
+```javascript
+app.get('/api/config', (req, res) => {
+  res.json({
+    googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID || null,
+    appleServiceId: process.env.APPLE_SERVICE_ID || null,
+    appleRedirectUri: 'https://dosuru.app/api/auth/apple/callback',
+  });
+});
+```
+
+## 8〜9. データモデル・APIの変更
+`data/users.json`スキーマ変更なし（`provider:'apple'`レコードが追加されるのみ）。新規API: `POST /api/auth/apple`・`GET /api/auth/apple/state`・`POST /api/auth/apple/callback`、既存`GET /api/config`にフィールド追加。既存API（`POST /api/auth/google`・`GET /api/auth/me`・コース関連3エンドポイント）は無変更。
+
+## 10. フロントエンドの変更
+- `public/index.html`: Apple JS SDK・ボタン描画スクリプト読み込み、`apple-login-btn-container`要素追加、`login-status-label`をプロバイダに応じた動的表示に変更（新規i18nキー`loginStatusApple`追加、ja:「Appleでログイン中」/en:「Signed in with Apple」）
+- `public/app.js`: `_handleAppleLoginIOS()`・`_initAppleButtonWeb()`・`_submitAppleIdentityToken(identityToken)`新設、URLフラグメント`auth_token`検出処理（起動時）、`refreshLoginUI()`のprovider別表示切替
+
+## 11. 変更するファイル一覧
+`package.json`（`apple-signin-auth`追加）、`server.js`、`.env`（`APPLE_SERVICE_ID`プレースホルダー・`APPLE_APP_ID=app.dosuru`）、`ios-app/package.json`（Apple Sign-Inプラグイン）、`ios-app/capacitor.config.js`（必要なら設定追加）、`.github/workflows/ios-deploy.yml`（entitlementsキー追加）、`public/index.html`、`public/app.js`、`public/.well-known/`（ドメイン確認ファイル配置は運用作業、コードではない）、CLAUDE.md。
+
+## 12. 承認状況
+2026-07-15 ユーザー承認済み。
+
+# 設計書45 — iOS版「プッシュ通知」トグルボタンが権限許可後もOFF表示のまま変わらない不具合の調査
+
+## 症状
+TestFlight版（Capacitor）の設定画面で、プッシュ通知トグルをタップするとiOSシステム権限ダイアログは正しく表示される。しかし許可を選択した後、ボタン表示がOFF→ONに切り替わらない。エラートーストの発生も未報告。
+
+## 背景（本日実施された関連変更）
+- 設計書34: フェーズ0完了に伴い`.github/workflows/ios-deploy.yml`のentitlements自動生成2ステップ（`aps-environment: production`付与）を復元
+- 設計書41: Google Sign-In用URL Scheme設定をCIに追加
+- 上記変更を含む最新TestFlightビルド（`release`へのpush、run id `29379919811`）で今回の症状が初めて報告された
+
+## 調査結果
+
+### 1. `public/app.js`のロジック自体は問題なし
+`_getCapPushPlugin()`（2854行目）／`_bindNativePushListenersOnce()`（2867行目）／`_toggleNativePush()`（2928行目）／`_initNativePush()`（2909行目）を通読した限り、実装ロジックに見落としは確認できなかった。
+- `register()`呼び出し→ネイティブ側非同期処理→`'registration'`または`'registrationError'`イベント→いずれの経路でも`_updatePushBtn()`が呼ばれる設計は健全
+- `#push-toggle-btn`は`onclick`属性を持たず、`touchend`一括ハンドラ（app.js 1951行目）から`togglePush()`→`_toggleNativePush()`が呼ばれる経路も確認済み、二重登録やゴーストクリックの構造的問題は見当たらない
+- `_nativePushRegisterIntent`によるinit/toggle-on判別、`localStorage`永続化、`_bindNativePushListenersOnce`の多重登録防止（`_nativePushListenersBound`）も一見して妥当
+
+### 2. `ios-app/package.json`のバージョン
+`@capacitor/push-notifications: ^6.0.0`（実際にインストールされたのは`6.0.5`、CI実行ログで確認）。Capacitor本体・`@capacitor/core`等も全て`^6.0.0`系で統一されており、メジャーバージョンの不整合はない。
+
+### 3. entitlements・Provisioning Profileの整合性（**重要な発見**）
+`.github/workflows/ios-deploy.yml`の`Create App.entitlements`ステップで`aps-environment: production`が正しく設定されていることを確認（コード上は問題なし）。
+
+GitHub Actionsの実行履歴を実際に確認したところ、直近のリリースビルド（run id `29379919811`、「Googleログイン機能追加」）は**2回試行されており、1回目（attempt 1）は`Deploy to App Store`ステップで失敗していた**:
+```
+Error parsing provisioning profile at path '.../profile.mobileprovision' (FastlaneCore::Interface::FastlaneCrash)
+```
+`gh run list`のサマリ表示は最終状態（2回目の成功）のみを反映するため、一見「completed success」に見えるが、実際には1回失敗→再実行で成功、という経緯だった。
+
+2回目（attempt 2）のログでは、`install_provisioning_profile`・`update_code_signing_settings`・ビルド・codesign・アップロードまで全て正常完了しており（`Successfully uploaded the new binary to App Store Connect`まで確認済み）、**GitHub Secrets `PROVISION_PROFILE_BASE64`自体の中身が壊れているわけではない**（同じsecret値で2回目は正常にパースできている）。1回目の失敗は、ダウンロード/デコード時の一時的な破損か、macOS runnerの一過性の問題である可能性が高い（推測）。
+
+**結論**: TestFlightに実際に配布されたバイナリはattempt 2（成功したビルド）であり、Push Notifications capability・`aps-environment: production`は正しく組み込まれた状態でビルドされている。ビルドパイプライン自体に恒常的な不具合があるとは断定できない（1回限りの一過性エラーの可能性が高い、ただし確証はない）。
+
+### 4. サーバー側APNs設定とクライアント側登録失敗は別レイヤー
+`pm2 logs`で直近ログに`📱 APNs初期化完了（production=true）`を複数回確認。`.env`の`APNS_BUNDLE_ID=app.dosuru`はアプリのbundle IDと一致。サーバー側のAPNs送信設定は正常に初期化されている。
+ただし、これは「サーバーがAPNs経由でプッシュを送信できる状態にあるか」の確認であり、**今回の症状（クライアント側で`register()`のコールバックが返ってこない）とは独立した問題**。サーバー側の設定が万全でも、クライアントがデバイストークンを取得できていなければ`POST /api/push-subscribe-ios`が呼ばれず、症状は再現し得る。
+
+### 5. Capacitor `@capacitor/push-notifications`の既知の注意点
+- **シミュレータでは`registrationError`が必ず発生する**（実機のみ有効）。ユーザー報告が実機（TestFlight配信のiPhone実機）であれば該当しないはずだが、念のため確認事項に含める
+- `register()`はiOS側で`checkPermissions()`/`requestPermissions()`で権限許可済みの状態でのみ有効なトークン発行が行われる。コード上は権限許可後に`register()`を呼ぶ順序になっており妥当
+- entitlements不整合（Provisioning ProfileにPush capabilityが含まれない状態でアプリがビルドされている等）が起きると、`register()`が`registrationError`すら発火せず**サイレントに無反応**になるケースが知られている（Appleネイティブ層のエラーがCapacitor JSブリッジまで伝播しないことがある）。これは本調査で確定した事実ではなく一般的な既知の注意点（推測）
+
+## 原因
+**不明**。以下の理由により、コードレビューのみでは原因を一つに断定できない:
+- `public/app.js`側のロジックは健全に見える
+- ビルドパイプラインのentitlements設定（`aps-environment: production`）はコード上正しい
+- 実際にTestFlightへ配布されたビルド（attempt 2）はビルド・署名・アップロードまで正常完了しており、静的な設定不備の証拠は見つからない
+- しかし「権限ダイアログは出るが、その後のイベントが一切発火しない（`registrationError`のtoastすら出ない）」という報告内容は、`register()`のネイティブ側コールバック自体が返っていないことを強く示唆しており、これはコードレビューだけでは再現・特定できない領域（entitlements×Provisioning Profileの実機上の整合性、APNs実機到達性等）
+
+## 推奨される次のアクション（実機ログでの計装案）
+
+コード修正は行わず、まず以下の一時的な計装ポイントを追加し、実機で1回操作してもらって`logs/debug-nav.log`を確認することを推奨する。
+
+1. **`_toggleNativePush()`冒頭**: `_sendDebugLog('push_toggle_start', { hasToken: !!_nativeDeviceToken, pluginExists: !!plugin })` — そもそも関数が呼ばれているか、pluginが取得できているかを確認
+2. **`_toggleNativePush()`の`requestPermissions()`直後**: `_sendDebugLog('push_perm_result', { perm })` — 権限ダイアログ選択後の実際のreceive値を確認
+3. **`plugin.register()`呼び出し直前**: `_sendDebugLog('push_register_call', {})` — `register()`が実際に呼ばれたか
+4. **`registration`イベントリスナー内、先頭**: `_sendDebugLog('push_registration_event', { tokenLength: token?.value?.length })` — イベント自体が発火したか
+5. **`registrationError`イベントリスナー内、先頭**: `_sendDebugLog('push_registration_error_event', { err: JSON.stringify(error) })` — エラーイベント発火の有無とエラー内容
+6. **`_toggleNativePush()`のcatchブロック内**: `_sendDebugLog('push_toggle_exception', { err: String(e) })` — 例外の有無
+
+上記6ポイントすべてを仕込んだ上で実機操作した際、
+- 1・3が記録され2・4・5・6が一切記録されない場合 → `register()`呼び出し後にネイティブ側で完全に応答が返っていない（entitlements/Provisioning Profileの実機上の不整合、またはAPNsサーバーとの疎通問題を疑う）
+- 5が記録される場合 → エラー内容次第でBadDeviceToken等具体的な原因が判明する
+- 2で`perm`が`granted`以外の場合 → 権限自体は許可されていない（ダイアログの見た目と実際のreceive値が一致していない可能性）
+
+## 変更するファイル一覧（実装フェーズで対応、今回は特定なし）
+- 計装追加のみなら`public/app.js`（`_toggleNativePush()`・`_bindNativePushListenersOnce()`内）
+
+## 受け入れ基準
+- 実機ログ（`logs/debug-nav.log`）で、上記6ポイントのうちどこまで到達しているかが判明すること
+- 判明した到達点に基づき、次の一手（entitlements再検証、Provisioning Profile再生成、APNsサーバー疎通確認等）を絞り込めること
+
+## 再発防止策
+- iOS CIの`Deploy to App Store`ステップが1回失敗→再実行で成功するケースがあったことが今回判明した。今後もリリースのたびに`gh run view <id> --log`でattempt数・各ステップのconclusionを確認し、「最終的にsuccessだから安心」と判断せず、途中に一過性のエラーがなかったかも確認する運用を推奨する（不明な一過性エラーの再発有無を継続的に観察する材料になる）
+- Push Notifications機能はフェーズ0完了後、今回が初めてentitlements有効な状態で実際にTestFlightへ配布されたビルドである。実機での動作検証がまだ一度も完了していない状態のため、今回の計装ログ確認をもって初回のエンドツーエンド実地検証とする
+
+## 承認状況
+未承認（ユーザー承認待ち）。

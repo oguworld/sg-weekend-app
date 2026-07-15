@@ -138,8 +138,8 @@ sg-weekend-app/
 - `_isCapacitorApp`による分岐は実装していない（ウィジェット自体のリンク処理はKlook側のiframe内で完結する想定のため独自クリックハンドラは追加せず）。**iOS版（Capacitor/TestFlight）でのカード風の見た目・PRラベル・カード間差し込み位置・iframe内リンクタップの挙動は2026-07-13時点で未検証**
 - スコープ外（今回未実装）: 複数スポンサーのローテーション、日替わり選択ロジック、カテゴリ一致判定、クリック計測、ウィジェット表示位置の詳細カスタマイズ（Klook側テンプレートの見た目自体はダッシュボード側の設定に依存）
 
-## Google Sign-In認証基盤（2026-07-14実装、設計書20/35/36。iOS版+Web版。Sign in with Apple・予定表紐づけは次回）
-`.claude/plan.md`の設計書20（元設計）・35（認証情報最小化・フェーズ再評価）・36（Web版追加）に基づき、Google Sign-Inのみ（iOS+Web両方）を実装。Sign in with Apple（設計書20/36）・予定表データ/共有カレンダーのユーザー紐づけ（設計書37）は今回スコープ外、未着手のまま。
+## Google/Apple Sign-In認証基盤（2026-07-14 Google実装・2026-07-15 Apple追加、設計書20/35/36/44。iOS版+Web版。予定表紐づけは次回）
+`.claude/plan.md`の設計書20（元設計）・35（認証情報最小化・フェーズ再評価）・36（Web版追加）に基づきGoogle Sign-In（iOS+Web両方）を実装、設計書44でSign in with Apple（iOS+Web両方）を追加した。予定表データ/共有カレンダーのユーザー紐づけ（設計書37）は今回もスコープ外、未着手のまま。
 
 - **認証情報最小化方針（2026-07-15設計書39で訂正）**: サーバー側が保存・利用するのは`idToken`の`sub`クレームのみ。`email`/`name`/`picture`等は一切保存・利用しない。`data/users.json`のスキーマは`userId`/`provider`/`providerSub`/`createdAt`/`lastLoginAt`/`subscriptions`のみ（`email`・`displayName`・`avatarEmoji`は含まない）。**ただし、Google同意画面自体に`email`・`profile`スコープへのアクセス許可（「名前とプロフィール写真」「メールアドレス」）が表示されることは、Google Identity Servicesの仕様上、技術的に回避不可能である**（`google.accounts.id.initialize()`にはそもそも`scope`パラメータが存在せず、より低レベルの`google.accounts.oauth2.initTokenClient`に切り替えても「サインインスコープ（openid, email, profile）はバンドル」という仕様上の制約が及ぶため）。方針は「（Googleに）取得させない」ではなく「（サーバー側で）保存・利用しない」ことを個人情報保護の実質的な担保手段とする（ユーザー合意済み、詳細は`.claude/plan.md`「設計書39」参照）
 - **`data/users.json`**: 新規（gitignore対象、既存`data/`ルールでカバー済み）。`provider`+`providerSub`をユニークキーにupsert。既存の`data/push-subscriptions.json`と同じ`withFileLock`パターンを踏襲
@@ -176,6 +176,15 @@ sg-weekend-app/
   - `renderButton()`オプション: `type:'standard'` `theme:'outline'` `size:'large'` `text:'signin_with'` `shape:'pill'` `logo_alignment:'left'` `width:280`。ダークモード・言語切替への自動追従はしない（初回描画時に固定、スコープ外として許容）
   - iOS版（`_handleGoogleLoginIOS()`）は無変更
   - **未検証事項（次回フォロー）**: 実機（TestFlight）でのログイン→ログアウト→再ログインの動作確認は2026-07-15時点で未実施。詳細は`.claude/next.md`参照
+- **2026-07-15修正: iOS版「Googleでログイン」ボタンが表示されない不具合を修正**。原因は設計書40で`#google-login-btn`（自前ボタン）を`#google-login-btn-container`（Web版`renderButton()`専用の空コンテナ）に置き換えた際、iOS版向けの代替ボタン挿入処理を追加し忘れていたため（`_isCapacitorApp`時は元々`if (!_isCapacitorApp) {...}`のWeb版分岐のみで、iOS版は何も描画しないまま放置されていた）。`public/app.js`の初期化コードに`else`分岐を追加し、iOS版では`#google-login-btn-container`に自前ボタン（設計書40以前と同じスタイル）を`innerHTML`で動的挿入する方式に修正。設定画面touchendガード一覧にも`#google-login-btn`の判定行を復元した
+- **2026-07-15追加: Sign in with Apple（設計書44）**
+  - **サーバー**: `apple-signin-auth`パッケージで`identityToken`を検証。`APPLE_SERVICE_ID`（Services ID、`.env`は2026-07-15時点プレースホルダー`app.dosuru.web`）・`APPLE_APP_ID`（App ID、確定値`app.dosuru`）のどちらか未設定なら`APPLE_AUTH_ENABLED=false`で機能を安全に無効化するフェイルセーフ（APNs実装と同パターン）。`verifyAppleTokenAndUpsert()`共通コアロジックがiOS/Web両経路から呼ばれ、`upsertUser('apple', sub)`で`data/users.json`をupsert（Googleと同じ`sub`のみ保存方針）
+  - **API**: `POST /api/auth/apple`（iOS版、`identityToken`を直接POSTしJWTを即時返す）、`GET /api/auth/apple/state`（Web版CSRF対策、ワンタイム`state`をサーバー側インメモリMap+5分TTLで発行）、`POST /api/auth/apple/callback`（Web版、Appleの`response_mode:'form_post'`によるフルページPOSTを受信。`state`検証後、JSONではなく`<script>location.replace('https://dosuru.app/#auth_token=...')</script>`のHTML中継でJWTをURLフラグメント経由でクライアントに渡す）。`GET /api/config`に`appleServiceId`/`appleRedirectUri`を追加（既存`googleWebClientId`と同居、後方互換）
+  - **Web版フロントエンド**: Sign in with Apple JS SDK（`appleid.auth.js`・`appleid-button.js`）を`<script async>`で読み込み。設定画面に`<div id="appleid-signin" data-color="black" data-border="true" data-type="sign in" data-width="280" data-height="40">`（Apple公式ボタン、`#apple-login-btn-container`でラップ）を配置。`_initAppleButtonWeb()`が`GET /api/config`→`GET /api/auth/apple/state`→`AppleID.auth.init({clientId, scope:'', redirectURI, state, usePopup:false})`の順で初期化（`scope`を指定しないことで同意画面を出さない設計）。起動時IIFE `_consumeAppleAuthTokenFromHash()`がURLフラグメントの`auth_token`を検出し`localStorage`保存後に`history.replaceState`でURLから除去
+  - **iOS版**: `ios-app/package.json`に`@capacitor-community/apple-sign-in@^6.0.0`を追加（Capacitor 6系対応バージョンをpeerDependencies確認済み、latestの7系はCapacitor7要求のため不使用）。`_handleAppleLoginIOS()`が`registerPlugin('SignInWithApple')`優先→`Plugins.SignInWithApple`フォールバックの防御的取得パターン（既存Google/Keyboardと同様）で`authorize({clientId:'app.dosuru', redirectURI, scopes:''})`を呼ぶ。iOS版は自前ボタン（`#apple-login-btn-container`に動的挿入、Googleボタンと同スタイル）
+  - **CI**: `.github/workflows/ios-deploy.yml`の「Create App.entitlements」ステップに`com.apple.developer.applesignin: ["Default"]`を追加（配列値のため設計書41で確立したPython plistlib方式、既存`aps-environment`（PlistBuddy）と共存）。Sign in with Apple自体はGoogleと異なりURL Scheme登録は不要
+  - **i18n**: `loginWithApple`/`loginStatusApple`をja/en同時追加。`refreshLoginUI()`が`GET /api/auth/me`の`provider`フィールドに応じて`login-status-label`の表示を動的切り替え（Google/Apple共通ラベル要素）
+  - **未実施事項（次回フォロー）**: Apple Developer PortalでのSign in with Apple capability有効化・Services ID発行（`app.dosuru.web`）・ドメイン確認ファイル配置（`public/.well-known/`）はユーザー側作業として未着手。完了するまで`APPLE_SERVICE_ID`は実質プレースホルダーのまま（`APPLE_AUTH_ENABLED`自体は`.env`の2値が揃っているため`true`になるが、Apple側のポータル設定が伴わないと実際の認証フローは失敗する）。iOS版・Web版とも実機・実ブラウザでのエンドツーエンド動作確認は未実施
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
