@@ -154,11 +154,11 @@ sg-weekend-app/
 - **`.env`新規変数（プレースホルダー状態、2026-07-14時点）**: `JWT_SECRET`（実際にランダム生成済み、`crypto.randomBytes(32).toString('hex')`）、`GOOGLE_WEB_CLIENT_ID`・`GOOGLE_IOS_CLIENT_ID`（いずれも`REPLACE_WITH_YOUR_...`のプレースホルダー、既存`OPENWEATHER_API_KEY`と同じ運用パターン。Google Cloud Consoleでの実発行はユーザーが別途行う）。値がプレースホルダーのままでもサーバーはクラッシュせず起動する設計（`POST /api/auth/google`は`audience`配列が空の場合500を返すのみ）
 - **フロントエンド（`public/app.js`）共通実装**:
   - `authedFetch(url, options)`: `localStorage`の`app_auth_token`があれば`Authorization: Bearer`ヘッダーを自動付与するfetchラッパー。コース公開/削除/非公開化の既存fetch呼び出し（`publishCourseById`/`unpublishCourseById`/`deleteMyCourse`）を`authedFetch`に置き換え済み
-  - `handleGoogleLoginClick()`: `_isCapacitorApp`で分岐。iOS版は`_handleGoogleLoginIOS()`（`registerPlugin('GoogleAuth')`優先→`Plugins.GoogleAuth`フォールバックの防御的取得パターンを踏襲、既存Keyboardプラグインの取得パターンと同様）、Web版は`_handleGoogleLoginWeb()`（GIS `initialize()`+`prompt()`、`client_id`は起動時に`GET /api/config`から取得しキャッシュ）
+  - `handleGoogleLoginClick()`: `_isCapacitorApp`のときのみ`_handleGoogleLoginIOS()`を呼ぶ（`registerPlugin('GoogleAuth')`優先→`Plugins.GoogleAuth`フォールバックの防御的取得パターンを踏襲、既存Keyboardプラグインの取得パターンと同様）。Web版は2026-07-15設計書40で`renderButton()`方式に変更したためこの関数では何もしない（下記参照）
   - `_submitGoogleIdToken(idToken)`: 共通処理。`POST /api/auth/google`に送信し、成功時`localStorage.app_auth_token`に自前JWTを保存、`refreshLoginUI()`で画面表示更新
   - `refreshLoginUI()`: 起動時（`init`シーケンス内`initPushState()`等と並んで呼び出し）および認証状態変化時に、設定画面のログインセクション表示を切り替え。未ログイン時は`GET /api/auth/me`を呼ばない（トークンなしなら即座に未ログイン表示、無駄な401を出さない設計）。トークン失効時（401）は自動的に匿名状態に戻す
   - `handleLogoutClick()`: `localStorage`からJWTを削除するのみ（サーバー側の状態変更は不要という設計書20 §7の方針通り）
-- **設定画面UI**: 「ログイン」セクションをプロフィールセクションの直後に新設。`_isCapacitorApp`による表示/非表示分岐はしない（Web・iOS共通表示、押下後の処理のみプラットフォーム分岐）。未ログイン時は「Googleでログイン」ボタン（Apple版ボタンは今回未実装）、ログイン時は「Googleでログイン中」固定表示＋ログアウトボタン（**メールアドレス・氏名は一切表示しない**）。既存の`.settings-section`/`.settings-item`クラスをそのまま使用、CSS変更なし
+- **設定画面UI**: 「ログイン」セクションをプロフィールセクションの直後に新設。`_isCapacitorApp`による表示/非表示分岐はしない（Web・iOS共通表示、押下後の処理のみプラットフォーム分岐）。未ログイン時は「Googleでログイン」ボタン（Apple版ボタンは今回未実装）、ログイン時は「Googleでログイン中」固定表示＋ログアウトボタン（**メールアドレス・氏名は一切表示しない**）。既存の`.settings-section`/`.settings-item`クラスをそのまま使用、CSS変更なし。**Web版のログインボタン自体は2026-07-15設計書40で自前ボタンからGoogle公式`renderButton()`描画に変更済み（下記参照）**
 - **i18n**: `secLogin`/`loginWithGoogle`/`loginStatusGoogle`/`logoutBtn`/`toastLoginSuccess`/`toastLoginError`/`toastLogoutSuccess`の7キーをja/en同時追加
 - **既知の制約・次回フォロー事項**:
   - 「Googleでログイン中」ラベルは現状固定文言（プロバイダがGoogleのみのため）。次回Sign in with Apple追加時は`provider`に応じた動的表示への変更が必要
@@ -166,6 +166,14 @@ sg-weekend-app/
   - Google Cloud ConsoleでのOAuthクライアントID（Web用・iOS用の両方）実発行はユーザーが別途行う想定。発行完了・`.env`及び`capacitor.config.js`への実値設定・CIワークフロー更新が揃うまで、実際のGoogleログインのエンドツーエンド動作は未検証
 - **2026-07-15修正（設計書38）**: 「Googleでログイン」「ログアウト」ボタンがタッチ操作（スマホ・タブレット）で反応しない不具合を修正。CLAUDE.md下記「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節のパターンのうち、touchend側の登録が新規ボタン`#google-login-btn`/`#logout-btn`にのみ漏れていたのが原因。既存の設定画面touchendハンドラ（`public/app.js`）に2行追加して解消済み
 - **2026-07-15訂正（設計書39、コード変更なし・ドキュメント訂正のみ）**: 実機でGoogleの同意画面を確認した結果、「scopeは`openid`のみ要求し`email`・`profile`スコープは要求しない」という当初記述（上記「認証情報最小化方針」節）が誤りだったと判明。Google Identity Servicesの仕様上、「Sign In With Google」機能を使う限り同意画面への`email`・`profile`スコープのアクセス許可表示は技術的に回避不可能（`google.accounts.id.initialize()`に`scope`パラメータ自体が存在せず、より低レベルのAPIに切り替えても「サインインスコープ（openid, email, profile）はバンドル」という仕様上の制約が及ぶため）。ユーザーに説明したところ「しょうがないね。個人情報は当面持ちたくないです」との回答を得て、方針を「（Googleに）取得させない」から「（サーバー側で）保存・利用しない」に転換した（サーバー側は`sub`のみ保存する実装を維持、コード変更は不要）。Apple Sign-In（未実装）はGoogleと異なり`email`・`fullName`スコープを個別に許可/拒否でき、`email`は実アドレス共有かAppleプライベートリレーかを選択できる、という認識があるが、これは一次情報（Apple公式ドキュメント）で確認済みの事実ではなく、Apple Sign-In実装着手時に必ず再確認が必要な未検証事項。詳細は`.claude/plan.md`「設計書39」参照
+- **2026-07-15修正（設計書40）: Web版GoogleログインボタンをrenderButton方式に変更（One Tap再表示不可問題の修正）**。「一度ログイン→ログアウトすると、リロードせずに再度ボタンを押しても反応しなくなる」不具合を修正。原因はGoogle One Tap（`google.accounts.id.prompt()`）の仕様で、一度サインインに成功するとページリロードまで内部的に抑制状態が残り、再度`prompt()`を呼んでも表示されなくなるため（Google公式ドキュメント記載の意図的な仕様）。Google公式の推奨解決策である`google.accounts.id.renderButton()`（クリックのたびに確実にポップアップが起動する恒久的なボタン）に切り替えた
+  - `public/index.html`: 自前デザインの`<button id="google-login-btn">`を空のコンテナ`<div id="google-login-btn-container">`に置き換え。ボタンの見た目・ラベルはGoogle側が描画するため、既存デザインへの完全一致は不可（許容済み）。`data-i18n="loginWithGoogle"`キー・翻訳文字列自体は死にキーとして残置（削除しない）
+  - `public/app.js`: `_handleGoogleLoginWeb()`（`prompt()`呼び出し）を`_initGoogleButtonWeb()`（`renderButton()`呼び出し、`container.dataset.rendered`で多重描画防止）に置き換え。アプリ起動時の初期化フロー内で、GIS SDK（`<script async>`）のロード完了を最大20回×300msリトライで待ってから一度だけ呼ぶ。`handleGoogleLoginClick()`はiOS版分岐（`_handleGoogleLoginIOS()`）のみが残り、Web版では何もしない（ボタンクリック自体をGoogleが処理するため）
+  - 設定画面のtouchendガード一覧（`public/app.js`、「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節参照）から`#google-login-btn`の行を削除（IDごとDOM上から消えたため）。`#logout-btn`側は変更なし
+  - **`disableAutoSelect()`追加**: `handleLogoutClick()`に`window.google?.accounts?.id?.disableAutoSelect?.()`を追加。GIS未ロード時・iOS環境実行時もオプショナルチェイニングでエラーにならない
+  - `renderButton()`オプション: `type:'standard'` `theme:'outline'` `size:'large'` `text:'signin_with'` `shape:'pill'` `logo_alignment:'left'` `width:280`。ダークモード・言語切替への自動追従はしない（初回描画時に固定、スコープ外として許容）
+  - iOS版（`_handleGoogleLoginIOS()`）は無変更
+  - **未検証事項（次回フォロー）**: 実機（TestFlight）でのログイン→ログアウト→再ログインの動作確認は2026-07-15時点で未実施。詳細は`.claude/next.md`参照
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み

@@ -1949,7 +1949,6 @@
         if (e.target.closest('#feedback-send-btn')) { e.preventDefault(); sendFeedback(); return; }
         if (e.target.closest('#lang-toggle-btn'))   { e.preventDefault(); setLang(getLang() === 'ja' ? 'en' : 'ja'); return; }
         if (e.target.closest('#push-toggle-btn'))   { e.preventDefault(); togglePush(); return; }
-        if (e.target.closest('#google-login-btn'))  { e.preventDefault(); handleGoogleLoginClick(); return; }
         if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
       }, { passive: false });
     }
@@ -2006,6 +2005,16 @@
     initSettingsProfile();
     initSettingsGenres();
     refreshLoginUI();
+    // Web版のみ: Google公式ログインボタンを描画。GISは<script async>読み込みのため
+    // 未ロードの場合に備えて一定回数リトライする（iOS版はネイティブフローのため対象外）。
+    if (!_isCapacitorApp) {
+      let _googleBtnRetries = 0;
+      const _tryInitGoogleBtn = () => {
+        if (window.google?.accounts?.id) { _initGoogleButtonWeb(); return; }
+        if (_googleBtnRetries++ < 20) setTimeout(_tryInitGoogleBtn, 300);
+      };
+      _tryInitGoogleBtn();
+    }
 
     // Pull to Refresh（設計書19、イベント画面。iOS版のみ有効化。既存の横スワイプ機構と共存させるためwatchSwipeIntent=true）
     _initPtr(document.getElementById('home-scroll-content'), 'ptr-indicator-home', async () => {
@@ -2473,6 +2482,7 @@
     }
 
     function handleLogoutClick() {
+      window.google?.accounts?.id?.disableAutoSelect?.();
       clearAuthToken();
       showToast(t('toastLogoutSuccess'));
       refreshLoginUI();
@@ -2500,15 +2510,17 @@
       }
     }
 
-    // Web版: Google Identity Services（GIS）JS SDKでサインインを起動
-    async function _handleGoogleLoginWeb() {
+    // Web版: Google公式ボタン（renderButton）をコンテナ内に描画する。
+    // One Tap（prompt()）は一度サインインに成功するとページリロードまで内部的に抑制され、
+    // 再度呼んでも表示されなくなる仕様のため、確実にクリックのたびに起動するrenderButton方式に統一する（設計書40）。
+    async function _initGoogleButtonWeb() {
       try {
         if (!_googleWebClientId) {
           const res = await fetch(API_BASE + '/api/config');
           const conf = await res.json();
           _googleWebClientId = conf.googleWebClientId;
         }
-        if (!_googleWebClientId || !window.google?.accounts?.id) { showToast(t('toastLoginError')); return; }
+        if (!_googleWebClientId || !window.google?.accounts?.id) return;
         if (!_googleAuthInited) {
           window.google.accounts.id.initialize({
             client_id: _googleWebClientId,
@@ -2516,15 +2528,27 @@
           });
           _googleAuthInited = true;
         }
-        window.google.accounts.id.prompt();
+        const container = document.getElementById('google-login-btn-container');
+        if (container && !container.dataset.rendered) {
+          window.google.accounts.id.renderButton(container, {
+            type: 'standard',
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'pill',
+            logo_alignment: 'left',
+            width: 280,
+          });
+          container.dataset.rendered = 'true';
+        }
       } catch (e) {
-        showToast(t('toastLoginError'));
+        // GIS SDK未ロード等の失敗時はコンテナが空のまま残るだけで実害なし
       }
     }
 
     function handleGoogleLoginClick() {
       if (_isCapacitorApp) _handleGoogleLoginIOS();
-      else _handleGoogleLoginWeb();
+      // Web版はrenderButton()が描画したGoogle公式ボタンがクリックを直接処理するため、ここでは何もしない
     }
 
     function initSettingsGenres() {

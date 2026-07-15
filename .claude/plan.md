@@ -4317,3 +4317,127 @@ GoogleAuth: {
 
 ## 承認状況
 2026-07-15 planner設計。**実装は不要（ドキュメント訂正のみ）**。設計書35・36本文は削除・上書きせず保持。2026-07-15 ユーザー承認済み。
+
+# 設計書40 — GoogleログインボタンをrenderButton方式に変更（One Tap再表示不可問題の修正）
+
+## 0. 背景・不具合の症状
+
+Web版（dosuru.app）のGoogle Sign-Inで、以下の手順で不具合が再現する。
+
+1. 設定画面で「Googleでログイン」ボタンをタップ → Google One Tap（または関連プロンプトUI）が表示されサインインに成功する
+2. 「ログアウト」ボタンをタップしてログアウトする
+3. 同一ページをリロードせずに、再度「Googleでログイン」ボタンをタップする
+4. **何も起こらない（プロンプトが一切表示されない）**
+
+### 原因
+
+現在の実装（`public/app.js` `_handleGoogleLoginWeb()`、2504〜2523行目）は、自前デザインのボタン（`public/index.html` 305〜308行目の`#google-login-btn`）のクリックハンドラ内で`google.accounts.id.prompt()`（Google One Tap）を呼び出す方式になっている。
+
+Google Identity Servicesの仕様として、One Tapは「一度サインインが完了する（またはユーザーが明示的に閉じる）と、そのページをリロードするまで内部的に抑制状態（dismissed/skipped momentの記録）が残り、`prompt()`を再度呼んでも表示されなくなる」という、過剰表示を避けるための意図的な仕様がある（Google公式ドキュメントに記載）。ログアウト操作はこの内部抑制状態を一切リセットしないため、症状の「再クリックで反応しない」は`prompt()`の仕様通りの挙動であり、バグというよりAPI選定の誤りに起因する。
+
+### Google公式の推奨解決策（採用決定）
+
+`prompt()`（受動的・自動サジェスト前提の一時的UI）に依存するのではなく、`google.accounts.id.renderButton(container, options)`でGoogle公式ボタンをコンテナ要素内にその場で描画する方式に切り替える。ユーザーの能動的クリックを前提とした恒久的なボタンであり、クリックのたびに確実にアカウント選択ポップアップ（またはOne Tap相当のUI）が起動し、`prompt()`のような抑制ロジックの影響を受けない。
+
+ボタンの見た目がGoogle標準デザインに寄る（一部カスタマイズは可能だが完全な既存デザイン踏襲は不可）ことは許容済み。
+
+## 1. 設計方針
+
+### 1-1. HTML変更: `#google-login-btn`を空のコンテナ要素に置き換え
+
+```html
+<div id="login-section-logged-out" class="settings-item" style="padding:14px 18px;">
+  <div id="google-login-btn-container" style="display:flex;justify-content:center;width:100%;"></div>
+</div>
+```
+
+`onclick`属性・`<span data-i18n="loginWithGoogle">`（ボタン内テキスト）は撤去する。ボタンのラベル文言はGoogle側の`text`オプションが描画するため、既存の`data-i18n="loginWithGoogle"`キー・翻訳文字列は死にキーになるが、STRINGS定義自体は削除せず残置する。
+
+`#logout-btn`（ログアウトボタン）は自前ボタンのまま変更なし。
+
+### 1-2. JS変更: `_handleGoogleLoginWeb()`相当のロジックを`renderButton()`呼び出しに置き換え
+
+```javascript
+function _initGoogleButtonWeb() {
+  if (!window.google?.accounts?.id) return;
+  if (!_googleAuthInited) {
+    window.google.accounts.id.initialize({
+      client_id: _googleWebClientId,
+      callback: (response) => { _submitGoogleIdToken(response.credential); },
+    });
+    _googleAuthInited = true;
+  }
+  const container = document.getElementById('google-login-btn-container');
+  if (container && !container.dataset.rendered) {
+    window.google.accounts.id.renderButton(container, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text: 'signin_with',
+      shape: 'pill',
+      logo_alignment: 'left',
+      width: 280,
+    });
+    container.dataset.rendered = 'true';
+  }
+}
+```
+
+- `initialize()`自体・`_googleWebClientId`の取得（`GET /api/config`）ロジックは現行のまま流用する
+- `_initGoogleButtonWeb()`は「ページ初期化時に一度だけ、ログイン状態に関わらず呼んでおく」方式にする（ログイン中はコンテナごと`display:none`になるので、描画済みでも実害がない）。既存のアプリ起動時初期化フロー内（例: `refreshLoginUI()`が最初に呼ばれる箇所付近、または独立した初期化呼び出し）に追加する
+- `_googleWebClientId`が未取得の場合は`GET /api/config`を先に呼んで取得してから`renderButton()`を呼ぶガードを入れる（現行の`_handleGoogleLoginWeb()`冒頭のチェックと同等のロジックを踏襲）
+- `handleGoogleLoginClick()`のiOS分岐（`_handleGoogleLoginIOS()`）は無変更。Web版分岐は上記`_initGoogleButtonWeb()`に置き換わるため、`handleGoogleLoginClick()`関数自体はiOS専用に絞り込むか、Web版呼び出し時は何もしない（ボタンクリック自体をGoogleが処理するため）ように調整する
+
+### 1-3. `renderButton()`のオプション（3-3節、上記コード参照）
+
+`type:'standard'` `theme:'outline'` `size:'large'` `text:'signin_with'` `shape:'pill'` `logo_alignment:'left'` `width:280`。既存デザインに完全一致はしないが、pill形状・控えめなoutlineスタイルで可能な範囲で寄せる。
+
+### 1-4. onclick/touchendガードパターンの削除
+
+- `public/index.html` 305行目: `<button id="google-login-btn" onclick="...">`ごと撤去（1-1節のコンテナ`<div>`に置き換わるため自然に消える）
+- `public/app.js` 1938〜1955行目「設定画面 即時タップ対応」ブロック内、`if (e.target.closest('#google-login-btn')) { e.preventDefault(); handleGoogleLoginClick(); return; }`の行を削除する（`#google-login-btn`というID自体がDOM上から無くなるため）
+- `#logout-btn`側のonclick/touchendガードは変更不要（現状維持）
+
+### 1-5. ログアウト時の`disableAutoSelect()`追加
+
+`handleLogoutClick()`内、`clearAuthToken()`の前後に以下を追加する:
+
+```javascript
+window.google?.accounts?.id?.disableAutoSelect?.();
+```
+
+オプショナルチェイニングにより、GIS未ロード時・iOS環境実行時にエラーにならない（`window.google`が存在しない場合は単に何もしない）。
+
+### 1-6. ダークモード・言語切替への非追従（スコープ外として許容）
+
+`renderButton()`の`theme`オプションは初回描画時に固定され、ダークモード切替に自動追従しない。同様に、ボタンの表示言語もページ言語切替に自動追従しない。いずれも今回のスコープでは対応せず、許容する。
+
+## 2. 影響範囲・受け入れ基準
+
+### 正常系
+- Web版（PCブラウザ）: 設定画面「ログイン」セクションにGoogle公式デザインのボタンが表示され、クリックでGoogleアカウント選択ポップアップが起動し、サインインが完了すること
+- 同一ページをリロードせずに「ログイン→ログアウト→再度ログイン」を繰り返しても、2回目以降もボタンクリックでアカウント選択ポップアップが確実に起動すること（**今回の主目的、最重要の受け入れ基準**）
+- ログイン成功後、`#login-section-logged-out`が非表示・`#login-section-logged-in`が表示されること（`refreshLoginUI()`の既存ロジックを踏襲）
+- タッチ操作環境でもGoogle公式ボタンのタップでポップアップが起動すること
+- ログアウトボタン（自前ボタン）はPCブラウザ・タッチ環境の両方で従来通り動作すること（設計書38の修正がそのまま活きる）
+- 日英切り替え時、`#logout-btn`・「ログイン中」ラベルは従来通り正しく切り替わること
+
+### 失敗系・エッジケース
+- GIS SDKロード失敗時、`renderButton()`呼び出し自体がガードされコンテナが空のまま残ってもエラーにならないこと
+- `_googleWebClientId`未取得時は`renderButton()`を呼ばないこと
+- 設定画面を何度開いてもGoogleボタンが多重描画されないこと（`container.dataset.rendered`ガード）
+
+### iOS版への影響確認
+`_handleGoogleLoginIOS()`（Capacitorネイティブプラグイン経由）は今回の変更対象外。無変更であることを確認すること。
+
+## 3. 変更するファイル一覧
+- `public/index.html`: 305〜308行目のボタンをコンテナdivに置き換え
+- `public/app.js`: `_handleGoogleLoginWeb()`相当ロジックの置き換え、`handleGoogleLoginClick()`のWeb分岐調整、1938〜1955行目のtouchendブロックから該当行削除、`handleLogoutClick()`に`disableAutoSelect()`追加
+- `public/sw.js`: `CACHE_NAME`インクリメント（キャッシュバスティング、CLAUDE.md記載の既存運用パターン）
+- `public/index.html`: `app.js?v=...`のバージョンクエリ更新
+
+## 4. データモデル・APIの変更
+なし。認証フロー（`POST /api/auth/google`、JWT発行・`data/users.json`）は無変更。Web版フロントエンドのボタン描画方式のみが対象。
+
+## 承認状況
+2026-07-15 planner設計。2026-07-15 ユーザー承認済み（`disableAutoSelect()`追加含む）。

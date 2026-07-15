@@ -302,10 +302,7 @@
       <div class="settings-section-title" data-i18n="secLogin">ログイン</div>
 
       <div id="login-section-logged-out" class="settings-item" style="padding:14px 18px;">
-        <button id="google-login-btn" onclick="if(!_touchCapableDetected) handleGoogleLoginClick()"
-          style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;width:100%;justify-content:center;">
-          <span data-i18n="loginWithGoogle">Googleでログイン</span>
-        </button>
+        <div id="google-login-btn-container" style="display:flex;justify-content:center;width:100%;"></div>
       </div>
 
       <div id="login-section-logged-in" class="settings-item" style="padding:12px 18px;display:none;">
@@ -913,7 +910,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260715a"></script>
+  <script src="/app.js?v=20260715b"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
