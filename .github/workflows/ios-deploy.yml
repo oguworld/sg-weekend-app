@@ -57,6 +57,32 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist || \
           /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist
 
+      # Google Sign-In（@codetrix-studio/capacitor-google-auth）を実機で機能させるために必須。
+      # 認証フロー完了後にアプリへ復帰するためのURL Scheme（Reversed Client ID）を登録する（設計書41）。
+      # CFBundleURLTypesは配列の中に辞書、その中にさらに配列というネスト構造のため、
+      # 既存のPlistBuddy Add/Setパターンではなくplistlibで安全に追記する。
+      - name: Set Google Sign-In URL scheme in Info.plist
+        run: |
+          cd ios-app
+          python3 - <<'PYEOF'
+          import plistlib
+
+          plist_path = "ios/App/App/Info.plist"
+          reversed_client_id = "com.googleusercontent.apps.928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4"
+
+          with open(plist_path, "rb") as f:
+              plist = plistlib.load(f)
+
+          url_types = plist.get("CFBundleURLTypes", [])
+          url_types.append({"CFBundleURLSchemes": [reversed_client_id]})
+          plist["CFBundleURLTypes"] = url_types
+
+          with open(plist_path, "wb") as f:
+              plistlib.dump(plist, f)
+
+          print(f"CFBundleURLTypes now: {plist['CFBundleURLTypes']}")
+          PYEOF
+
       # 2026-07-11に一時無効化（Apple Developerアカウント法人審査完了待ちのため）していたが、
       # 2026-07-14 フェーズ0完了（APNs Auth Key発行・App ID(app.dosuru)のPush Notifications
       # capability有効化・配布用Provisioning Profile再生成・GitHub Secrets

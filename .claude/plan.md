@@ -4441,3 +4441,71 @@ window.google?.accounts?.id?.disableAutoSelect?.();
 
 ## 承認状況
 2026-07-15 planner設計。2026-07-15 ユーザー承認済み（`disableAutoSelect()`追加含む）。
+
+# 設計書41 — iOS版Google Sign-In用URL Scheme設定のCI追加
+
+## 0. 背景
+iOS版Google Sign-Inを実機で機能させるには、認証フロー完了後にアプリへ復帰するためのURL Scheme（Reversed Client ID）を`Info.plist`の`CFBundleURLTypes`に登録する必要がある。`@codetrix-studio/capacitor-google-auth`公式ドキュメント（GitHub: CodetrixStudio/CapacitorGoogleAuth）で、この手順が必須であることを確認済み:「Add identifier REVERSED_CLIENT_ID as URL schemes to Info.plist from iOS URL scheme」。
+
+Reversed Client ID: `com.googleusercontent.apps.928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4`
+
+## 1. 現状
+`.github/workflows/ios-deploy.yml`にはURL Scheme関連の設定が一切存在しない（0件）。既存のInfo.plist操作は3パターン（export compliance / status bar / camera usage description、40〜58行目）で、いずれも単純な文字列・真偽値の`Add`→失敗時`Set`フォールバック。`CFBundleURLTypes`は配列の中に辞書、その中にさらに配列というネスト構造のため、既存パターンをそのまま流用できない。
+
+`ios-app/capacitor.config.js`の`GoogleAuth.iosClientId`には実際のiOS用OAuthクライアントIDが2026-07-15付コメントとともに設定済みだが、未コミットの差分として残っている。これを今回のCI変更と合わせて1コミットにまとめる。
+
+## 2. 実装方針
+
+### 2-1. 追加位置
+`Sync Capacitor`ステップ（`npx cap sync ios`実行）の後、既存の3つのInfo.plist操作ステップの直後、`Create App.entitlements`ステップの直前に新規ステップ「Set Google Sign-In URL scheme in Info.plist」を追加する。
+
+### 2-2. 実装方式（堅牢性を優先）
+PlistBuddyの複数`Add`コマンド積み重ねは、既存の`CFBundleURLTypes`がある場合に壊れるリスクがあるため、Python3（macOS runner標準搭載）の`plistlib`モジュールを使い、既存の`CFBundleURLTypes`配列の有無を確認した上で安全に追記する方式を採用する。実装イメージ:
+
+```yaml
+- name: Set Google Sign-In URL scheme in Info.plist
+  run: |
+    cd ios-app
+    python3 - <<'PYEOF'
+    import plistlib
+
+    plist_path = "ios/App/App/Info.plist"
+    reversed_client_id = "com.googleusercontent.apps.928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4"
+
+    with open(plist_path, "rb") as f:
+        plist = plistlib.load(f)
+
+    url_types = plist.get("CFBundleURLTypes", [])
+    url_types.append({"CFBundleURLSchemes": [reversed_client_id]})
+    plist["CFBundleURLTypes"] = url_types
+
+    with open(plist_path, "wb") as f:
+        plistlib.dump(plist, f)
+
+    print(f"CFBundleURLTypes now: {plist['CFBundleURLTypes']}")
+    PYEOF
+```
+
+- 既存の`CFBundleURLTypes`があれば追記、無ければ新規作成という両対応になっている点が、素朴なPlistBuddy `Add`連打より堅牢
+- ステップ末尾で結果をprintし、CIログで確認できるようにする（既存の`cat`パターンと同等の目的）
+- builderはこの実装イメージをそのまま採用してよいが、Pythonのヒアドキュメント記法がYAML内で正しくエスケープされるか、実際にCI上でのテスト（少なくとも構文的な妥当性確認）を行うこと
+
+### 2-3. `ios-app/capacitor.config.js`の扱い
+既存の未コミット差分（`iosClientId`実値設定）を`git status`で確認し、意図した値であることを確認した上で、今回のCI変更と同一コミットにまとめる。
+
+## 3. 受け入れ基準
+- `.github/workflows/ios-deploy.yml`がYAML構文として正しいこと
+- 新規ステップが「Sync Capacitor」の後・既存Info.plist操作3ステップの後・「Create App.entitlements」の前に配置されていること
+- Pythonスクリプト部分が構文的に正しいこと（可能であればローカルで`python3 -c`相当の簡易チェック、または少なくとも目視レビュー）
+- `ios-app/capacitor.config.js`の`iosClientId`実値がコミットに含まれること
+
+## 4. 変更するファイル一覧
+- `.github/workflows/ios-deploy.yml`（新規ステップ追加）
+- `ios-app/capacitor.config.js`（既存の未コミット差分をコミット）
+- `.claude/plan.md`（本設計書追記）
+
+## 5. データモデル・APIの変更
+なし。
+
+## 承認状況
+2026-07-15 planner設計。2026-07-15 ユーザー承認済み。

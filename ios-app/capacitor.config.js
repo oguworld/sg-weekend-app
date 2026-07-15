@@ -24,10 +24,8 @@ const config = {
     GoogleAuth: {
       // scopes: 認証情報最小化方針（設計書35）により openid のみ要求（email/profileは要求しない）
       scopes: ['openid'],
-      // iosClientId: Google Cloud Consoleで発行するiOS用OAuthクライアントID（GOOGLE_IOS_CLIENT_ID相当）。
-      // 2026-07-14実装時点では未発行のためプレースホルダー。発行後、実際の値をここに設定すること
-      // （形式: "XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.apps.googleusercontent.com"）
-      iosClientId: 'REPLACE_WITH_YOUR_GOOGLE_IOS_CLIENT_ID',
+      // iosClientId: Google Cloud Consoleで発行したiOS用OAuthクライアントID（2026-07-15発行済み）
+      iosClientId: '928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4.apps.googleusercontent.com',
       grantOfflineAccess: false,
     },
   },
