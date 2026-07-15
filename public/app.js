@@ -464,15 +464,15 @@
         supportBtn: '$5 を贈る',
         scheduleMakePlan: '予定を立てる',
         courseCreateBtn: '🗺 コース作成',
-        secLogin: 'ログイン',
+        secLogin: 'アカウント連携',
         loginWithGoogle: 'Googleでログイン',
-        loginWithApple: 'Appleでログイン',
-        loginStatusGoogle: 'Googleでログイン中',
-        loginStatusApple: 'Appleでログイン中',
-        logoutBtn: 'ログアウト',
-        toastLoginSuccess: 'ログインしました',
-        toastLoginError: 'ログインに失敗しました。もう一度お試しください',
-        toastLogoutSuccess: 'ログアウトしました',
+        loginWithApple: 'Appleでサインイン',
+        loginStatusGoogle: 'Google連携中',
+        loginStatusApple: 'Apple連携中',
+        logoutBtn: '連携解除',
+        toastLoginSuccess: '連携しました',
+        toastLoginError: '連携に失敗しました。もう一度お試しください',
+        toastLogoutSuccess: '連携を解除しました',
       },
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
@@ -669,15 +669,15 @@
         supportBtn: 'Gift $5',
         scheduleMakePlan: 'Plan a trip',
         courseCreateBtn: '🗺 Course',
-        secLogin: 'Login',
+        secLogin: 'Link account',
         loginWithGoogle: 'Sign in with Google',
         loginWithApple: 'Sign in with Apple',
-        loginStatusGoogle: 'Signed in with Google',
-        loginStatusApple: 'Signed in with Apple',
-        logoutBtn: 'Log out',
-        toastLoginSuccess: 'Signed in',
-        toastLoginError: 'Sign-in failed. Please try again',
-        toastLogoutSuccess: 'Signed out',
+        loginStatusGoogle: 'Linked with Google',
+        loginStatusApple: 'Linked with Apple',
+        logoutBtn: 'Unlink',
+        toastLoginSuccess: 'Account linked',
+        toastLoginError: 'Linking failed. Please try again',
+        toastLogoutSuccess: 'Account unlinked',
       }
     };
 
@@ -2032,15 +2032,17 @@
       // 公式SDK描画用の空コンテナのため、iOS版では自前ボタンを動的に挿入する（設計書44、Googleボタン非表示バグの修正）
       const gc = document.getElementById('google-login-btn-container');
       if (gc) {
-        gc.innerHTML = `<button id="google-login-btn" onclick="if(!_touchCapableDetected) handleGoogleLoginClick()"
-          style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;width:100%;justify-content:center;">
+        // 公式4色「G」ロゴ（Google Branding Guidelines準拠、viewBox 0 0 48 48の4パス）をインライン埋め込み
+        gc.innerHTML = `<button id="google-login-btn" onclick="if(!_touchCapableDetected) handleGoogleLoginClick()" class="oauth-btn oauth-btn--google">
+          <svg class="oauth-btn__logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
           <span data-i18n="loginWithGoogle">${t('loginWithGoogle')}</span>
         </button>`;
       }
       const ac = document.getElementById('apple-login-btn-container');
       if (ac) {
-        ac.innerHTML = `<button id="apple-login-btn" onclick="if(!_touchCapableDetected) handleAppleLoginClick()"
-          style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;width:100%;justify-content:center;">
+        // 公式Appleロゴ（Sign in with Apple HIG準拠、fill白）をインライン埋め込み
+        ac.innerHTML = `<button id="apple-login-btn" onclick="if(!_touchCapableDetected) handleAppleLoginClick()" class="oauth-btn oauth-btn--apple">
+          <svg class="oauth-btn__logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#fff" d="M17.05 12.54c-.03-2.9 2.37-4.29 2.48-4.36-1.35-1.98-3.46-2.25-4.21-2.28-1.79-.18-3.5 1.05-4.41 1.05-.91 0-2.31-1.03-3.8-1-1.96.03-3.77 1.14-4.78 2.9-2.04 3.53-.52 8.76 1.46 11.62.97 1.4 2.12 2.97 3.63 2.91 1.46-.06 2.01-.94 3.77-.94 1.76 0 2.26.94 3.8.91 1.57-.03 2.56-1.42 3.52-2.83 1.11-1.62 1.57-3.19 1.59-3.27-.03-.02-3.05-1.17-3.08-4.64zM14.13 4.03c.81-.98 1.35-2.34 1.2-3.7-1.16.05-2.57.77-3.4 1.75-.75.86-1.4 2.25-1.23 3.58 1.29.1 2.62-.66 3.43-1.63z"/></svg>
           <span data-i18n="loginWithApple">${t('loginWithApple')}</span>
         </button>`;
       }

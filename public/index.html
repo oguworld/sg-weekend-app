@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260713h">
+  <link rel="stylesheet" href="/app.css?v=20260716a">
 </head>
 <body>
   </div>
@@ -302,7 +302,7 @@
 
     <!-- 2. ログイン（Google/Apple Sign-In、iOS/Web共通表示。設計書20/35/36/44） -->
     <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secLogin">ログイン</div>
+      <div class="settings-section-title" data-i18n="secLogin">アカウント連携</div>
 
       <div id="login-section-logged-out" class="settings-item" style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
         <div id="google-login-btn-container" style="display:flex;justify-content:center;width:100%;"></div>
@@ -315,7 +315,7 @@
         <span class="settings-item-label" id="login-status-label" data-i18n="loginStatusGoogle">Googleでログイン中</span>
         <button id="logout-btn" onclick="if(!_touchCapableDetected) handleLogoutClick()"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
-          <span data-i18n="logoutBtn">ログアウト</span>
+          <span data-i18n="logoutBtn">連携解除</span>
         </button>
       </div>
     </div>
@@ -916,7 +916,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260715c"></script>
+  <script src="/app.js?v=20260716a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

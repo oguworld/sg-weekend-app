@@ -2928,3 +2928,43 @@
       font-weight: 700;
     }
 
+
+    /* OAuthログインボタン（iOS版自前ボタン、設計書46）。公式ロゴ付き・ブランドガイドライン準拠 */
+    .oauth-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 11px 16px;
+      border-radius: 50px;
+      cursor: pointer;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.18s;
+    }
+    .oauth-btn__logo {
+      flex-shrink: 0;
+      display: block;
+    }
+    /* Google: 白背景・グレー枠（Google Branding Guidelines準拠） */
+    .oauth-btn--google {
+      background: #FFFFFF;
+      border: 1px solid #747775;
+      color: #1F1F1F;
+    }
+    .oauth-btn--google:active { background: #F2F2F2; }
+    .oauth-btn--google .oauth-btn__logo { width: 18px; height: 18px; }
+    /* Apple: 黒背景・白文字（Sign in with Apple HIG準拠） */
+    .oauth-btn--apple {
+      background: #000000;
+      border: 1px solid #000000;
+      color: #FFFFFF;
+    }
+    .oauth-btn--apple:active { background: #1a1a1a; }
+    .oauth-btn--apple .oauth-btn__logo { width: 16px; height: 16px; }
+    /* ダークモード: Appleボタン(黒)が背景と溶けないよう薄い枠を付与 */
+    html[data-theme="dark"] .oauth-btn--apple {
+      border: 1px solid rgba(255, 255, 255, 0.28);
+    }

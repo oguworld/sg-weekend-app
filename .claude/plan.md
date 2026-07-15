@@ -4916,3 +4916,67 @@ Error parsing provisioning profile at path '.../profile.mobileprovision' (Fastla
 
 ## 承認状況
 未承認（ユーザー承認待ち）。
+
+# 設計書46 — 設定画面ログインボタンのブランド化（iOS版Google/Apple公式ロゴ付与）＋「ログイン」文言の「アカウント連携」化
+
+## 1. 背景・目的
+設計書44までで、iOS版の設定画面に自前のGoogle/Appleログインボタンを実装した。しかし現状のiOS版ボタンは公式ロゴがなくテキストのみで、Google/Appleのブランドガイドラインに準拠していない（Web版は`renderButton()`/Apple公式ボタンを使うため準拠済み）。App Store審査・ブランド規約遵守のため、iOS版の自前ボタンにも公式ロゴを付与してブランド化する。
+
+あわせて、この認証機能はログイン（＝それだけでアプリが使える）ではなく、匿名でも使えるアプリに対する「アカウント連携（予定表データの同期・引き継ぎ用）」の位置づけであるため、UI文言を「ログイン」から「アカウント連携」に統一する。
+
+## 2. スコープ
+- 改善1: iOS版（`_isCapacitorApp`分岐）の自前Google/Appleボタンに公式ロゴのインラインSVGを付与し、ブランドガイドライン準拠の見た目にする
+- 改善2: i18n文言7キーを「連携」ベースに変更（ja/en同時）
+
+## 3. スコープ外
+- Web版のボタン（`renderButton()`・Apple公式ボタン）は無変更
+- 認証フロー・サーバーAPI・データ紐づけロジックは無変更
+- `loginWithGoogle`/`loginWithApple`（公式ロゴ使用時の承認文言）は据え置き
+
+## 4. 改善1: iOSボタンのブランド化
+`public/app.js`の`_isCapacitorApp` else分岐（現状2030〜2047行目付近）を、公式ロゴ入りに差し替える。
+- Googleボタン: 公式4色「G」ロゴのインラインSVG（`viewBox="0 0 48 48"`、青#4285F4/緑#34A853/黄#FBBC05/赤#EA4335の4パス）を左配置。白背景・グレー枠・pill・"Googleでログイン"。
+- Appleボタン: 公式AppleロゴのインラインSVG（`fill:#fff`）を左配置。黒背景(#000)・白文字・pill・"Appleでサインイン"。
+- `onclick`・`_touchCapableDetected`ガード・要素id（`#google-login-btn`/`#apple-login-btn`）・`data-i18n`構造は維持（設計書44のtouchendガードを壊さない）。
+- CSSは`public/app.css`に専用クラス（`.oauth-btn` `.oauth-btn--google` `.oauth-btn--apple` `.oauth-btn__logo`）を切り出す。ダークモード時、Appleボタン(黒)が背景と溶けないよう薄い枠を付与。
+- ロゴSVGはインライン埋め込み（外部URL参照にしない。オフライン対応）。
+
+## 5. 改善2: 文言の「アカウント連携」化
+### 5-1. i18n 7キー変更（ja/en同時）
+| キー | 新ja | 新en |
+|---|---|---|
+| `secLogin` | アカウント連携 | Link account |
+| `loginStatusGoogle` | Google連携中 | Linked with Google |
+| `loginStatusApple` | Apple連携中 | Linked with Apple |
+| `logoutBtn` | 連携解除 | Unlink |
+| `toastLoginSuccess` | 連携しました | Account linked |
+| `toastLogoutSuccess` | 連携を解除しました | Account unlinked |
+| `toastLoginError` | 連携に失敗しました。もう一度お試しください | Linking failed. Please try again |
+
+### 5-2. 据え置きキー
+`loginWithGoogle`（Googleでログイン）・`loginWithApple`は公式ロゴ承認文言のため据え置き。ただし`loginWithApple`のjaは「Appleでサインイン」に整える（Apple公式ローカライズ表記、審査で安全）。
+
+### 5-3. index.htmlのデフォルト直書き
+`data-i18n="secLogin"`（>ログイン<→>アカウント連携<）・`data-i18n="logoutBtn"`（>ログアウト<→>連携解除<）を更新（英語モード初期表示前のちらつき防止）。
+
+## 6. キャッシュバスティング
+`public/index.html`の`app.js?v=`・`app.css?v=`を更新、`public/sw.js`の`CACHE_NAME`をインクリメント。
+
+## 7. 変更ファイル
+- `public/app.js`（iOSボタン差し替え・i18n 7キー・loginWithApple ja）
+- `public/app.css`（`.oauth-btn`系クラス追加）
+- `public/index.html`（data-i18nデフォルト直書き・バージョンクエリ2つ）
+- `public/sw.js`（CACHE_NAME）
+
+## 8. 受け入れ基準
+- iOS版ボタンに公式ロゴが表示され、ブランドガイドライン準拠になる
+- 文言が「アカウント連携」系に変わる（ja/en両方）
+- `node --check public/app.js`が通る
+- Web版ボタンは無変更
+
+## 9. リスク・注意
+- ダークモードでAppleボタン(黒)が背景と溶けないか実機確認が必要（薄枠で簡易対応）
+- iOSボタンの見た目・タップ挙動は次回TestFlightビルドで実機確認
+
+## 10. 承認状況
+2026-07-16 ユーザー承認済み。英語表記はLink account系で確定。
