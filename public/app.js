@@ -2993,6 +2993,7 @@
       if (_nativePushListenersBound) return;
       _nativePushListenersBound = true;
       plugin.addListener('registration', (token) => {
+        _sendDebugLog('push_registration_event', { tokenLength: token?.value?.length });
         _nativeDeviceToken = token.value;
         _nativePushDenied = false;
         localStorage.setItem('app_ios_push_token', token.value);
@@ -3005,7 +3006,8 @@
         _nativePushRegisterIntent = null;
         _updatePushBtn();
       });
-      plugin.addListener('registrationError', () => {
+      plugin.addListener('registrationError', (error) => {
+        _sendDebugLog('push_registration_error_event', { err: JSON.stringify(error) });
         if (_nativePushRegisterIntent === 'toggle-on') showToast(t('toastPushError'));
         _nativePushRegisterIntent = null;
         _updatePushBtn();
@@ -3052,6 +3054,7 @@
 
     async function _toggleNativePush() {
       const plugin = _getCapPushPlugin();
+      _sendDebugLog('push_toggle_start', { hasToken: !!_nativeDeviceToken, pluginExists: !!plugin });
       if (!plugin) { showToast(t('toastPushError')); return; }
       _bindNativePushListenersOnce(plugin);
       try {
@@ -3069,12 +3072,15 @@
             const req = await plugin.requestPermissions();
             perm = req.receive;
           }
+          _sendDebugLog('push_perm_result', { perm });
           _nativePushDenied = perm === 'denied';
           if (perm !== 'granted') { showToast(t('toastPushDenied')); _updatePushBtn(); return; }
           _nativePushRegisterIntent = 'toggle-on';
+          _sendDebugLog('push_register_call', {});
           await plugin.register();
         }
       } catch (e) {
+        _sendDebugLog('push_toggle_exception', { err: String(e) });
         showToast(t('toastPushError'));
       }
       _updatePushBtn();
