@@ -5369,3 +5369,79 @@ iOS版（Capacitor/TestFlight）で設定画面の「プッシュ通知」トグ
 ## 再発防止策
 - 設計書49のTDZ教訓（起動時IIFE・初期化フローで参照する`let`/`const`は宣言が参照より前か`grep -n`で確認）を、**同一関数内の同期呼び出しチェーンにも適用する**。今回は`initPushState()`→`_initNativePush()`→`_getCapPushPlugin()`という**関数呼び出しを跨いだ同期参照**で、直接の参照行だけ見ると気づきにくかった。起動時に呼ばれる関数から辿れる全ての同期参照変数（呼び出し先の関数本体で参照される`let`含む）を洗い出し、宣言位置を確認すること。
 - TDZ移動は「参照される変数を1つ移したら、同じ起動時経路で参照される兄弟変数（今回の`_CapPush`/`_nativePushDenied`のように隣接宣言されているもの）も一緒に移せているか」を必ずセットで確認する。設計書50は`_nativeDeviceToken`だけ移して隣の`_nativePushDenied`/`_CapPush`を残したのが直接の見落とし。
+
+
+# 設計書52 — iOS版「プッシュ通知」トグルをOFFにして再起動すると勝手にON表示に戻る不具合の修正（ユーザー意思フラグの永続化）
+
+## ステータス/承認状況
+2026-07-16 ユーザー承認済み。
+
+## 問題
+設計書50/51でプッシュトークン（`app_ios_push_token`）のPreferences永続化＋起動時自己回復（`_initNativePush()`でpermission=grantedなら`plugin.register()`を呼んでトークンを再取得しON表示に戻す）を実装した。これにより「ONにしたユーザーが再起動してもON表示が維持される」問題は解決した。
+
+しかし副作用として、**ユーザーが明示的にトグルをOFFにしても、アプリ完全終了→再起動すると勝手にON表示に戻る**不具合が生まれた。理由: 一度でも通知許可を与えた端末は`permission.receive === 'granted'`のままであり、`_initNativePush()`の起動時自己回復ロジックが「grantedなら無条件にregister()」してトークンを再取得してしまうため。OS許可の有無（granted/denied）と、アプリ内トグルでのユーザーのON/OFF意思は別物なのに、前者だけで起動時挙動を決めていた。
+
+## 原因
+起動時自己回復の判定が`permStatus.receive === 'granted'`のみで、**ユーザーがアプリ内トグルで表明したON/OFF意思を記録・参照していなかった**。OFFにしてもトークン削除は行われるが「OFFにしたい」という意思自体はどこにも永続化されず、次回起動時に許可granted判定だけで再ONされていた。
+
+## 修正方針
+アプリ内トグルのON/OFF操作時に「ユーザーの意思」を専用フラグ`app_push_enabled`（`'true'`/`'false'`）としてlocalStorage＋Preferences（`_CapPrefs`ハイブリッド、設計書49/50と同型）に永続化する。起動時`_initNativePush()`は、このフラグを読んで「ユーザーがONを望んでいる場合のみ」`register()`する。OFF意思なら`granted`でもregister()せず`_nativeDeviceToken=null`のままOFF表示を維持する。
+
+- **意思フラグ未設定（`null`）時の後方互換**: 設計書52より前からのONユーザーはこのフラグを持たない。`null`かつトークンありなら「以前ONだった」とみなしON扱い（`wantOn = (pushIntent==='true') || (pushIntent===null && !!_nativeDeviceToken)`）。これにより既存ONユーザーが勝手にOFFにされることはない。
+- 新規モジュールスコープ変数は追加しない（設計書49/50/51のTDZ教訓）。`_setPushIntent`は関数宣言（巻き上げ）、`pushIntent`は`_initNativePush`内ローカル変数のみ。
+
+## public/app.js 具体的変更内容
+
+### A) 意思フラグ保存ヘルパー `_setPushIntent(enabled)` を新規追加（PUSHセクション内）
+```javascript
+function _setPushIntent(enabled) {
+  try { localStorage.setItem('app_push_enabled', enabled ? 'true' : 'false'); } catch (_) {}
+  if (_CapPrefs) _CapPrefs.set({ key: 'app_push_enabled', value: enabled ? 'true' : 'false' }).catch(() => {});
+}
+```
+
+### B) 保存タイミング
+- **ON成功時**: `_bindNativePushListenersOnce()`の`registration`リスナー内（トークンセット・Preferencesトークン保存に続けて）`_setPushIntent(true)`。ON確定の共通合流点（`toggle-on`/`init`両方をカバー。OFF意思時は起動時register()を呼ばない設計なので`init`起因のregistrationはON意思時のみ発火し矛盾しない）。
+- **OFF時**: `_toggleNativePush()`のOFF処理（トークン削除・localStorage/Preferences削除・`DELETE`の並び）に`_setPushIntent(false)`。
+
+### C) 起動時ロジック `_initNativePush()` の意思フラグ制御
+Preferencesトークン復元と同じ`_initNativePush`内で逐次await（同時並行にしない）で意思フラグを読む。
+```javascript
+let pushIntent = null; // 'true' | 'false' | null
+if (_CapPrefs) {
+  try {
+    const ri = await _CapPrefs.get({ key: 'app_push_enabled' });
+    pushIntent = (ri && typeof ri.value === 'string') ? ri.value : null;
+  } catch (_) {}
+}
+if (pushIntent === null) { try { pushIntent = localStorage.getItem('app_push_enabled'); } catch (_) {} }
+```
+- 意思フラグ読み出しをトークン復元より前に置き、トークン復元ブロック先頭に「`pushIntent === 'false'`ならトークン復元しない」ガードを入れる。
+- perm判定ブロック:
+```javascript
+_nativePushDenied = permStatus.receive === 'denied';
+const wantOn = (pushIntent === 'true') || (pushIntent === null && !!_nativeDeviceToken);
+if (permStatus.receive === 'granted' && wantOn) {
+  _nativePushRegisterIntent = 'init';
+  await plugin.register();
+} else {
+  _nativeDeviceToken = null;
+}
+```
+
+### D) 変更しないもの
+`_updatePushBtn()`のON判定、`_registerNativePushToken`/`_deregisterNativePushToken`、Web版`togglePush()`/`_pushSubscription`系、設計書49のJWT永続化、設計書50/51のトークン永続化・TDZ移動（`_nativeDeviceToken`/`_CapPrefs`/`_CapPush`/`_nativePushDenied`の宣言位置）。
+
+### E) 計装
+`push_init_start`のdataに`intent: pushIntent`を追加（使い捨て、他の`push_init_*`とまとめて後で削除）。
+
+## キャッシュバスティング
+`public/index.html`の`app.js?v=20260716h`、`public/sw.js`の`CACHE_NAME='sg-weekend-v618'`。
+
+## 検証
+- `node --check public/app.js`。node最小再現でpushIntentが`null`/`'false'`/`'true'`の各ケースで`wantOn`が期待通り（null&トークンなし→false、null&トークンあり→true、`'false'`→false、`'true'`→true）。
+- 次ビルドの実機ログ（`logs/debug-nav.log`）でOFF回に`push_init_register_call`が出ず、ON回に出ることを確認。OFF→完全終了→再起動でOFF維持、ON→再起動でON維持、既存ONユーザーがOFFにされないこと。
+
+## 再発防止策
+- OS許可状態（granted/denied）とアプリ内トグルのユーザー意思（ON/OFF）は別軸として扱う。「許可があるから自動でON」ではなく「ユーザーがONを望んだか」を永続化して起動時挙動を決める。
+- 「自己回復」系ロジックを追加する際は、ユーザーの明示的な逆操作（OFFにした等）を上書きしないか必ず確認する。

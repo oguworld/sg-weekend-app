@@ -275,6 +275,14 @@ iOS版で「プッシュ通知」トグルをONにしても権限許可後に通
 - 設計書45の計装6ポイント（`public/app.js`の`push_registration_event`/`push_registration_error_event`/`push_toggle_start`/`push_perm_result`/`push_register_call`/`push_toggle_exception`）は削除せず残置。次ビルドの診断ダンプと`logs/debug-nav.log`を突き合わせて原因を確定する。
 - **未確認（次回フォロー）**: 次回TestFlightビルドのCIログで`AppDelegate.swift`ダンプ結果とブリッジメソッド有無を確認、実機でトグル操作 → `logs/debug-nav.log`で`push_registration_event`記録を確認。
 
+### プッシュ通知トグルの永続化（トークン: 設計書50/51、ユーザー意思: 設計書52）
+- **プッシュトークンのPreferences永続化（設計書50、TDZ修正が設計書51）**: プッシュトークン（`app_ios_push_token`）はlocalStorage単独だとiOS WKWebViewのアプリ完全終了→再起動で揮発することがあり（設計書49のJWTと同型）、トグルがOFF表示に戻る不具合があった。`_CapPrefs`（`@capacitor/preferences`）へミラー保存し`_initNativePush()`冒頭で復元する方式で恒久修正。起動時permission=grantedなら`plugin.register()`でトークン再取得（自己回復）。設計書51で`_CapPush`/`_nativePushDenied`の宣言がTDZになっていた（初期化フローより後に宣言）のを`_nativeDeviceToken`/`_CapPrefs`同様に`loadEventData()`直前へ移動して修正。
+- **ユーザーON/OFF意思の永続化（設計書52、2026-07-16）**: 上記の起動時自己回復が「permission=grantedなら無条件にregister()」だったため、ユーザーが明示的にトグルをOFFにしても再起動で勝手にON表示に戻る副作用があった。OS許可（granted/denied）とアプリ内トグルのユーザー意思（ON/OFF）は別軸として扱うべきだったのが原因。
+  - `app_push_enabled`フラグ（`'true'`/`'false'`）を`_setPushIntent(enabled)`ヘルパーでlocalStorage＋Preferencesハイブリッド保存する。ON確定の共通合流点（`registration`リスナー内）で`_setPushIntent(true)`、`_toggleNativePush()`のOFF処理で`_setPushIntent(false)`。
+  - `_initNativePush()`は起動時に`app_push_enabled`を復元（Preferences優先→localStorageフォールバック、逐次await）。OFF意思（`'false'`）ならトークン復元自体をスキップ。register判定は`const wantOn = (pushIntent === 'true') || (pushIntent === null && !!_nativeDeviceToken)`で、`granted && wantOn`のときのみregister()し、そうでなければ`_nativeDeviceToken = null`でOFF表示に統一する。
+  - **後方互換**: 意思フラグ未設定（`null`）でトークンありなら「以前ON」とみなしON扱い。設計書52以前からのONユーザーが勝手にOFFにされることはない。
+  - 新規モジュールスコープ変数は追加していない（`_setPushIntent`は関数宣言で巻き上げ、`pushIntent`は`_initNativePush`内ローカル変数。設計書49/50/51のTDZ教訓に従う）。`_updatePushBtn()`のON判定・Web版`togglePush()`/`_pushSubscription`系・設計書49のJWT永続化は無変更。
+
 ## ジャンル・興味機能（2026-07-02実装、おすすめモード周りは2026-07-11刷新）
 - ジャンルマスター: GENRE_LIST 定数（13種）。id / emoji / label を持つ
 - ユーザー設定: localStorage `app_genres`（選択ジャンルIDの配列）

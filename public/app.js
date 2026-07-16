@@ -3084,6 +3084,12 @@
 
     let _nativePushListenersBound = false;
     let _nativePushRegisterIntent = null; // 'init' | 'toggle-on' | null（registrationイベント発火時にどちらの操作起因かを判別）
+    // ユーザーがアプリ内トグルで表明したON/OFF意思を永続化（OS許可granted/deniedとは別軸。設計書52）。
+    // localStorage＋Preferences（_CapPrefs）ハイブリッド。起動時_initNativePush()がこれを見てregister要否を決める。
+    function _setPushIntent(enabled) {
+      try { localStorage.setItem('app_push_enabled', enabled ? 'true' : 'false'); } catch (_) {}
+      if (_CapPrefs) _CapPrefs.set({ key: 'app_push_enabled', value: enabled ? 'true' : 'false' }).catch(() => {});
+    }
     function _bindNativePushListenersOnce(plugin) {
       if (_nativePushListenersBound) return;
       _nativePushListenersBound = true;
@@ -3094,6 +3100,7 @@
         localStorage.setItem('app_ios_push_token', token.value);
         // Preferences（ネイティブ永続領域）へもミラー保存（localStorage揮発対策・設計書50）
         if (_CapPrefs) _CapPrefs.set({ key: 'app_ios_push_token', value: token.value }).catch(() => {});
+        _setPushIntent(true); // ON確定の共通合流点（toggle-on/init両方をカバー・設計書52）
         _registerNativePushToken(token.value);
         if (_nativePushRegisterIntent === 'toggle-on') {
           const gid = getSharedGroupId();
@@ -3133,8 +3140,19 @@
     async function _initNativePush() {
       const item = document.getElementById('push-setting-item');
       const plugin = _getCapPushPlugin();
-      // Preferencesからトークン復元（localStorage揮発対策、設計書49と同型・設計書50）
+      // ユーザーのON/OFF意思フラグを復元（Preferences優先→localStorageフォールバック。逐次await・設計書52）。
+      // トークン復元より前に読む（OFF意思なら復元・register自体を抑止するため）。
+      let pushIntent = null; // 'true' | 'false' | null（未設定）
       if (_CapPrefs) {
+        try {
+          const ri = await _CapPrefs.get({ key: 'app_push_enabled' });
+          pushIntent = (ri && typeof ri.value === 'string') ? ri.value : null;
+        } catch (_) {}
+      }
+      if (pushIntent === null) { try { pushIntent = localStorage.getItem('app_push_enabled'); } catch (_) {} }
+      // Preferencesからトークン復元（localStorage揮発対策、設計書49と同型・設計書50）。
+      // ただしOFF意思（pushIntent==='false'）なら復元しない（起動時にON表示へ戻さない・設計書52）。
+      if (pushIntent !== 'false' && _CapPrefs) {
         try {
           const r = await _CapPrefs.get({ key: 'app_ios_push_token' });
           const prefsToken = (r && typeof r.value === 'string' && r.value) ? r.value : null;
@@ -3147,7 +3165,7 @@
           }
         } catch (_) {}
       }
-      _sendDebugLog('push_init_start', { pluginExists: !!plugin, hasToken: !!_nativeDeviceToken }); // 一時計装（原因確定後に削除）
+      _sendDebugLog('push_init_start', { pluginExists: !!plugin, hasToken: !!_nativeDeviceToken, intent: pushIntent }); // 一時計装（原因確定後に削除）
       _updatePushBtn(); // 復元したトークンでON表示を即反映（プラグイン未取得でも維持）
       if (!plugin) { if (item) item.style.display = 'none'; return; }
       _bindNativePushListenersOnce(plugin);
@@ -3155,12 +3173,15 @@
         const permStatus = await plugin.checkPermissions();
         _sendDebugLog('push_init_perm', { perm: permStatus.receive }); // 一時計装（原因確定後に削除）
         _nativePushDenied = permStatus.receive === 'denied';
-        if (permStatus.receive === 'granted') {
+        // OS許可granted かつ ユーザーがONを望んでいる場合のみ register()（設計書52）。
+        // 後方互換: 意思フラグ未設定（null）でもトークンがあれば以前ONとみなす。
+        const wantOn = (pushIntent === 'true') || (pushIntent === null && !!_nativeDeviceToken);
+        if (permStatus.receive === 'granted' && wantOn) {
           _nativePushRegisterIntent = 'init';
           _sendDebugLog('push_init_register_call', {}); // 一時計装（原因確定後に削除）
           await plugin.register();
         } else {
-          // 未許可 or 拒否済み。トグルOFF表示のまま、次回togglePush()で許可ダイアログを出す
+          // 未許可 or 拒否済み or OFF意思。起動時registerせず、OFF表示に統一
           _nativeDeviceToken = null;
         }
       } catch (e) { _sendDebugLog('push_init_exception', { err: String(e) }); } // 一時計装（原因確定後に削除）
@@ -3180,6 +3201,7 @@
           _nativeDeviceToken = null;
           localStorage.removeItem('app_ios_push_token');
           if (_CapPrefs) _CapPrefs.remove({ key: 'app_ios_push_token' }).catch(() => {}); // Preferencesからも削除（設計書50）
+          _setPushIntent(false); // OFF意思を永続化。起動時自己回復で勝手にON表示に戻るのを防ぐ（設計書52）
           showToast(t('toastPushOff'));
         } else {
           const permStatus = await plugin.checkPermissions();
