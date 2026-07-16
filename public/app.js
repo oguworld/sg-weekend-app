@@ -2014,7 +2014,36 @@
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
-    refreshLoginUI();
+    // JWTトークンの初期化（設計書49）。iOS版は @capacitor/preferences から読み出し、
+    // 読み出し完了「後」に refreshLoginUI() を呼ぶ（同期 localStorage が空でも連携中を維持するため）。
+    (async function _initAuthToken() {
+      try {
+        if (_CapPrefs) {
+          let prefsToken = null;
+          try {
+            const r = await _CapPrefs.get({ key: AUTH_TOKEN_KEY });
+            prefsToken = (r && typeof r.value === 'string') ? r.value : null;
+          } catch (_) {}
+          if (prefsToken) {
+            _authTokenCache = prefsToken;
+            try { localStorage.setItem(AUTH_TOKEN_KEY, prefsToken); } catch (_) {} // localStorageミラー
+          } else {
+            // Preferencesに無くlocalStorageにある場合（旧バージョンからの移行）はPreferencesへ書き込む
+            const lsToken = localStorage.getItem(AUTH_TOKEN_KEY);
+            _authTokenCache = lsToken;
+            if (lsToken) _CapPrefs.set({ key: AUTH_TOKEN_KEY, value: lsToken }).catch(() => {});
+          }
+        } else {
+          // Web版 or プラグイン取得失敗: 従来通り localStorage をキャッシュへ
+          _authTokenCache = localStorage.getItem(AUTH_TOKEN_KEY);
+        }
+      } catch (_) {
+        _authTokenCache = localStorage.getItem(AUTH_TOKEN_KEY);
+      }
+      _prefsReady = true;
+      _sendDebugLog('auth_prefs_init', { hasPrefs: !!_CapPrefs, hasToken: !!_authTokenCache }); // 一時計装（原因確定後に削除）
+      refreshLoginUI();
+    })();
     // Web版: Google/Apple公式ログインボタンを描画。各SDKは<script async>読み込みのため
     // 未ロードの場合に備えて一定回数リトライする（iOS版はネイティブフローのため対象外、下記else分岐で自前ボタンを挿入する）。
     if (!_isCapacitorApp) {
@@ -2458,14 +2487,36 @@
     let _appleRedirectUri = null; // GET /api/config で起動時に取得（Web版のredirectURI）
     let _appleAuthInited = false; // Web版のみ、AppleID.auth.init()を一度だけ行うためのフラグ
 
+    // JWT保存: iOS版はlocalStorage単独だとWKWebView再起動で消えることがあるため、
+    // @capacitor/preferences（ネイティブ永続領域）をソースオブトゥルースにするハイブリッド方式（設計書49）。
+    // localStorage はミラー、_authTokenCache は getAuthToken() を同期のまま維持するための同期読み取り元。
+    let _authTokenCache = null;        // getAuthToken() が同期で返す唯一の読み取り元
+    let _prefsReady = false;           // 起動時 Preferences 読み出しが完了したか（診断用）
+    let _CapPrefs = null;              // @capacitor/preferences プラグイン（iOS版のみ非null想定）
+    if (_isCapacitorApp) {
+      try {
+        if (window.Capacitor?.registerPlugin) _CapPrefs = window.Capacitor.registerPlugin('Preferences');
+      } catch (_) {}
+      if (!_CapPrefs) _CapPrefs = window.Capacitor?.Plugins?.Preferences || null;
+    }
+
     function getAuthToken() {
+      if (_authTokenCache !== null) return _authTokenCache;
       return localStorage.getItem(AUTH_TOKEN_KEY);
     }
     function setAuthToken(token) {
-      localStorage.setItem(AUTH_TOKEN_KEY, token);
+      _authTokenCache = token;
+      try { localStorage.setItem(AUTH_TOKEN_KEY, token); } catch (_) {}
+      if (_CapPrefs) {
+        _CapPrefs.set({ key: AUTH_TOKEN_KEY, value: token }).catch(() => {});
+      }
     }
     function clearAuthToken() {
-      localStorage.removeItem(AUTH_TOKEN_KEY);
+      _authTokenCache = null;
+      try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (_) {}
+      if (_CapPrefs) {
+        _CapPrefs.remove({ key: AUTH_TOKEN_KEY }).catch(() => {});
+      }
     }
 
     // Authorizationヘッダーを自動付与するfetchヘルパー（未ログイン時は通常のfetchと同じ挙動）

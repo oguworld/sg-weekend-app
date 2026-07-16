@@ -195,6 +195,13 @@ sg-weekend-app/
   - **課題2（再起動で連携が切れる不具合の対策）**: `refreshLoginUI()`（`public/app.js`）は従来`GET /api/auth/me`が`!res.ok`またはfetch例外のとき無条件で`clearAuthToken()`していた。iOS版は起動直後にネットワーク未確立・サーバー一時エラー（500系）・タイムアウトが起きやすく、有効なトークンでも「連携が切れた」ように見えて破棄していた（実質ログアウト）。**`res.status === 401`（明確な失効）のときのみ`clearAuthToken()`**し、それ以外（500系など`!res.ok`）と`catch`（通信エラー）ではトークンを保持して`_showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl)`で「連携中」の楽観的表示を維持する。楽観的表示ではproviderが不明なためラベルは既存の`loginStatusGoogle`を汎用流用（新規i18nキーは追加せず）。provider確定は正常時（`res.ok`）経路のみ`data.provider`から正確に更新。**`@capacitor/preferences`へのトークン移行はスコープ外**（設計書48・課題2-2、まずcatch/status修正のみで様子見。localStorage方式のまま）
   - **課題3（連携解除の確認ダイアログ）**: `handleLogoutClick()`先頭に`if (!confirm(t('confirmLogout'))) return;`を追加。誤タップでの即解除を防止。i18n新規キー`confirmLogout`をja（`アカウント連携を解除しますか？`）/en（`Disconnect your linked account?`）に同時追加
   - **未検証（次回フォロー）**: 実機（TestFlight）で「連携後にアプリ再起動して連携が維持されるか」「連携解除の確認ダイアログが出るか」の確認が必要
+- **2026-07-16修正（設計書49）: JWT保存を`@capacitor/preferences`ハイブリッド方式に変更（再起動で連携が切れる根本解決）**
+  - 設計書48の課題2は「有効なトークンを一時通信エラーで破棄しない」対策だったが、**トークン自体がiOS版WKWebViewの再起動でlocalStorageから消える**ケースには効かなかった。そのためJWTの保存先を`@capacitor/preferences`（iOSネイティブの`UserDefaults`にマップされる永続領域）をソースオブトゥルースとする**ハイブリッド方式**に変更した（`public/app.js`のトークン操作4関数＋起動時初期化のみ。`server.js`無変更＝pm2再起動不要）
+  - 3層構造: `_authTokenCache`（JSモジュールスコープ変数、`getAuthToken()`を**同期のまま維持**するための同期読み取り元）／ `localStorage`（ミラー・Web版の主保存先）／ `@capacitor/preferences`（iOS版のソースオブトゥルース、非同期API）。`getAuthToken()`はキャッシュ優先→localStorageフォールバックの同期関数（`authedFetch()`の既存シグネチャを壊さない）。`setAuthToken`/`clearAuthToken`はキャッシュ・localStorageを即時更新し、Preferences書き込みはfire-and-forget（`.catch(()=>{})`、awaitしない）
+  - プラグイン取得は`registerPlugin('Preferences')`優先→`window.Capacitor.Plugins.Preferences`フォールバックの防御的実装（Keyboard/PushNotifications既存パターン踏襲）。`_CapPrefs`は`_isCapacitorApp`時のみ非null。Web版は`_CapPrefs===null`で従来通りlocalStorage単独動作（挙動不変）
+  - 起動時初期化 `_initAuthToken`（非同期IIFE、旧同期`refreshLoginUI()`呼び出しを置換）: iOS版は`await _CapPrefs.get({key})`でトークン読み出し→`_authTokenCache`セット＋localStorageミラー。Preferencesに無くlocalStorageにあれば（旧バージョン移行）Preferencesへ書き込む。**Preferences読み出し完了「後」に`refreshLoginUI()`を呼ぶことが必須**（非同期のため同期で先に呼ぶとキャッシュ未初期化で匿名表示になる）。`ios-app/package.json`に`@capacitor/preferences@^6.0.0`追加
+  - 一時計装`_sendDebugLog('auth_prefs_init', { hasPrefs, hasToken })`を`_initAuthToken`末尾に埋め込み済み。**原因確定後に削除する使い捨て**（`.claude/next.md`参照）
+  - **未検証（次回フォロー）**: 実機（TestFlight）で「連携→アプリ完全終了→再起動して連携が維持されるか」、`logs/debug-nav.log`の`auth_prefs_init`で`hasPrefs:true`かつ再起動後も`hasToken:true`（Preferences永続化が機能しているか）の確認が必要
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み

@@ -5132,3 +5132,131 @@ iOS版（TestFlight）ユーザーとして、以下3点を改善したい。
 
 ## 承認状況
 2026-07-16 ユーザー承認済み。
+
+# 設計書49 — iOS版アカウント連携が再起動で切れる根本解決（`@capacitor/preferences`ハイブリッド保存方式でJWTを永続化）
+
+## 背景・問題
+設計書48で「アカウント連携が再起動で切れる」問題に対し、`refreshLoginUI()`が401以外の失敗（通信エラー・500系）でトークンを破棄しないよう楽観的維持へ変更した。これは「有効なトークンを持っているのに一時的な通信失敗で連携表示が消える」ケースには有効だが、**トークンそのものがiOS版WKWebViewの再起動でlocalStorageから消えている**ケースには効かない。
+
+iOS版（Capacitor/WKWebView）では、`localStorage`はネイティブアプリのデータクリア・OSによるWebViewストレージのパージ・iOS更新時などで消失することがある。JWTは`localStorage`（キー`app_auth_token`）にのみ保存されているため、消えると次回起動時に`getAuthToken()`が`null`を返し、`refreshLoginUI()`が匿名表示（未連携）になり、ユーザーには「勝手にログアウトされた」ように見える。
+
+## 方針
+JWTの保存先を`@capacitor/preferences`（iOSネイティブの`UserDefaults`にマップされる永続領域）をソースオブトゥルースとする**ハイブリッド方式**に変更する。
+
+- `@capacitor/preferences`: iOSネイティブの永続領域。WKWebViewの再起動・ストレージパージの影響を受けにくい。**非同期API**（`get`/`set`/`remove`が全てPromise）
+- `localStorage`: ミラー（後方互換・Web版の主保存先）
+- `_authTokenCache`（JSモジュールスコープ変数）: `getAuthToken()`を**同期のまま維持**するための同期読み取り元。`authedFetch()`が同期的にトークンを読む既存シグネチャを壊さないために必須
+
+Web版（`_CapPrefs === null`）は従来通り`localStorage`単独で動作し、挙動は一切変わらない。
+
+## 各関数の Before / After
+
+### `getAuthToken()`（同期シグネチャ維持が最重要）
+Before:
+```javascript
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+```
+After:
+```javascript
+function getAuthToken() {
+  if (_authTokenCache !== null) return _authTokenCache;
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+```
+キャッシュが埋まっていればキャッシュを、まだ初期化前（`null`）ならlocalStorageをフォールバックで返す。同期のまま。
+
+### `setAuthToken(token)`
+After:
+```javascript
+function setAuthToken(token) {
+  _authTokenCache = token;
+  try { localStorage.setItem(AUTH_TOKEN_KEY, token); } catch (_) {}
+  if (_CapPrefs) {
+    _CapPrefs.set({ key: AUTH_TOKEN_KEY, value: token }).catch(() => {});
+  }
+}
+```
+キャッシュ・localStorageを即時更新し、Preferences書き込みはfire-and-forget（awaitしない）。
+
+### `clearAuthToken()`
+After:
+```javascript
+function clearAuthToken() {
+  _authTokenCache = null;
+  try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (_) {}
+  if (_CapPrefs) {
+    _CapPrefs.remove({ key: AUTH_TOKEN_KEY }).catch(() => {});
+  }
+}
+```
+
+### 定数直後に追加するプラグイン取得
+```javascript
+let _authTokenCache = null;
+let _prefsReady = false;
+let _CapPrefs = null;
+if (_isCapacitorApp) {
+  try {
+    if (window.Capacitor?.registerPlugin) _CapPrefs = window.Capacitor.registerPlugin('Preferences');
+  } catch (_) {}
+  if (!_CapPrefs) _CapPrefs = window.Capacitor?.Plugins?.Preferences || null;
+}
+```
+`registerPlugin`優先→`Plugins`フォールバックの防御的実装（CLAUDE.mdのKeyboard/PushNotifications既存パターン踏襲）。
+
+## 起動時初期化 — Preferences読み出し完了「後」に refreshLoginUI()
+現状の同期`refreshLoginUI();`（初期化フロー内）を、以下の非同期IIFEに置き換える:
+```javascript
+(async function _initAuthToken() {
+  try {
+    if (_CapPrefs) {
+      let prefsToken = null;
+      try {
+        const r = await _CapPrefs.get({ key: AUTH_TOKEN_KEY });
+        prefsToken = (r && typeof r.value === 'string') ? r.value : null;
+      } catch (_) {}
+      if (prefsToken) {
+        _authTokenCache = prefsToken;
+        try { localStorage.setItem(AUTH_TOKEN_KEY, prefsToken); } catch (_) {}
+      } else {
+        const lsToken = localStorage.getItem(AUTH_TOKEN_KEY);
+        _authTokenCache = lsToken;
+        if (lsToken) _CapPrefs.set({ key: AUTH_TOKEN_KEY, value: lsToken }).catch(() => {});
+      }
+    } else {
+      _authTokenCache = localStorage.getItem(AUTH_TOKEN_KEY);
+    }
+  } catch (_) {
+    _authTokenCache = localStorage.getItem(AUTH_TOKEN_KEY);
+  }
+  _prefsReady = true;
+  _sendDebugLog('auth_prefs_init', { hasPrefs: !!_CapPrefs, hasToken: !!_authTokenCache });
+  refreshLoginUI();
+})();
+```
+Preferences読み出しが**非同期**のため、`refreshLoginUI()`を`await`完了後に呼ぶことが必須。同期のまま先に呼ぶと、Preferencesにトークンがあってもキャッシュ未初期化のまま匿名表示になってしまう。
+
+- iOS版: Preferencesからトークンを読み出し`_authTokenCache`へ。あればlocalStorageミラーも更新。Preferencesに無くlocalStorageにあれば（旧バージョンからの移行）Preferencesへ書き込む
+- Web版/プラグイン取得失敗: localStorageをキャッシュへ
+- 完了後に`_prefsReady = true`・一時計装`_sendDebugLog('auth_prefs_init', ...)`・`refreshLoginUI()`
+
+## レビュー観点（planner 自己チェック）
+- **R1**: `getAuthToken()`の同期シグネチャを維持したか（`authedFetch()`・`refreshLoginUI()`が同期的に読む既存経路を壊さない）→ 維持
+- **R2**: `setAuthToken`/`clearAuthToken`がキャッシュ・localStorage・Preferencesの3層を更新し、Preferens書き込みはfire-and-forget（awaitしない）か → 満たす
+- **R3**: 起動直後、Preferences読み出し完了「前」に`authedFetch`を`refreshLoginUI`以外から呼ぶ経路が無いか。ある場合、キャッシュ未初期化のトークン欠落でAuthorizationヘッダーが付かない懸念 → 実装直前に`grep`で全`authedFetch`呼び出しを確認し、起動時同期実行経路が`refreshLoginUI`のみであることを確認する
+- **R4**: `@capacitor/preferences`がCapacitor 6対応版で、`get`が`{ value: string | null }`を返すシグネチャか → 実装直前に`npm view`で確認する
+
+## 影響範囲
+- `public/app.js`のトークン操作4関数＋起動時初期化のみ。`server.js`無変更（pm2再起動不要）
+- Web版は`_CapPrefs === null`のため挙動不変
+- iOS版は新ビルド配信端末のみ反映。旧トークン（localStorageのみ）は初回起動時にPreferencesへ移行される
+
+## スコープ外
+- Android版対応（`@capacitor/preferences`はAndroidでも動くが今回iOS版のみ想定）
+- Keychainへの保存（Preferencesは`UserDefaults`ベース。JWTは失効前提の短期トークンのためKeychainまでは不要と判断）
+- 設計書48の楽観的維持ロジック（401のみclearAuthToken）は無変更で維持
+
+## 承認状況
+2026-07-16 ユーザー承認済み。
