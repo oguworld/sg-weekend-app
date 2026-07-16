@@ -5299,3 +5299,73 @@ iOS版（Capacitor/TestFlight）で設定画面の「プッシュ通知」トグ
 - 計装: `push_init_start`/`push_init_perm`/`push_init_register_call`/`push_init_exception`を追加（原因確定後に削除する使い捨て）。
 - `_updatePushBtn`のON判定・`_registerNativePushToken`・Web版push系は無変更。設計書49のJWT永続化（`_authTokenCache`・`_initAuthToken`）も無変更。
 - キャッシュバスティング: `app.js?v=20260716f`、`sw.js`の`CACHE_NAME`を`sg-weekend-v616`へ。
+
+---
+
+# 設計書51 — 設計書50（iOS版プッシュ通知トークンのPreferences永続化）がビルド101実機で機能しない真因の特定と確実な修正（TDZ実行時エラー）
+
+## ステータス
+2026-07-16 debugger調査完了・修正方針提示（未実装）。この後 orchestrator で実装予定。コードは書いていない（調査のみ）。
+
+## 症状（実機・確定事実）
+- 実機はビルド101（v1.5 (101)、スクショ確認済み）。`run_number=101` のGitHub Actionsワークフローは設計書50のコミット`d73bec7`のビルド（`gh api`で機械確認済み）。TestFlight完了は`13:17 UTC`、ユーザー検証ログは`13:36 UTC`。**実機のapp.jsには設計書50のコードが確実に含まれている**（「実機コードが古い」説は否定）。
+- `logs/debug-nav.log` 13:36 UTC で:
+  - `auth_prefs_init`（設計書49の`_initAuthToken` IIFE、`hasPrefs:true`/`hasToken:true`）が**正常発火**。
+  - 設計書45の計装（`push_toggle_start`/`push_perm_result`/`push_register_call`/`push_registration_event`、手動トグルタップ経路）も発火。
+  - **設計書50で追加した`push_init_start`/`push_init_perm`/`push_init_register_call`/`push_init_exception`が全期間0件**（`grep -c`で機械確認）。
+- 結果、起動時の`_initNativePush()`によるトークン復元が走らず、再起動でトグルがOFF表示に戻る。
+
+## 真因（確定・推測ではない）
+**TDZ（Temporal Dead Zone）実行時 ReferenceError**。設計書49/50で`_nativeDeviceToken`(3066付近→2041)と`_CapPrefs`(2030)は初期化フロー前へ移動済みだが、**同じく起動時経路で参照される`_CapPush`(宣言3068行)と`_nativePushDenied`(宣言3067行)の移動を忘れている**。
+
+実行チェーン:
+1. 初期化フロー2044行で`initPushState()`を同期呼び出し（fire-and-forget、awaitされない）。
+2. `initPushState()`(2995) → `_isCapacitorApp`真 → `await _initNativePush()`(2998)。
+3. `_initNativePush()`(3128)の**本体1行目・同期文** `const plugin = _getCapPushPlugin();`(3130)。
+4. `_getCapPushPlugin()`(3069)の本体1行目 `if (_CapPush) return ...`(3070)で`_CapPush`を参照。
+5. `_CapPush`の`let`宣言は**3068行**。初期化フロー実行時（コード実行位置は2044付近）、3068行はまだ評価されておらずTDZ内。→ `ReferenceError: Cannot access '_CapPush' before initialization`。
+
+- 例外は`try`(3149)より手前の3130行で発生 → try/catchに捕まらず `push_init_start`(3145)にも到達しない → **`push_init_*`全期間0件と完全一致**。
+- `initPushState()`は2044でawaitされずfire-and-forgetのため、rejectはunhandledになるだけで後続の`initSettingsProfile()`(2045)・`_initAuthToken` IIFE(2049)は実行継続 → **`auth_prefs_init`正常発火と完全一致**。
+- 最小再現（node、app.jsの宣言順を再現）で、`_initNativePush`相当が`ReferenceError - Cannot access '_CapPush' before initialization`で落ち、後続の`auth_prefs_init`相当が正常発火することを機械確認済み（実機ログの非対称と一字一句一致）。
+
+## get()ハング仮説 vs 早期リターン仮説 vs TDZ仮説の判定
+- **get()ハング仮説: 否定寄り**。`push_init_start`(3145)は`await _CapPrefs.get`(3134)の後なので出ないのは同じだが、連携側(2054)は同一プラグイン`Preferences.get`で正常に返っている。同一プラグインで通知側`get`だけがハングするのは非現実的。かつTDZ例外は3134行より手前の3130行で発生するため、そもそも3134の`get`に到達しない。
+- **早期リターン仮説（`if(!item)return`）: 否定**。`push-setting-item`はindex.html 344行に存在しapp.js(919行)より前に読まれる。かつ早期リターンなら例外は出ず後続に影響ないが、より手前の3130でTDZ例外が確定的に起きる。
+- **TDZ仮説: 確定**。コード上の宣言順（`_CapPush`宣言3068 > 参照3070、かつ呼び出し元initPushState 2044 < 宣言3068）から確定的に証明でき、node最小再現でも実機ログの非対称を完全再現。設計書49で全く同型のTDZバグ（AUTH変数）を踏んでおり、その修正時に`_nativeDeviceToken`/`_CapPrefs`は移動したが`_CapPush`/`_nativePushDenied`を見落とした、という経緯とも整合する。
+
+## 修正方針（確実・推奨）
+方針A（TDZ解消・最小変更・設計書49の前例と同型）を推奨:
+- **`_CapPush`(宣言3068)と`_nativePushDenied`(宣言3067)の`let`宣言を、初期化フロー（`loadEventData();`=2043）より前に移動する**（設計書49/50で`_nativeDeviceToken`(2041)・`_CapPrefs`(2030)を移動したのと全く同じ手法）。移動先はAUTHブロック直後の`_nativeDeviceToken`宣言(2041)付近が自然。旧位置(3067/3068)はコメントに置換し、二重宣言にしない（`grep -c`で1を確認）。
+  - `_nativePushListenersBound`(3080)・`_nativePushRegisterIntent`(3081)は起動時経路で`_bindNativePushListenersOnce`(3148)まで到達してから参照されるが、これは`plugin`取得成功後・`push_init_start`後なので、`_CapPush`移動でTDZが解消されれば同フロー内で3080/3081の宣言も既に評価済みか確認する（`_initNativePush`が3148で`_bindNativePushListenersOnce`を呼ぶ時点でコード実行位置が3080を通過済みかは、3080が3148より前の行にあるため問題ない。ただし移動対象を最小に絞り、3080/3081は現状のままでよいか実装時に宣言行 vs 参照タイミングをgrepで再確認する）。
+- この方針は「get()ハング仮説」「早期リターン仮説」に対してもロバスト（そもそもTDZが真因なので、それを潰せば`push_init_start`まで到達し、以降のPreferences復元・register再登録が設計書50の意図通り動く）。
+
+方針B（併用可・より根本的、ユーザー承認あれば推奨）: 質問票の提案どおり、**プッシュトークンのPreferences復元を、確実に発火している`_initAuthToken` IIFEに統合し、JWT復元の後に逐次（await JWT get → await push token get）で読み出す**。
+- 利点: (a)`initPushState`/`_initNativePush`が起動時に到達するか否かに関係なくトークンが復元される（TDZ・早期リターン・ハングの全仮説にロバスト）。(b)同一Preferencesへの同時並行get()を避け逐次化できる。復元後に`_updatePushBtn()`を呼びトグルON表示を反映。
+- この場合、`_initNativePush()`側の`await _CapPrefs.get`(3132-3144)は削除（統合IIFEで復元済みのため不要、残すと同時並行get()に戻る）。ただし**方針BだけでもTDZ（3130の`_CapPush`参照）は残る**ため、`_initNativePush`が起動時permission checkでregister()する経路（設計書50の起動時自己回復）を生かすなら方針Aは併せて必須。トークン復元だけを目的とし起動時register()を捨てるなら方針B単独でもトグルON表示は回復するが、サーバー側トークン再登録の鮮度が落ちるため、**方針A（TDZ解消）を主とし、方針Bは任意で併用**が最も確実。
+- 統合IIFEで参照する変数（`_nativeDeviceToken`=2041, `_CapPrefs`=2030, `AUTH_TOKEN_KEY`=2018）は既に初期化フロー前に宣言済みで参照可能。
+
+## 追加計装（最小限）
+方針A（TDZ解消）が両仮説にロバストなため、大掛かりな計装は不要。実装後の次ビルドで既存の`push_init_start`（`hasToken`が再起動後もtrueか）・`push_init_perm`・`push_init_register_call`が発火するようになるかを確認すれば真因確定になる。念のため`_initNativePush`冒頭（`_getCapPushPlugin`呼び出しの直後、`_CapPrefs.get`の直前）に到達確認ログを1点足してもよいが、`push_init_start`が発火すること自体がTDZ解消の証拠になるため必須ではない。
+
+## 変更対象（ファイル・関数・行番号）
+- `public/app.js`:
+  - 【方針A・必須】`let _nativePushDenied = false;`(3067) と `let _CapPush = null;`(3068) を初期化フロー前（`_nativeDeviceToken`宣言=2041付近）へ移動。旧位置はコメント化。
+  - 【方針B・任意併用】`_initAuthToken` IIFE(2049-2076)にプッシュトークンのPreferences逐次復元を追加し、`_initNativePush()`(3132-3144)の`await _CapPrefs.get`を削除。
+  - キャッシュバスティング: `index.html`(919) `app.js?v=` を更新、`public/sw.js`(2) `CACHE_NAME` を`sg-weekend-v617`へ。
+- `server.js`: 無変更（pm2再起動不要）。
+
+## 影響確認
+- Web版（`_isCapacitorApp=false`・`_CapPrefs=null`・`_CapPush`未使用）: `initPushState()`(2998)の`if(_isCapacitorApp)`分岐に入らずWeb Push経路。`_CapPush`/`_nativePushDenied`の宣言位置移動は値の初期化タイミングを早めるだけでWeb版の挙動に影響なし。
+- 設計書49のJWT復元（`_initAuthToken`・`_authTokenCache`・`auth_prefs_init`）: 方針Aは無変更。方針B併用時はIIFE内にpush復元を追記するのみで、JWT復元ロジック本体・呼び出し順（`refreshLoginUI()`をget完了後に呼ぶ）は維持。
+- 設計書50のPreferences set/remove（`registration`保存・OFF削除、3091/3141/3177）・`_updatePushBtn`・`_registerNativePushToken`: 無変更。
+
+## 受け入れ基準
+1. 次ビルドの実機ログで`push_init_start`が発火する（＝TDZ解消の直接証拠）。`hasToken`が再起動後もtrueなら設計書50のPreferences復元が機能している。
+2. iOS実機で通知トグルON→アプリ完全終了→再起動で**トグルON表示を維持**する。
+3. Web版のWeb Push（トグル・購読）が無変更で動作する。
+4. `node --check public/app.js`エラーなし。node最小再現でpost-fix宣言順がReferenceErrorを投げないことを確認。
+
+## 再発防止策
+- 設計書49のTDZ教訓（起動時IIFE・初期化フローで参照する`let`/`const`は宣言が参照より前か`grep -n`で確認）を、**同一関数内の同期呼び出しチェーンにも適用する**。今回は`initPushState()`→`_initNativePush()`→`_getCapPushPlugin()`という**関数呼び出しを跨いだ同期参照**で、直接の参照行だけ見ると気づきにくかった。起動時に呼ばれる関数から辿れる全ての同期参照変数（呼び出し先の関数本体で参照される`let`含む）を洗い出し、宣言位置を確認すること。
+- TDZ移動は「参照される変数を1つ移したら、同じ起動時経路で参照される兄弟変数（今回の`_CapPush`/`_nativePushDenied`のように隣接宣言されているもの）も一緒に移せているか」を必ずセットで確認する。設計書50は`_nativeDeviceToken`だけ移して隣の`_nativePushDenied`/`_CapPush`を残したのが直接の見落とし。

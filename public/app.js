@@ -2039,6 +2039,12 @@
     // 呼び出し（下記 initPushState()）より前に宣言する。元は下部の PUSH セクションにあったが、
     // 設計書50でPreferences復元＋計装を _initNativePush 冒頭に追加した際、TDZ回避のためここへ移動した。
     let _nativeDeviceToken = localStorage.getItem('app_ios_push_token') || null;
+    // iOS版プッシュ状態フラグ／プラグイン参照も、起動時フロー（initPushState()→_initNativePush()
+    // →_getCapPushPlugin()）が同期実行部で参照するため、呼び出しより前に宣言する（設計書51・TDZ回避）。
+    // 元は下部の PUSH セクション（_getCapPushPlugin 直前）にあったが、設計書50で _nativeDeviceToken だけ
+    // 移動し、同じ起動時経路で参照されるこの2変数の移動を忘れてTDZ ReferenceErrorになっていたのを修正。
+    let _nativePushDenied = false;
+    let _CapPush = null;
 
     loadEventData();
     initPushState();
@@ -3063,9 +3069,8 @@
     // ─── PUSH NOTIFICATIONS（iOSアプリ/Capacitor版・APNs） ───
     // Web版のtogglePush()（Promiseベース、PushManager経由）とは別に、
     // @capacitor/push-notificationsはコールバック/イベント形式のため独立実装する
-    // （_nativeDeviceToken の宣言は起動時参照のTDZ回避のため上部のAUTHブロック直後へ移動済み・設計書50）
-    let _nativePushDenied = false;
-    let _CapPush = null;
+    // （_nativeDeviceToken／_nativePushDenied／_CapPush の宣言は起動時参照のTDZ回避のため
+    //  上部のAUTHブロック直後へ移動済み・設計書50/51）
     function _getCapPushPlugin() {
       if (_CapPush) return _CapPush;
       try {
