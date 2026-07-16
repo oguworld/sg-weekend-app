@@ -337,6 +337,7 @@
         agePreschoolBadge: '🚀 3〜6歳',
         ageSchoolBadge: '📚 小学生',
         confirmClearPins: 'ピン留めをすべて削除しますか？',
+        confirmLogout: 'アカウント連携を解除しますか？',
         toastPinned: '📌 ピン留めしました！',
         toastUnpinned: '📌 ピン留めを外しました',
         toastFeedbackSent: '📨 フィードバックを送信しました！',
@@ -542,6 +543,7 @@
         agePreschoolBadge: '🚀 3–6 yrs',
         ageSchoolBadge: '📚 School age',
         confirmClearPins: 'Clear all pins?',
+        confirmLogout: 'Disconnect your linked account?',
         toastPinned: '📌 Pinned!',
         toastUnpinned: '📌 Unpinned',
         toastFeedbackSent: '📨 Feedback sent!',
@@ -2512,6 +2514,18 @@
       }
     }
 
+    // トークンがある前提で「連携中」表示に切り替える楽観的ヘルパー（設計書48・課題2）
+    // providerが確定できない状況（通信エラー・500系）で呼ぶため、ラベルは既存の汎用キーを流用する。
+    // provider が分かる正常時（refreshLoginUI 内 res.ok 経路）のみ正確なラベルへ更新される。
+    function _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl) {
+      if (labelEl && !labelEl.getAttribute('data-i18n')) {
+        labelEl.setAttribute('data-i18n', 'loginStatusGoogle');
+        labelEl.textContent = t('loginStatusGoogle');
+      }
+      loggedOutEl.style.display = 'none';
+      loggedInEl.style.display = '';
+    }
+
     // 設定画面のログインセクション表示をログイン状態に合わせて更新する
     async function refreshLoginUI() {
       const loggedOutEl = document.getElementById('login-section-logged-out');
@@ -2526,7 +2540,20 @@
       }
       try {
         const res = await authedFetch(API_BASE + '/api/auth/me');
-        if (!res.ok) throw new Error('invalid session');
+        // 明確に失効を示す 401 のときだけトークンを破棄して匿名表示に戻す（設計書48・課題2）
+        if (res.status === 401) {
+          clearAuthToken();
+          loggedOutEl.style.display = '';
+          loggedInEl.style.display = 'none';
+          return;
+        }
+        // 401 以外の失敗（500系など）はトークンを消さず、楽観的に「連携中」を維持する。
+        // iOS版は起動直後にネットワーク未確立・サーバー一時エラーが起きやすく、
+        // 有効なトークンを誤って破棄すると再起動のたびに連携が切れて見えるため。
+        if (!res.ok) {
+          _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
+          return;
+        }
         const data = await res.json();
         // メールアドレス・氏名は一切表示しない（認証情報最小化方針）。プロバイダのみ表示
         if (labelEl) {
@@ -2537,14 +2564,13 @@
         loggedOutEl.style.display = 'none';
         loggedInEl.style.display = '';
       } catch (e) {
-        // トークン失効時は匿名状態に戻す
-        clearAuthToken();
-        loggedOutEl.style.display = '';
-        loggedInEl.style.display = 'none';
+        // 通信エラー・fetch自体の失敗ではトークンを消さず、楽観的に「連携中」を維持する（設計書48・課題2）
+        _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
       }
     }
 
     function handleLogoutClick() {
+      if (!confirm(t('confirmLogout'))) return;
       window.google?.accounts?.id?.disableAutoSelect?.();
       clearAuthToken();
       showToast(t('toastLogoutSuccess'));

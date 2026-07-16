@@ -191,6 +191,10 @@ sg-weekend-app/
   - iOS版（`_isCapacitorApp`分岐、`public/app.js`）の自前Google/Appleボタンに公式ロゴのインラインSVGを付与しブランドガイドライン準拠にした。Google=公式4色「G」マーク（`viewBox="0 0 48 48"`の4パス）＋白背景・グレー枠・pill、Apple=公式Appleロゴ（`fill:#fff`）＋黒背景・白文字・pill。ロゴはインライン埋め込み（オフライン対応のため外部URL参照にしない）。`onclick`・`_touchCapableDetected`ガード・要素id（`#google-login-btn`/`#apple-login-btn`）・`data-i18n`構造は維持（設計書44のtouchendガードを壊さない）。CSSは`public/app.css`に`.oauth-btn`/`.oauth-btn--google`/`.oauth-btn--apple`/`.oauth-btn__logo`を切り出し。ダークモード（`html[data-theme="dark"]`）時、黒背景のAppleボタンが背景と溶けないよう薄い枠（`border:1px solid rgba(255,255,255,0.28)`）を付与。**Web版ボタン（`renderButton()`・Apple公式ボタン）は無変更**
   - 文言を「ログイン」から「アカウント連携」へ統一（匿名でも使えるアプリに対する予定表同期用の連携という位置づけを反映）。i18n 7キーをja/en同時変更: `secLogin`（アカウント連携/Link account）・`loginStatusGoogle`（Google連携中/Linked with Google）・`loginStatusApple`（Apple連携中/Linked with Apple）・`logoutBtn`（連携解除/Unlink）・`toastLoginSuccess`（連携しました/Account linked）・`toastLogoutSuccess`（連携を解除しました/Account unlinked）・`toastLoginError`（連携に失敗しました…/Linking failed…）。`loginWithGoogle`（Googleでログイン）・`loginWithApple`は公式ロゴ承認文言のため据え置き（`loginWithApple`のjaは「Appleでログイン」→「Appleでサインイン」にApple公式ローカライズ表記へ調整）。`index.html`の`data-i18n="secLogin"`/`data-i18n="logoutBtn"`のデフォルト直書きも更新
   - **未検証（次回フォロー）**: iOS版ボタンの公式ロゴ表示・ダークモード時のAppleボタン（黒背景）の視認性・タップ挙動は次回TestFlightビルドでの実機確認が必要
+- **2026-07-16修正（設計書48・課題2/3）: 連携維持のトークン破棄条件緩和＋連携解除の確認ダイアログ**
+  - **課題2（再起動で連携が切れる不具合の対策）**: `refreshLoginUI()`（`public/app.js`）は従来`GET /api/auth/me`が`!res.ok`またはfetch例外のとき無条件で`clearAuthToken()`していた。iOS版は起動直後にネットワーク未確立・サーバー一時エラー（500系）・タイムアウトが起きやすく、有効なトークンでも「連携が切れた」ように見えて破棄していた（実質ログアウト）。**`res.status === 401`（明確な失効）のときのみ`clearAuthToken()`**し、それ以外（500系など`!res.ok`）と`catch`（通信エラー）ではトークンを保持して`_showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl)`で「連携中」の楽観的表示を維持する。楽観的表示ではproviderが不明なためラベルは既存の`loginStatusGoogle`を汎用流用（新規i18nキーは追加せず）。provider確定は正常時（`res.ok`）経路のみ`data.provider`から正確に更新。**`@capacitor/preferences`へのトークン移行はスコープ外**（設計書48・課題2-2、まずcatch/status修正のみで様子見。localStorage方式のまま）
+  - **課題3（連携解除の確認ダイアログ）**: `handleLogoutClick()`先頭に`if (!confirm(t('confirmLogout'))) return;`を追加。誤タップでの即解除を防止。i18n新規キー`confirmLogout`をja（`アカウント連携を解除しますか？`）/en（`Disconnect your linked account?`）に同時追加
+  - **未検証（次回フォロー）**: 実機（TestFlight）で「連携後にアプリ再起動して連携が維持されるか」「連携解除の確認ダイアログが出るか」の確認が必要
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
@@ -249,6 +253,16 @@ sg-weekend-app/
   5. `ios-deploy.yml`のentitlements自動生成2ステップ（上記iOS/CI 1・2）のコメントアウト解除・復元 ✅完了（2026-07-14、設計書34）
   - 次回`release`ブランチへのpushでTestFlightビルドがentitlements付きでトリガーされる（ユーザー明示指示があるまでpushしない、既存プロジェクトルール通り）。実機でのPush通知送受信確認は次回のTestFlightビルド後に実施予定
 - スコープ外（設計時点で明示）: Android版対応、通知既読管理・一覧UI、ジャンル/エリア別配信パーソナライズ、FCM導入、Web版・iOS版購読者の名寄せ、サイレントプッシュ、通知文言の多言語化
+
+### プッシュ通知トグル不発の診断＋AppDelegate.swift APNsブリッジ条件付き追記（2026-07-16、設計書48・課題1）
+iOS版で「プッシュ通知」トグルをONにしても権限許可後に通知登録が完了せずトグルがOFFのまま変わらない不具合（設計書45で計装したが原因未確定）の調査を、次回TestFlightビルドで進めるためのCI仕込み。
+- **仮説**: Capacitorが生成する`AppDelegate.swift`に、APNsデバイストークン登録を`@capacitor/push-notifications`プラグインへブリッジするメソッド（`didRegisterForRemoteNotificationsWithDeviceToken` → `NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, ...)`）が欠落しており、`registration`イベントが発火せず`push_registration_event`（設計書45の計装）が記録されない可能性。
+- **CI（`.github/workflows/ios-deploy.yml`、`Sync Capacitor`直後の2ステップ）**:
+  1. `(診断) Dump generated AppDelegate.swift`: `AppDelegate.swift`全文を`cat`し、ブリッジメソッド有無を`grep`（無ければ`!!! BRIDGE METHODS NOT FOUND !!!`を出力）。次ビルドのログで実体を確認する。
+  2. `(課題1) Ensure APNs bridge methods in AppDelegate.swift`: **`scripts/ensure-apns-bridge.py`**を実行。冪等（既に`capacitorDidRegisterForRemoteNotifications`を含めばスキップ）。含まなければ`re.search(r'(class\s+AppDelegate[^\{]*\{)')`でクラス開き波括弧を探し、その直後に2メソッド（`didRegisterForRemoteNotificationsWithDeviceToken`・`didFailToRegisterForRemoteNotificationsWithError`）を挿入。**クラス開き波括弧が見つからない場合は`raise SystemExit(1)`で明示的にビルド失敗**させる（サイレント素通り禁止）。
+  - ⚠️ **Pythonロジックを外部スクリプト`scripts/ensure-apns-bridge.py`に分離した理由**: 設計書48時点はCIの`run: |`ブロック内にPythonヒアドキュメント直書きの想定だったが、YAMLブロックスカラー（`|`）は最初の非空行のインデント量で内容範囲を決めるため、Swiftコードの4スペースインデント行がブロック基準インデント（10スペース）より浅くなりYAMLパースエラーになる。外部スクリプト化で回避（ロジックは設計書と等価）。同種の「CI内にインデントの浅い行を含む多言語コードをヒアドキュメントで埋め込む」場合は外部スクリプト分離を標準パターンとする。
+- 設計書45の計装6ポイント（`public/app.js`の`push_registration_event`/`push_registration_error_event`/`push_toggle_start`/`push_perm_result`/`push_register_call`/`push_toggle_exception`）は削除せず残置。次ビルドの診断ダンプと`logs/debug-nav.log`を突き合わせて原因を確定する。
+- **未確認（次回フォロー）**: 次回TestFlightビルドのCIログで`AppDelegate.swift`ダンプ結果とブリッジメソッド有無を確認、実機でトグル操作 → `logs/debug-nav.log`で`push_registration_event`記録を確認。
 
 ## ジャンル・興味機能（2026-07-02実装、おすすめモード周りは2026-07-11刷新）
 - ジャンルマスター: GENRE_LIST 定数（13種）。id / emoji / label を持つ

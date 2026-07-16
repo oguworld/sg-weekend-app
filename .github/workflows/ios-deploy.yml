@@ -37,6 +37,19 @@ jobs:
           cd ios-app
           npx cap sync ios
 
+      - name: (診断) Dump generated AppDelegate.swift
+        run: |
+          cd ios-app
+          echo "===== AppDelegate.swift ====="
+          cat ios/App/App/AppDelegate.swift
+          echo "============================="
+          grep -n "capacitorDidRegisterForRemoteNotifications\|didRegisterForRemoteNotificationsWithDeviceToken" ios/App/App/AppDelegate.swift || echo "!!! BRIDGE METHODS NOT FOUND !!!"
+
+      - name: (課題1) Ensure APNs bridge methods in AppDelegate.swift
+        run: |
+          cd ios-app
+          python3 ../scripts/ensure-apns-bridge.py ios/App/App/AppDelegate.swift
+
       - name: Set export compliance in Info.plist
         run: |
           cd ios-app
