@@ -117,8 +117,9 @@ sg-weekend-app/
 - 運用: `data/sg/affiliate-links.json`は2026-07-13時点で2件のみ登録（Gardens by the Bay – Supertree Grove、National Orchid Garden）。停止中のため今後`match-affiliate-links.js`を実行してデータを拡充してもUIには反映されない（復活時に備えたデータ蓄積は可能）
 - `data/affiliate-clicks.json`はサイズ上限・ローテーションなし（`_sendDebugLog`と同様の既知の注意点、定期確認が必要）。エンドポイント自体は稼働中のため、直接叩かれれば引き続き追記され得る
 
-## 広告表示機能フェーズ2: PRカード（スポンサー広告枠）（2026-07-13実装、設計書29）
+## 広告表示機能フェーズ2: PRカード（スポンサー広告枠）（2026-07-13実装、設計書29 → 2026-07-16設計書47でテストデータ削除・非表示化）
 - イベント一覧に、Klookアフィリエイトとは別枠のスポンサー広告カード（PRカード）を条件付きで1件差し込む機能。設計書23フェーズ2の元設計を、plannerが現在の行番号ベースで再検証・確定した内容
+- ⚠️ **2026-07-16時点、非表示（テストデータ削除済み・設計書47）**: 広告掲載準備が整うまでの一時停止として、`data/sg/sponsored-cards.json`のテスト用ダミー2件（`sponsor_test_001`・`sponsor_test_002`）を削除し**空配列`[]`**にした。`_pickSponsoredCardForToday([])`が`null`を返すため`splice`されず、DOM分岐も通らずPRカードは表示されない。**コード（`_pickSponsoredCardForToday()`/`renderSponsoredCard()`/`__sponsored`分岐/`GET /api/sponsored-cards`）は一切無変更・残置**。再開は`sponsored-cards.json`に本番掲載データ（`active:true`・有効期間内）を追記するだけ（`pm2 restart`不要、`data/`は都度readFileSync）
 - **データモデル**: `data/{city}/sponsored-cards.json`（配列。`data/`はgitignore対象）。各要素: `id`/`sponsorName`/`title`/`content`/`imageUrl`/`url`/`category`（`event/show/gourmet/opening/sale`のいずれか、または`null`=全カテゴリ共通枠）/`startDate`/`endDate`/`priority`（現状未使用、将来の重み付け抽選用に温存）/`active`。**本番運用時は空配列`[]`が正常状態**（2026-07-13実装完了時点でテストデータは削除済み、掲載する広告主が決まり次第人力で追記する運用）
 - **サーバー**: `GET /api/sponsored-cards?city=sg`（`server.js`、`GET /api/events`の直後）。ファイル不存在時は空配列を返す（エラーにしない）。既存`GET /api/events`は無変更
 - **選択ロジック**（`public/app.js`）: `_pickSponsoredCardForToday(cards)`が、有効期間（`startDate`/`endDate`）・`active`・`_matchesCurrentCategory()`（`category`がnullなら常時対象、値ありなら`filterCats`一致時のみ対象）で候補を絞り込み、当日日付をシードにした`候補配列[seed % length]`で日替わり固定選択する（リロードのたびに変わらない）
@@ -128,8 +129,9 @@ sg-weekend-app/
 - コース生成AI・アフィリエイトリンク機能（フェーズ1）には一切手を加えていない。両フェーズとも広告要素とコース/イベント生成ロジックは意図的に分離
 - スコープ外（今回未実装）: PRカードのクリック計測（フェーズ1の`POST /api/affiliate-click`相当の仕組み）、`priority`フィールドを使った複数カード同時掲載・重み付け抽選、広告主向け管理画面・入稿フロー（`sponsored-cards.json`の直接編集が現状唯一の運用手段）
 
-## 広告表示機能: Klookアフィリエイトウィジェット試験導入（2026-07-13実装、設計書30 → 同日設計書31で表示改善）
+## 広告表示機能: Klookアフィリエイトウィジェット試験導入（2026-07-13実装、設計書30 → 同日設計書31で表示改善 → 2026-07-16設計書47で一時非表示化）
 - フェーズ1（アフィリエイトリンク）・フェーズ2（自前PRカード、`sponsored-cards.json`）とは別に、ユーザーが「Klookアフィリエイトダッシュボードで生成した公式アクティビティバナーウィジェットをそのまま埋め込みたい」と方針転換したことを受けて追加した軽量な試験導入。複数スポンサーのローテーション・カテゴリ一致判定・クリック計測などのフル実装は行っていない
+- ⚠️ **2026-07-16時点、非表示（マーカー挿入停止・設計書47）**: 広告掲載準備が整うまでの一時停止として、`renderEventCards()`内のKlookマーカー挿入`splice`（`if (!_recommendModeActive && filtered.length > 0) { ... filtered.splice(klookInsertAt, 0, { __klookWidget: true }); }`、1672-1675行付近）を**コメントアウト**した。`__klookWidget`が`filtered`に入らずDOM構築ループの`if (e && e.__klookWidget)`分岐が通らないため表示されない。**`_createKlookWidgetEl()`関数定義・DOM構築ループ側の分岐・`loadEventData()`のリセット処理（`_klookWidgetInserted`/`_klookWidgetEl`）は一切無変更・残置**。再開は該当コメントアウトを解除するだけ（Web版は配信＋キャッシュバスティング、iOS版は再ビルドが必要）
 - **実装**: `public/app.js`の`_createKlookWidgetEl()`関数が、Klook公式ダッシュボードが発行した埋め込みコード（`<ins class="klk-aff-widget" data-wid="127020" data-adid="1337601" data-actids="117,127,119" data-prod="mul_act" data-price="true" data-width="336" data-height="280" data-currency="SGD">` + `https://affiliate.klook.com/widget/fetch-iframe-init.js`を読み込む`<script>`）をそのまま`document.createElement`で動的生成し、`.klook-widget-card`（他のイベントカードと揃えた角丸・背景白・影のラッパー、`public/app.css`）の中に「PR」ラベル（`.klook-widget-card__label`、既存i18nキー`prBadgeLabel`を再利用）と共に格納する（設計書31、2026-07-13）
 - **見た目の方針（設計書31）**: `.spot-card`クラス自体は付与しない独立クラス（`fadeUp`アニメーション・`:active`時の`transform`等、iframeを含む要素に適用したくない既存ルールが多数付いているため）。目立つカラーボタン等は使わず、「PR」ラベルは11px・warm-gray色の控えめな表示に留める
 - **挿入位置・再利用方式（設計書31で最下部固定から変更）**: 設計書29のPRカード（自前PRカード）と同じ`filtered`配列への`splice`挿入パターンを転用し、新規マーカーキー`__klookWidget`を`Math.min(7, filtered.length)`（8番目あたり、カードの間）に差し込む。「1回だけ生成し使い回す」方式（`_klookWidgetEl`にDOM要素を保持し、以降は`insertBefore`で位置移動のみ、再生成しない）でiframeの意図しない再読み込みを防止。おすすめモード中（`_recommendModeActive`）はマーカー挿入自体をスキップし非表示（PRカードと同じ方針）。表示されない回は`display:none`にするのみでDOM/iframeは破棄しない

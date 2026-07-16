@@ -4980,3 +4980,79 @@ Error parsing provisioning profile at path '.../profile.mobileprovision' (Fastla
 
 ## 10. 承認状況
 2026-07-16 ユーザー承認済み。英語表記はLink account系で確定。
+
+# 設計書47 — イベント一覧の広告要素（PRカード テストデータ / Klook公式ウィジェット）の一時非表示化
+
+## ユーザーストーリー
+運営者として、広告掲載の準備が整うまでの間、イベント一覧に表示されている「PRカードのテスト用ダミーデータ」と「Klookアフィリエイトウィジェット」の両方を一時的に非表示にしたい。「後でやる」＝一時停止であり、後日データを入れ直す/コメントアウトを外すだけで簡単に再開できる形（仕組み自体は残す）にする。設計書32（フェーズ1アフィリエイトリンク停止）と同じ思想。
+
+## 背景
+- PRカード（設計書29）: `data/sg/sponsored-cards.json`にテスト用ダミー2件（`sponsor_test_001`・`sponsor_test_002`、`active:true`）が入っており表示されている。CLAUDE.mdに「本番運用時は空配列`[]`が正常状態」と明記済み。
+- Klook公式ウィジェット（設計書30・31）: `public/app.js`の`_createKlookWidgetEl()`が生成するKlook公式バナーが`renderEventCards()`のマーカー挿入により表示されている。
+- 両者は別系統・別データソースで独立して非表示化できる。
+
+## 調査で確認した実挙動
+- PRカード: `sponsored-cards.json`を空配列にすれば`_pickSponsoredCardForToday([])`が`null`を返し、spliceされず、DOM分岐が通らない。`!sponsoredUsed`で前回描画分のDOMも除去される。エラー・副作用なし。
+- Klook: マーカー挿入splice（1673-1674行付近）を止めれば`__klookWidget`が`filtered`に入らず、DOM構築ループの`if (e && e.__klookWidget)`分岐が通らない。`klookWidgetUsed`は`false`のまま、`_klookWidgetEl`は`null`のままで1755行付近は短絡評価でno-op。`_createKlookWidgetEl()`関数定義・分岐・リセット処理を残しても未使用になるだけで実害なし。
+
+## 受け入れ基準
+### 正常系
+- イベント一覧でPRカード（「【テスト】サンプル学習塾」等）が表示されない
+- イベント一覧でKlookウィジェット（`.klook-widget-card`）が表示されない
+- イベントカード本体・件数表示・カテゴリタブ切替・都市切替・おすすめモードは従来通り正常動作
+
+### 失敗系
+- `GET /api/sponsored-cards`が空配列を返してもフロントでエラーが出ない
+- Klookマーカー未挿入時に`_klookWidgetEl`が`null`でも短絡評価でno-op
+
+### エッジケース
+- おすすめモードON/OFF・言語切替・カテゴリタブ切替を繰り返しても両広告要素が復活せず、DOM差分更新（設計書21）が壊れない
+
+## スコープ外
+- 広告機能の削除・ロジック除去（関数定義・分岐・エンドポイントはすべて残置）
+- フェーズ1アフィリエイトリンク（設計書32で停止中）への追加変更
+- BKK/SYDの`sponsored-cards.json`（都市停止中・対象外）
+
+## 変更するファイル一覧
+| ファイル | 変更内容 | git管理 |
+|---|---|---|
+| `data/sg/sponsored-cards.json` | 中身を空配列`[]`に置換（テストデータ2件削除） | gitignore対象 |
+| `public/app.js` | Klookマーカー挿入splice（1673-1674行付近）をコメントアウト | 管理下 |
+
+## 具体的な変更箇所
+### 変更1: `data/sg/sponsored-cards.json`
+ファイル全体を`[]`に置換。`data/`配下JSONは都度readFileSyncのため`pm2 restart`不要。
+
+### 変更2: `public/app.js` Klookマーカー挿入
+マーカー挿入の`splice`をコメントアウトして無効化。DOM構築ループ側の分岐・`_createKlookWidgetEl()`・リセット処理は残置。
+
+Before:
+```javascript
+      if (!_recommendModeActive && filtered.length > 0) {
+        const klookInsertAt = Math.min(7, filtered.length);
+        filtered.splice(klookInsertAt, 0, { __klookWidget: true });
+      }
+```
+After（【設計書47で一時停止】のコメント＋コメントアウト。復活時はコメント解除するだけ）:
+```javascript
+      // 【設計書47で一時停止】広告掲載準備が整うまでKlookウィジェットのマーカー挿入を止める。
+      // 関数定義・DOM構築ループ側の分岐・リセット処理は残置しているため、下記コメントアウトを解除するだけで再開できる（設計書32と同じ思想）。
+      // if (!_recommendModeActive && filtered.length > 0) {
+      //   const klookInsertAt = Math.min(7, filtered.length);
+      //   filtered.splice(klookInsertAt, 0, { __klookWidget: true });
+      // }
+```
+
+## データモデル・APIの変更
+なし。`GET /api/sponsored-cards`・`GET /api/events`ともエンドポイント・レスポンス構造無変更。
+
+## データ共有の影響
+- 後方互換: APIレスポンス構造無変更。旧App Store版も`_pickSponsoredCardForToday([])`→`null`経路で正常動作、壊れない
+- 影響範囲: PRカードはデータ変更のため全クライアント即時反映。Klookは`app.js`変更のためWeb版は配信後、iOS版は新ビルド配信端末のみ反映（旧ビルドは表示されたままだがAPI非依存で壊れない）
+
+## 再開手順
+1. PRカード: `data/sg/sponsored-cards.json`に本番掲載データを追記（`active:true`・有効期間内）。`pm2 restart`不要
+2. Klook: `public/app.js`の該当コメントアウトを解除。Web版は配信＋キャッシュ更新、iOS版は再ビルド
+
+## 承認状況
+2026-07-16 ユーザー承認済み。

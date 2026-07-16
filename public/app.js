@@ -1669,10 +1669,12 @@
 
       // Klookアフィリエイトウィジェット（設計書31）: おすすめモード中は非表示。8枚目あたりに1件だけ差し込む
       // 設計書29のPRカードと同時表示時の間隔調整は今回スコープ外（ユーザー判断、データが実際に入る段階で改めて調整）
-      if (!_recommendModeActive && filtered.length > 0) {
-        const klookInsertAt = Math.min(7, filtered.length);
-        filtered.splice(klookInsertAt, 0, { __klookWidget: true });
-      }
+      // 【設計書47で一時停止】広告掲載準備が整うまでKlookウィジェットのマーカー挿入を止める。
+      // 関数定義・DOM構築ループ側の分岐・リセット処理は残置しているため、下記コメントアウトを解除するだけで再開できる（設計書32と同じ思想）。
+      // if (!_recommendModeActive && filtered.length > 0) {
+      //   const klookInsertAt = Math.min(7, filtered.length);
+      //   filtered.splice(klookInsertAt, 0, { __klookWidget: true });
+      // }
 
       // 設計書21: DOM要素キャッシュによる差分更新（Instagram埋め込みiframeの再読み込み防止）
       // キャッシュキーは id + 言語（言語切替時は必ず作り直す）
