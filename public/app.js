@@ -2035,6 +2035,11 @@
       if (!_CapPrefs) _CapPrefs = window.Capacitor?.Plugins?.Preferences || null;
     }
 
+    // iOS版プッシュトークン: initPushState()→_initNativePush()が起動時に参照するため、
+    // 呼び出し（下記 initPushState()）より前に宣言する。元は下部の PUSH セクションにあったが、
+    // 設計書50でPreferences復元＋計装を _initNativePush 冒頭に追加した際、TDZ回避のためここへ移動した。
+    let _nativeDeviceToken = localStorage.getItem('app_ios_push_token') || null;
+
     loadEventData();
     initPushState();
     initSettingsProfile();
@@ -3058,7 +3063,7 @@
     // ─── PUSH NOTIFICATIONS（iOSアプリ/Capacitor版・APNs） ───
     // Web版のtogglePush()（Promiseベース、PushManager経由）とは別に、
     // @capacitor/push-notificationsはコールバック/イベント形式のため独立実装する
-    let _nativeDeviceToken = localStorage.getItem('app_ios_push_token') || null;
+    // （_nativeDeviceToken の宣言は起動時参照のTDZ回避のため上部のAUTHブロック直後へ移動済み・設計書50）
     let _nativePushDenied = false;
     let _CapPush = null;
     function _getCapPushPlugin() {
@@ -3082,6 +3087,8 @@
         _nativeDeviceToken = token.value;
         _nativePushDenied = false;
         localStorage.setItem('app_ios_push_token', token.value);
+        // Preferences（ネイティブ永続領域）へもミラー保存（localStorage揮発対策・設計書50）
+        if (_CapPrefs) _CapPrefs.set({ key: 'app_ios_push_token', value: token.value }).catch(() => {});
         _registerNativePushToken(token.value);
         if (_nativePushRegisterIntent === 'toggle-on') {
           const gid = getSharedGroupId();
@@ -3121,19 +3128,37 @@
     async function _initNativePush() {
       const item = document.getElementById('push-setting-item');
       const plugin = _getCapPushPlugin();
+      // Preferencesからトークン復元（localStorage揮発対策、設計書49と同型・設計書50）
+      if (_CapPrefs) {
+        try {
+          const r = await _CapPrefs.get({ key: 'app_ios_push_token' });
+          const prefsToken = (r && typeof r.value === 'string' && r.value) ? r.value : null;
+          if (prefsToken) {
+            _nativeDeviceToken = prefsToken;
+            try { localStorage.setItem('app_ios_push_token', prefsToken); } catch (_) {}
+          } else if (_nativeDeviceToken) {
+            // Preferencesに無くlocalStorageにある場合（旧バージョンからの移行）はPreferencesへ書き込む
+            _CapPrefs.set({ key: 'app_ios_push_token', value: _nativeDeviceToken }).catch(() => {});
+          }
+        } catch (_) {}
+      }
+      _sendDebugLog('push_init_start', { pluginExists: !!plugin, hasToken: !!_nativeDeviceToken }); // 一時計装（原因確定後に削除）
+      _updatePushBtn(); // 復元したトークンでON表示を即反映（プラグイン未取得でも維持）
       if (!plugin) { if (item) item.style.display = 'none'; return; }
       _bindNativePushListenersOnce(plugin);
       try {
         const permStatus = await plugin.checkPermissions();
+        _sendDebugLog('push_init_perm', { perm: permStatus.receive }); // 一時計装（原因確定後に削除）
         _nativePushDenied = permStatus.receive === 'denied';
         if (permStatus.receive === 'granted') {
           _nativePushRegisterIntent = 'init';
+          _sendDebugLog('push_init_register_call', {}); // 一時計装（原因確定後に削除）
           await plugin.register();
         } else {
           // 未許可 or 拒否済み。トグルOFF表示のまま、次回togglePush()で許可ダイアログを出す
           _nativeDeviceToken = null;
         }
-      } catch (e) {}
+      } catch (e) { _sendDebugLog('push_init_exception', { err: String(e) }); } // 一時計装（原因確定後に削除）
       _updatePushBtn();
     }
 
@@ -3149,6 +3174,7 @@
           await _deregisterNativePushToken(_nativeDeviceToken);
           _nativeDeviceToken = null;
           localStorage.removeItem('app_ios_push_token');
+          if (_CapPrefs) _CapPrefs.remove({ key: 'app_ios_push_token' }).catch(() => {}); // Preferencesからも削除（設計書50）
           showToast(t('toastPushOff'));
         } else {
           const permStatus = await plugin.checkPermissions();
