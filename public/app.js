@@ -2010,6 +2010,31 @@
     // app-headerはscreen-home内のstickyヘッダーになったためsyncHeaderHeightは不要
     function syncHeaderHeight() {}
 
+    // ─── AUTH（Google/Apple Sign-In。iOS版・Web版共通。設計書20/35/36/44/49） ───
+    // 【重要】この変数宣言ブロックは、下記 _initAuthToken IIFE（起動時に即実行される）が
+    // これらの let/const を参照するため、必ず初期化フロー（loadEventData()）より前に置くこと。
+    // 元は関数定義群の直前（getAuthToken() の上）にあったが、宣言より前に参照される
+    // TDZ（Temporal Dead Zone）実行時 ReferenceError が発生したため、ここへ移動した（設計書49・TDZ修正）。
+    const AUTH_TOKEN_KEY = 'app_auth_token';
+    let _googleWebClientId = null; // GET /api/config で起動時に取得（Web版GISの初期化用）
+    let _googleAuthInited = false; // Web/iOS共通、各プラットフォームの初期化を一度だけ行うためのフラグ
+    let _appleServiceId = null; // GET /api/config で起動時に取得（Web版Sign in with Apple JSの初期化用）
+    let _appleRedirectUri = null; // GET /api/config で起動時に取得（Web版のredirectURI）
+    let _appleAuthInited = false; // Web版のみ、AppleID.auth.init()を一度だけ行うためのフラグ
+
+    // JWT保存: iOS版はlocalStorage単独だとWKWebView再起動で消えることがあるため、
+    // @capacitor/preferences（ネイティブ永続領域）をソースオブトゥルースにするハイブリッド方式（設計書49）。
+    // localStorage はミラー、_authTokenCache は getAuthToken() を同期のまま維持するための同期読み取り元。
+    let _authTokenCache = null;        // getAuthToken() が同期で返す唯一の読み取り元
+    let _prefsReady = false;           // 起動時 Preferences 読み出しが完了したか（診断用）
+    let _CapPrefs = null;              // @capacitor/preferences プラグイン（iOS版のみ非null想定）
+    if (_isCapacitorApp) {
+      try {
+        if (window.Capacitor?.registerPlugin) _CapPrefs = window.Capacitor.registerPlugin('Preferences');
+      } catch (_) {}
+      if (!_CapPrefs) _CapPrefs = window.Capacitor?.Plugins?.Preferences || null;
+    }
+
     loadEventData();
     initPushState();
     initSettingsProfile();
@@ -2477,27 +2502,6 @@
         btn.classList.toggle('selected', next.includes(btn.dataset.genre));
       });
       _syncRecommendChip();
-    }
-
-    // ─── AUTH（Google/Apple Sign-In。iOS版・Web版共通。設計書20/35/36/44） ───
-    const AUTH_TOKEN_KEY = 'app_auth_token';
-    let _googleWebClientId = null; // GET /api/config で起動時に取得（Web版GISの初期化用）
-    let _googleAuthInited = false; // Web/iOS共通、各プラットフォームの初期化を一度だけ行うためのフラグ
-    let _appleServiceId = null; // GET /api/config で起動時に取得（Web版Sign in with Apple JSの初期化用）
-    let _appleRedirectUri = null; // GET /api/config で起動時に取得（Web版のredirectURI）
-    let _appleAuthInited = false; // Web版のみ、AppleID.auth.init()を一度だけ行うためのフラグ
-
-    // JWT保存: iOS版はlocalStorage単独だとWKWebView再起動で消えることがあるため、
-    // @capacitor/preferences（ネイティブ永続領域）をソースオブトゥルースにするハイブリッド方式（設計書49）。
-    // localStorage はミラー、_authTokenCache は getAuthToken() を同期のまま維持するための同期読み取り元。
-    let _authTokenCache = null;        // getAuthToken() が同期で返す唯一の読み取り元
-    let _prefsReady = false;           // 起動時 Preferences 読み出しが完了したか（診断用）
-    let _CapPrefs = null;              // @capacitor/preferences プラグイン（iOS版のみ非null想定）
-    if (_isCapacitorApp) {
-      try {
-        if (window.Capacitor?.registerPlugin) _CapPrefs = window.Capacitor.registerPlugin('Preferences');
-      } catch (_) {}
-      if (!_CapPrefs) _CapPrefs = window.Capacitor?.Plugins?.Preferences || null;
     }
 
     function getAuthToken() {
