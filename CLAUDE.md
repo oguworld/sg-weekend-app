@@ -458,6 +458,14 @@ RSS/Instagram取得から`events.json`保存までのバッチ処理は、実行
 - 除外件数は`⚠️ 記事生成に失敗したため${n}件のイベントを除外しました`としてログ出力する
 - 既知の副次効果: `notify-fetch-summary.js`のLINE通知「◯件採用」の合計値はHaikuフィルタ通過数（`totalAccepted`）ベースのままで、この除外分は反映されない（通知ロジック自体は今回変更対象外）。ソース別内訳（`accepted/sent`）の方はSonnet失敗分がカウントされなくなり、より正確になった
 
+### `scripts/filter-events.js` 画像URL疎通確認（2026-07-17実装、設計書57）
+Alvinology（RSSソース）由来のイベントで、CDNオフロードプラグインのサブドメイン（`media.alvinology.com`）が記事公開直後の伝播遅延により403を返し、壊れた画像URLがそのまま`events.json`に保存される不具合が発生したため対策を追加した。
+- 新規関数`isImageUrlReachable(url)`（HTTP HEAD優先、405/501ならGETにフォールバック、3秒タイムアウト、AbortControllerで打ち切り、例外はtry/catchで握りつぶし`false`を返す）を追加
+- 既存のOGP画像フォールバック発火条件（`item.image === null` または Instagram CDN URL）に「疎通確認に失敗した場合」を追加。疎通確認・OGP取得の両方が失敗した場合は`item.image = null`にし、既存のUnsplash補完ロジックに委ねる
+- RSS/Instagram問わず全ソースの新規イベントに汎用的に適用（Alvinology固有の特殊対応ではない）。Instagram由来の署名付きURL（有効期限切れが主リスク）は取得直後のバッチ内で疎通確認するため通常は問題を検知しない点に留意（詳細は`.claude/plan.md`「設計書57」参照）
+- データパッチ: 2026-07-17時点で既に`events.json`へ保存されていたAlvinology由来2件（`im-qalb-by-pun-im.png`・`Fujifilm-quicksnap-kv.jpg`）の`image`を、CDNサブドメインではなくオリジンサーバー（`alvinology.com/wp-content/uploads/...`）のURLへ手動書き換え済み
+- 同種の「URLはあるが実際には壊れている」既存イベントの全件スキャン・一括修復は今回のスコープ外（今後発覚した個別ケースごとに対応）
+
 ## 環境構成と注意事項（2026-07-07）
 
 ### Web版 = テスト環境 / iOS App Store版 = 本番環境

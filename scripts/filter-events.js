@@ -53,6 +53,38 @@ async function fetchArticleContent(url) {
   }
 }
 
+// ─── 画像URL疎通確認 ──────────────────────────────────────────────
+// RSSフィード等が返す画像URLが実際にHTTPで到達可能かを確認する。
+// CDNオフロードプラグインの伝播遅延等で403/404を返すケースを検知し、
+// OGPフォールバック（さらにはUnsplash補完）へ振り分けるために使う。
+async function isImageUrlReachable(url) {
+  if (!url) return false;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    try {
+      let res = await fetch(url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+      if (res.status === 405 || res.status === 501) {
+        // HEAD未対応のサーバー向けフォールバック（GET、ボディは読まない）
+        res = await fetch(url, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+      }
+      return res.ok; // 200-299
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch {
+    return false;
+  }
+}
+
 // ─── OGP画像取得 ──────────────────────────────────────────────────
 async function fetchOgpImage(url) {
   if (!url) return null;
@@ -493,7 +525,7 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
     console.log(`  ⚠️ 記事生成に失敗したため${enrichFailedCount}件のイベントを除外しました`);
   }
 
-  // OGP画像の取得（imageがnullのものだけ）
+  // OGP画像の取得（imageがnull、Instagram CDN、または疎通不能なもの）
   if (newItems.length > 0) {
     console.log(`\n  🖼 OGP画像取得中... (${newItems.length}件)`);
     await Promise.all(
@@ -501,9 +533,22 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
         // 外部URLがある場合はOGP優先（Instagram CDNは期限切れになるため）
         const hasExternalUrl = item.url && !item.url.includes('instagram.com');
         const isInstagramCdn = item.image && item.image.includes('cdninstagram.com');
-        if ((item.image === null || isInstagramCdn) && hasExternalUrl) {
+        // RSS由来等の画像URLがあり、Instagram CDNでもない場合のみ疎通確認する
+        // （item.image===null や isInstagramCdn の時点で既にfallback対象と分かっているため無駄な確認はしない）
+        const needsReachabilityCheck = item.image && !isInstagramCdn;
+        const isUnreachable = needsReachabilityCheck ? !(await isImageUrlReachable(item.image)) : false;
+
+        if ((item.image === null || isInstagramCdn || isUnreachable) && hasExternalUrl) {
           const ogp = await fetchOgpImage(item.url);
-          if (ogp) item.image = ogp;
+          if (ogp) {
+            item.image = ogp;
+          } else if (isUnreachable) {
+            // OGPも取得できず、元のURLも疎通不能ならnullにしUnsplash補完に委ねる
+            item.image = null;
+          }
+        } else if (isUnreachable) {
+          // 外部URLがなくOGPフォールバックもできない場合も、疎通不能なURLは保存しない
+          item.image = null;
         }
       })
     );
