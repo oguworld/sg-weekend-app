@@ -1695,7 +1695,8 @@ function getCalFilePath(groupId) {
 
 app.post('/api/calendar/create', async (req, res) => {
   try {
-    const { city = 'sg', encryptedData } = req.body;
+    // salt: 設計書55（パスフレーズ方式）。新方式グループのみ持つ。平文保存（秘密情報ではない、PBKDF2用ソルト）
+    const { city = 'sg', encryptedData, salt } = req.body;
     let groupId;
     do { groupId = generateGroupId(); }
     while (fs.existsSync(path.join(SHARED_CAL_DIR, `${groupId}.json`)));
@@ -1704,9 +1705,13 @@ app.post('/api/calendar/create', async (req, res) => {
       groupId, city,
       createdAt: new Date().toISOString(),
       lastSyncAt: new Date().toISOString(),
+      salt: salt || null,
       encryptedData: encryptedData || null,
     };
-    fs.writeFileSync(getCalFilePath(groupId), JSON.stringify(calData, null, 2));
+    const fp = getCalFilePath(groupId);
+    await withFileLock(fp, () => {
+      fs.writeFileSync(fp, JSON.stringify(calData, null, 2));
+    });
     res.json({ groupId });
   } catch (e) {
     console.error('calendar create:', e);
@@ -1721,23 +1726,25 @@ app.get('/api/calendar/:groupId', (req, res) => {
   catch (e) { res.status(500).json({ error: 'read failed' }); }
 });
 
-app.put('/api/calendar/:groupId', (req, res) => {
+app.put('/api/calendar/:groupId', async (req, res) => {
   const fp = getCalFilePath(req.params.groupId);
   if (!fp || !fs.existsSync(fp)) return res.status(404).json({ error: 'not found' });
   try {
-    const existing = JSON.parse(fs.readFileSync(fp, 'utf8'));
-    const { encryptedData, customPlans, eventPlans } = req.body;
-    const updated = { ...existing, lastSyncAt: new Date().toISOString() };
-    if (encryptedData !== undefined) {
-      updated.encryptedData = encryptedData;
-      delete updated.customPlans;
-      delete updated.eventPlans;
-      delete updated.qrDataUrl;
-    } else {
-      updated.customPlans = customPlans || [];
-      updated.eventPlans = eventPlans || [];
-    }
-    fs.writeFileSync(fp, JSON.stringify(updated, null, 2));
+    await withFileLock(fp, () => {
+      const existing = JSON.parse(fs.readFileSync(fp, 'utf8'));
+      const { encryptedData, customPlans, eventPlans } = req.body;
+      const updated = { ...existing, lastSyncAt: new Date().toISOString() };
+      if (encryptedData !== undefined) {
+        updated.encryptedData = encryptedData;
+        delete updated.customPlans;
+        delete updated.eventPlans;
+        delete updated.qrDataUrl;
+      } else {
+        updated.customPlans = customPlans || [];
+        updated.eventPlans = eventPlans || [];
+      }
+      fs.writeFileSync(fp, JSON.stringify(updated, null, 2));
+    });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: 'write failed' }); }
 });
@@ -1851,6 +1858,54 @@ app.post('/api/calendar/:groupId/notify', calNotifyLimit, async (req, res) => {
     }
     res.json({ ok: true, sent: subs.length - expired.size - expiredTokens.size });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────
+// USER PLANS BACKUP（個人予定表のログインユーザー同期＋ゼロ知識暗号化バックアップ、設計書54）
+// サーバーは salt（非秘密のPBKDF2ソルト）と encryptedData（暗号文）のみを保持し、
+// customPlans/eventPlansの平文は一切扱わない・検証もしない（暗号文のためパースも不可能）。
+// ─────────────────────────────────────────────
+const USER_PLANS_DIR = path.join(__dirname, 'data', 'user-plans');
+if (!fs.existsSync(USER_PLANS_DIR)) fs.mkdirSync(USER_PLANS_DIR, { recursive: true });
+
+function getUserPlansFilePath(userId) {
+  // userId は upsertUser() が 'usr_' + hex24 で発行する既知フォーマットのみ許可（パストラバーサル対策）
+  if (!/^usr_[a-f0-9]{24}$/.test(userId)) return null;
+  return path.join(USER_PLANS_DIR, `${userId}.json`);
+}
+
+app.get('/api/user-plans/me', requireAppAuth, (req, res) => {
+  const fp = getUserPlansFilePath(req.authUserId);
+  if (!fp) return res.status(400).json({ error: 'invalid user' });
+  if (!fs.existsSync(fp)) {
+    return res.json({ userId: req.authUserId, salt: null, encryptedData: null, updatedAt: null });
+  }
+  try {
+    res.json(JSON.parse(fs.readFileSync(fp, 'utf8')));
+  } catch (e) {
+    res.status(500).json({ error: 'read failed' });
+  }
+});
+
+app.put('/api/user-plans/me', requireAppAuth, async (req, res) => {
+  const fp = getUserPlansFilePath(req.authUserId);
+  if (!fp) return res.status(400).json({ error: 'invalid user' });
+  const { salt, encryptedData } = req.body;
+  if (!salt || !encryptedData) return res.status(400).json({ error: 'salt and encryptedData are required' });
+  try {
+    await withFileLock(fp, () => {
+      const data = {
+        userId: req.authUserId,
+        salt,
+        encryptedData,
+        updatedAt: new Date().toISOString(),
+      };
+      fs.writeFileSync(fp, JSON.stringify(data, null, 2));
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: 'write failed' });
+  }
 });
 
 // ─────────────────────────────────────────────

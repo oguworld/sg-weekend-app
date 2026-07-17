@@ -203,6 +203,41 @@ sg-weekend-app/
   - 一時計装`_sendDebugLog('auth_prefs_init', { hasPrefs, hasToken })`を`_initAuthToken`末尾に埋め込み済み。**原因確定後に削除する使い捨て**（`.claude/next.md`参照）
   - **未検証（次回フォロー）**: 実機（TestFlight）で「連携→アプリ完全終了→再起動して連携が維持されるか」、`logs/debug-nav.log`の`auth_prefs_init`で`hasPrefs:true`かつ再起動後も`hasToken:true`（Preferences永続化が機能しているか）の確認が必要
 
+## 個人予定表バックアップ（ゼロ知識暗号化）＋共有カレンダーのパスフレーズ方式化（2026-07-17実装、設計書54・55）
+
+設計書37のフェーズ1.5-Aを確定させ、ユーザー新要件「個人予定のサーバーバックアップもパスフレーズでゼロ知識暗号化したい」（設計書54）・「共有カレンダーの鍵配布をランダム鍵のURLフラグメント方式からパスフレーズ方式に変更したい」（設計書55）を実装した。両方とも**サーバーはパスフレーズ自体を一切保存しない**（PBKDF2用の非秘密saltと暗号文のみ保持）ゼロ知識設計。
+
+### 共通鍵導出ヘルパー（`public/app.js`）
+`_deriveKeyFromPassphrase(passphrase, saltB64)`: PBKDF2（iterations:100000, SHA-256）→AES-256-GCM鍵（`CryptoKey`）を導出。個人予定表バックアップ・共有カレンダーの両方から呼ばれる**唯一の共通実装**。ただし**パスフレーズ自体・保存先キー・保存値は完全に分離**（同じパスフレーズを使い回さない設計）。付随ヘルパー: `_genSaltB64()`（salt生成）・`_exportKeyMaterial()`/`_importKeyMaterial()`（鍵material⇔Base64url変換、案X-B用）・`_encryptWithKey()`/`_decryptWithKey()`（`CryptoKey`を直接受け取る汎用暗号化・復号、IV12バイト先頭付与）。
+
+### 個人予定表バックアップ（設計書54）
+- **データモデル**: `data/user-plans/{userId}.json`（新規、gitignore対象）。`{userId, salt, encryptedData, updatedAt}`のみ。`customPlans`/`eventPlans`の平文フィールドは一切持たない（`encryptedData`はAES-256-GCM暗号化されたJSON文字列）
+- **API**: `GET/PUT /api/user-plans/me`（`requireAppAuth`必須）。`getUserPlansFilePath(userId)`が`usr_[a-f0-9]{24}`形式のみ許可（パストラバーサル対策）。`PUT`は`salt`/`encryptedData`欠如時400、`withFileLock`で排他制御
+- **オプトイン方式**: ログインしただけでは自動的にバックアップは開始されない。設定画面「予定表のバックアップ」セクションで明示的にパスフレーズを設定した場合のみ有効化される（`isBackupEnabled()`は`localStorage`の鍵material有無で判定）
+- **同期フロー**: `saveCustomPlans`/`saveEventPlans`実行のたびに`_syncBackupToServer()`が呼ばれる（未ログイン・バックアップ未設定なら即return、実害なし）。設計書22パターン（5秒タイムアウト、失敗しても静かに諦めてUIをハングさせない）を踏襲
+- **鍵の保持方式（案X-B、2026-07-17ユーザー承認）**: 導出済み鍵material（`CryptoKey`をraw export→Base64url化した文字列）を`localStorage`（キー`app_backup_key_material`）＋`_CapPrefs`（iOS版、設計書49と同じハイブリッド方式）に保存し、次回起動時は自動復元。パスフレーズ自体は保存しない。端末が盗まれた場合のリスクは既存の共有カレンダー鍵保存方式と同じトレードオフとして許容（ユーザー確認済み）
+- **UI**: `renderBackupSection()`（未ログイン/未設定/設定済みの3状態を出し分け）。パスフレーズ入力シート（`#backup-passphrase-sheet`、`.plan-modal`パターン、z-index:3601/3602）は`setup`（初回、確認欄あり）/`change`（変更、確認欄あり）/`restore`（別端末での復元、確認欄なし）の3モードを1つのマークアップで共有。別端末での既存バックアップ検知は`checkExistingBackupOnOpen()`（設定画面を開いたタイミングで`GET /api/user-plans/me`を叩き、`salt`/`encryptedData`があれば復元導線を表示）
+- **失敗時の挙動**: 誤ったパスフレーズはAES-GCMタグ検証エラーとして捕捉し、ローカルデータを一切変更せずエラートースト表示のみ（`_doBackupRestore()`）
+- **既知の未解決事項（設計書54 §8に明記済み）**: パスフレーズを忘れた場合はサーバー側の救済手段なし（ゼロ知識設計の必然）。ログアウト時に鍵material・端末ローカルデータをクリアするかは未解決のまま「クリアしない」保守的挙動を採用（次回要検討）。バックアップ無効化時にサーバー側ファイルを削除するかも未設計
+
+### 共有カレンダーのパスフレーズ方式化（設計書55）
+- **データモデル変更**: `data/shared-calendars/{groupId}.json`に`salt`フィールドを追加（既存フィールドの削除・型変更なし、追加のみ）。`salt`ありグループ=新方式（パスフレーズ由来の鍵）、`salt`なしグループ=旧方式（ランダム鍵をURLフラグメントに埋め込み）として共存する
+- **サーバー**: `POST /api/calendar/create`が`salt`を追加受信・保存するのみ（既存`city`/`encryptedData`受信ロジックに1フィールド追加）。`GET /api/calendar/:groupId`は無変更で`salt`を含めてレスポンス（既存コードがオブジェクト全体を返すため自動対応）。`POST`/`PUT`両エンドポイントに`withFileLock`を新規適用（旧実装は素の`fs.writeFileSync`だった）
+- **クライアント（`public/app.js`）**: `getCalSalt()`/`setCalSalt()`新規（`{city}_shared_cal_salt`）。既存`getCalKey()`/`setCalKey()`は新方式では「パスフレーズから導出した鍵materialのBase64url」を保存する用途に変更（`setCalKey`にも`_CapPrefs`ミラーを追加）
+  - `doCreateGroup()`: 「グループを作成する」ボタン押下で即座にグループ作成せず、まずパスフレーズ設定シート（`openCalPassphraseSheet('create')`）を開く。実処理は`_doCalCreateGroup(passphrase)`に分離
+  - `loadCalQR()`/`copyJoinLink()`/`shareViaLine()`: `getCalSalt()`の有無で新方式（フラグメントなしURL）/旧方式（フラグメント付きURL、従来通り）に分岐
+  - `doJoinGroup()`: `_pendingJoinKey`（URLフラグメント由来）があれば旧方式として即座に`_doJoinGroupWithKey()`へ。フラグメントが無い場合はサーバーから該当グループの`salt`有無を確認し、`salt`ありなら新方式としてパスフレーズ入力シート（`openCalPassphraseSheet('join')`）へ誘導、`salt`なし（無暗号化グループ）ならそのまま`_doJoinGroupWithKey(gid, null)`。新規`_doJoinGroupWithPassphrase(gid, passphrase)`が新方式の復号・マージ・再暗号化・アップロードを担う
+  - `handleScannedQR()`/`checkJoinParam()`は無変更（既存の「URLに`join`パラメータ＋`#`フラグメント」抽出ロジックがそのまま新旧判定の入口として機能する）
+  - パスフレーズはQR・招待リンク・LINE共有メッセージのいずれにも含めない（設計書55 §2-7、鍵とグループIDを意図的に分離したままにする）。招待相手には別チャネル（口頭・LINE本文とは別）でパスフレーズを伝える運用を前提とする
+- **UI**: パスフレーズ入力シート（`#cal-passphrase-sheet`、z-index:3603/3604）は作成用（確認欄あり）・参加用（確認欄なし）を`_calPassphraseMode`で出し分け、個人予定表バックアップ側と同じマークアップパターンだが別要素・別変数で完全に分離
+- **⚠️ 後方互換性の重要な制約（2026-07-17ユーザー承認済みで受け入れ済みのリスク）**: 既存（デプロイ前作成済み）の`salt`なしグループは引き続き従来通りURLフラグメント鍵方式でアクセス可能。**しかし新方式（`salt`あり）で作られたグループには、旧バージョンApp（またはこの変更が未反映のWeb版/iOS版）から参加できない**（旧バージョンはパスフレーズ入力UIを持たず、フラグメントなしURLから鍵を取得する手段がないため）。Web版・iOS版のリリースタイミングがずれる期間は、新方式グループへの参加が片方のプラットフォームでのみ機能する状態が一時的に発生し得る
+- **既知の未解決事項（設計書55 §9に明記済み）**: `doManualJoin()`（6桁グループID手入力）への新方式パスフレーズ対応は今回のスコープ外のまま据え置き（技術的には可能だがUI詳細未設計）。PBKDF2のiterations値（100000固定）のモバイル実機でのパフォーマンスは次回TestFlightビルドでの実機確認が必要
+
+### 両機能共通
+- **TDZ回避**: 新規モジュールスコープ変数（`_backupKeyCache`/`_backupSyncInFlight`/`_backupSheetMode`/`_calPassphraseMode`）はいずれもオプトイン機能（ユーザーが設定画面を開いて明示的に操作するまで一切呼ばれない）のため、起動時同期フロー（`loadEventData()`/`initPushState()`等）から参照されず、TDZ対象外
+- **キャッシュバスティング**: `index.html` app.js?v=20260717a、`sw.js` CACHE_NAME=sg-weekend-v619
+- **未検証事項（次回TestFlightビルド後にフォロー）**: パスフレーズ設定→サーバーバックアップ→別端末での復元、共有カレンダーのQR読み取り→パスフレーズ入力での参加、の両フローとも実機での動作確認が未実施（Web版でのAPI疎通・暗号化ロジックの単体検証のみ完了）
+
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
 - `server.js` の `/api/chat` エンドポイントは旧App Store版の後方互換のため残置（新規呼び出し元なし）

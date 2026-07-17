@@ -474,6 +474,36 @@
         toastLoginSuccess: '連携しました',
         toastLoginError: '連携に失敗しました。もう一度お試しください',
         toastLogoutSuccess: '連携を解除しました',
+        // 個人予定表バックアップ（設計書54）
+        secBackup: '予定表のバックアップ',
+        backupLoginRequired: 'バックアップを利用するにはアカウント連携が必要です',
+        backupDisabledDesc: 'パスフレーズを設定すると、予定表をサーバーに暗号化してバックアップできます。パスフレーズを知っている本人以外は内容を読めません。',
+        backupEnabledDesc: 'バックアップは有効です。予定の追加・編集は自動的に暗号化して同期されます。',
+        backupFoundExistingDesc: '別の端末で作成済みのバックアップが見つかりました。パスフレーズを入力して復元するか、新しくバックアップを作成できます。',
+        backupEnable: 'バックアップを有効にする',
+        backupDisable: 'バックアップを無効にする',
+        backupChangePassphrase: 'パスフレーズを変更',
+        backupSetupTitle: 'バックアップ用パスフレーズを設定',
+        backupRestoreTitle: 'パスフレーズを入力',
+        backupPassphraseWarning: '⚠️ パスフレーズを忘れるとバックアップは復元できません。安全な場所に控えてください。',
+        backupPassphrasePlaceholder: 'パスフレーズ',
+        backupPassphraseConfirmPlaceholder: 'パスフレーズ（確認）',
+        backupPassphraseSubmit: '確定',
+        backupPassphraseEmpty: 'パスフレーズを入力してください',
+        backupPassphraseMismatch: 'パスフレーズが一致しません',
+        confirmBackupDisable: 'バックアップを無効にしますか？サーバー上のデータはこの端末からは同期されなくなります。',
+        toastBackupEnabled: '🔒 バックアップを有効にしました',
+        toastBackupDisabled: 'バックアップを無効にしました',
+        toastBackupRestored: '✅ バックアップから復元しました',
+        toastBackupError: '⚠️ 処理に失敗しました。もう一度お試しください',
+        toastBackupPassphraseWrong: 'パスフレーズが正しくありません',
+        // 共有カレンダーのパスフレーズ方式（設計書55）
+        calPassphraseSetupTitle: '共有用パスフレーズを設定',
+        calPassphraseJoinTitle: 'パスフレーズを入力',
+        calPassphraseWarning: '⚠️ パスフレーズを忘れると共有カレンダーは復元できません。参加者に別途お伝えください。',
+        toastCalGroupCreateError: 'グループ作成に失敗しました',
+        toastCalJoinError: '参加に失敗しました。グループIDをご確認ください。',
+        toastCalPassphraseWrong: 'パスフレーズが正しくありません',
       },
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
@@ -680,6 +710,36 @@
         toastLoginSuccess: 'Account linked',
         toastLoginError: 'Linking failed. Please try again',
         toastLogoutSuccess: 'Account unlinked',
+        // Personal plan backup (design doc 54)
+        secBackup: 'Plan Backup',
+        backupLoginRequired: 'Please link your account to use backup',
+        backupDisabledDesc: 'Set a passphrase to back up your plans to the server, encrypted so only you can read them.',
+        backupEnabledDesc: 'Backup is enabled. Plan changes are automatically encrypted and synced.',
+        backupFoundExistingDesc: 'An existing backup from another device was found. Enter your passphrase to restore it, or create a new backup.',
+        backupEnable: 'Enable Backup',
+        backupDisable: 'Disable Backup',
+        backupChangePassphrase: 'Change Passphrase',
+        backupSetupTitle: 'Set a Backup Passphrase',
+        backupRestoreTitle: 'Enter Passphrase',
+        backupPassphraseWarning: '⚠️ If you forget your passphrase, the backup cannot be recovered. Please keep it somewhere safe.',
+        backupPassphrasePlaceholder: 'Passphrase',
+        backupPassphraseConfirmPlaceholder: 'Confirm Passphrase',
+        backupPassphraseSubmit: 'Confirm',
+        backupPassphraseEmpty: 'Please enter a passphrase',
+        backupPassphraseMismatch: 'Passphrases do not match',
+        confirmBackupDisable: 'Disable backup? This device will stop syncing with the server.',
+        toastBackupEnabled: '🔒 Backup enabled',
+        toastBackupDisabled: 'Backup disabled',
+        toastBackupRestored: '✅ Restored from backup',
+        toastBackupError: '⚠️ Something went wrong. Please try again',
+        toastBackupPassphraseWrong: 'Incorrect passphrase',
+        // Shared calendar passphrase mode (design doc 55)
+        calPassphraseSetupTitle: 'Set a Sharing Passphrase',
+        calPassphraseJoinTitle: 'Enter Passphrase',
+        calPassphraseWarning: '⚠️ If the passphrase is forgotten, the shared calendar cannot be recovered. Please share it with participants separately.',
+        toastCalGroupCreateError: 'Failed to create group',
+        toastCalJoinError: 'Failed to join. Please check the group ID.',
+        toastCalPassphraseWrong: 'Incorrect passphrase',
       }
     };
 
@@ -1960,6 +2020,11 @@
         if (e.target.closest('#google-login-btn'))  { e.preventDefault(); handleGoogleLoginClick(); return; }
         if (e.target.closest('#apple-login-btn'))    { e.preventDefault(); handleAppleLoginClick();  return; }
         if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
+        if (e.target.closest('#backup-section-content button')) {
+          const btn = e.target.closest('button');
+          e.preventDefault(); btn && btn.click();
+          return;
+        }
       }, { passive: false });
     }
 
@@ -1988,6 +2053,10 @@
       ['emoji-picker-overlay',    () => closeEmojiPicker()],
       ['schedule-action-overlay', () => closeScheduleActionSheet()],
       ['cal-popup-overlay',       () => closeCalPopup()],
+      ['backup-passphrase-overlay', () => closeBackupPassphraseSheet()],
+      ['cal-passphrase-overlay',    () => closeCalPassphraseSheet()],
+      ['backup-passphrase-submit-btn', () => submitBackupPassphrase()],
+      ['cal-passphrase-submit-btn',    () => submitCalPassphrase()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -2633,6 +2702,7 @@
         // 通信エラー・fetch自体の失敗ではトークンを消さず、楽観的に「連携中」を維持する（設計書48・課題2）
         _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
       }
+      if (typeof renderBackupSection === 'function') renderBackupSection();
     }
 
     function handleLogoutClick() {
@@ -2641,6 +2711,10 @@
       clearAuthToken();
       showToast(t('toastLogoutSuccess'));
       refreshLoginUI();
+      // ログアウト時、バックアップの鍵material自体はローカルに残す（設計書54 §8-5、未解決事項として明示。
+      // 再ログイン時に同じ端末なら鍵を保持したまま同期を再開できるようにするための保守的な選択）。
+      // 表示のみ「未ログイン」向けの案内に更新する。
+      renderBackupSection();
     }
 
     // iOS版: Capacitorネイティブプラグイン経由でGoogleサインインを起動
@@ -3328,6 +3402,8 @@
         if (screen === 'settings') {
           initSettingsProfile();
           initSettingsGenres();
+          renderBackupSection();
+          checkExistingBackupOnOpen();
         }
       }
     }
@@ -4490,11 +4566,14 @@
     async function saveCustomPlans(arr) {
       localStorage.setItem('custom_plans', JSON.stringify(arr));
       if (getSharedGroupId() && !_calSyncFromServer) await syncToServer();
+      // 個人予定表バックアップ（設計書54）: ログイン中かつバックアップ有効時のみ、restore経由の書き込み以外でバックグラウンド同期
+      if (!_calSyncFromServer) _syncBackupToServer();
     }
     function getEventPlans() { return JSON.parse(localStorage.getItem(getCity()+'_event_plans') || '[]'); }
     async function saveEventPlans(arr) {
       localStorage.setItem(getCity()+'_event_plans', JSON.stringify(arr));
       if (getSharedGroupId() && !_calSyncFromServer) await syncToServer();
+      if (!_calSyncFromServer) _syncBackupToServer();
     }
 
     function fmtDateKey(d) {
@@ -5962,6 +6041,328 @@
 
 
 
+    // ─── パスフレーズ由来の鍵導出（共通ヘルパー、設計書54/55）───
+    // 個人予定表バックアップ（設計書54）・共有カレンダー（設計書55）の両方から呼ばれる。
+    // 「鍵導出アルゴリズムの関数のみ共通化し、パスフレーズ自体・保存先キー・保存値は完全に分離する」方針（設計書55 §4）。
+    function _b64urlEncode(bytes) {
+      return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    }
+    function _b64urlDecode(b64) {
+      return Uint8Array.from(atob(b64.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
+    }
+    function _genSaltB64() {
+      return _b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
+    }
+    // パスフレーズ文字列 + salt(Base64url) から AES-256-GCM の CryptoKey を導出する（PBKDF2, iterations:100000, SHA-256）
+    async function _deriveKeyFromPassphrase(passphrase, saltB64) {
+      const saltBytes = _b64urlDecode(saltB64);
+      const baseKey = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
+      );
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: saltBytes, iterations: 100000, hash: 'SHA-256' },
+        baseKey,
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+      );
+    }
+    // CryptoKeyをraw exportしてBase64url化する（案X-B: 端末保存・自動復元用。導出済み鍵materialのみ保存し、平文パスフレーズ自体は保存しない）
+    async function _exportKeyMaterial(cryptoKey) {
+      const raw = await crypto.subtle.exportKey('raw', cryptoKey);
+      return _b64urlEncode(raw);
+    }
+    async function _importKeyMaterial(b64) {
+      return crypto.subtle.importKey('raw', _b64urlDecode(b64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    }
+    // CryptoKeyオブジェクトを直接受け取る汎用の暗号化・復号（IV12バイト先頭付与、Base64url、既存_encryptPlans/_decryptPlansと同パターン）
+    async function _encryptWithKey(cryptoKey, data) {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(JSON.stringify(data)));
+      const buf = new Uint8Array(12 + ct.byteLength);
+      buf.set(iv); buf.set(new Uint8Array(ct), 12);
+      return _b64urlEncode(buf);
+    }
+    async function _decryptWithKey(cryptoKey, encB64) {
+      const buf = _b64urlDecode(encB64);
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, cryptoKey, buf.slice(12));
+      return JSON.parse(new TextDecoder().decode(plain));
+    }
+
+    // ─── 個人予定表バックアップ（設計書54）───
+    // ログイン認証（誰のデータか）とバックアップ用パスフレーズ（暗号化鍵の元）は完全に別レイヤー。
+    // オプトイン機能のため起動時同期フロー（loadEventData()等）からは一切呼ばれない。
+    // そのため下記モジュールスコープ変数はTDZ対象外（起動時フローの間接参照経路に無い、設計書54 §2-8）。
+    const BACKUP_KEY_MATERIAL_KEY = 'app_backup_key_material'; // 導出済み鍵material（raw export→Base64url）の保存キー。パスフレーズ自体は保存しない
+    let _backupKeyCache = null; // 導出済みCryptoKey（メモリキャッシュ、同期読み取り用）
+    let _backupSyncInFlight = false; // 多重PUT防止用の簡易フラグ
+
+    function _getBackupKeyMaterial() {
+      try { return localStorage.getItem(BACKUP_KEY_MATERIAL_KEY); } catch (_) { return null; }
+    }
+    function _setBackupKeyMaterial(material) {
+      try { localStorage.setItem(BACKUP_KEY_MATERIAL_KEY, material); } catch (_) {}
+      if (_CapPrefs) _CapPrefs.set({ key: BACKUP_KEY_MATERIAL_KEY, value: material }).catch(() => {});
+    }
+    function _clearBackupKeyMaterial() {
+      _backupKeyCache = null;
+      try { localStorage.removeItem(BACKUP_KEY_MATERIAL_KEY); } catch (_) {}
+      if (_CapPrefs) _CapPrefs.remove({ key: BACKUP_KEY_MATERIAL_KEY }).catch(() => {});
+    }
+    // iOS版はPreferencesをソースオブトゥルースとして復元（設計書49/50と同じハイブリッド方式）。
+    // オプトイン機能のため起動時には呼ばない。バックアップセクションを開いたタイミングで一度だけ呼ぶ。
+    async function _restoreBackupKeyFromPrefsIfNeeded() {
+      if (_backupKeyCache) return true;
+      let material = null;
+      if (_CapPrefs) {
+        try {
+          const r = await _CapPrefs.get({ key: BACKUP_KEY_MATERIAL_KEY });
+          material = (r && typeof r.value === 'string') ? r.value : null;
+          if (material) { try { localStorage.setItem(BACKUP_KEY_MATERIAL_KEY, material); } catch (_) {} }
+        } catch (_) {}
+      }
+      if (!material) material = _getBackupKeyMaterial();
+      if (!material) return false;
+      try {
+        _backupKeyCache = await _importKeyMaterial(material);
+        return true;
+      } catch (_) { return false; }
+    }
+
+    function isBackupEnabled() {
+      return !!_getBackupKeyMaterial();
+    }
+
+    // saveCustomPlans/saveEventPlansから呼ばれる。バックアップ未設定・未ログインなら即return（実害なし）。
+    async function _syncBackupToServer() {
+      if (!getAuthToken()) return;
+      if (!isBackupEnabled()) return;
+      if (_backupSyncInFlight) return;
+      _backupSyncInFlight = true;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 設計書22パターン踏襲：ハングさせない
+      try {
+        if (!_backupKeyCache) {
+          const ok = await _restoreBackupKeyFromPrefsIfNeeded();
+          if (!ok) return;
+        }
+        const salt = localStorage.getItem('app_backup_salt');
+        if (!salt) return;
+        const customPlans = getCustomPlans();
+        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const encryptedData = await _encryptWithKey(_backupKeyCache, { customPlans, eventPlans });
+        await authedFetch(API_BASE + '/api/user-plans/me', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ salt, encryptedData }),
+          signal: controller.signal,
+        });
+      } catch (e) {
+        // ネットワークエラー・タイムアウトとも静かに諦める（ローカル保存は既に完了済み、UIをブロックしない）
+      } finally {
+        clearTimeout(timeoutId);
+        _backupSyncInFlight = false;
+      }
+    }
+
+    function openBackupSection() {
+      renderBackupSection();
+    }
+
+    function renderBackupSection() {
+      const el = document.getElementById('backup-section-content');
+      if (!el) return;
+      const loggedIn = !!getAuthToken();
+      if (!loggedIn) {
+        el.innerHTML = `<p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0;" data-i18n="backupLoginRequired">${t('backupLoginRequired')}</p>`;
+        return;
+      }
+      if (isBackupEnabled()) {
+        el.innerHTML = `
+          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupEnabledDesc">${t('backupEnabledDesc')}</p>
+          <button class="cal-sync-action secondary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('change')" ontouchend="">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>
+          <button class="cal-sync-action danger" onclick="if(!_touchCapableDetected) disableBackup()">🚫 <span data-i18n="backupDisable">${t('backupDisable')}</span></button>`;
+      } else {
+        el.innerHTML = `
+          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
+          <button class="cal-sync-action primary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('setup')">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
+      }
+    }
+
+    // ─── バックアップ用パスフレーズ入力シート ───
+    let _backupSheetMode = null; // 'setup' | 'restore' | 'change'
+
+    async function openBackupPassphraseSheet(mode) {
+      if (!getAuthToken()) { showToast(t('backupLoginRequired')); return; }
+      _backupSheetMode = mode;
+      const titleEl = document.getElementById('backup-passphrase-title');
+      const warnEl = document.getElementById('backup-passphrase-warn');
+      const confirmRow = document.getElementById('backup-passphrase-confirm-row');
+      document.getElementById('backup-passphrase-input').value = '';
+      document.getElementById('backup-passphrase-confirm-input').value = '';
+      if (warnEl) warnEl.style.display = '';
+      if (mode === 'setup') {
+        if (titleEl) titleEl.textContent = t('backupSetupTitle');
+        if (confirmRow) confirmRow.style.display = '';
+      } else if (mode === 'change') {
+        if (titleEl) titleEl.textContent = t('backupChangePassphrase');
+        if (confirmRow) confirmRow.style.display = '';
+      } else {
+        // restore: サーバーに既存バックアップがある場合（別端末で設定済み）
+        if (titleEl) titleEl.textContent = t('backupRestoreTitle');
+        if (confirmRow) confirmRow.style.display = 'none';
+      }
+      lockScroll();
+      document.getElementById('backup-passphrase-overlay').classList.add('visible');
+      document.getElementById('backup-passphrase-sheet').classList.add('visible');
+    }
+
+    function closeBackupPassphraseSheet() {
+      _blurIfFocusInside('backup-passphrase-sheet');
+      unlockScroll();
+      document.getElementById('backup-passphrase-overlay').classList.remove('visible');
+      document.getElementById('backup-passphrase-sheet').classList.remove('visible');
+    }
+
+    async function submitBackupPassphrase() {
+      const passphrase = (document.getElementById('backup-passphrase-input').value || '').trim();
+      if (!passphrase) { showToast(t('backupPassphraseEmpty')); return; }
+      const mode = _backupSheetMode;
+      if (mode === 'setup' || mode === 'change') {
+        const confirmVal = (document.getElementById('backup-passphrase-confirm-input').value || '').trim();
+        if (passphrase !== confirmVal) { showToast(t('backupPassphraseMismatch')); return; }
+      }
+      const btn = document.getElementById('backup-passphrase-submit-btn');
+      if (btn) { btn.disabled = true; }
+      try {
+        if (mode === 'setup') {
+          await _doBackupSetup(passphrase);
+        } else if (mode === 'change') {
+          await _doBackupChange(passphrase);
+        } else {
+          await _doBackupRestore(passphrase);
+        }
+      } finally {
+        if (btn) { btn.disabled = false; }
+      }
+    }
+
+    async function _doBackupSetup(passphrase) {
+      try {
+        const salt = _genSaltB64();
+        const key = await _deriveKeyFromPassphrase(passphrase, salt);
+        const customPlans = getCustomPlans();
+        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const encryptedData = await _encryptWithKey(key, { customPlans, eventPlans });
+        const res = await authedFetch(API_BASE + '/api/user-plans/me', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ salt, encryptedData }),
+        });
+        if (!res.ok) throw new Error('backup setup failed');
+        _backupKeyCache = key;
+        const material = await _exportKeyMaterial(key);
+        _setBackupKeyMaterial(material);
+        localStorage.setItem('app_backup_salt', salt);
+        closeBackupPassphraseSheet();
+        renderBackupSection();
+        showToast(t('toastBackupEnabled'));
+      } catch (e) {
+        showToast(t('toastBackupError'));
+      }
+    }
+
+    async function _doBackupChange(passphrase) {
+      try {
+        // 既存の鍵で復号できることを確認してから新パスフレーズで再暗号化（設計書54 §6-10のフロー）
+        if (!_backupKeyCache) {
+          const ok = await _restoreBackupKeyFromPrefsIfNeeded();
+          if (!ok) { showToast(t('toastBackupError')); return; }
+        }
+        const customPlans = getCustomPlans();
+        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const newSalt = _genSaltB64();
+        const newKey = await _deriveKeyFromPassphrase(passphrase, newSalt);
+        const encryptedData = await _encryptWithKey(newKey, { customPlans, eventPlans });
+        const res = await authedFetch(API_BASE + '/api/user-plans/me', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ salt: newSalt, encryptedData }),
+        });
+        if (!res.ok) throw new Error('backup change failed');
+        _backupKeyCache = newKey;
+        const material = await _exportKeyMaterial(newKey);
+        _setBackupKeyMaterial(material);
+        localStorage.setItem('app_backup_salt', newSalt);
+        closeBackupPassphraseSheet();
+        renderBackupSection();
+        showToast(t('toastBackupEnabled'));
+      } catch (e) {
+        showToast(t('toastBackupError'));
+      }
+    }
+
+    async function _doBackupRestore(passphrase) {
+      try {
+        const res = await authedFetch(API_BASE + '/api/user-plans/me');
+        if (!res.ok) throw new Error('fetch failed');
+        const d = await res.json();
+        if (!d.salt || !d.encryptedData) { showToast(t('toastBackupError')); return; }
+        const key = await _deriveKeyFromPassphrase(passphrase, d.salt);
+        let dec;
+        try {
+          dec = await _decryptWithKey(key, d.encryptedData);
+        } catch (e) {
+          showToast(t('toastBackupPassphraseWrong'));
+          return;
+        }
+        const localCustom = getCustomPlans();
+        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const merged = { customPlans: mergeArr(localCustom, dec.customPlans || []), eventPlans: mergeArr(localEvent, dec.eventPlans || []) };
+        _backupKeyCache = key;
+        const material = await _exportKeyMaterial(key);
+        _setBackupKeyMaterial(material);
+        localStorage.setItem('app_backup_salt', d.salt);
+        await saveCustomPlans(merged.customPlans);
+        await saveEventPlans(merged.eventPlans);
+        closeBackupPassphraseSheet();
+        renderBackupSection();
+        renderScheduleTab();
+        showToast(t('toastBackupRestored'));
+      } catch (e) {
+        showToast(t('toastBackupError'));
+      }
+    }
+
+    function disableBackup() {
+      if (!confirm(t('confirmBackupDisable'))) return;
+      _clearBackupKeyMaterial();
+      localStorage.removeItem('app_backup_salt');
+      renderBackupSection();
+      showToast(t('toastBackupDisabled'));
+    }
+
+    // 設定画面「予定表のバックアップ」セクションを開いたタイミングで、
+    // 別端末での既存バックアップ有無をチェックし、あればrestoreモードの案内を出す。
+    async function checkExistingBackupOnOpen() {
+      if (!getAuthToken()) return;
+      if (isBackupEnabled()) return; // 既にこの端末で有効化済みなら何もしない
+      try {
+        const res = await authedFetch(API_BASE + '/api/user-plans/me');
+        if (!res.ok) return;
+        const d = await res.json();
+        if (d.salt && d.encryptedData) {
+          const el = document.getElementById('backup-section-content');
+          if (el) {
+            el.innerHTML = `
+              <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupFoundExistingDesc">${t('backupFoundExistingDesc')}</p>
+              <button class="cal-sync-action primary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('restore')">🔓 <span data-i18n="backupRestoreTitle">${t('backupRestoreTitle')}</span></button>
+              <button class="cal-sync-action secondary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('setup')">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
+          }
+        }
+      } catch (e) {}
+    }
+
     // ─── 共有カレンダー ───
     let _calSyncFromServer = false;
     let _pendingJoinGroupId = null;
@@ -5977,9 +6378,25 @@
       return Object.values(m);
     }
 
-    // ─── E2E ENCRYPTION (AES-256-GCM, key lives in URL fragment only) ───
+    // ─── E2E ENCRYPTION (AES-256-GCM) ───
+    // 設計書55: 新方式（パスフレーズ由来の鍵）と旧方式（URLフラグメントのランダム鍵）が共存する。
+    // getCalKey/setCalKey は「実際に暗号化・復号に使う鍵材料（Base64url）」を保持する点は旧方式から変更なし。
+    // 新方式ではパスフレーズ自体ではなく、パスフレーズから導出した鍵material（raw export→Base64url）をここに保存する
+    // （案X-B: 端末保存・自動復元、設計書55 §2-8）。
     function getCalKey() { return localStorage.getItem(getCity()+'_shared_cal_key') || null; }
-    function setCalKey(k) { if (k) localStorage.setItem(getCity()+'_shared_cal_key', k); else localStorage.removeItem(getCity()+'_shared_cal_key'); }
+    function setCalKey(k) {
+      if (k) localStorage.setItem(getCity()+'_shared_cal_key', k); else localStorage.removeItem(getCity()+'_shared_cal_key');
+      if (_CapPrefs) {
+        const prefKey = getCity()+'_shared_cal_key';
+        if (k) _CapPrefs.set({ key: prefKey, value: k }).catch(() => {});
+        else _CapPrefs.remove({ key: prefKey }).catch(() => {});
+      }
+    }
+    // salt: 新方式グループのみ持つ。平文（非秘密）、パスフレーズと組み合わせて鍵を導出するために必要。
+    function getCalSalt() { return localStorage.getItem(getCity()+'_shared_cal_salt') || null; }
+    function setCalSalt(s) {
+      if (s) localStorage.setItem(getCity()+'_shared_cal_salt', s); else localStorage.removeItem(getCity()+'_shared_cal_salt');
+    }
 
     async function _genCalKey() {
       const k = await crypto.subtle.generateKey({name:'AES-GCM',length:256}, true, ['encrypt','decrypt']);
@@ -6204,8 +6621,9 @@
           <div class="cal-sync-groupid-line">グループID: <strong>${gid}</strong></div>
           <div style="background:var(--sage-pale);border:1px solid var(--sage-light);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--warm-gray);line-height:1.65;">
             🔒 予定は<strong>暗号化</strong>して保存されています。共有メンバー以外は読めません（アプリ管理者も含む）。<br>
-            <span style="color:var(--terracotta);">⚠️ リンク（またはQR）を知っている人は誰でも参加できます。</span><br>
-            信頼できる相手にだけ共有してください。
+            ${getCalSalt()
+              ? '<span style="color:var(--terracotta);">⚠️ 参加にはパスフレーズが必要です。招待相手に別途パスフレーズをお伝えください。</span>'
+              : '<span style="color:var(--terracotta);">⚠️ リンク（またはQR）を知っている人は誰でも参加できます。</span><br>信頼できる相手にだけ共有してください。'}
           </div>
           <p style="font-size:13px;color:var(--warm-gray);text-align:center;margin:0 0 10px;">QRコードを読み取るか、リンクを送ると参加できます</p>
           <div id="cal-qr-wrap" style="display:flex;justify-content:center;margin-bottom:12px;min-height:200px;align-items:center;">
@@ -6229,39 +6647,52 @@
       }
     }
 
+    // 新方式（salt）グループはフラグメントなしURL、旧方式（fragment鍵）グループは従来通りフラグメント付きURL（設計書55 §3）
     async function loadCalQR(gid) {
       try {
+        const salt = getCalSalt();
         const key = getCalKey();
-        const url = `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
+        const url = salt
+          ? `https://dosuru.app/?join=${gid}&city=${getCity()}`
+          : `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
         const dataUrl = await _generateQR(url);
         const wrap = document.getElementById('cal-qr-wrap');
         if (wrap) wrap.innerHTML = `<img src="${dataUrl}" width="200" height="200" style="border-radius:12px;" alt="QR">`;
       } catch(e) {}
     }
 
-    async function doCreateGroup() {
-      const btn = document.getElementById('cal-create-btn');
-      if (btn) { btn.disabled = true; btn.textContent = '作成中...'; }
+    // 「グループを作成する」ボタン押下 → パスフレーズ設定シートを開くフローに変更（設計書55）
+    function doCreateGroup() {
+      openCalPassphraseSheet('create');
+    }
+
+    async function _doCalCreateGroup(passphrase) {
+      const btn = document.getElementById('cal-passphrase-submit-btn');
       try {
         const city = getCity();
-        const key = await _genCalKey();
+        const salt = _genSaltB64();
+        const cryptoKey = await _deriveKeyFromPassphrase(passphrase, salt);
         const customPlans = getCustomPlans();
         const eventPlans  = JSON.parse(localStorage.getItem(city+'_event_plans')||'[]');
-        const encryptedData = await _encryptPlans(key, {customPlans, eventPlans});
+        const encryptedData = await _encryptWithKey(cryptoKey, {customPlans, eventPlans});
         const r = await fetch(API_BASE + '/api/calendar/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, encryptedData })
+          body: JSON.stringify({ city, salt, encryptedData })
         });
+        if (!r.ok) throw new Error('create failed');
         const d = await r.json();
-        setCalKey(key);
+        const material = await _exportKeyMaterial(cryptoKey);
+        setCalKey(material);
+        setCalSalt(salt);
         setSharedGroupId(d.groupId);
         if (_hasActivePushSub()) await _registerGroupPush(d.groupId);
         updateCalSyncBtn();
+        closeCalPassphraseSheet();
         renderCalSyncModal();
       } catch(e) {
-        showToast('グループ作成に失敗しました');
-        if (btn) { btn.disabled = false; btn.textContent = '🔗 グループを作成する'; }
+        showToast(t('toastCalGroupCreateError'));
+        if (btn) { btn.disabled = false; }
       }
     }
 
@@ -6279,6 +6710,7 @@
       await fetchFromServer();
       setSharedGroupId(null);
       setCalKey(null);
+      setCalSalt(null);
       updateCalSyncBtn();
       renderScheduleTab();
       closeCalSync();
@@ -6286,8 +6718,11 @@
     }
 
     function copyJoinLink(gid) {
+      const salt = getCalSalt();
       const key = getCalKey();
-      const url = `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
+      const url = salt
+        ? `https://dosuru.app/?join=${gid}&city=${getCity()}`
+        : `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(url).then(() => showToast('リンクをコピーしました')).catch(() => _fallbackCopy(url));
       } else {
@@ -6303,8 +6738,12 @@
     }
 
     function shareViaLine(gid) {
+      const salt = getCalSalt();
       const key = getCalKey();
-      const url = `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
+      const url = salt
+        ? `https://dosuru.app/?join=${gid}&city=${getCity()}`
+        : `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
+      // パスフレーズ自体はメッセージ本文に含めない（設計書55 §2-7、意図的に鍵とグループIDを分離したままにする）
       const msg = `おでかけNaviの予定表グループに参加してください！\n${url}`;
       window.open(`https://line.me/R/share?text=${encodeURIComponent(msg)}`, '_blank');
     }
@@ -6440,10 +6879,35 @@
       _pendingJoinKey = null;
     }
 
+    // 「参加する」ボタン押下。salt有無で新方式（パスフレーズ入力）/旧方式（フラグメント鍵）に分岐する（設計書55 §2-5）。
     async function doJoinGroup() {
       if (!_pendingJoinGroupId) return;
       const gid = _pendingJoinGroupId;
-      const key = _pendingJoinKey;
+      // 旧方式: URLフラグメントに鍵が含まれていた場合はそのまま従来ロジックで参加する
+      if (_pendingJoinKey) {
+        await _doJoinGroupWithKey(gid, _pendingJoinKey);
+        return;
+      }
+      // 新方式判定のため、まずグループ情報を取得してsaltの有無を見る
+      try {
+        const r = await fetch(API_BASE + `/api/calendar/${gid}`);
+        if (!r.ok) throw new Error();
+        const serverData = await r.json();
+        if (serverData.salt) {
+          // 新方式グループ: パスフレーズ入力シートへ誘導（確認ダイアログはそのまま維持、閉じてから開く）
+          closeJoinPrompt();
+          _pendingJoinGroupId = gid;
+          openCalPassphraseSheet('join');
+          return;
+        }
+        // saltなし・暗号化なしグループ（既存の無暗号化グループ）
+        await _doJoinGroupWithKey(gid, null);
+      } catch (e) {
+        showToast('参加に失敗しました。グループIDをご確認ください。');
+      }
+    }
+
+    async function _doJoinGroupWithKey(gid, key) {
       try {
         const r = await fetch(API_BASE + `/api/calendar/${gid}`);
         if (!r.ok) throw new Error();
@@ -6495,6 +6959,107 @@
         }
       } catch(e) {
         showToast('参加に失敗しました。グループIDをご確認ください。');
+      }
+    }
+
+    // 新方式グループ（salt あり）への参加。パスフレーズ入力シートから呼ばれる（設計書55 §2-5）。
+    async function _doJoinGroupWithPassphrase(gid, passphrase) {
+      try {
+        const r = await fetch(API_BASE + `/api/calendar/${gid}`);
+        if (!r.ok) throw new Error();
+        const serverData = await r.json();
+        if (!serverData.salt || !serverData.encryptedData) { showToast(t('toastCalJoinError')); return; }
+
+        const cryptoKey = await _deriveKeyFromPassphrase(passphrase, serverData.salt);
+        let dec;
+        try {
+          dec = await _decryptWithKey(cryptoKey, serverData.encryptedData);
+        } catch (e) {
+          showToast(t('toastCalPassphraseWrong'));
+          return;
+        }
+        const serverCustom = dec.customPlans || [];
+        const serverEvent  = dec.eventPlans  || [];
+        const localCustom = getCustomPlans();
+        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
+        const merged = { customPlans: mergeArr(serverCustom, localCustom), eventPlans: mergeArr(serverEvent, localEvent) };
+        const encryptedData = await _encryptWithKey(cryptoKey, merged);
+        await fetch(API_BASE + `/api/calendar/${gid}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ encryptedData })
+        });
+
+        const material = await _exportKeyMaterial(cryptoKey);
+        setCalKey(material);
+        setCalSalt(serverData.salt);
+        _calSyncFromServer = true;
+        await saveCustomPlans(merged.customPlans);
+        await saveEventPlans(merged.eventPlans);
+        _calSyncFromServer = false;
+        setSharedGroupId(gid);
+        if (_hasActivePushSub()) await _registerGroupPush(gid);
+        updateCalSyncBtn();
+        renderScheduleTab();
+        closeCalPassphraseSheet();
+        showToast('グループに参加しました！');
+        if (_shouldShowPushPrompt()) {
+          renderCalSyncModal();
+          document.getElementById('cal-sync-overlay').classList.add('visible');
+          document.getElementById('cal-sync-modal').classList.add('visible');
+        }
+      } catch (e) {
+        showToast(t('toastCalJoinError'));
+      }
+    }
+
+    // ─── 共有カレンダー用パスフレーズ入力シート（作成用・参加用共通、設計書55）───
+    let _calPassphraseMode = null; // 'create' | 'join'
+
+    function openCalPassphraseSheet(mode) {
+      _calPassphraseMode = mode;
+      const titleEl = document.getElementById('cal-passphrase-title');
+      const confirmRow = document.getElementById('cal-passphrase-confirm-row');
+      document.getElementById('cal-passphrase-input').value = '';
+      document.getElementById('cal-passphrase-confirm-input').value = '';
+      if (mode === 'create') {
+        if (titleEl) titleEl.textContent = t('calPassphraseSetupTitle');
+        if (confirmRow) confirmRow.style.display = '';
+      } else {
+        if (titleEl) titleEl.textContent = t('calPassphraseJoinTitle');
+        if (confirmRow) confirmRow.style.display = 'none';
+      }
+      lockScroll();
+      document.getElementById('cal-passphrase-overlay').classList.add('visible');
+      document.getElementById('cal-passphrase-sheet').classList.add('visible');
+    }
+
+    function closeCalPassphraseSheet() {
+      _blurIfFocusInside('cal-passphrase-sheet');
+      unlockScroll();
+      document.getElementById('cal-passphrase-overlay').classList.remove('visible');
+      document.getElementById('cal-passphrase-sheet').classList.remove('visible');
+    }
+
+    async function submitCalPassphrase() {
+      const passphrase = (document.getElementById('cal-passphrase-input').value || '').trim();
+      if (!passphrase) { showToast(t('backupPassphraseEmpty')); return; }
+      const mode = _calPassphraseMode;
+      if (mode === 'create') {
+        const confirmVal = (document.getElementById('cal-passphrase-confirm-input').value || '').trim();
+        if (passphrase !== confirmVal) { showToast(t('backupPassphraseMismatch')); return; }
+      }
+      const btn = document.getElementById('cal-passphrase-submit-btn');
+      if (btn) { btn.disabled = true; }
+      try {
+        if (mode === 'create') {
+          await _doCalCreateGroup(passphrase);
+        } else {
+          if (!_pendingJoinGroupId) { showToast(t('toastCalJoinError')); return; }
+          await _doJoinGroupWithPassphrase(_pendingJoinGroupId, passphrase);
+        }
+      } finally {
+        if (btn) { btn.disabled = false; }
       }
     }
 
