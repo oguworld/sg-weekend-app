@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // scripts/post-to-x.js
 // X (Twitter) への自動投稿スクリプト
-// 使い方: node post-to-x.js [--city=sg|bkk|syd|all] [--dry-run]
+// 使い方: node post-to-x.js [--city=sg|bkk|syd|all] [--to-line] [--dry-run]
+// --to-line 指定時はX APIを呼ばず、生成した投稿文（本文＋URL＋ハッシュタグ）を
+//           見出しなし・素のまま1通でLINEに下書き送信する（手動投稿用。設計書53）。
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
 const Anthropic = require('@anthropic-ai/sdk');
@@ -43,7 +45,8 @@ function parseArgs() {
   const type = typeArg ? typeArg.split('=')[1] : 'auto';
   const city = cityArg ? cityArg.split('=')[1].toLowerCase() : 'all';
   const dryRun = process.argv.includes('--dry-run');
-  return { type, city, dryRun };
+  const toLine = process.argv.includes('--to-line');
+  return { type, city, dryRun, toLine };
 }
 
 // ─── 履歴管理 ─────────────────────────────────────────────────────
@@ -263,7 +266,7 @@ async function notifyLine(text) {
 
 // ─── メイン ───────────────────────────────────────────────────────
 async function main() {
-  const { type: rawType, city, dryRun } = parseArgs();
+  const { type: rawType, city, dryRun, toLine } = parseArgs();
   const history = loadHistory();
   const type = resolveType(rawType, history);
   const now = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Singapore' });
@@ -299,6 +302,20 @@ async function main() {
 
   if (dryRun) {
     console.log('[post-to-x] --dry-run のため投稿スキップ');
+    return;
+  }
+
+  // --to-line: X APIを呼ばず、生成した投稿文を素のまま1通LINEに下書き送信する（設計書53）
+  if (toLine) {
+    try {
+      await notifyLine(text);
+      console.log('[post-to-x] ✅ LINEに下書きを送信しました');
+    } catch (err) {
+      console.error('[post-to-x] LINE送信エラー:', err.message);
+      throw err;
+    } finally {
+      saveHistory(history);
+    }
     return;
   }
 
