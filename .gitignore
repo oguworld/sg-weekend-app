@@ -4,6 +4,7 @@ logs/
 *.log
 .claude/*
 !.claude/plan.md
+!.claude/plan-archive.md
 data/
 
 # iOS署名関連（絶対にコミットしない）
