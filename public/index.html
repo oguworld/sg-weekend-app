@@ -685,72 +685,76 @@
   <!-- 個人予定表バックアップ用パスフレーズ入力シート（設計書54） -->
   <div class="chat-overlay" id="backup-passphrase-overlay" onclick="if(!_touchCapableDetected) closeBackupPassphraseSheet()" style="z-index:3601;"></div>
   <div id="backup-passphrase-sheet" class="plan-modal" style="z-index:3602;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px calc(84px + env(safe-area-inset-bottom,0px));
+    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;
     box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
       <div id="backup-passphrase-title" style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="backupSetupTitle">バックアップ用パスフレーズを設定</div>
       <button data-close onclick="closeBackupPassphraseSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
     </div>
-    <div id="backup-passphrase-warn" style="font-size:12px;color:var(--terracotta);line-height:1.6;background:var(--caramel-pale);border-radius:10px;padding:8px 10px;margin-bottom:12px;" data-i18n="backupPassphraseWarning">⚠️ パスフレーズを忘れるとバックアップは復元できません。安全な場所に控えてください。</div>
-    <input id="backup-passphrase-input" type="password" maxlength="100" autocomplete="off"
-      data-i18n-ph="backupPassphrasePlaceholder" placeholder="パスフレーズ"
-      style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
-             border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-             color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:10px;"
-      onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-    <div id="backup-passphrase-confirm-row">
-      <input id="backup-passphrase-confirm-input" type="password" maxlength="100" autocomplete="off"
-        data-i18n-ph="backupPassphraseConfirmPlaceholder" placeholder="パスフレーズ（確認）"
+    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
+      <div id="backup-passphrase-warn" style="font-size:12px;color:var(--terracotta);line-height:1.6;background:var(--caramel-pale);border-radius:10px;padding:8px 10px;margin-bottom:12px;" data-i18n="backupPassphraseWarning">⚠️ パスフレーズを忘れるとバックアップは復元できません。安全な場所に控えてください。</div>
+      <input id="backup-passphrase-input" type="password" maxlength="100" autocomplete="off"
+        data-i18n-ph="backupPassphrasePlaceholder" placeholder="パスフレーズ"
         style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
                border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-               color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
+               color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:10px;"
         onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-    </div>
-    <div style="display:flex;gap:10px;margin-top:12px;">
-      <button onclick="closeBackupPassphraseSheet()"
-        style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
-               font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
-        data-i18n="titleEditCancel">キャンセル</button>
-      <button id="backup-passphrase-submit-btn" onclick="if(!_touchCapableDetected) submitBackupPassphrase()"
-        style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
-               font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
-        data-i18n="backupPassphraseSubmit">確定</button>
+      <div id="backup-passphrase-confirm-row">
+        <input id="backup-passphrase-confirm-input" type="password" maxlength="100" autocomplete="off"
+          data-i18n-ph="backupPassphraseConfirmPlaceholder" placeholder="パスフレーズ（確認）"
+          style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
+                 border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
+                 color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
+          onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button onclick="closeBackupPassphraseSheet()"
+          style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
+                 font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
+          data-i18n="titleEditCancel">キャンセル</button>
+        <button id="backup-passphrase-submit-btn" onclick="if(!_touchCapableDetected) submitBackupPassphrase()"
+          style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
+                 font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
+          data-i18n="backupPassphraseSubmit">確定</button>
+      </div>
     </div>
   </div>
 
   <!-- 共有カレンダー用パスフレーズ入力シート（設計書55、作成用・参加用でタイトルのみ出し分け） -->
   <div class="chat-overlay" id="cal-passphrase-overlay" onclick="if(!_touchCapableDetected) closeCalPassphraseSheet()" style="z-index:3603;"></div>
   <div id="cal-passphrase-sheet" class="plan-modal" style="z-index:3604;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px calc(84px + env(safe-area-inset-bottom,0px));
+    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;
     box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
       <div id="cal-passphrase-title" style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="calPassphraseSetupTitle">共有用パスフレーズを設定</div>
       <button data-close onclick="closeCalPassphraseSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
     </div>
-    <div id="cal-passphrase-warn" style="font-size:12px;color:var(--terracotta);line-height:1.6;background:var(--caramel-pale);border-radius:10px;padding:8px 10px;margin-bottom:12px;" data-i18n="calPassphraseWarning">⚠️ パスフレーズを忘れると共有カレンダーは復元できません。参加者に別途お伝えください。</div>
-    <input id="cal-passphrase-input" type="password" maxlength="100" autocomplete="off"
-      data-i18n-ph="backupPassphrasePlaceholder" placeholder="パスフレーズ"
-      style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
-             border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-             color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:10px;"
-      onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-    <div id="cal-passphrase-confirm-row">
-      <input id="cal-passphrase-confirm-input" type="password" maxlength="100" autocomplete="off"
-        data-i18n-ph="backupPassphraseConfirmPlaceholder" placeholder="パスフレーズ（確認）"
+    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
+      <div id="cal-passphrase-warn" style="font-size:12px;color:var(--terracotta);line-height:1.6;background:var(--caramel-pale);border-radius:10px;padding:8px 10px;margin-bottom:12px;" data-i18n="calPassphraseWarning">⚠️ パスフレーズを忘れると共有カレンダーは復元できません。参加者に別途お伝えください。</div>
+      <input id="cal-passphrase-input" type="password" maxlength="100" autocomplete="off"
+        data-i18n-ph="backupPassphrasePlaceholder" placeholder="パスフレーズ"
         style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
                border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-               color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
+               color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:10px;"
         onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-    </div>
-    <div style="display:flex;gap:10px;margin-top:12px;">
-      <button onclick="closeCalPassphraseSheet()"
-        style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
-               font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
-        data-i18n="titleEditCancel">キャンセル</button>
-      <button id="cal-passphrase-submit-btn" onclick="if(!_touchCapableDetected) submitCalPassphrase()"
-        style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
-               font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
-        data-i18n="backupPassphraseSubmit">確定</button>
+      <div id="cal-passphrase-confirm-row">
+        <input id="cal-passphrase-confirm-input" type="password" maxlength="100" autocomplete="off"
+          data-i18n-ph="backupPassphraseConfirmPlaceholder" placeholder="パスフレーズ（確認）"
+          style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
+                 border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
+                 color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
+          onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;">
+        <button onclick="closeCalPassphraseSheet()"
+          style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
+                 font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
+          data-i18n="titleEditCancel">キャンセル</button>
+        <button id="cal-passphrase-submit-btn" onclick="if(!_touchCapableDetected) submitCalPassphrase()"
+          style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
+                 font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
+          data-i18n="backupPassphraseSubmit">確定</button>
+      </div>
     </div>
   </div>
 
@@ -996,7 +1000,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260718a"></script>
+  <script src="/app.js?v=20260718b"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

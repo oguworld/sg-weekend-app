@@ -5282,3 +5282,198 @@ document.getElementById('backup-section-content')?.addEventListener('click', e =
 2026-07-17 planner設計。**2026-07-18 ユーザー承認済み**（8節リスク1「バックアップ範囲の最終確認」に対し、ジャンル設定・プロフィール・いいねしたコースを含む全データを対象とする方針〈3-1節の推奨案〉で確定）。**実装完了**（orchestrator実行、2026-07-18）。
 
 `public/app.js`: (A)バグ修正 - `#backup-section-content`の動的ボタンを`onclick`+`btn.click()`委譲方式から`data-backup-action`属性+`_runBackupAction()`直接呼び出し方式に変更（タッチ環境はtouchendデリゲーション、PC/マウス環境は新設の要素スコープ`click`リスナー、`_touchCapableDetected`で二重発火防止）。`ontouchend=""`残骸も削除。(B)全データバックアップ拡張 - `_collectBackupPayload()`/`_applyRestoredBackup()`を新設し、`version:2`構造（`customPlans`/`eventPlansByCity`/`myCoursesByCity`〈sg/bkk/syd全都市〉/`genres`/`who`/`ageList`/`likedCourses`/`avatar`）に対応。旧構造（`version`フィールドなし）は後方互換の読み替えロジックで自動吸収。マイコース・ジャンル・プロフィール・いいね・アバターの各保存箇所に`_syncBackupToServer()`呼び出しを追加。i18n: `secBackup`/`backupDisabledDesc`/`backupEnabledDesc`の文言を「予定表」→「予定表・マイコースなどのデータ」に更新、新規キー`backupExcludesCalendarNote`をja/en追加。`server.js`は無変更（設計書通り、暗号化ペイロード構造の変更のみでサーバーAPIは無関係）。`public/index.html`/`public/sw.js`はキャッシュバスティング更新のみ。
+
+# 設計書59 — バックアップ／共有カレンダーのパスフレーズ入力シートで、フォーカス移動後にボタン行がボトムナビと重なる不具合の修正
+
+## 背景
+
+設計書54（個人予定表バックアップ）・設計書55（共有カレンダーのパスフレーズ方式化）で新規追加した`#backup-passphrase-sheet`・`#cal-passphrase-sheet`（いずれも`public/index.html`）で、実機バグ報告があった。
+
+**症状**（実機スクリーンショット2枚で確認済み）:
+- パスフレーズ入力欄 → 確認用入力欄とフォーカス移動した後、モーダル下部の「キャンセル/確定」ボタン行がボトムナビ（`.bottom-nav`、z-index 9999）とわずかに重なって表示される
+- 同じモーダルを`setup`モードで開いた直後（フォーカス移動前）のスクリーンショットでは、ボタン行とボトムナビの間に十分な余白がある
+- 同一モーダル要素・同一CSSにもかかわらず、見た目の位置が変化している
+
+## 原因
+
+### 1. 構造上の違い：内部スクロールコンテナ（`.plan-modal-body`）の欠落
+
+`.plan-modal`は共通CSSで以下のように定義されている（`public/app.css` 2613〜2619行目）。
+
+```css
+.plan-modal {
+  position: fixed; bottom: 0; left: 0; right: 0; background: white;
+  border-radius: 24px 24px 0 0; z-index: 3100; max-height: 88vh;
+  display: none; flex-direction: column; overflow: hidden;
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(.32,2,.55,.89), bottom 0.2s ease;
+}
+```
+
+`overflow: hidden`かつ`display:flex; flex-direction:column`。他の`.plan-modal`インスタンス（`#date-picker-modal`・`#plan-event-modal`・`#plan-custom-modal`・`#plan-shared-modal`）は、いずれもヘッダー直下に`.plan-modal-body`（`public/app.css` 2626行目、`overflow-y:auto; flex:1; min-height:0; padding: 4px 20px calc(90px + env(safe-area-inset-bottom, 0px))`）というflex子要素を持ち、これが実際のスクロール領域として機能する。ボトムナビ分の余白は、この`.plan-modal-body`の`padding-bottom: calc(90px + ...)`で確保されている。
+
+これに対し`#backup-passphrase-sheet`・`#cal-passphrase-sheet`（`public/index.html` 687〜719行目、723〜755行目）は`.plan-modal-body`を持たず、タイトル・警告文・入力欄・ボタン行が`.plan-modal`直下にフラットに並ぶ構造。ボトムナビ分の余白は、`.plan-modal`自身のインラインstyle`padding: 20px 20px calc(84px + env(safe-area-inset-bottom,0px))`のみで確保されている。この時点では設計として成立しており、フォーカス移動が起きなければボタン行はボトムナビと重ならない（`setup`直後のスクリーンショットが正常に見えるのはこのため）。
+
+### 2. キーボード表示時の副作用：`_scrollFocusedIntoViewOnKb()`の`scrollIntoView`フォールバック
+
+`public/app.js` 84〜119行目の`_scrollFocusedIntoViewOnKb(kbHeight)`は、Capacitor環境の`keyboardWillShow`イベント（229〜230行目）のたびに呼ばれる。
+
+```javascript
+function _scrollFocusedIntoViewOnKb(kbHeight) {
+  setTimeout(() => {
+    const focused = document.activeElement;
+    if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
+    const screenH = window.innerHeight;
+    const rect = focused.getBoundingClientRect();
+    const visibleBottom = screenH - kbHeight - 80;
+    const overflow = rect.bottom - visibleBottom;
+    if (overflow <= 0) return;
+
+    let container = focused.parentElement;
+    let foundContainer = null;
+    while (container && container !== document.body) {
+      const cs = getComputedStyle(container);
+      if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+        foundContainer = container;
+        // ...container.scrollTop += overflow;
+        break;
+      }
+      container = container.parentElement;
+    }
+    if (!foundContainer) {
+      focused.scrollIntoView({ block: 'center', behavior: 'smooth' }); // ← フォールバック
+    }
+  }, 80);
+}
+```
+
+同関数直前のコメント（75〜83行目）には、以下のように明記されている。
+
+```
+// ただし「設定画面直下の入力欄（#feedback-text / #nickname-input など、.plan-modal/.plan-sheetの外側）」は
+// 内部スクロールコンテナを持たずキーボードに隠れやすいため、この軽量関数だけ温存する（回帰防止）。
+// フォーカス要素が .plan-modal / .plan-sheet の外にあるときだけスクロールで逃がす。
+```
+
+つまり設計意図は「`.plan-modal`/`.plan-sheet`の**外側**にある入力欄（設定画面のフィードバック欄など）専用」だが、**実装コード上にはこの「`.plan-modal`/`.plan-sheet`内かどうか」を判定するガード（`closest()`等）が一切存在しない**（`grep`で確認済み、該当パターン0件）。そのため、`.plan-modal`の内側にある入力欄でも無条件に実行される。
+
+`#backup-passphrase-input`/`#backup-passphrase-confirm-input`は`.plan-modal-body`のような`overflow-y:auto`の祖先を持たない（前述の通り`.plan-modal`自体は`overflow:hidden`）。そのため`while`ループは`foundContainer`を見つけられずに`document.body`まで遡って終了し、**必ず`scrollIntoView({block:'center', behavior:'smooth'})`のフォールバック分岐に入る**。
+
+`focused`（`#backup-passphrase-confirm-input`）は`position:fixed`の`.plan-modal`の子孫であり、それ自体は`position:fixed`ではない通常配置要素である。`scrollIntoView()`は、要素を可視化するために祖先のスクロール可能なコンテキスト（この場合は事実上`document`のビューポート/`html`or`body`）をスクロールさせようとする。`.plan-modal`は`bottom:0`で画面下端に固定された`position:fixed`要素だが、`fixed`要素は通常のドキュメントスクロールの影響を受けない（スクロールしてもビューポートに対する位置は変わらない）——**はずだが**、iOS WKWebViewでは、`visualViewport`のリサイズ・スクロール処理・`fixed`要素の再計算タイミングにズレが生じることがあり、`scrollIntoView`が引き起こす暗黙のビューポート/レイアウト再計算が、`.plan-modal`（`bottom:0`基準で位置決めされている）の実効表示位置に対して、ボトムナビ（同じく`position:fixed`、z-index 9999、こちらは`bottom:0`固定でキーボード等の影響を受けない設計）との相対关係をわずかにズレさせている可能性が高い。
+
+加えて、`keyboardWillShow`は**同一シート内でのフィールド間フォーカス移動のたびに再発火する**（CLAUDE.md「フィールド間フォーカス移動時の多重縮小」節に記載の通り、iOSネイティブの一般的挙動としてキーボードが表示されたまま消えない場合、`keyboardWillHide`は発火せず`keyboardWillShow`のみが再送される）。パスフレーズ欄→確認欄の移動で最低2回、`_scrollFocusedIntoViewOnKb`が呼ばれ、そのたびに`scrollIntoView`フォールバックが実行される。1回目の呼び出し由来のズレが解消されないまま2回目が上書きされる可能性があり、**「setup直後（1回もフォーカス移動していない）は正常、change操作でフィールド間移動した後はズレる」という報告内容と整合する**。
+
+### 3. `#cal-passphrase-sheet`も同一の脆弱性を持つ
+
+`#cal-passphrase-sheet`（設計書55、`public/index.html` 723〜755行目）は`#backup-passphrase-sheet`と完全に同じ構造（`.plan-modal-body`なし、`#cal-passphrase-input`→`#cal-passphrase-confirm-input`の2フィールド構成）を持つ。今回のバグ報告はバックアップシートのみで確認されているが、同じ原因構造である以上、**共有カレンダー作成時のパスフレーズ設定・変更フローでも理論上同一の不具合が再現するはず**。実機未報告なのは、共有カレンダー機能の利用頻度がバックアップ機能より低い、あるいはまだ気づかれていないだけの可能性が高い。
+
+## 修正方針
+
+### 検討した案
+
+**案A: `#backup-passphrase-sheet`・`#cal-passphrase-sheet`に`.plan-modal-body`ラッパーを追加**
+
+他の`.plan-modal`インスタンス（`#date-picker-modal`・`#plan-event-modal`等）と同じ構造に統一する。タイトル行を`.plan-modal-header`相当として残し、警告文・入力欄・ボタン行を`.plan-modal-body`（`overflow-y:auto; flex:1; min-height:0`）で包む。
+
+- 長所: 既存パターンへの統一。`_scrollFocusedIntoViewOnKb`の`while`ループが`overflow-y:auto`祖先（`.plan-modal-body`）を正しく見つけられるようになり、`scrollTop`加算という「本来の（意図された）処理経路」に乗る。これは既に`course-sheet`等の`.plan-modal-body`持ちシートで実績のある安定した経路であり、`scrollIntoView`フォールバックの副作用を根本的に回避できる
+- 短所: マークアップ変更のためレイアウト（padding・余白）を若干作り直す必要がある。警告文・ボタン行のインラインstyle値の調整が必要
+
+**案B: `_scrollFocusedIntoViewOnKb()`に「`.plan-modal`/`.plan-sheet`内では何もしない」ガードを追加**
+
+コード中のコメントが元々意図していた設計（`.plan-modal`/`.plan-sheet`の外側の入力欄専用）を、実装に反映させる。
+
+```javascript
+function _scrollFocusedIntoViewOnKb(kbHeight) {
+  setTimeout(() => {
+    const focused = document.activeElement;
+    if (!focused || (focused.tagName !== 'INPUT' && focused.tagName !== 'TEXTAREA')) return;
+    if (focused.closest('.plan-modal, .plan-sheet')) return; // ← 追加
+    ...
+```
+
+- 長所: 影響範囲が1関数・1行に限定できる。`#backup-passphrase-sheet`・`#cal-passphrase-sheet`だけでなく、将来同種の「`.plan-modal-body`を持たないシート」が追加された場合にも横展開で効く
+- 短所: **CLAUDE.md「フィールド間フォーカス移動時の多重縮小」節・設計書16の経緯と矛盾するリスクがある。** 設計書16（2026-07-11）は、当初存在していた`focused.closest('.plan-modal, .plan-sheet')`による早期returnを**意図的に削除**し、「既存の祖先スクロールロジックが、コース作成シート（`#course-sheet`の`#course-note`）等のシート内入力欄にも適用されるようになった」という変更を行っている。つまり`.plan-modal`/`.plan-sheet`内の入力欄（`.plan-modal-body`を持つもの）に対しても、`_scrollFocusedIntoViewOnKb`の祖先探索ロジック（`scrollTop`加算の方）を適用する必要があるというのが設計書16時点の要件だった。案Bを単純に適用すると、`course-sheet`等の既存の正常系（`.plan-modal-body`を持つシート内の入力欄がキーボードに隠れないようにする機能）を退行させてしまう
+- 案Bを採用する場合は、単純な「`.plan-modal`/`.plan-sheet`内は全部スキップ」ではなく、**「`.plan-modal-body`のような`overflow-y:auto`の祖先スクロールコンテナが見つからない場合は、`scrollIntoView`フォールバックを発火させず何もしない」**という、より狭いガードにする必要がある（＝`foundContainer`が`null`のときの`scrollIntoView`呼び出し自体を削除する）
+
+**案C（採用）: 案Bの狭いガード（`scrollIntoView`フォールバックの削除）を主軸とし、案Aの`.plan-modal-body`化は見送る**
+
+再検討の結果、`_scrollFocusedIntoViewOnKb`内の`scrollIntoView`フォールバック分岐そのものを削除する（`foundContainer`が見つからない場合は何もしない）方針を推奨する。理由:
+
+1. **`scrollIntoView`フォールバックは、そもそも設計コメントが想定していた「`.plan-modal`/`.plan-sheet`の外側にある入力欄（`#feedback-text`/`#nickname-input`）」に対しても、実際には過剰な処理である可能性が高い**。`#feedback-text`/`#nickname-input`は`.screen-scroll-content`という`overflow-y:auto`の祖先を持つ画面（設定画面）に配置されているため、通常は`foundContainer`が見つかり、`scrollIntoView`フォールバックには到達しない設計のはずである（コメントの「温存する」という表現とも整合）。つまり`scrollIntoView`フォールバックが実際に発火するのは、`overflow-y:auto`の祖先を一切持たない特殊なケース（今回の`#backup-passphrase-sheet`/`#cal-passphrase-sheet`のような`.plan-modal-body`を持たない`.plan-modal`）に限られると考えられ、この分岐を削除しても`#feedback-text`等の既存正常系には実質的な影響が出ない可能性が高い
+2. 案Aで`.plan-modal-body`ラッパーを追加すると、`while`ループが`.plan-modal-body`を発見して`scrollTop`加算の経路に乗るため、**案Aと案Cは併用しても矛盾しない**（案Aを実施すれば案Cのガードは通常発火しなくなるだけで、無害な保険として機能する）
+3. `scrollIntoView`フォールバック分岐が「`overflow-y:auto`祖先が無いときは何もしない（諦める）」という保守的な挙動になっても、機能的な欠落（＝入力欄がキーボードに完全に隠れて見えなくなる）が新たに生まれるリスクより、**現状の「見えないどころか、ボタン行がボトムナビと重なって誤タップを誘発しかねない位置ズレ」の方が実害が大きい**と判断できる
+
+**したがって、案Aと案Cを両方実施することを推奨する（案Aで根本的な構造を他シートと統一し、案Cで`scrollIntoView`フォールバックという副作用の火種そのものを取り除く、二段構えの修正）。**
+
+- **案A**: `#backup-passphrase-sheet`・`#cal-passphrase-sheet`の両方に、タイトル行を除く残り（警告文・入力欄2つ・ボタン行）を`.plan-modal-body`相当のスクロールラッパーで包む。`.plan-modal`本体側のインラインstyle`padding: 20px 20px calc(84px + env(safe-area-inset-bottom,0px))`は、タイトル行の外側余白のみに縮小し、ボトムナビ分の余白は`.plan-modal-body`側の`padding-bottom`に委譲する形に整理する
+- **案C**: `_scrollFocusedIntoViewOnKb()`の`if (!foundContainer) { focused.scrollIntoView(...) }`分岐を削除し、`foundContainer`が見つからない場合は何もしないようにする
+
+両方を同一パッチで実施することで、`#backup-passphrase-sheet`・`#cal-passphrase-sheet`が今後同種の構造変更（フィールド追加等）を受けても、`scrollIntoView`の副作用に再び巻き込まれるリスクを構造的に減らせる。
+
+### `#cal-passphrase-sheet`も同時修正すべきか
+
+**同時修正を推奨する。** 理由:
+- 原因構造が完全に同一（`.plan-modal-body`なし、2フィールド構成、同じ`_scrollFocusedIntoViewOnKb`の対象）であるため、片方だけ直しても`#cal-passphrase-sheet`側に同一バグが未解決のまま残る
+- ユーザーへの実機報告が`#backup-passphrase-sheet`のみだったとしても、共有カレンダー作成フローを使うユーザーが将来同じ不具合に遭遇する可能性が高く、放置すると再度同種の調査コストが発生する
+- 変更内容がほぼ同型（同じマークアップパターンの複製）であり、同時修正によるコスト増は軽微
+
+## 変更ファイル一覧
+
+| ファイル | 変更内容 |
+|---|---|
+| `public/index.html` | `#backup-passphrase-sheet`（687〜719行目）・`#cal-passphrase-sheet`（723〜755行目）のマークアップに`.plan-modal-body`相当のスクロールラッパーを追加し、ボタン行の余白確保をラッパー側に委譲する構造へ変更 |
+| `public/app.js` | `_scrollFocusedIntoViewOnKb()`（84〜119行目）の`if (!foundContainer) { focused.scrollIntoView(...) }`分岐を削除（何もしない処理に変更） |
+| `public/index.html` | キャッシュバスティング（`app.css?v=...`が変わる場合はそちらも、CLAUDE.md記載の手順に従う） |
+| `public/sw.js` | `CACHE_NAME`のバージョン番号を上げる（CSS/JS変更に伴う必須セット変更） |
+
+※ `server.js`・`data/`配下は無変更。バックエンド API・データモデルへの影響はなし。
+
+## データモデルの変更
+
+なし。
+
+## APIの変更
+
+なし。`POST /api/user-plans/me`等の既存エンドポイントは無変更。フロントエンドのUI表示位置に関する修正のみ。
+
+## フロントエンドの変更
+
+- `#backup-passphrase-sheet`・`#cal-passphrase-sheet`のDOM構造変更（`.plan-modal-body`ラッパー追加）。既存のJS参照（`document.getElementById('backup-passphrase-warn')`・`document.getElementById('backup-passphrase-confirm-row')`等、`openBackupPassphraseSheet()`/`submitBackupPassphrase()`/`closeBackupPassphraseSheet()`が参照するid群）はラッパー内に移動するだけで、id自体・`display`切り替えロジックは変更しない想定（`display:none`/`''`切り替えの対象要素は同一idのまま維持する）
+- `_scrollFocusedIntoViewOnKb()`のロジック簡素化（フォールバック削除）。他の呼び出し元（`#feedback-text`/`#nickname-input`）への影響は「稀」と評価しているが、後述のリスク・受け入れ基準で確認する
+
+## 受け入れ基準
+
+### 正常系
+1. 設定画面から「パスフレーズを変更」ボタンで`#backup-passphrase-sheet`を`change`モードで開き、パスフレーズ入力欄 → 確認用入力欄とフォーカス移動しても、キャンセル/確定ボタン行がボトムナビと重ならず、setup直後と同じ位置（クリーム色の余白が見える状態）で表示され続けること
+2. `setup`モード（初回バックアップ有効化）・`restore`モード（確認欄なし）でも、引き続きボタン行とボトムナビが重ならないこと（既存の正常系の回帰がないこと）
+3. パスフレーズ欄→確認欄→パスフレーズ欄、のように複数回フォーカスを往復しても、最終的に同じ安定した表示位置に収束すること（CLAUDE.md「フィールド間フォーカス移動時の多重縮小」節が警告する「同一イベントが1シーケンス中に複数回発火しうるケース」を踏まえた確認）
+4. `#cal-passphrase-sheet`（共有カレンダーの作成・パスフレーズ変更フロー）でも、同様にボタン行とボトムナビが重ならないこと
+5. 設定画面「改善要望」欄（`#feedback-text`）・ニックネーム欄（`#nickname-input`）にフォーカスした際、引き続きキーボードに隠れず入力欄が見える位置までスクロールされること（`_scrollFocusedIntoViewOnKb`のフォールバック削除による回帰がないこと。これらは`.screen-scroll-content`という`overflow-y:auto`祖先を持つため`foundContainer`が見つかり、`scrollTop`加算経路に乗ることを確認する）
+6. `course-sheet`（`#course-note`）等、`.plan-modal-body`を持つ既存シート内の入力欄でも、引き続きキーボード表示時に適切にスクロールされること（設計書16の既存正常系の回帰がないこと）
+
+### 失敗系
+7. パスフレーズ・確認用パスフレーズが空、または不一致の場合のバリデーション（`submitBackupPassphrase()`の既存ロジック）が変更後も引き続き機能すること
+8. `overflow-y:auto`祖先が見つからない特殊ケース（`scrollIntoView`フォールバック削除後）で、対象の入力欄が万一キーボードに隠れたままになったとしても、アプリがクラッシュしたり他の操作が不能になったりしないこと（機能的な劣化に留まり、致命的な不具合を新たに生まないこと）
+
+### エッジケース
+9. Web版（Capacitor環境でない）では`_scrollFocusedIntoViewOnKb`自体が呼ばれない設計（`_isCapacitorApp`分岐内でのみ登録、79〜83行目コメント参照）のため、Web版の表示・挙動に変化がないこと
+10. `restore`モードなど確認欄非表示（`display:none`）のケースで、`.plan-modal-body`ラッパー導入後もレイアウト崩れ（余白の二重確保・不足）が起きないこと
+11. ダークモード（`html[data-theme="dark"]`）でも、ラッパー追加によるレイアウト崩れが起きないこと
+
+## リスク・未解決の質問
+
+- **`scrollIntoView`フォールバック削除の影響範囲は完全には検証しきれていない**。コメント上の設計意図（`.plan-modal`/`.plan-sheet`外側の入力欄専用）から「`#feedback-text`/`#nickname-input`は通常`foundContainer`が見つかるはずで、フォールバックは実質未使用のはず」と推測しているが、実機（TestFlight）でのフォーカス移動テストにより、削除後も設定画面フィードバック欄等でキーボード被りが再発しないことを必ず確認する必要がある
+- **`scrollIntoView`が`.plan-modal`（`position:fixed`）の位置ズレを引き起こすメカニズムは、iOS WKWebViewの実装依存の推測であり、一次情報（Apple/WebKit公式ドキュメント等）による確証は得ていない**。案Cの効果（フォールバックを削除すればズレが解消するか）は理論的な推測に基づくものであり、実機検証で効果を確認できなかった場合、追加の原因調査（例: `visualViewport`のresizeイベントとの競合、`_liftVisibleSheetForKeyboard`系の撤去済みコードの残滓が無いかの再確認等）が必要になる可能性がある
+- **`.plan-modal-body`ラッパー導入によるマークアップ変更は、既存のJS参照（id）を壊さないよう慎重に行う必要がある**。特に`confirmRow.style.display`の切り替え対象・`backup-passphrase-warn`の`display`切り替え対象が、リファクタ後も同じ意味を持つ要素を指しているか、builder実装時に一行ずつ確認すること
+- Web版・iOS版は同一コード（Capacitorはローカルバンドル）のため、この修正はWeb版にも適用されるが、`_scrollFocusedIntoViewOnKb`自体がCapacitor限定機能のため、Web版での見た目の変化は`.plan-modal-body`マークアップ変更（案A）由来のみとなる。Web版でも念のため目視確認することを推奨する
+- 本バグはUIレイアウトの表示位置修正であり、`data/`配下のデータ構造・`/api/*`エンドポイントには一切影響しない。**Web版／iOS App Store版のデータ共有・後方互換性への影響はない**（フロントエンドの静的ファイルのみの変更のため、iOS版は次回TestFlightビルドでのみ反映され、旧バージョンAppは本バグを抱えたまま動作し続けるが、機能停止やクラッシュには至らないため互換性上の問題はない）
+- CI/リリースへの影響: `public/index.html`・`public/app.js`・`public/sw.js`の変更のため、**Web版はキャッシュバスティング更新＋配信で即時反映、iOS版は次回TestFlightビルドが必要**（CLAUDE.md「iOS / Capacitor 開発ノウハウ」節の既存ルール通り）。ユーザーの明示指示があるまで`release`ブランチへのpushは行わない
+
+## スコープ外
+
+- `#backup-passphrase-sheet`・`#cal-passphrase-sheet`以外の`.plan-modal`インスタンス（`#date-picker-modal`等、既に`.plan-modal-body`を持つもの）のマークアップ変更は行わない
+- `_scrollFocusedIntoViewOnKb`のロジック自体の全面刷新（設計書15が撤去した`_adjustSheetForKb`系の「縮小+移動」方式への回帰等）は行わない。今回はフォールバック分岐の削除のみに留める
+- パスフレーズ入力シートのUI・バリデーション・暗号化ロジック（設計書54・55本体）自体の変更は行わない
+- 新規i18nキーの追加は不要と見込む（既存の`backupSetupTitle`等の文言・翻訳キーはそのまま流用、マークアップ構造のみの変更のため）。ただしbuilder実装時に新規テキストノードが必要になった場合は、CLAUDE.mdのi18n必須ルールに従いja/en同時追加すること
+
+## 承認状況
+2026-07-18 planner設計。ユーザー承認済み。同日orchestratorにより実装完了（案A・案C両方実施）。

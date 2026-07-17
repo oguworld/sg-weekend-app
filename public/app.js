@@ -93,11 +93,9 @@
         if (overflow <= 0) return;
 
         let container = focused.parentElement;
-        let foundContainer = null;
         while (container && container !== document.body) {
           const cs = getComputedStyle(container);
           if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
-            foundContainer = container;
             // 既存padding-bottomだけでは実際に必要なスクロール量に足りず、scrollTopが
             // scrollHeight-clientHeightで頭打ちになるケースがあるため、キーボード表示中のみ
             // 一時的にpadding-bottomを拡張して伸びしろを確保してから加算する。
@@ -112,9 +110,9 @@
           }
           container = container.parentElement;
         }
-        if (!foundContainer) {
-          focused.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }
+        // overflow-y:auto の祖先スクロールコンテナが見つからない場合は何もしない
+        // （設計書59・案C：scrollIntoView フォールバックは .plan-modal のような position:fixed
+        //  要素配下で iOS WKWebView のレイアウト再計算ズレを誘発する副作用があったため撤去）
       }, 80);
     }
 
