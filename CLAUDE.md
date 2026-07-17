@@ -203,22 +203,32 @@ sg-weekend-app/
   - 一時計装`_sendDebugLog('auth_prefs_init', { hasPrefs, hasToken })`を`_initAuthToken`末尾に埋め込み済み。**原因確定後に削除する使い捨て**（`.claude/next.md`参照）
   - **未検証（次回フォロー）**: 実機（TestFlight）で「連携→アプリ完全終了→再起動して連携が維持されるか」、`logs/debug-nav.log`の`auth_prefs_init`で`hasPrefs:true`かつ再起動後も`hasToken:true`（Preferences永続化が機能しているか）の確認が必要
 
-## 個人予定表バックアップ（ゼロ知識暗号化）＋共有カレンダーのパスフレーズ方式化（2026-07-17実装、設計書54・55）
+## データバックアップ（端末移行用、ゼロ知識暗号化）＋共有カレンダーのパスフレーズ方式化（2026-07-17実装 設計書54・55 → 2026-07-18 設計書58で全データ対応に拡張）
 
-設計書37のフェーズ1.5-Aを確定させ、ユーザー新要件「個人予定のサーバーバックアップもパスフレーズでゼロ知識暗号化したい」（設計書54）・「共有カレンダーの鍵配布をランダム鍵のURLフラグメント方式からパスフレーズ方式に変更したい」（設計書55）を実装した。両方とも**サーバーはパスフレーズ自体を一切保存しない**（PBKDF2用の非秘密saltと暗号文のみ保持）ゼロ知識設計。
+設計書37のフェーズ1.5-Aを確定させ、ユーザー新要件「個人予定のサーバーバックアップもパスフレーズでゼロ知識暗号化したい」（設計書54）・「共有カレンダーの鍵配布をランダム鍵のURLフラグメント方式からパスフレーズ方式に変更したい」（設計書55）を実装した。両方とも**サーバーはパスフレーズ自体を一切保存しない**（PBKDF2用の非秘密saltと暗号文のみ保持）ゼロ知識設計。2026-07-18の設計書58で、対象を「予定表のみ」から「マイコース・ジャンル設定・プロフィール・いいね・アバターを含む全データ」に拡張し、あわせてボタンのタッチ不発バグを修正した（下記「全データバックアップへの拡張＋タッチ不発バグ修正」節参照）。
 
 ### 共通鍵導出ヘルパー（`public/app.js`）
-`_deriveKeyFromPassphrase(passphrase, saltB64)`: PBKDF2（iterations:100000, SHA-256）→AES-256-GCM鍵（`CryptoKey`）を導出。個人予定表バックアップ・共有カレンダーの両方から呼ばれる**唯一の共通実装**。ただし**パスフレーズ自体・保存先キー・保存値は完全に分離**（同じパスフレーズを使い回さない設計）。付随ヘルパー: `_genSaltB64()`（salt生成）・`_exportKeyMaterial()`/`_importKeyMaterial()`（鍵material⇔Base64url変換、案X-B用）・`_encryptWithKey()`/`_decryptWithKey()`（`CryptoKey`を直接受け取る汎用暗号化・復号、IV12バイト先頭付与）。
+`_deriveKeyFromPassphrase(passphrase, saltB64)`: PBKDF2（iterations:100000, SHA-256）→AES-256-GCM鍵（`CryptoKey`）を導出。個人データバックアップ・共有カレンダーの両方から呼ばれる**唯一の共通実装**。ただし**パスフレーズ自体・保存先キー・保存値は完全に分離**（同じパスフレーズを使い回さない設計）。付随ヘルパー: `_genSaltB64()`（salt生成）・`_exportKeyMaterial()`/`_importKeyMaterial()`（鍵material⇔Base64url変換、案X-B用）・`_encryptWithKey()`/`_decryptWithKey()`（`CryptoKey`を直接受け取る汎用暗号化・復号、IV12バイト先頭付与）。
 
-### 個人予定表バックアップ（設計書54）
-- **データモデル**: `data/user-plans/{userId}.json`（新規、gitignore対象）。`{userId, salt, encryptedData, updatedAt}`のみ。`customPlans`/`eventPlans`の平文フィールドは一切持たない（`encryptedData`はAES-256-GCM暗号化されたJSON文字列）
+### データバックアップ（端末移行用）（設計書54 → 設計書58で全データ対応に拡張）
+- **データモデル**: `data/user-plans/{userId}.json`（新規、gitignore対象）。`{userId, salt, encryptedData, updatedAt}`のみ。平文フィールドは一切持たない（`encryptedData`はAES-256-GCM暗号化されたJSON文字列）。サーバーは暗号文を不透明なBlobとして保存・返却するのみで中身に一切関知しないため、下記のペイロード構造変更は`server.js`無変更で完結する
+- **暗号化ペイロード構造（`_collectBackupPayload()`、設計書58で`version:2`に刷新）**: `{version:2, customPlans, eventPlansByCity:{sg,bkk,syd}, myCoursesByCity:{sg,bkk,syd}, genres, who, ageList, likedCourses, avatar}`。`eventPlansByCity`/`myCoursesByCity`は`ACTIVE_CITIES`（現状`['sg']`のみ）ではなく固定`BACKUP_CITIES=['sg','bkk','syd']`で全都市分を対象にする（BKK/SYD再開時のデータ取りこぼし防止、停止中でも過去データが`localStorage`に残っていれば拾う）。共有カレンダー参加情報（`{city}_shared_cal_key`等）・`app_ios_push_token`・`cal_device_id`・`app_auth_token`・バックアップ機構自身の鍵material/saltは意図的にスコープ外（設計書58 §3-1・3-2）
+- **後方互換（`_applyRestoredBackup()`）**: 復号したJSONに`version`フィールドが無い場合は旧構造（`{customPlans, eventPlans}`のみ）とみなし、`eventPlans`を現在の都市の`eventPlansByCity[city]`に読み替える。マイコース等の新規フィールドは存在しないため空扱い（エラーにはならない）。復元後の次回同期で自動的に新構造（`version:2`）に上書きされる
 - **API**: `GET/PUT /api/user-plans/me`（`requireAppAuth`必須）。`getUserPlansFilePath(userId)`が`usr_[a-f0-9]{24}`形式のみ許可（パストラバーサル対策）。`PUT`は`salt`/`encryptedData`欠如時400、`withFileLock`で排他制御
-- **オプトイン方式**: ログインしただけでは自動的にバックアップは開始されない。設定画面「予定表のバックアップ」セクションで明示的にパスフレーズを設定した場合のみ有効化される（`isBackupEnabled()`は`localStorage`の鍵material有無で判定）
-- **同期フロー**: `saveCustomPlans`/`saveEventPlans`実行のたびに`_syncBackupToServer()`が呼ばれる（未ログイン・バックアップ未設定なら即return、実害なし）。設計書22パターン（5秒タイムアウト、失敗しても静かに諦めてUIをハングさせない）を踏襲
+- **オプトイン方式**: ログインしただけでは自動的にバックアップは開始されない。設定画面「データバックアップ」セクション（設計書58でセクション名を「予定表のバックアップ」から変更）で明示的にパスフレーズを設定した場合のみ有効化される（`isBackupEnabled()`は`localStorage`の鍵material有無で判定）
+- **同期フロー**: `saveCustomPlans`/`saveEventPlans`に加え、設計書58でマイコース保存箇所（タイトル編集・削除・公開・非公開・新規保存）、ジャンル設定（`saveGenreList`）、プロフィール（`toggleSettingsWho`/`selectSettingsAge`）、いいね（`toggleLike`）、アバター（`selectAvatar`）の各保存箇所からも`_syncBackupToServer()`が呼ばれるようになった（未ログイン・バックアップ未設定なら即return、実害なし）。設計書22パターン（5秒タイムアウト、失敗しても静かに諦めてUIをハングさせない）を踏襲
 - **鍵の保持方式（案X-B、2026-07-17ユーザー承認）**: 導出済み鍵material（`CryptoKey`をraw export→Base64url化した文字列）を`localStorage`（キー`app_backup_key_material`）＋`_CapPrefs`（iOS版、設計書49と同じハイブリッド方式）に保存し、次回起動時は自動復元。パスフレーズ自体は保存しない。端末が盗まれた場合のリスクは既存の共有カレンダー鍵保存方式と同じトレードオフとして許容（ユーザー確認済み）
 - **UI**: `renderBackupSection()`（未ログイン/未設定/設定済みの3状態を出し分け）。パスフレーズ入力シート（`#backup-passphrase-sheet`、`.plan-modal`パターン、z-index:3601/3602）は`setup`（初回、確認欄あり）/`change`（変更、確認欄あり）/`restore`（別端末での復元、確認欄なし）の3モードを1つのマークアップで共有。別端末での既存バックアップ検知は`checkExistingBackupOnOpen()`（設定画面を開いたタイミングで`GET /api/user-plans/me`を叩き、`salt`/`encryptedData`があれば復元導線を表示）
 - **失敗時の挙動**: 誤ったパスフレーズはAES-GCMタグ検証エラーとして捕捉し、ローカルデータを一切変更せずエラートースト表示のみ（`_doBackupRestore()`）
-- **既知の未解決事項（設計書54 §8に明記済み）**: パスフレーズを忘れた場合はサーバー側の救済手段なし（ゼロ知識設計の必然）。ログアウト時に鍵material・端末ローカルデータをクリアするかは未解決のまま「クリアしない」保守的挙動を採用（次回要検討）。バックアップ無効化時にサーバー側ファイルを削除するかも未設計
+- **既知の未解決事項（設計書54 §8に明記済み、設計書58時点も未解決のまま）**: パスフレーズを忘れた場合はサーバー側の救済手段なし（ゼロ知識設計の必然）。ログアウト時に鍵material・端末ローカルデータをクリアするかは未解決のまま「クリアしない」保守的挙動を採用（次回要検討）。バックアップ無効化時にサーバー側ファイルを削除するかも未設計
+
+### 全データバックアップへの拡張＋タッチ不発バグ修正（2026-07-18実装、設計書58）
+- **バグの原因**: `renderBackupSection()`/`checkExistingBackupOnOpen()`が生成するボタンは`onclick="if(!_touchCapableDetected) 関数呼び出し(...)"`パターンだったが、設定画面のタッチデリゲーション側（`#backup-section-content button`分岐）が`btn.click()`でDOM合成clickイベントを発火させる実装になっていた。`touchend`発火時点では`_touchCapableDetected`が既に`true`のため、`.click()`によって呼ばれた`onclick`属性内のガードが常に偽と評価され、実際の関数が一切呼ばれず「自分自身のガードで自分をブロックする」状態になっていた（このセクションのボタン全てが影響を受けていた）
+- **修正**: `renderBackupSection()`/`checkExistingBackupOnOpen()`が生成するボタンの`onclick`属性を`data-backup-action`属性（`setup`/`change`/`restore`/`disable`）に置き換え、`ontouchend=""`の無害だが不統一な残骸も削除。タッチデリゲーション側は`btn.click()`ではなく新設の`_runBackupAction(action)`を直接呼ぶよう変更。PC/マウス操作環境向けに、`#backup-section-content`への専用`click`イベントリスナーを新規追加し、`_touchCapableDetected`が`true`の場合は何もしない（タッチ環境ではtouchend側で処理済みのため二重発火しない）という要素スコープの対応に留めた（CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴーストクリック」節の確立パターンを踏襲、グローバルなclickブロックは追加していない）
+- **バックアップ対象の拡張**: 上記「データバックアップ（端末移行用）」節に統合済み（`version:2`ペイロード構造・`BACKUP_CITIES`・同期呼び出し追加箇所）
+- **i18n**: `secBackup`（「予定表のバックアップ」→「データバックアップ」）・`backupDisabledDesc`/`backupEnabledDesc`の文言を「予定表」から「予定表・マイコースなどのデータ」に変更（既存キーの値変更のみ、キー追加なし）。新規キー`backupExcludesCalendarNote`（「共有カレンダーへの参加状態は引き継がれません」の注意書き）をja/en同時追加、`renderBackupSection()`の未設定時の説明文の直後に表示
+- **スコープ外（設計書58 §3-9で明示）**: 共有カレンダー参加情報のバックアップ対応、ログイン確定直後の自動バックアップ有無チェック、`sg_lang`/`sg_theme`/`app_city`の同期対象化、パスフレーズ強度チェック、複数デバイス間のリアルタイム同期
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのタッチ操作によるボタン反応確認、全データバックアップ→別端末での復元（マイコース・ジャンル設定等が正しく復元されるか）は2026-07-18時点でWeb版での単体ロジック検証のみ完了、実機確認は未実施
 
 ### 共有カレンダーのパスフレーズ方式化（設計書55）
 - **データモデル変更**: `data/shared-calendars/{groupId}.json`に`salt`フィールドを追加（既存フィールドの削除・型変更なし、追加のみ）。`salt`ありグループ=新方式（パスフレーズ由来の鍵）、`salt`なしグループ=旧方式（ランダム鍵をURLフラグメントに埋め込み）として共存する
@@ -234,9 +244,9 @@ sg-weekend-app/
 - **既知の未解決事項（設計書55 §9に明記済み）**: `doManualJoin()`（6桁グループID手入力）への新方式パスフレーズ対応は今回のスコープ外のまま据え置き（技術的には可能だがUI詳細未設計）。PBKDF2のiterations値（100000固定）のモバイル実機でのパフォーマンスは次回TestFlightビルドでの実機確認が必要
 
 ### 両機能共通
-- **TDZ回避**: 新規モジュールスコープ変数（`_backupKeyCache`/`_backupSyncInFlight`/`_backupSheetMode`/`_calPassphraseMode`）はいずれもオプトイン機能（ユーザーが設定画面を開いて明示的に操作するまで一切呼ばれない）のため、起動時同期フロー（`loadEventData()`/`initPushState()`等）から参照されず、TDZ対象外
-- **キャッシュバスティング**: `index.html` app.js?v=20260717a、`sw.js` CACHE_NAME=sg-weekend-v619
-- **未検証事項（次回TestFlightビルド後にフォロー）**: パスフレーズ設定→サーバーバックアップ→別端末での復元、共有カレンダーのQR読み取り→パスフレーズ入力での参加、の両フローとも実機での動作確認が未実施（Web版でのAPI疎通・暗号化ロジックの単体検証のみ完了）
+- **TDZ回避**: 新規モジュールスコープ変数（`_backupKeyCache`/`_backupSyncInFlight`/`_backupSheetMode`/`_calPassphraseMode`/`BACKUP_CITIES`）はいずれもオプトイン機能（ユーザーが設定画面を開いて明示的に操作するまで一切呼ばれない）のため、起動時同期フロー（`loadEventData()`/`initPushState()`等）から参照されず、TDZ対象外
+- **キャッシュバスティング**: `index.html` app.js?v=20260718a、`sw.js` CACHE_NAME=sg-weekend-v620
+- **未検証事項（次回TestFlightビルド後にフォロー）**: パスフレーズ設定→サーバーバックアップ→別端末での復元、共有カレンダーのQR読み取り→パスフレーズ入力での参加、の両フローとも実機での動作確認が未実施（Web版でのAPI疎通・暗号化ロジックの単体検証のみ完了）。設計書58のタッチ不発バグ修正・全データバックアップ拡張も同様に実機未検証
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み

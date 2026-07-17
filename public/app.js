@@ -474,12 +474,13 @@
         toastLoginSuccess: '連携しました',
         toastLoginError: '連携に失敗しました。もう一度お試しください',
         toastLogoutSuccess: '連携を解除しました',
-        // 個人予定表バックアップ（設計書54）
-        secBackup: '予定表のバックアップ',
+        // データバックアップ（端末移行用。設計書54 → 設計書58で全データ対応に拡張）
+        secBackup: 'データバックアップ',
         backupLoginRequired: 'バックアップを利用するにはアカウント連携が必要です',
-        backupDisabledDesc: 'パスフレーズを設定すると、予定表をサーバーに暗号化してバックアップできます。パスフレーズを知っている本人以外は内容を読めません。',
-        backupEnabledDesc: 'バックアップは有効です。予定の追加・編集は自動的に暗号化して同期されます。',
+        backupDisabledDesc: 'パスフレーズを設定すると、予定表・マイコースなどのデータをサーバーに暗号化してバックアップできます。パスフレーズを知っている本人以外は内容を読めません。',
+        backupEnabledDesc: 'バックアップは有効です。予定表・マイコースなどのデータの変更は自動的に暗号化して同期されます。',
         backupFoundExistingDesc: '別の端末で作成済みのバックアップが見つかりました。パスフレーズを入力して復元するか、新しくバックアップを作成できます。',
+        backupExcludesCalendarNote: '※ 共有カレンダーへの参加状態は引き継がれません',
         backupEnable: 'バックアップを有効にする',
         backupDisable: 'バックアップを無効にする',
         backupChangePassphrase: 'パスフレーズを変更',
@@ -710,12 +711,13 @@
         toastLoginSuccess: 'Account linked',
         toastLoginError: 'Linking failed. Please try again',
         toastLogoutSuccess: 'Account unlinked',
-        // Personal plan backup (design doc 54)
-        secBackup: 'Plan Backup',
+        // Data backup for device migration (design doc 54 -> expanded to all data in design doc 58)
+        secBackup: 'Data Backup',
         backupLoginRequired: 'Please link your account to use backup',
-        backupDisabledDesc: 'Set a passphrase to back up your plans to the server, encrypted so only you can read them.',
-        backupEnabledDesc: 'Backup is enabled. Plan changes are automatically encrypted and synced.',
+        backupDisabledDesc: 'Set a passphrase to back up your plans, my courses, and other data to the server, encrypted so only you can read them.',
+        backupEnabledDesc: 'Backup is enabled. Changes to your plans, my courses, and other data are automatically encrypted and synced.',
         backupFoundExistingDesc: 'An existing backup from another device was found. Enter your passphrase to restore it, or create a new backup.',
+        backupExcludesCalendarNote: '* Shared calendar memberships are not included in this backup',
         backupEnable: 'Enable Backup',
         backupDisable: 'Disable Backup',
         backupChangePassphrase: 'Change Passphrase',
@@ -2022,10 +2024,31 @@
         if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
         if (e.target.closest('#backup-section-content button')) {
           const btn = e.target.closest('button');
-          e.preventDefault(); btn && btn.click();
+          e.preventDefault();
+          _runBackupAction(btn && btn.dataset.backupAction);
           return;
         }
       }, { passive: false });
+    }
+
+    // ─── データバックアップセクション ボタン共通処理（設計書58）───
+    // タッチ環境はtouchendデリゲーション（上記）から、PC/マウス環境は下記clickリスナーから呼ばれる。
+    function _runBackupAction(action) {
+      if (action === 'setup') openBackupPassphraseSheet('setup');
+      else if (action === 'change') openBackupPassphraseSheet('change');
+      else if (action === 'restore') openBackupPassphraseSheet('restore');
+      else if (action === 'disable') disableBackup();
+    }
+    {
+      const backupSectionEl = document.getElementById('backup-section-content');
+      if (backupSectionEl) {
+        backupSectionEl.addEventListener('click', e => {
+          if (_touchCapableDetected) return; // タッチ環境ではtouchend側で処理済み（二重発火防止）
+          const btn = e.target.closest('button');
+          if (!btn) return;
+          _runBackupAction(btn.dataset.backupAction);
+        });
+      }
     }
 
     // ─── カレンダーポップアップ 即時タップ対応 ───
@@ -2548,6 +2571,7 @@
         localStorage.setItem('app_age_list', JSON.stringify([]));
       }
       initSettingsProfile();
+      _syncBackupToServer();
     }
 
     function getAgeList() {
@@ -2563,6 +2587,7 @@
         localStorage.setItem('app_age_list', JSON.stringify([val]));
       }
       initSettingsProfile();
+      _syncBackupToServer();
     }
 
     // ─── GENRE SETTINGS ───
@@ -2572,6 +2597,7 @@
 
     function saveGenreList(ids) {
       localStorage.setItem('app_genres', JSON.stringify(ids));
+      _syncBackupToServer();
     }
 
     function toggleGenre(id) {
@@ -2954,6 +2980,7 @@
         b.classList.toggle('selected', b.dataset.emoji === emoji);
       });
       document.getElementById('avatar-picker').style.display = 'none';
+      _syncBackupToServer();
     }
 
     function getUserAvatar() {
@@ -4295,6 +4322,7 @@
         list[idx].title = newTitle;
         localStorage.setItem(key, JSON.stringify(list));
         if (_allLoadedCourses[_editingCourseId]) _allLoadedCourses[_editingCourseId].title = newTitle;
+        _syncBackupToServer();
       }
       closeTitleEdit();
       // 詳細画面が開いていればタイトルを即更新
@@ -4313,6 +4341,7 @@
 
       // localStorageから削除
       localStorage.setItem(key, JSON.stringify(list.filter(c => c.id !== courseId)));
+      _syncBackupToServer();
 
       // 公開済みならサーバーからも削除
       if (target?.published) {
@@ -4432,6 +4461,7 @@
       } else {
         localStorage.setItem('liked_courses', JSON.stringify([...liked, courseId]));
       }
+      _syncBackupToServer();
 
       try {
         await fetch(API_BASE + `/api/courses/${courseId}/like`, {
@@ -4498,6 +4528,7 @@
         // localStorageの published フラグを更新
         const updated = myList.map(c => c.id === courseId ? {...c, isPublic: true, published: true} : c);
         localStorage.setItem(city + '_my_courses', JSON.stringify(updated));
+        _syncBackupToServer();
 
         // ボタンを「公開済み」表示に更新
         const publishBtn = document.getElementById(`publish-btn-${courseId}`);
@@ -4527,6 +4558,7 @@
         localStorage.setItem(key, JSON.stringify(
           myList.map(c => c.id === courseId ? { ...c, published: false, isPublic: false } : c)
         ));
+        _syncBackupToServer();
         showToast(t('toastCourseUnpublish'));
         closeCourseDetail();
         switchCourseTab('mylist');
@@ -4556,6 +4588,7 @@
         list.unshift({ ...course, published: false });
         if (list.length > 10) list.pop();
         localStorage.setItem(key, JSON.stringify(list));
+        _syncBackupToServer();
       }
     }
 
@@ -6133,7 +6166,87 @@
       return !!_getBackupKeyMaterial();
     }
 
-    // saveCustomPlans/saveEventPlansから呼ばれる。バックアップ未設定・未ログインなら即return（実害なし）。
+    // 全データバックアップ対象の都市（設計書58 §3-3: ACTIVE_CITIESが['sg']のみでも、
+    // 過去にBKK/SYDが稼働していた時期のlocalStorageデータを取りこぼさないよう固定で全都市分を対象にする）
+    const BACKUP_CITIES = ['sg', 'bkk', 'syd'];
+
+    // 現在のlocalStorageからバックアップ対象データ一式を集める（設計書58 §3-4 新構造）
+    function _collectBackupPayload() {
+      const eventPlansByCity = {};
+      const myCoursesByCity = {};
+      BACKUP_CITIES.forEach(city => {
+        try { eventPlansByCity[city] = JSON.parse(localStorage.getItem(city + '_event_plans') || '[]'); } catch (_) { eventPlansByCity[city] = []; }
+        try { myCoursesByCity[city] = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]'); } catch (_) { myCoursesByCity[city] = []; }
+      });
+      let genres = [], likedCourses = [], ageList = [];
+      try { genres = JSON.parse(localStorage.getItem('app_genres') || '[]'); } catch (_) {}
+      try { likedCourses = JSON.parse(localStorage.getItem('liked_courses') || '[]'); } catch (_) {}
+      try { ageList = JSON.parse(localStorage.getItem('app_age_list') || '[]'); } catch (_) {}
+      return {
+        version: 2,
+        customPlans: getCustomPlans(),
+        eventPlansByCity,
+        myCoursesByCity,
+        genres,
+        who: localStorage.getItem('app_who') || '[]',
+        ageList,
+        likedCourses,
+        avatar: localStorage.getItem('user_avatar') || '',
+      };
+    }
+
+    // 復号したバックアップデータをlocalStorageへローカルとマージして書き込む（設計書58 §3-5 後方互換含む）
+    async function _applyRestoredBackup(dec) {
+      // 旧構造（versionフィールドなし）: {customPlans, eventPlans} のみ。eventPlansは現在の都市に割り当てる
+      const isLegacy = !dec || typeof dec.version === 'undefined';
+      const legacyEventPlans = isLegacy ? (dec.eventPlans || []) : [];
+
+      const localCustom = getCustomPlans();
+      const mergedCustom = mergeArr(localCustom, dec.customPlans || []);
+      await saveCustomPlans(mergedCustom);
+
+      BACKUP_CITIES.forEach(city => {
+        const localEvent = (() => { try { return JSON.parse(localStorage.getItem(city + '_event_plans') || '[]'); } catch (_) { return []; } })();
+        let remoteEvent = [];
+        if (isLegacy) {
+          if (city === getCity()) remoteEvent = legacyEventPlans;
+        } else {
+          remoteEvent = (dec.eventPlansByCity && dec.eventPlansByCity[city]) || [];
+        }
+        const mergedEvent = mergeArr(localEvent, remoteEvent);
+        localStorage.setItem(city + '_event_plans', JSON.stringify(mergedEvent));
+
+        const localCourses = (() => { try { return JSON.parse(localStorage.getItem(city + '_my_courses') || '[]'); } catch (_) { return []; } })();
+        const remoteCourses = (!isLegacy && dec.myCoursesByCity && dec.myCoursesByCity[city]) || [];
+        const mergedCourses = mergeArr(localCourses, remoteCourses);
+        localStorage.setItem(city + '_my_courses', JSON.stringify(mergedCourses));
+      });
+
+      if (!isLegacy) {
+        if (Array.isArray(dec.genres) && dec.genres.length && getGenreList().length === 0) {
+          saveGenreList(dec.genres);
+        }
+        if (Array.isArray(dec.likedCourses) && dec.likedCourses.length) {
+          try {
+            const localLiked = JSON.parse(localStorage.getItem('liked_courses') || '[]');
+            const mergedLiked = Array.from(new Set([...localLiked, ...dec.likedCourses]));
+            localStorage.setItem('liked_courses', JSON.stringify(mergedLiked));
+          } catch (_) {}
+        }
+        if (dec.who && getWhoList().length === 0) {
+          try { localStorage.setItem('app_who', typeof dec.who === 'string' ? dec.who : JSON.stringify(dec.who)); } catch (_) {}
+        }
+        if (Array.isArray(dec.ageList) && dec.ageList.length && getAgeList().length === 0) {
+          localStorage.setItem('app_age_list', JSON.stringify(dec.ageList));
+        }
+        if (dec.avatar && !localStorage.getItem('user_avatar')) {
+          localStorage.setItem('user_avatar', dec.avatar);
+        }
+      }
+    }
+
+    // saveCustomPlans/saveEventPlans/マイコース保存・ジャンル/プロフィール/いいね変更から呼ばれる。
+    // バックアップ未設定・未ログインなら即return（実害なし）。
     async function _syncBackupToServer() {
       if (!getAuthToken()) return;
       if (!isBackupEnabled()) return;
@@ -6148,9 +6261,7 @@
         }
         const salt = localStorage.getItem('app_backup_salt');
         if (!salt) return;
-        const customPlans = getCustomPlans();
-        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const encryptedData = await _encryptWithKey(_backupKeyCache, { customPlans, eventPlans });
+        const encryptedData = await _encryptWithKey(_backupKeyCache, _collectBackupPayload());
         await authedFetch(API_BASE + '/api/user-plans/me', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -6180,12 +6291,13 @@
       if (isBackupEnabled()) {
         el.innerHTML = `
           <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupEnabledDesc">${t('backupEnabledDesc')}</p>
-          <button class="cal-sync-action secondary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('change')" ontouchend="">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>
-          <button class="cal-sync-action danger" onclick="if(!_touchCapableDetected) disableBackup()">🚫 <span data-i18n="backupDisable">${t('backupDisable')}</span></button>`;
+          <button class="cal-sync-action secondary" data-backup-action="change">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>
+          <button class="cal-sync-action danger" data-backup-action="disable">🚫 <span data-i18n="backupDisable">${t('backupDisable')}</span></button>`;
       } else {
         el.innerHTML = `
-          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
-          <button class="cal-sync-action primary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('setup')">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
+          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 6px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
+          <p style="font-size:12px;color:var(--warm-gray);line-height:1.6;margin:0 0 10px;" data-i18n="backupExcludesCalendarNote">${t('backupExcludesCalendarNote')}</p>
+          <button class="cal-sync-action primary" data-backup-action="setup">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
       }
     }
 
@@ -6251,9 +6363,7 @@
       try {
         const salt = _genSaltB64();
         const key = await _deriveKeyFromPassphrase(passphrase, salt);
-        const customPlans = getCustomPlans();
-        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const encryptedData = await _encryptWithKey(key, { customPlans, eventPlans });
+        const encryptedData = await _encryptWithKey(key, _collectBackupPayload());
         const res = await authedFetch(API_BASE + '/api/user-plans/me', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -6279,11 +6389,9 @@
           const ok = await _restoreBackupKeyFromPrefsIfNeeded();
           if (!ok) { showToast(t('toastBackupError')); return; }
         }
-        const customPlans = getCustomPlans();
-        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
         const newSalt = _genSaltB64();
         const newKey = await _deriveKeyFromPassphrase(passphrase, newSalt);
-        const encryptedData = await _encryptWithKey(newKey, { customPlans, eventPlans });
+        const encryptedData = await _encryptWithKey(newKey, _collectBackupPayload());
         const res = await authedFetch(API_BASE + '/api/user-plans/me', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -6316,15 +6424,11 @@
           showToast(t('toastBackupPassphraseWrong'));
           return;
         }
-        const localCustom = getCustomPlans();
-        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const merged = { customPlans: mergeArr(localCustom, dec.customPlans || []), eventPlans: mergeArr(localEvent, dec.eventPlans || []) };
         _backupKeyCache = key;
         const material = await _exportKeyMaterial(key);
         _setBackupKeyMaterial(material);
         localStorage.setItem('app_backup_salt', d.salt);
-        await saveCustomPlans(merged.customPlans);
-        await saveEventPlans(merged.eventPlans);
+        await _applyRestoredBackup(dec);
         closeBackupPassphraseSheet();
         renderBackupSection();
         renderScheduleTab();
@@ -6356,8 +6460,8 @@
           if (el) {
             el.innerHTML = `
               <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupFoundExistingDesc">${t('backupFoundExistingDesc')}</p>
-              <button class="cal-sync-action primary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('restore')">🔓 <span data-i18n="backupRestoreTitle">${t('backupRestoreTitle')}</span></button>
-              <button class="cal-sync-action secondary" onclick="if(!_touchCapableDetected) openBackupPassphraseSheet('setup')">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
+              <button class="cal-sync-action primary" data-backup-action="restore">🔓 <span data-i18n="backupRestoreTitle">${t('backupRestoreTitle')}</span></button>
+              <button class="cal-sync-action secondary" data-backup-action="setup">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
           }
         }
       } catch (e) {}
