@@ -6391,6 +6391,7 @@
     }
 
     async function _doBackupSetup(passphrase) {
+      _sendDebugLog('backup_start', { mode: 'setup', hasAuthToken: !!getAuthToken() });
       try {
         const salt = _genSaltB64();
         const key = await _deriveKeyFromPassphrase(passphrase, salt);
@@ -6400,6 +6401,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ salt, encryptedData }),
         });
+        _sendDebugLog('backup_put_response', { mode: 'setup', status: res.status, ok: res.ok });
         if (!res.ok) throw new Error('backup setup failed');
         _backupKeyCache = key;
         const material = await _exportKeyMaterial(key);
@@ -6409,16 +6411,27 @@
         renderBackupSection();
         showToast(t('toastBackupEnabled'));
       } catch (e) {
+        _sendDebugLog('backup_error', {
+          mode: 'setup',
+          errorName: e?.name || null,
+          errorMessage: e?.message || String(e),
+          hasAuthToken: !!getAuthToken(),
+        });
         showToast(t('toastBackupError'));
       }
     }
 
     async function _doBackupChange(passphrase) {
+      _sendDebugLog('backup_start', { mode: 'change', hasAuthToken: !!getAuthToken() });
       try {
         // 既存の鍵で復号できることを確認してから新パスフレーズで再暗号化（設計書54 §6-10のフロー）
         if (!_backupKeyCache) {
           const ok = await _restoreBackupKeyFromPrefsIfNeeded();
-          if (!ok) { showToast(t('toastBackupError')); return; }
+          if (!ok) {
+            _sendDebugLog('backup_error', { mode: 'change', errorName: 'RestoreKeyFailed', errorMessage: 'no existing backup key material', hasAuthToken: !!getAuthToken() });
+            showToast(t('toastBackupError'));
+            return;
+          }
         }
         const newSalt = _genSaltB64();
         const newKey = await _deriveKeyFromPassphrase(passphrase, newSalt);
@@ -6428,6 +6441,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ salt: newSalt, encryptedData }),
         });
+        _sendDebugLog('backup_put_response', { mode: 'change', status: res.status, ok: res.ok });
         if (!res.ok) throw new Error('backup change failed');
         _backupKeyCache = newKey;
         const material = await _exportKeyMaterial(newKey);
@@ -6437,21 +6451,34 @@
         renderBackupSection();
         showToast(t('toastBackupEnabled'));
       } catch (e) {
+        _sendDebugLog('backup_error', {
+          mode: 'change',
+          errorName: e?.name || null,
+          errorMessage: e?.message || String(e),
+          hasAuthToken: !!getAuthToken(),
+        });
         showToast(t('toastBackupError'));
       }
     }
 
     async function _doBackupRestore(passphrase) {
+      _sendDebugLog('backup_start', { mode: 'restore', hasAuthToken: !!getAuthToken() });
       try {
         const res = await authedFetch(API_BASE + '/api/user-plans/me');
+        _sendDebugLog('backup_get_response', { mode: 'restore', status: res.status, ok: res.ok });
         if (!res.ok) throw new Error('fetch failed');
         const d = await res.json();
-        if (!d.salt || !d.encryptedData) { showToast(t('toastBackupError')); return; }
+        if (!d.salt || !d.encryptedData) {
+          _sendDebugLog('backup_error', { mode: 'restore', errorName: 'MissingSaltOrData', errorMessage: 'no salt/encryptedData in response', hasAuthToken: !!getAuthToken() });
+          showToast(t('toastBackupError'));
+          return;
+        }
         const key = await _deriveKeyFromPassphrase(passphrase, d.salt);
         let dec;
         try {
           dec = await _decryptWithKey(key, d.encryptedData);
         } catch (e) {
+          _sendDebugLog('backup_error', { mode: 'restore', errorName: e?.name || null, errorMessage: 'decrypt failed: ' + (e?.message || String(e)), hasAuthToken: !!getAuthToken() });
           showToast(t('toastBackupPassphraseWrong'));
           return;
         }
@@ -6465,6 +6492,12 @@
         renderScheduleTab();
         showToast(t('toastBackupRestored'));
       } catch (e) {
+        _sendDebugLog('backup_error', {
+          mode: 'restore',
+          errorName: e?.name || null,
+          errorMessage: e?.message || String(e),
+          hasAuthToken: !!getAuthToken(),
+        });
         showToast(t('toastBackupError'));
       }
     }

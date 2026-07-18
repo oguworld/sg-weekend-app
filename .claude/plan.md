@@ -5751,3 +5751,199 @@ function showToast(msg) {
 
 ## 承認状況
 2026-07-18 planner設計。ユーザー承認済み。2026-07-18 orchestratorにより実装完了（builder→checker完了、🔴Criticalなし）。ローカル`main`へコミット済み。releaseブランチへのpush・TestFlightビルドは未実施（ユーザー明示指示待ち）。
+
+# 設計書62 「データバックアップ」setupモードで確定押下時に失敗する不具合の原因調査計装
+
+## 背景
+
+TestFlight実機（iOS App Store版）で、設定画面「データバックアップ」→「バックアップ用パスフレーズを設定」（setupモード）でパスフレーズ・確認用パスフレーズを入力し「確定」を押すと、`toastBackupError`（「⚠️ 処理に失敗しました。もう一度お試しください」）が表示され、バックアップが有効化できない。
+
+`_doBackupSetup()`（`public/app.js` 6393〜6414行目）は下記の通り、`try`ブロック内の全処理（`_genSaltB64()` → `_deriveKeyFromPassphrase()` → `_collectBackupPayload()` → `_encryptWithKey()` → `authedFetch()`によるPUT → `res.ok`判定 → `_exportKeyMaterial()` → `_setBackupKeyMaterial()` → `localStorage.setItem()`）を単一の`catch`で一括して`toastBackupError`にマッピングしている。
+
+```js
+async function _doBackupSetup(passphrase) {
+  try {
+    const salt = _genSaltB64();
+    const key = await _deriveKeyFromPassphrase(passphrase, salt);
+    const encryptedData = await _encryptWithKey(key, _collectBackupPayload());
+    const res = await authedFetch(API_BASE + '/api/user-plans/me', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ salt, encryptedData }),
+    });
+    if (!res.ok) throw new Error('backup setup failed');
+    _backupKeyCache = key;
+    const material = await _exportKeyMaterial(key);
+    _setBackupKeyMaterial(material);
+    localStorage.setItem('app_backup_salt', salt);
+    closeBackupPassphraseSheet();
+    renderBackupSection();
+    showToast(t('toastBackupEnabled'));
+  } catch (e) {
+    showToast(t('toastBackupError'));
+  }
+}
+```
+
+`_doBackupChange()`（6416〜6442行目）・`_doBackupRestore()`（6444〜6470行目）も同一パターン（`_doBackupChange`は既存鍵の復元処理`_restoreBackupKeyFromPrefsIfNeeded()`が先行する点が異なる、`_doBackupRestore`は`GET`→復号→適用の流れで、復号失敗は既に`toastBackupPassphraseWrong`に個別分岐済み）。
+
+サーバー側ログ（`pm2 logs` / `sg-weekend-error.log` / `sg-weekend-out.log`）を確認したが、該当時刻にエラーの痕跡がなく、`server.js`にHTTPアクセスログ自体が無いため、リクエストがサーバーに到達したかどうかも不明。同一ユーザーはWeb版では同じ操作に成功しており（`data/user-plans/usr_2ae6926badb07cff1c20c0fb.json`存在確認済み）、暗号化ロジック・サーバーAPI自体は少なくとも一度は正常動作した実績がある。今回はCapacitor native環境で初めて発生しており、環境固有の問題（WebCrypto API非対応/挙動差異、`authedFetch`のネットワークエラー、CORS、iOS版特有のクロックスキュー等）を疑う必要があるが、現状の情報では切り分けができない。
+
+CLAUDE.mdに記載の恒久デバッグ基盤（`_sendDebugLog()` → `POST /api/debug-log` → `logs/debug-nav.log`）を使い、原因を一次切り分けするための**使い捨て計装**をこのタイミングで追加する。
+
+## 目的
+
+- 実機操作1回につき、`_doBackupSetup()`（および横展開として`_doBackupChange()`・`_doBackupRestore()`）が「どこまで到達し、どこで失敗したか」を`logs/debug-nav.log`から後追いで判別できるようにする
+- 特に、以下のどの段階で失敗しているかを切り分けられるようにする
+  1. 関数自体が呼ばれていない（呼び出し元・`submitBackupPassphrase()`のガード等で弾かれている）
+  2. WebCrypto処理（`_deriveKeyFromPassphrase`/`_encryptWithKey`）で例外
+  3. `authedFetch()`の`fetch()`自体が例外を投げた（ネットワーク到達不可・タイムアウト等）
+  4. `fetch()`は成功したが`res.ok===false`（サーバーがエラーステータスを返した。この場合ステータスコードも記録する）
+  5. `res.ok===true`だがその後の後処理（`_exportKeyMaterial`/`_setBackupKeyMaterial`等）で例外
+
+## 具体的な計装箇所
+
+対象ファイルは`public/app.js`のみ。`server.js`・`data/`は無変更（既存の`POST /api/debug-log`エンドポイントをそのまま利用するため、サーバー側の変更は不要）。
+
+### 1. `_doBackupSetup()`（6393〜6414行目）
+
+開始ログ・PUT前後の分離ログ・catchログの3点を追加する。
+
+- **開始ログ**（`try`の直前、または`try`ブロック先頭）:
+  ```js
+  _sendDebugLog('backup_start', { mode: 'setup', hasAuthToken: !!getAuthToken() });
+  ```
+- **PUT直後の`res.ok`判定に、ステータスコードを記録するログを追加**（既存の`if (!res.ok) throw new Error('backup setup failed');`の直前に挿入。`throw`する場合としない場合のどちらでも通るよう、判定前に置く）:
+  ```js
+  _sendDebugLog('backup_put_response', { mode: 'setup', status: res.status, ok: res.ok });
+  ```
+- **catchブロック**（既存の`showToast(t('toastBackupError'));`と併記、`e`の詳細を記録）:
+  ```js
+  } catch (e) {
+    _sendDebugLog('backup_error', {
+      mode: 'setup',
+      errorName: e?.name || null,
+      errorMessage: e?.message || String(e),
+      hasAuthToken: !!getAuthToken(),
+    });
+    showToast(t('toastBackupError'));
+  }
+  ```
+
+これにより、`backup_start`だけ記録されて`backup_put_response`が無ければ「PUT到達前（WebCrypto処理 or `authedFetch`の`fetch()`自体の例外）で失敗」、`backup_put_response`が記録されて`status`が2xx以外なら「サーバー側がエラーを返した」、`backup_put_response`が200台なのに`backup_error`も記録されていれば「後処理（`_exportKeyMaterial`/`_setBackupKeyMaterial`/`localStorage.setItem`）で例外」と切り分けられる。
+
+### 2. `_doBackupChange()`（6416〜6442行目）
+
+同様のパターンで3点追加（`mode: 'change'`）。既存の`_restoreBackupKeyFromPrefsIfNeeded()`失敗時の早期return（`if (!ok) { showToast(t('toastBackupError')); return; }`、6419〜6422行目）にもログを追加する（このパスは`catch`を通らず独立した失敗経路のため、既存の3点だけでは捕捉できない）:
+
+```js
+if (!_backupKeyCache) {
+  const ok = await _restoreBackupKeyFromPrefsIfNeeded();
+  if (!ok) {
+    _sendDebugLog('backup_error', { mode: 'change', errorName: 'RestoreKeyFailed', errorMessage: 'no existing backup key material', hasAuthToken: !!getAuthToken() });
+    showToast(t('toastBackupError'));
+    return;
+  }
+}
+```
+
+### 3. `_doBackupRestore()`（6444〜6470行目）
+
+同様に`backup_start`（`mode: 'restore'`）・GET直後のレスポンスログ・catchログを追加する。このモードは`GET`（PUTではない）である点、および`d.salt`/`d.encryptedData`欠落時の早期return（6449行目）・復号失敗時の個別catch（6452〜6457行目、既存の`toastBackupPassphraseWrong`分岐）がある点に注意し、それぞれにログを追加する:
+
+```js
+_sendDebugLog('backup_start', { mode: 'restore', hasAuthToken: !!getAuthToken() });
+...
+const res = await authedFetch(API_BASE + '/api/user-plans/me');
+_sendDebugLog('backup_get_response', { mode: 'restore', status: res.status, ok: res.ok });
+if (!res.ok) throw new Error('fetch failed');
+const d = await res.json();
+if (!d.salt || !d.encryptedData) {
+  _sendDebugLog('backup_error', { mode: 'restore', errorName: 'MissingSaltOrData', errorMessage: 'no salt/encryptedData in response', hasAuthToken: !!getAuthToken() });
+  showToast(t('toastBackupError'));
+  return;
+}
+...
+try {
+  dec = await _decryptWithKey(key, d.encryptedData);
+} catch (e) {
+  _sendDebugLog('backup_error', { mode: 'restore', errorName: e?.name || null, errorMessage: 'decrypt failed: ' + (e?.message || String(e)), hasAuthToken: !!getAuthToken() });
+  showToast(t('toastBackupPassphraseWrong'));
+  return;
+}
+...
+} catch (e) {
+  _sendDebugLog('backup_error', { mode: 'restore', errorName: e?.name || null, errorMessage: e?.message || String(e), hasAuthToken: !!getAuthToken() });
+  showToast(t('toastBackupError'));
+}
+```
+
+`_doBackupSetup`/`_doBackupChange`は今回報告の主対象ではないが、同じ計装パターンを横展開しておくことで、次に別モードで同種の不具合が報告された場合にも即座に切り分けられる（CLAUDE.mdの既存流儀＝同一パターンの計装を横展開する慣習に合わせる）。
+
+## `authedFetch()`自体の変更について（検討の結果、見送り）
+
+依頼文3では「`fetch()`が投げる例外」と「`res.ok===false`」を区別できる設計を求められているが、上記2.の各呼び出し箇所（PUT/GET直後にステータスを記録するログを個別追加する方式）で目的は達成できる。`authedFetch()`本体（2664〜2669行目）を変更すると、コース公開/削除/非公開化など複数の既存呼び出し元（`publishCourseById`/`unpublishCourseById`/`deleteMyCourse`等）にも影響が及ぶため、**今回はバックアップ関連の呼び出し箇所側でのみログを追加し、`authedFetch()`自体には一切手を加えない**方針とする。これにより影響範囲を本不具合の調査に限定できる。
+
+## 変更ファイル一覧
+
+- `public/app.js` のみ
+  - `_doBackupSetup()`（6393〜6414行目付近）: `backup_start` 1箇所・`backup_put_response` 1箇所・`backup_error`（catch内）1箇所を追加
+  - `_doBackupChange()`（6416〜6442行目付近）: `backup_start` 1箇所・`backup_error`（早期return内）1箇所・`backup_put_response` 1箇所・`backup_error`（catch内）1箇所を追加
+  - `_doBackupRestore()`（6444〜6470行目付近）: `backup_start` 1箇所・`backup_get_response` 1箇所・`backup_error`（早期return内）1箇所・`backup_error`（復号catch内、既存`toastBackupPassphraseWrong`と併記）1箇所・`backup_error`（外側catch内）1箇所を追加
+  - `index.html`のキャッシュバスティング（`app.js?v=...`）・`sw.js`の`CACHE_NAME`更新（既存ルール通り、JS変更を伴うため必須）
+- `server.js`・`data/`・`.claude/plan.md`（本設計書追記を除く）は無変更。既存の`POST /api/debug-log`エンドポイント（712〜717行目）をそのまま利用するため`pm2 restart`は不要（静的ファイルのみの変更）
+
+## ログに含める項目（個人情報・秘密情報を含まないことの確認）
+
+各`_sendDebugLog()`呼び出しに含める項目は以下のみとする。
+
+| フィールド | 内容 | 例 |
+|---|---|---|
+| `event` | イベント種別 | `backup_start` / `backup_put_response` / `backup_get_response` / `backup_error` |
+| `mode` | `setup` / `change` / `restore` | `"setup"` |
+| `hasAuthToken` | JWT保有の真偽値のみ（トークン本体は含めない） | `true` |
+| `status` | HTTPステータスコード（`res.status`） | `401` |
+| `ok` | `res.ok`の真偽値 | `false` |
+| `errorName` | `e?.name`（`TypeError`等のJS標準エラー名） | `"TypeError"` |
+| `errorMessage` | `e?.message`または`String(e)`（エラー文言のみ、スタックトレースは含めない） | `"Failed to fetch"` |
+
+`_sendDebugLog()`側で自動付与される`ts`（タイムスタンプ）・`isCapacitor`（既存実装、6〜13行目）もそのまま利用する。
+
+**含めないもの（厳守）**: パスフレーズ本体・確認用パスフレーズ本体、`salt`・`encryptedData`（暗号化前後のデータ本体）、JWT本体（`getAuthToken()`の戻り値そのもの）、`userId`、`e.stack`（スタックトレース、ファイルパスや行番号以上の情報は含まれないと想定されるが念のため送信しない）。
+
+## 受け入れ基準
+
+### 正常系
+- 実装後、TestFlight実機で設定画面「データバックアップ」→「バックアップ用パスフレーズを設定」を開き、パスフレーズ・確認用パスフレーズを入力し「確定」を押す（＝バグ報告の再現手順そのまま）と、`logs/debug-nav.log`に`backup_start`（`mode:"setup"`）のエントリが最低1件記録される
+- 上記操作でエラートーストが表示された場合、同じ操作の中で`backup_put_response`（PUTに到達した場合）または`backup_error`（到達しなかった/後処理で失敗した場合）のいずれかが記録され、両者を突き合わせることで失敗段階が判別できる
+- Web版（Safari）で同じ操作を行った場合も同様にログが記録され、Web版では成功実績がある通り`toastBackupEnabled`が表示され、対応するログに異常なステータス・エラーが記録されないことを確認できる（対照群としての確認）
+
+### 失敗系
+- `_sendDebugLog()`自体がネットワークエラー等で送信に失敗しても（fire-and-forget、`.catch(()=>{})`で握りつぶす既存実装）、`_doBackupSetup()`等のバックアップ処理自体の成否・表示されるトーストの内容には一切影響しないこと（既存の`_sendDebugLog`の設計方針を踏襲するのみで、新規のリスクは生まない）
+
+### エッジケース
+- `_doBackupChange()`の`_restoreBackupKeyFromPrefsIfNeeded()`失敗による早期return（既存鍵が見つからないケース）でも、`catch`を経由しない独立した失敗経路であるため、この経路専用の`backup_error`ログが正しく記録されること
+- `_doBackupRestore()`で誤ったパスフレーズを入力した場合（`toastBackupPassphraseWrong`が表示される既存の正常な失敗系）にも、`backup_error`（`errorMessage`に`"decrypt failed: ..."`を含む）が記録され、今回のバグ報告（`toastBackupError`）とは別カテゴリの失敗であることがログ上でも区別できること
+
+## リスク
+
+- ログ送信自体は`fetch()`をfire-and-forgetで呼ぶのみのため、既存の`_sendDebugLog`利用箇所と同様、パフォーマンス・機能への影響はほぼ無いと考えられる
+- `logs/debug-nav.log`はサイズ上限・ローテーションが無い既知の制約（CLAUDE.md記載済み）。今回の計装追加により1回の操作あたり最大2〜3行程度増える見込みだが、恒久的な問題ではない（原因特定後に計装自体を削除する前提）
+- 計装を追加しても、`fetch()`が投げる例外の`e.name`/`e.message`だけでは、iOS WKWebView環境固有のネットワークエラー（証明書検証エラー・ATS関連等）の詳細までは判別できない可能性がある。その場合は本設計書の計装だけでは原因特定に至らず、追加調査（Xcodeコンソールログ等、TestFlightでは通常取得できない）が必要になる可能性がある
+- CORS起因の失敗の場合、ブラウザ/WKWebViewは`fetch()`に対して詳細な理由を伏せた汎用的な`TypeError: Failed to fetch`（またはCapacitor環境特有の類似エラー）しか返さないことが多く、`errorMessage`だけでは「CORSかネットワーク断かサーバー未到達か」を完全には区別できない可能性がある
+
+## スコープ外
+
+- 今回はコードの修正（不具合そのものの解消）は一切行わない。診断計装の追加のみ
+- `authedFetch()`本体・`getAuthToken()`・`server.js`側の`/api/user-plans/me`エンドポイント実装は無変更（原因特定後、別途この設計書とは別の修正設計書で対応する）
+- サーバー側にHTTPアクセスログ（morgan等）を新規導入することはスコープ外（今回はクライアント側計装のみで原因を絞り込む方針。ここで切り分けできない場合は別途検討）
+- 今回追加する計装ポイント（`backup_start`/`backup_put_response`/`backup_get_response`/`backup_error`、計10箇所前後）は**使い捨て**であり、原因特定後は次回フォローとして削除する。CLAUDE.mdの既存の使い捨て計装（`push_init_*`/`auth_prefs_init`等）と同様、`.claude/next.md`に削除予定として記録する
+
+## データ共有の影響確認（プロジェクトルール）
+
+- **後方互換性**: `server.js`・APIレスポンス構造は無変更のため、旧バージョンApp Storeアプリへの影響は無い
+- **影響範囲**: `public/app.js`のみの変更のため、Web版は配信直後から反映されるが、iOS版（Capacitor同梱）は次回TestFlightビルドを配信するまで反映されない。既存ビルドのユーザーには一切影響しない（ログが増えないだけで、既存の不具合状態が変わるわけでもない）
+- **リリースタイミング**: 診断目的のみの変更のため、通常のCLAUDE.mdルール通り、ユーザーの明示指示があるまで`release`ブランチへのpush・TestFlightビルドは行わない
+
+## 承認状況
+2026-07-18 planner設計。ユーザー承認済み。2026-07-18 orchestratorにより実装完了（builder→checker完了、🔴Criticalなし）。ローカル`main`へコミット済み。releaseブランチへのpush・TestFlightビルドは未実施（ユーザー明示指示待ち）。
