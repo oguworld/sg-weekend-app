@@ -72,6 +72,29 @@
     let _touchCapableDetected = false;
     document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
 
+    // ─── パスフレーズ入力シート（バックアップ/共有カレンダー）フォーカス中はbottom-navを一時的に隠す（設計書60）───
+    // Web版Safari・iOS版共通（Capacitor限定にしない）。モバイルSafariのキーボード表示時、独立したposition:fixed;bottom:0
+    // 要素同士（.bottom-nav と #backup-passphrase-sheet/#cal-passphrase-sheet）の可視領域追従がズレ、
+    // ボタン行がボトムナビと重なる不具合の対策。対象を2シート内のinput/textareaに厳密に限定する。
+    document.addEventListener('focusin', (e) => {
+      try {
+        const t = e.target;
+        if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
+        if (!t.closest('#backup-passphrase-sheet, #cal-passphrase-sheet')) return;
+        const nav = document.querySelector('.bottom-nav');
+        if (nav) nav.style.visibility = 'hidden';
+      } catch (_) {}
+    });
+    document.addEventListener('focusout', (e) => {
+      try {
+        const t = e.target;
+        if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
+        if (!t.closest('#backup-passphrase-sheet, #cal-passphrase-sheet')) return;
+        const nav = document.querySelector('.bottom-nav');
+        if (nav) nav.style.visibility = '';
+      } catch (_) {}
+    });
+
     // ─── 設定画面のキーボード被り対策（軽量フォールバックのみ。2026-07-11設計書15で刷新）───
     // かつての .plan-modal / .plan-sheet を縮小・移動する複雑なJS一式（_adjustSheetForKb等）は撤去した。
     // ビューポート固着バグの真因は capacitor.config.js の contentInset:'always' 側にあり、

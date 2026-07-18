@@ -5477,3 +5477,131 @@ function _scrollFocusedIntoViewOnKb(kbHeight) {
 
 ## 承認状況
 2026-07-18 planner設計。ユーザー承認済み。同日orchestratorにより実装完了（案A・案C両方実施）。
+
+# 設計書60 — バックアップ／共有カレンダーのパスフレーズ入力シートでボタン行がボトムナビと重なる不具合、Web版（Safari）向けの再修正（設計書59はCapacitor限定コードのみを対象としており的外れだったための再設計）
+
+## 背景
+
+設計書59（`.plan-modal-body`ラッパー追加＋`_scrollFocusedIntoViewOnKb`の`scrollIntoView`フォールバック削除）を実装・ローカルコミット済みだったが、ユーザーからWeb版（Safari）で「直っていない」と報告があった。
+
+debuggerが調査した結果、設計書59が対象にしていた`_scrollFocusedIntoViewOnKb()`は`_isCapacitorApp`が`true`のとき（＝iOS App Store版）にしか実行されないコードパスであり、**Web版Safariではそもそも設計書59の変更が一度も実行されていなかった**ことが判明した。設計書59はCapacitor版の潜在的な副作用の除去としては無意味ではないが、今回ユーザーが報告している「Web版Safariでの症状」には無関係だった。今回はWeb版Safariで実際に効く修正を設計する。
+
+## 調査結果（debugger、実コードで再確認済み）
+
+### 確定した事実
+
+1. `_isCapacitorApp`はWeb版Safariでは確実に`false`になる（`public/app.js` 2行目 `const _isCapacitorApp = !!(window.Capacitor?.isNativePlatform?.());`）。
+2. `_scrollFocusedIntoViewOnKb()`の呼び出しは`if (_isCapacitorApp) { ... } else { /* Web環境: JS制御は一切行わない */ }`（`public/app.js` 217〜249行目）の`if`ブロック内でのみ登録されており、`else`節（246〜249行目）は空。Web版では`keyboardWillShow`相当のイベント自体が存在せず、設計書59の変更は実行されない。
+3. `.bottom-nav`（`public/app.css` 1952行目、`position:fixed; bottom:0; z-index:9999`）と`#backup-passphrase-sheet`（`public/index.html` 687行目、`class="plan-modal"`、インラインstyleで`z-index:3602`）・`#cal-passphrase-sheet`（725行目、`z-index:3604`）は、いずれも`<body>`直下の独立したトップレベル要素で、互いに入れ子関係を持たない完全な兄弟。両者とも`position:fixed`。
+4. `#backup-passphrase-sheet`・`#cal-passphrase-sheet`は設計書59で`.plan-modal-body`ラッパー（`flex:1; min-height:0; overflow-y:auto`）が既に追加されているが、親`.plan-modal`に確定`height`指定が無く`max-height:88vh`のみのため、`flex-grow`は実質無効化され、モーダル全体の実高さはコンテンツ量（タイトル+警告文+入力欄2つ+ボタン行）で決まる自然サイズになる。他の入力項目が多い`.plan-modal`（例: `#plan-custom-modal`）よりコンテンツ量が少なく、実高さが小さい短いモーダルとして表示される。
+5. Web版でキーボード表示時に発火するJS（`resize`/`visualViewport`イベント含む）はコード全体を確認しても皆無。この症状は**ピュアにCSS + モバイルSafariのネイティブ挙動由来**であり、アプリ側JSのバグではない。
+6. CLAUDE.mdに既知事実として記録済み: モバイルSafariは`position:fixed;bottom:0`要素をキーボード表示時にvisualViewportの可視領域へ自動追従させるネイティブ挙動を持つ（設定画面のボトムナビが一緒に上がる現象と同一。CLAUDE.md「✅ 全画面共通キーボード被り対策」節参照）。
+
+### 原因の結論（確度順）
+
+1. **【最有力】モバイルSafariのネイティブ仕様に起因する構造的な相性の悪さ**: `.bottom-nav`と`.plan-modal`（`#backup-passphrase-sheet`/`#cal-passphrase-sheet`）が独立した`position:fixed;bottom:0`要素であり、キーボード表示時のSafariのfixed要素可視領域追従処理が、フォーカスを持つ`.plan-modal`側とフォーカスと無関係な`.bottom-nav`側とで同期せず、相対位置がズレる。**アプリ側の実装バグというより、2つの独立したfixed要素を同時に画面下部に置くレイアウト構成そのものが、モバイルSafariのキーボード追従仕様と根本的に相性が悪いことに起因する**。
+2. 【副次的要因】`#backup-passphrase-sheet`・`#cal-passphrase-sheet`のコンテンツ量の少なさ（実高さが小さく内部スクロールが発生しない）により、ズレが顕在化しやすい・目立ちやすい。
+
+## 修正方針
+
+debuggerの推奨（案1を主軸、案3を保険として併用）を採用する。
+
+### 主軸: フォーカス中は`.bottom-nav`を一時的に隠す（`visibility:hidden`方式）
+
+**対象を`#backup-passphrase-sheet`・`#cal-passphrase-sheet`内の入力欄に限定する**（全画面・全入力欄への適用はスコープ外、理由は下記「適用範囲を絞る理由」参照）。
+
+- `document`に1つだけ`focusin`/`focusout`リスナーを登録する（バブリングを利用、Web版・iOS版共通で有効化して構わない設計にする。ただし実際に主眼となる不具合はWeb版）。
+- ガード条件: `e.target`が`INPUT`または`TEXTAREA`要素で、かつ`e.target.closest('#backup-passphrase-sheet, #cal-passphrase-sheet')`が真の場合のみ、`.bottom-nav`の表示/非表示を切り替える。
+- 実装は`visibility:hidden`（`display:none`ではなく）を採用する。理由: `display:none`は要素をレイアウトフローから除外しリフローを誘発するため、fixed要素の消失・復帰時にiOS WKWebView/Safari側で追加のレイアウト再計算ズレを誘発するリスクがある（CLAUDE.md記載の既知のiOS特有の挙動不安定さと同系統のリスク）。`visibility:hidden`はレイアウトボックスを保持したまま見た目だけ消すため副作用が小さいと判断する。タップ判定（クリック透過）も`visibility:hidden`で自動的に無効化される（`pointer-events`の追加指定は不要）。
+- `focusout`側では、`setTimeout(..., 0)`等の遅延を挟まず即時に`.bottom-nav`を復帰させてよい（同一シート内でフィールド間フォーカス移動する際、`focusout`→`focusin`が連続発火することでボトムナビが一瞬ちらつく可能性はあるが、実害は軽微と判断する。ちらつきが実機で目立つ場合は次回フォローで遅延復帰への調整を検討する）。
+- `focusout`のガードは、`e.relatedTarget`が同一シート内の別input/textareaである場合でも一律`.bottom-nav`を隠したままにする、という積極的な制御は行わない（実装をシンプルに保つため、`focusout`のたびに一度表示に戻し、直後の`focusin`で再度隠す方式でよい。ちらつきが許容できないと判明した場合のみ次回フォローで見直す）。
+
+### CLAUDE.mdの既存方針との整合性の整理
+
+CLAUDE.mdには「2026-07-09、全モーダルに横展開して統一済み: モーダル表示中もbottom-navを表示し続ける設計を正式採用」という確立済み方針があり、一見矛盾するように見える。この整理は以下の通りとする。
+
+- **既存方針が対象にしていたのは「モーダルが開いている間」全体である**。モーダルを開いただけ（フォーカスがまだ入力欄に無い状態、あるいはタイトル閲覧・ボタンタップのみで完結する操作）では、従来通り常にボトムナビは表示され続ける。この既存方針は一切変更しない。
+- **今回追加するのは、その中でもさらに粒度の細かい「テキスト入力中（キーボードが開いている間）」という一時的な例外区間のみ**である。キーボードが開いている間はそもそも画面下部の大部分が物理的にキーボードに覆われており、ボトムナビ自体がユーザーから見えない・押せない状態になっているのが通常（キーボード自体がボトムナビより手前に表示されるため）。すなわち「ボトムナビが見えなくなる」という結果自体は、この対策をしなくてもキーボード表示中は既に事実上発生している状態であり、今回の変更が新たにユーザー体験を悪化させる度合いは小さいと判断する。
+- CLAUDE.md本体には、今回の対策を「モーダル表示中は表示し続ける」の例外条項として追記する（下記「CLAUDE.md更新内容」参照）。既存文言の削除・上書きは行わない。
+
+### 適用範囲を絞る理由
+
+- 対象を`#backup-passphrase-sheet`・`#cal-passphrase-sheet`の2シートに限定し、設定画面のフィードバック欄（`#feedback-text`）・ニックネーム欄（`#nickname-input`）等、既存で問題なく動作している画面には一切影響を与えない設計にする。
+- 理由: (1) 今回実機で不具合が確認されているのはこの2シートのみであり、他画面まで挙動を変える必要性・根拠がない。(2) 全画面の全入力欄に適用すると、正常に動作している既存画面（設定画面等）の見た目まで意図せず変えてしまうリスクがあり、CLAUDE.mdの「対症療法は影響範囲を最小化する」という過去の教訓（onclick+touchendの節「グローバルなイベントブロックは影響範囲が広すぎるリスクがある」）とも整合する。(3) `.plan-modal`系の他シート（`#plan-custom-modal`等）はコンテンツ量が多く内部スクロール（`.plan-modal-body{overflow-y:auto}`）が実際に機能しているため、今回と同じ「実高さが小さいシート」特有の顕在化条件に当てはまらない。仮に将来別のシートで同じ症状が再現した場合は、対象セレクタに追加する形で横展開する（1つの`focusin`/`focusout`リスナーのガード条件にセレクタを追加するだけで済む設計にしておく）。
+
+### 保険的対策（案3、併用する）
+
+主軸対策で解消しない場合や、`focusin`/`focusout`のタイミングのズレでボタン行が一瞬重なるケースへの備えとして、以下を併用する。
+
+- `#backup-passphrase-sheet`・`#cal-passphrase-sheet`のボタン行（`display:flex;gap:10px;margin-top:12px;`の`div`、キャンセル/確定ボタンを含む行）の下に、既存の`.plan-modal-body`の`padding-bottom: calc(84px + env(safe-area-inset-bottom,0px))`に加えて、ボタン行自体に`margin-bottom`を追加し、ボトムナビの実測高さ（`.bottom-nav`は`padding:10px 0 calc(10px + env(safe-area-inset-bottom))`+コンテンツ高さで概ね60〜70px程度）に対してさらに安全マージンを確保する。
+- 具体的には、ボタン行の`div`に`margin-bottom:8px;`程度の小さな追加余白を足す軽微な調整に留める（大幅なレイアウト変更はしない）。これは「万一フォーカス中のズレが起きても、ボタンの誤タップというより実害の大きい事態（例えばボトムナビ側のリンクを意図せず踏む）を避ける」ための保険であり、ズレそのものの解消は主軸対策に委ねる。
+
+## 変更ファイル一覧
+
+| ファイル | 変更内容 |
+|---|---|
+| `public/app.js` | 新規関数`_toggleBottomNavForPassphraseSheetFocus()`相当のロジックを追加。`document`への`focusin`/`focusout`リスナー1組を、既存の`_isCapacitorApp`分岐やCapacitor限定ブロックの外側（Web版・iOS版どちらでも実行される場所）に新規登録する。既存の`_scrollFocusedIntoViewOnKb`関連コードは変更しない（設計書59の変更を取り消す必要はない。Capacitor版での潜在的副作用除去としては引き続き有効なため） |
+| `public/index.html` | `#backup-passphrase-sheet`・`#cal-passphrase-sheet`内のボタン行`div`に`margin-bottom`を軽微追加（保険的対策）。キャッシュバスティング: `<script src="/app.js?v=20260718b">` → `v=20260718c` |
+| `public/sw.js` | `CACHE_NAME`を`sg-weekend-v621` → `v622`に更新（app.js変更に伴う必須連動、CLAUDE.md「CSSキャッシュバスティング手順」節の同種ルールをJS変更にも適用） |
+| CLAUDE.md | 「z-index方針」節または「UIスタイル規約」節付近に、今回の「モーダル表示中はボトムナビ表示を維持する既存方針」の例外条項として、テキスト入力中（フォーカス中）に限り`#backup-passphrase-sheet`・`#cal-passphrase-sheet`でボトムナビを一時的に`visibility:hidden`にする対応を追記。将来同じ症状が別シートで起きた場合の横展開手順（対象セレクタへの追加のみで済む設計）も明記 |
+| `.claude/plan.md` | 本設計書60を末尾に追記（既存設計書1〜59は無変更） |
+
+`server.js`・データファイル（`data/`配下）の変更は無い。API変更・データ構造変更は無いため、Web版/iOS版のデータ共有・後方互換性への影響は無い。
+
+## データモデルの変更
+
+無し。
+
+## APIの変更
+
+無し。
+
+## フロントエンドの変更
+
+- `public/app.js`: `document`レベルの`focusin`/`focusout`リスナーを1組新規追加（グローバルリスナーだが、ガード条件で対象を2シート内の入力欄に限定するため実質的な影響範囲は狭い）。新規モジュールスコープ変数は追加しない方針とする（関数はトップレベルの即時実行コード内に直接記述するか、既存の`_touchCapableDetected`検出リスナー（71〜73行目）と同じ並びに追加する形にし、`let`/`const`の新規宣言を増やさないことでTDZリスクを回避する）。
+- `public/index.html`: ボタン行`div`への`margin-bottom`軽微追加（2箇所、`#backup-passphrase-sheet`・`#cal-passphrase-sheet`）。キャッシュバスティングのバージョン文字列更新。
+- `public/sw.js`: `CACHE_NAME`のバージョン数値更新のみ。
+
+## TDZ・onclick+touchend・i18nルールとの整合確認
+
+- **TDZ**: 今回追加する`focusin`/`focusout`リスナーは、起動時の同期初期化フロー（`loadEventData()`/`initPushState()`等）から呼ばれるものではなく、`document.addEventListener(...)`の登録自体がトップレベルで即座に実行されるだけの副作用のないコードであり、起動時フローが参照する`let`/`const`変数を新規に増やさない設計とする。既存の`_touchCapableDetected`検出リスナー（71〜73行目）と同じ性質（イベントリスナー登録のみ、モジュールスコープ変数への書き込み無し、または既存パターンに倣った単純な代入のみ）にすることで、CLAUDE.mdの「起動時フローが辿る全関数の同期実行部で参照される全let/const変数」に該当しないようにする。新規変数を万一必要とする場合は、`_touchCapableDetected`宣言（72行目）と同じ並び・同じタイミングで宣言し、起動時フロー（`loadEventData();`、2049行目付近）より前に配置することを実装時に必ず確認する。
+- **onclick+touchendパターン**: 今回はボタンの新規追加・onclick属性の変更は行わない。`focusin`/`focusout`はクリックイベントではなくフォーカスイベントであり、ゴーストクリック対策（`_touchCapableDetected`ガード）の対象外。既存の`#backup-passphrase-submit-btn`等のonclickガード（`if(!_touchCapableDetected) submitBackupPassphrase()`）には触れない。
+- **i18n**: 新規UI文言・新規ボタン・新規テキストの追加は無い（表示/非表示の切り替えロジックとCSS微調整のみ）ため、i18nキーの追加は不要。
+
+## 受け入れ基準
+
+### 正常系
+- `#backup-passphrase-sheet`を`setup`/`change`/`restore`いずれのモードで開いても、モーダル自体の開閉・表示は従来通り正常に動作する。
+- パスフレーズ欄にフォーカスすると、キーボード表示と同時に`.bottom-nav`が非表示になる（Web版Safari実機で確認）。
+- パスフレーズ欄 → 確認欄へフォーカス移動しても、ボタン行（キャンセル/確定）がボトムナビと重ならずに表示される（**本修正の主目的、Web版Safariで実際に確認する**）。
+- 入力欄からフォーカスを外す（他要素をタップ、キーボードの「完了」等でキーボードを閉じる）と、`.bottom-nav`が再表示される。
+- `#cal-passphrase-sheet`（共有カレンダー用、設計書55）でも同様の挙動になる。
+- iOS App Store版（TestFlight実機）でも同様に、フォーカス中は`.bottom-nav`が隠れ、フォーカスアウトで復帰することを確認する（Web版と共通コードのため副作用が無いことの確認）。
+- 設定画面の「改善要望」欄（`#feedback-text`）・ニックネーム欄（`#nickname-input`）など、対象2シート以外の入力欄にフォーカスしても、`.bottom-nav`の表示は一切変化しない（今回のガード条件が正しく限定されていることの確認）。
+
+### 失敗系
+- ガード条件（`closest('#backup-passphrase-sheet, #cal-passphrase-sheet')`）の判定に失敗するケース（例: モーダルが`display:none`の状態で内部のinputにfocusイベントだけが誤発火するような異常系）が発生しても、`.bottom-nav`が非表示のまま戻らなくなる（フリーズ）ことがないよう、`focusout`側の復帰処理は例外を投げない防御的実装にする（try-catchで囲む、または`document.activeElement`ベースの安全策を検討）。
+- Safariで`focusin`/`focusout`イベント自体が発火しない特殊なケース（考えにくいが）が起きても、既存の「モーダルは開閉できる・入力はできる」という基本機能自体には影響しない（今回の対策はあくまで見た目の重なり回避であり、必須機能ではないため）。
+
+### エッジケース
+- 同一シート内でパスフレーズ欄→確認欄→パスフレーズ欄、と複数回フォーカスを行き来しても、`.bottom-nav`の表示/非表示が破綻しない（ちらつきは許容するが、最終的に閉じた状態では必ず`.bottom-nav`が表示された状態に戻ること）。
+- モーダルを開いた直後（フォーカスがまだどの入力欄にも無い状態）は、従来通り`.bottom-nav`が表示されたままであること（CLAUDE.md既存方針「モーダル表示中もbottom-nav表示」を壊していないことの確認）。
+- モーダルを✕ボタンやキャンセルボタンで閉じる際、入力欄にフォーカスが残ったまま閉じられた場合でも（既存の`_blurIfFocusInside`等の対策があるため通常は起きないはずだが）、`.bottom-nav`が非表示のまま取り残されないこと。心配な場合は`closeBackupPassphraseSheet()`/`closeCalPassphraseSheet()`の中で明示的に`.bottom-nav`を表示状態へ強制リセットする1行を追加することも検討する（builder実装時の判断に委ねる）。
+
+## リスク・未解決の質問
+
+1. **`visibility:hidden`によるちらつきの実機体感は未検証**: 同一シート内でのフィールド間フォーカス移動時、`focusout`→`focusin`が連続発火することで`.bottom-nav`が一瞬表示→非表示を繰り返す可能性がある。実機で気になるレベルであれば、次回フォローで「同一シート内への再フォーカスの場合はちらつかせない」制御（`relatedTarget`判定や短いdebounce）への調整が必要になる可能性がある。
+2. **保険的対策（ボタン行への`margin-bottom`追加）の効果は限定的**: 主軸対策（`.bottom-nav`非表示化）が機能すれば保険策の出番自体が無くなるはずだが、万一主軸対策が何らかの理由で効かない環境（Safari特有のバージョン差異等）があった場合、保険策だけでは重なりを完全には防げない可能性がある。
+3. **前回（設計書59）と同じ轍を踏まないための検証方法**: 設計書59はCapacitor限定コードを直しただけでWeb版での実効性を検証できておらず今回の再修正に至った。今回は**Web版（Safari、実機のiPhone/iPadまたはmacOS SafariのレスポンシブモードでのVirtual Keyboard相当の確認）で実際に動作確認することを受け入れ基準に明記済み**。builder/checker工程では、コードレビューだけでなく可能な範囲で実機に近い確認（少なくともブラウザの開発者ツールでのタッチエミュレーション、理想はユーザーによる実機確認）を行うこと。
+4. **`focusin`/`focusout`の登録位置**: Capacitor限定ブロック（`if (_isCapacitorApp) {...}`）の外に置く設計としたが、iOS版でも同じリスナーが有効になることで、既存の`_scrollFocusedIntoViewOnKb`関連処理（Capacitor限定）と今回の新規リスナーが同一の`focusin`/`focusout`タイミングで二重に動くことになる。両者は別々の副作用（一方はスクロール位置調整、一方はボトムナビ表示切替）であり機能的な衝突は無いと考えられるが、実装時に処理順序・パフォーマンスへの影響が無いことを確認すること。
+5. **`.bottom-nav`非表示中に他のフォーカス経路でタップされる可能性**: `visibility:hidden`によりタップ判定は無効化されるため、誤操作のリスクは無いと考えられるが、iOS WKWebViewの「タッチイベント配送先が親要素にずれることがある」既知の注意点（CLAUDE.md記載）とfixed要素の`visibility`切り替えの組み合わせについて、未知の相互作用が無いとは言い切れない。次回TestFlight実機確認で合わせて確認する。
+
+## スコープ外（今回作らないもの）
+
+- 設定画面のフィードバック欄・ニックネーム欄など、`#backup-passphrase-sheet`・`#cal-passphrase-sheet`以外の入力欄への同様の対策は行わない（今回症状が確認されていないため）。
+- `.bottom-nav`と`.plan-modal`系要素全体の構造的な見直し（例: ボトムナビをモーダル表示中は常に別レイヤーとして扱う設計変更等）は行わない。今回は最小限のピンポイント対策に留める。
+- ちらつき対策（`relatedTarget`判定によるスマートな抑制等）は初期実装では行わず、実機確認の結果次第で次回フォローとする。
+- 設計書59で行った`.plan-modal-body`ラッパー追加・`scrollIntoView`フォールバック削除自体の取り消し・ロールバックは行わない（Capacitor版での意義は残っているため）。
+
+## 承認状況
+2026-07-18 planner設計。ユーザー承認済み。同日orchestratorにより実装完了（主軸のfocusin/focusoutリスナー・保険的対策のmargin-bottom追加とも実施、Web版・iOS版共通コードとして`_isCapacitorApp`ブロック外に配置）。
