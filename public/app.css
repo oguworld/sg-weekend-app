@@ -2041,6 +2041,8 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+    /* 設計書61: キーボード表示中はトーストをキーボードの上（画面下半分中央付近）に引き上げる */
+    .toast.kb-open { bottom: calc(50vh + env(safe-area-inset-bottom, 0px)); }
     /* ─── PIN DETAIL MODAL ─── */
     .pin-detail-overlay {
       display: none;

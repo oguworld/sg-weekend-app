@@ -248,8 +248,14 @@
       } catch (_) {}
       if (!_CapKB) _CapKB = window.Capacitor?.Plugins?.Keyboard;
       if (_CapKB?.addListener) {
-        _CapKB.addListener('keyboardWillShow', (info) => _scrollFocusedIntoViewOnKb(info.keyboardHeight));
-        _CapKB.addListener('keyboardWillHide', () => _resetScrollPaddingAfterKb());
+        _CapKB.addListener('keyboardWillShow', (info) => {
+          _scrollFocusedIntoViewOnKb(info.keyboardHeight);
+          document.getElementById('toast')?.classList.add('kb-open');
+        });
+        _CapKB.addListener('keyboardWillHide', () => {
+          _resetScrollPaddingAfterKb();
+          document.getElementById('toast')?.classList.remove('kb-open');
+        });
       } else {
         // フォールバック: keyboardプラグイン未検出時は focusin/focusout で近似
         document.addEventListener('focusin', e => {
@@ -257,12 +263,16 @@
           if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
           setTimeout(() => {
             const kbHeight = window.innerHeight - window.visualViewport.height;
-            if (kbHeight > 50) _scrollFocusedIntoViewOnKb(kbHeight);
+            if (kbHeight > 50) {
+              _scrollFocusedIntoViewOnKb(kbHeight);
+              document.getElementById('toast')?.classList.add('kb-open');
+            }
           }, 350);
         }, true);
         document.addEventListener('focusout', e => {
           if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
             setTimeout(_resetScrollPaddingAfterKb, 100);
+            document.getElementById('toast')?.classList.remove('kb-open');
           }
         }, true);
       }
