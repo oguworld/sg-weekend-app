@@ -300,9 +300,9 @@
 
     </div>
 
-    <!-- 2. ログイン（Google/Apple Sign-In、iOS/Web共通表示。設計書20/35/36/44） -->
+    <!-- 2. アカウント（Google/Apple Sign-In＋予定表のバックアップ。設計書20/35/36/44、バックアップは設計書54。統合は設計書64） -->
     <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secLogin">アカウント連携</div>
+      <div class="settings-section-title" data-i18n="secAccount">アカウント</div>
 
       <div id="login-section-logged-out" class="settings-item" style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
         <div id="google-login-btn-container" style="display:flex;justify-content:center;width:100%;"></div>
@@ -318,11 +318,7 @@
           <span data-i18n="logoutBtn">連携解除</span>
         </button>
       </div>
-    </div>
 
-    <!-- 2.5 予定表のバックアップ（ゼロ知識暗号化、設計書54） -->
-    <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secBackup">予定表のバックアップ</div>
       <div class="settings-item" style="padding:14px 18px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
         <div id="backup-section-content" style="width:100%;"></div>
       </div>
@@ -360,9 +356,9 @@
 
     </div>
 
-    <!-- 4. その他 -->
+    <!-- 4. サポート・情報（旧「その他」、設計書64でフィードバックを分離） -->
     <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secOther">その他</div>
+      <div class="settings-section-title" data-i18n="secSupport">サポート・情報</div>
 
 
       <div class="settings-item" style="padding:16px 18px;">
@@ -401,6 +397,12 @@
           <span data-i18n="supportBtn">$5 を贈る</span>
         </a>
       </div>
+
+    </div>
+
+    <!-- 5. フィードバック（設計書64で「その他」から分離） -->
+    <div class="settings-section">
+      <div class="settings-section-title" data-i18n="secFeedback">フィードバック</div>
 
       <div class="settings-item" style="flex-direction:column;align-items:stretch;gap:10px;padding:16px 18px;">
         <textarea id="feedback-text" data-i18n-ph="feedbackPlaceholder"
@@ -1000,7 +1002,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260718e"></script>
+  <script src="/app.js?v=20260719a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
