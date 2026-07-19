@@ -120,6 +120,9 @@ async function main() {
           } else {
             lines.push(`🔎 ${cityName}: 新候補なし`);
           }
+          if (d.invalidCount > 0) {
+            lines.push(`  ⚠️ 無効な候補${d.invalidCount}件あり（discover-sources.log参照）`);
+          }
         }
       }
     }
