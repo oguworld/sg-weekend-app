@@ -6620,3 +6620,126 @@ function _clearAllAccountLocalState() {
 
 ## 承認状況
 2026-07-19 planner設計。**ユーザー承認済み**。**実装完了**（orchestrator、2026-07-19）。詳細は`.claude/session-log.md`・`.claude/next.md`参照。
+
+# 設計書66 アカウント削除ボタンを設定画面の独立セクションとして最下部に移動（2026-07-19計画）
+
+## 背景
+現状、`#delete-account-section`（アカウント削除ボタン）は「2. アカウント」セクション（`public/index.html` 303〜333行目）内に、ログイン状態表示・連携解除ボタンと同居する形で配置されている（設計書65で新規追加、設計書64で既存の「アカウント」セクションへ統合）。
+
+ユーザーから「アカウント削除ボタンを設定画面の一番下に独立したセクションとして移動してほしい」との依頼があった。アカウント削除は破壊的・不可逆な操作であり、一般的なUXパターンとして「日常的な設定操作から視覚的・構造的に切り離し、画面の最後に置く」ことで誤操作を減らす狙いがあると解釈する。
+
+現在の設定画面は5セクション構成（設計書64で確定）:
+1. プロフィール（`secProfile`）
+2. アカウント（`secAccount`）: ログイン状態・連携解除ボタン・**削除ボタン（`#delete-account-section`）**・バックアップUI
+3. アプリ設定（`secAppSettings`）
+4. サポート・情報（`secSupport`）
+5. フィードバック（`secFeedback`、現状の最終セクション）
+
+## 変更内容
+
+### 1. `#delete-account-section`を「アカウント」セクションから削除
+`public/index.html` 322〜328行目の以下のブロックを、現在の位置（「アカウント」セクション内、連携解除ボタンとバックアップUIの間）から除去する。
+
+```html
+<div id="delete-account-section" style="padding:4px 18px 12px;display:none;">
+  <button id="delete-account-btn" class="settings-item--danger"
+    onclick="if(!_touchCapableDetected) handleDeleteAccountClick()"
+    style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid transparent;background:transparent;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;transition:all 0.18s;">
+    <span data-i18n="deleteAccountBtn">アカウントを削除</span>
+  </button>
+</div>
+```
+
+### 2. 新規独立セクションとして設定画面最下部（「5. フィードバック」の後）に追加
+`public/index.html` 426行目（「5. フィードバック」セクションの閉じタグ）の直後、427行目`</div><!-- /screen-scroll-content -->`の直前に、新規`.settings-section`として上記マークアップをそのまま配置する（`id`・`class`・`onclick`・`data-i18n`は一切変更しない）。
+
+**見出しの扱い（推奨案）**: 新規セクションに見出しテキストを追加する。既存の4セクション全てが`.settings-section-title`を持つ中でこのセクションだけ見出しなしだと「浮いた孤立要素」に見え、他セクションとの一貫性を欠く。一方で通常の`secXxx`系ラベル（例:「その他」）ではなく、**赤系の警告トーンの見出し**にすることで、他セクションと構造的な一貫性を保ちつつ「ここから先は破壊的操作」であることを視覚的に予告する。
+
+具体案:
+```html
+<!-- 6. アカウント削除（設計書66で「アカウント」セクションから分離・最下部へ移動） -->
+<div class="settings-section">
+  <div class="settings-section-title" data-i18n="secDangerZone" style="color:var(--danger, #d9534f);">アカウント削除</div>
+
+  <div id="delete-account-section" style="padding:4px 18px 12px;display:none;">
+    <button id="delete-account-btn" class="settings-item--danger"
+      onclick="if(!_touchCapableDetected) handleDeleteAccountClick()"
+      style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid transparent;background:transparent;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;transition:all 0.18s;">
+      <span data-i18n="deleteAccountBtn">アカウントを削除</span>
+    </button>
+  </div>
+</div>
+```
+
+- 見出し文言の色指定は、既存のCSS変数一覧（`:root`）に「危険色」を表す変数が既にあればそれを使う（CLAUDE.md UIスタイル規約「inline styleで生の色値を書かない、必ずCSS変数を使う」に従う）。**既存に該当変数が存在するかは今回未調査のため、builder実装時に`grep -n "danger\|error\|red" public/index.html`等で`:root`定義を確認し、無ければ新規に生の色値を書かず`.settings-item--danger`クラス（既存、削除ボタン自体に使われている）の色をそのまま流用するか、既存デザインパターンに沿った控えめな配色にすること**（新規CSS変数追加が必要な場合はスコープに含める）
+- `#delete-account-section`自体のスタイル（`padding:4px 18px 12px`）は元々「アカウント」セクション内の一項目としての余白設計だったため、独立セクションの最初の要素として見た時に余白バランスが窮屈に見える可能性がある。必要に応じて`padding`調整はスコープに含めてよい（見た目の微調整は許容）
+
+### 3. i18nキー追加（ja/en同時、CLAUDE.mdルール準拠）
+新規セクション見出し用に1キーを追加する。
+
+| キー | ja | en |
+|---|---|---|
+| `secDangerZone` | アカウント削除 | Delete Account |
+
+既存の`deleteAccountBtn`（ボタンラベル）・`confirmDeleteAccount`（確認ダイアログ文言）は変更なし、そのまま流用する。
+
+### 4. `public/app.js`側の表示制御ロジックへの影響確認（実コード確認済み）
+`#delete-account-section`のdisplay制御は以下3箇所、いずれも`document.getElementById('delete-account-section')`によるIDベース参照であることを確認済み:
+- `_showLoggedInOptimistic()`（2717〜2726行目）: 楽観的ログイン中表示時に`display=''`
+- `refreshLoginUI()`（2729〜739行目付近）: トークンなし時`display='none'`、トークンあり正常系でも同様にdisplay制御
+
+いずれもDOM順序・親要素構造に依存しない`getElementById`のため、**DOM上の位置を「アカウント」セクションから最下部の新規セクションへ移動しても、この表示制御ロジックは無変更のまま正しく動作する**（設計書64で確立済みの「DOMの並び替えはIDベース参照なら安全」という前提を踏襲）。
+
+タッチイベント処理（`e.target.closest('#delete-account-btn')`、2060行目付近）も同様にIDセレクタベースのため、`closest()`は要素がDOM上のどこにあっても正しくマッチする。移動の影響を受けない。
+
+### 5. `.settings-item--danger`クラスの定義（`public/app.css`）
+このクラス自体は変更しない。ボタンの見た目（色・ホバー等）は既存のまま、位置のみ変わる。
+
+## 変更するファイル一覧
+- `public/index.html`: `#delete-account-section`ブロックを「アカウント」セクションから削除し、末尾に新規`.settings-section`として追加。新規`data-i18n="secDangerZone"`見出し要素を追加
+- `public/app.js`: `STRINGS.ja`/`STRINGS.en`に`secDangerZone`キーを追加（表示制御ロジック本体は無変更）。キャッシュバスティング用に`index.html`側の`app.js?v=...`のクエリ文字列更新が必要（既存運用パターン踏襲）
+- `public/sw.js`: `CACHE_NAME`のバージョン番号を1つ上げる（`app.js`変更を伴うキャッシュバスティングのセット変更、CLAUDE.md「CSSキャッシュバスティング手順」と同様のルールをJS変更にも適用）
+- `public/app.css`: 見出し色のためのCSS変数追加が必要になった場合のみ変更（builder実装時の調査結果次第）
+- `server.js`: 変更なし（データ・API構造に影響しないフロントエンドのみの変更）
+
+## 受け入れ基準
+
+### 正常系
+- 設定画面をログイン状態で開いたとき、「アカウント削除」セクションが画面最下部（「フィードバック」セクションのさらに下）に独立して表示される
+- セクション内のボタンをタップ/クリックすると、従来通り確認ダイアログ（`confirmDeleteAccount`）が表示され、承認すると削除フローが実行される（`handleDeleteAccountClick()`本体は無変更のため機能面の回帰なし）
+- 未ログイン状態では、新しい位置でも従来通りセクションが非表示（`display:none`）になる
+- 英語モードに切り替えても`secDangerZone`が正しく`Delete Account`と表示される（i18nキー追加漏れがないこと）
+
+### 失敗系
+- 該当なし（表示位置の変更のみで、削除処理自体のエラーハンドリングは変更しない）
+
+### エッジケース
+- ログイン→ログアウトを繰り返しても、新しい位置のセクションが正しく表示/非表示を切り替えること（`refreshLoginUI()`・`_showLoggedInOptimistic()`の呼び出しタイミングに影響がないことの確認）
+- ダークモード時に見出し色が視認性を損なわないこと（新規色指定を追加する場合）
+
+## スコープ外
+- 削除処理のロジック自体（`handleDeleteAccountClick()`、サーバー側`DELETE /api/auth/me`）は一切変更しない
+- 確認ダイアログの文言・UI（`confirm()`のネイティブダイアログのまま）は変更しない
+- 「アカウント」セクションの残り要素（ログイン状態表示・連携解除ボタン・バックアップUI）の並び順・スタイルは変更しない
+- 他の4セクションの構成・順序は変更しない
+
+## データ共有への影響確認（CLAUDE.md必須確認事項）
+- **後方互換性**: 今回の変更はHTML/JS/CSSのみの静的ファイル変更であり、`/api/*`エンドポイントのリクエスト/レスポンス構造に一切変更を加えない。旧バージョンのApp Storeアプリ（まだ更新していないユーザー）に対する影響はない
+- **影響範囲**: `data/`配下のデータファイル・APIエンドポイントは無変更。Web版・iOS版共通のフロントエンド変更（`public/`配下）のため、Web版は配信直後に反映されるが、**iOS版（Capacitorバンドル方式）は次回TestFlightビルドが配信されるまで反映されない**（既存の運用パターン通り）
+- **リリースタイミング**: サーバー側API変更を伴わないため、Web版とiOS版のリリースタイミングを揃える必要はない。Web版は`pm2 restart`不要（静的ファイルのみ、`server.js`無変更）。iOS版はユーザーの明示指示があった時点で`release`ブランチへpushしTestFlightビルドをトリガーする（通常運用フロー通り）
+
+## リスク・未解決の質問
+- 見出し色（危険色）に使う既存CSS変数の有無は未調査。builder実装時に`grep`で確認し、なければ新規変数追加または既存クラス流用で対応する必要がある
+- 新規セクションのpadding・余白バランスの微調整が必要になる可能性がある（見た目の最終確認は実装後の目視・実機確認に委ねる）
+- iOS実機での見た目確認（次回TestFlightビルド後）は未実施のため、`.claude/next.md`にフォロー事項として記載する運用が必要
+
+## 承認状況
+2026-07-19 planner設計。**ユーザー承認済み**。**実装完了**（2026-07-19、orchestrator実行）。
+
+## 実装結果
+- `public/index.html`: `#delete-account-section`ブロックを「アカウント」セクションから削除し、末尾（「フィードバック」の後）に新規「6. アカウント削除」セクションとして配置。見出し`data-i18n="secDangerZone"`を追加（`style="color:var(--terracotta);"`、既存の危険色CSS変数`--terracotta`を流用、新規変数追加なし）。`id`/`onclick`/`data-i18n`は完全に据え置き
+- `public/app.js`: `STRINGS.ja`/`STRINGS.en`に`secDangerZone`（ja「アカウント削除」/ en「Delete Account」）を追加。`_showLoggedInOptimistic()`/`refreshLoginUI()`のIDベース参照は無変更のまま正しく動作することを確認済み
+- キャッシュバスティング: `index.html`の`app.js?v=20260719b`→`20260719c`、`sw.js`の`CACHE_NAME`を`sg-weekend-v626`→`v627`に更新。CSS変更なしのため`app.css`のバージョンは据え置き
+- `server.js`/`public/app.css`は無変更（設計書通り）
+- `node --check public/app.js`構文OK、curlで実配信内容を確認済み。Web版は`pm2 restart`不要（`server.js`無変更のため未実施）
+- **iOS版は次回TestFlightビルドまで未反映**（`.claude/next.md`にフォロー事項として記載）

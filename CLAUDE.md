@@ -205,7 +205,7 @@ sg-weekend-app/
 - **2026-07-19実装（設計書65）: アカウント削除機能を追加（App Store Review Guideline 5.1.1(v)対応）**
   - **サーバー**: 新規`DELETE /api/auth/me`（`requireAppAuth`必須、`server.js`の`GET /api/auth/me`直後）。(1)`data/users.json`から該当`userId`のレコードを`withFileLock`で削除、(2)`data/user-plans/{userId}.json`が存在すれば`withFileLock`で削除（`getUserPlansFilePath()`の既存バリデーション使用）、(3)全都市（sg/bkk/syd）の`data/{city}/community-courses.json`を走査し該当`authorId`を`null`に匿名化（**コース自体・`spots`・`likes`・`isPublic`は変更しない**。公開コースは他ユーザーが既に閲覧・いいねしている可能性がある公開データのため、削除ではなく作成者情報のみ匿名化する設計。`authorId`は権限判定にのみ使われ画面表示には使われないため`null`化による表示崩れなし）。冪等（対象レコードが既に無くても200 `{ok:true}`を返す）。プッシュ通知トークン（`data/push-subscriptions.json`）・共有カレンダー参加情報（userIdと紐づく仕組みが存在しない）は対象外
   - **クライアント**: `public/app.js`の`handleDeleteAccountClick()`（`handleLogoutClick()`直後）が`confirm(t('confirmDeleteAccount'))`→`authedFetch(DELETE /api/auth/me)`→成功時`_clearAllAccountLocalState()`（JWT・バックアップ鍵material・saltの3点セットを一括クリア）→`refreshLoginUI()`/`renderBackupSection()`で未ログイン表示に戻す、という流れ。**500系エラー時はローカル状態を一切クリアしない**（サーバー側削除が確認できてから消す設計、`handleLogoutClick()`とは逆の慎重さ）。401時（トークン失効）はローカルクリアのみで完了トースト表示
-  - **UI配置**: 設定画面「アカウント」セクション、`#login-section-logged-in`（ログイン中表示ブロック）の直後に`#delete-account-section`を新設。**未ログイン時は非表示**（`refreshLoginUI()`/`_showLoggedInOptimistic()`の全分岐で`#login-section-logged-in`と表示/非表示を同期）。既存の「連携解除」ボタン（`#logout-btn`）とは別ブロックにし、`.settings-item--danger`（`var(--terracotta)`色、`public/app.css`新規）で視覚的に区別
+  - **UI配置（2026-07-19設計書66で「アカウント」セクションから分離・設定画面最下部の独立セクションへ移動済み。以下は歴史的経緯）**: 当初は設定画面「アカウント」セクション、`#login-section-logged-in`（ログイン中表示ブロック）の直後に`#delete-account-section`を新設していたが、破壊的・不可逆操作を日常操作から視覚的に切り離すため、設計書66で「フィードバック」セクションの後、新規見出し`secDangerZone`（ja「アカウント削除」/en「Delete Account」、`color:var(--terracotta)`）を持つ独立`.settings-section`として最下部に移動した。**未ログイン時は非表示**（`refreshLoginUI()`/`_showLoggedInOptimistic()`の全分岐で`#login-section-logged-in`と表示/非表示を同期、`document.getElementById('delete-account-section')`によるIDベース参照のためDOM位置移動の影響を受けない）。`.settings-item--danger`（`var(--terracotta)`色、`public/app.css`）で視覚的に区別
   - **touchendハンドラ追加漏れ対策**: 設定画面の`touchend`デリゲーション一覧（`public/app.js`、`#logout-btn`判定行の直後）に`#delete-account-btn`を追加済み。設計書46（iOS版Googleボタン表示漏れ）と同型のミスを踏まないための必須対応として実施
   - **i18n**: `deleteAccountBtn`（アカウントを削除/Delete account）・`confirmDeleteAccount`（取り消せない旨の強い警告文言）・`toastDeleteAccountSuccess`・`toastDeleteAccountError`の4キーをja/en同時追加
   - **リスク・スコープ外（設計書65 §11・§4に明記）**: 部分失敗リスク（3つの独立した`withFileLock`操作のため、途中クラッシュで一部だけ完了する可能性。既存の他マルチステップ処理と同水準のリスクとして許容）。「猶予期間」「復元（アンドゥ）」機能は実装せず即時削除のみ。Google/Appleサーバー側のOAuth連携解除（各プラットフォームの設定画面で行う操作）は範囲外。共有カレンダー参加情報の削除連動は、そもそも紐づけ機能自体が未実装（設計書37 §3・設計書54 §4）のためスコープ外
@@ -273,6 +273,14 @@ sg-weekend-app/
 - 上記に伴い、本CLAUDE.md内の「Google/Apple Sign-In認証基盤」セクションおよび本セクション内の`secLogin`/`secBackup`への言及（設計書20/35/36/44・設計書54/58由来の記述）は、**セクションの見出しキー自体は現在存在しない**という点で実態と乖離している。ロジック・データモデル・API等の実装内容自体はそれらの記述通り無変更で有効
 - キャッシュバスティング: `index.html` app.js?v=20260719a、`sw.js` CACHE_NAME=sg-weekend-v625
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS版での5セクション表示、「アカウント」セクション内のログイン+バックアップ統合表示、「フィードバック」単独セクションの見た目（他セクションと内容量の差による間延び有無）は2026-07-19時点でWeb版のみ確認済み、iOS実機は未確認
+
+### ⚠️ アカウント削除ボタンを独立セクションとして最下部へ移動（2026-07-19実装、設計書66）
+設計書64で「アカウント」セクションに統合されていた`#delete-account-section`（ログイン状態表示・連携解除ボタンと同居）を、破壊的・不可逆操作を日常操作から視覚的・構造的に切り離すため、設定画面の**最後**（「5. フィードバック」の後）に新規「6. アカウント削除」独立セクションとして分離した。設定画面は現在6セクション構成: プロフィール→アカウント→アプリ設定→サポート・情報→フィードバック→**アカウント削除**。
+- `public/index.html`: `#delete-account-section`ブロック（`id`/`onclick`/`data-i18n`/ボタン内部構造は完全に無変更）を「アカウント」セクションから削除し、末尾に新規`.settings-section`として再配置。新規見出し`<div class="settings-section-title" data-i18n="secDangerZone" style="color:var(--terracotta);">`を追加（既存の危険色CSS変数`--terracotta`を流用、新規CSS変数は追加していない）
+- `public/app.js`: `STRINGS.ja`/`STRINGS.en`に`secDangerZone`（ja「アカウント削除」/en「Delete Account」）を追加。`_showLoggedInOptimistic()`・`refreshLoginUI()`は`document.getElementById('delete-account-section')`によるIDベース参照のため、DOM位置移動の影響を受けず無変更のまま正しく動作する
+- キャッシュバスティング: `index.html` app.js?v=20260719c、`sw.js` CACHE_NAME=sg-weekend-v627（CSS変更を伴わないため`app.css?v=`は据え置き）
+- `server.js`・`public/app.css`は無変更。`handleDeleteAccountClick()`本体・サーバー側`DELETE /api/auth/me`も無変更（表示位置のみの変更、機能面の回帰なし）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での新セクションの余白バランス・ダークモード時の`--terracotta`見出し色の視認性は2026-07-19時点でWeb版のみ確認済み、iOS実機は未確認
 
 ## AIチャット機能の廃止（2026-07-09）
 - AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
