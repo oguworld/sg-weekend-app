@@ -1530,6 +1530,47 @@ app.get('/api/auth/me', requireAppAuth, (req, res) => {
   res.json({ userId: user.userId, provider: user.provider, createdAt: user.createdAt });
 });
 
+// DELETE /api/auth/me — アカウント削除（設計書65）。ユーザーレコード・予定表バックアップを削除し、
+// 公開コースの authorId は匿名化（null）する。冪等: 対象レコードが既に無くても200を返す
+app.delete('/api/auth/me', requireAppAuth, async (req, res) => {
+  const userId = req.authUserId;
+  try {
+    // 1. data/users.json からレコードを削除（冪等: 既に無くても成功扱い）
+    await withFileLock(USERS_PATH, () => {
+      const users = loadUsers();
+      const next = users.filter(u => u.userId !== userId);
+      saveUsers(next);
+    });
+
+    // 2. data/user-plans/{userId}.json を削除（存在すれば）
+    const fp = getUserPlansFilePath(userId);
+    if (fp && fs.existsSync(fp)) {
+      await withFileLock(fp, () => {
+        try { fs.unlinkSync(fp); } catch (_) {}
+      });
+    }
+
+    // 3. 全都市のコミュニティコースの authorId を匿名化（null化）
+    for (const city of ['sg', 'bkk', 'syd']) {
+      const cPath = path.join(__dirname, 'data', city, 'community-courses.json');
+      if (!fs.existsSync(cPath)) continue;
+      await withFileLock(cPath, () => {
+        const courses = JSON.parse(fs.readFileSync(cPath, 'utf8'));
+        let changed = false;
+        for (const c of courses) {
+          if (c.authorId === userId) { c.authorId = null; changed = true; }
+        }
+        if (changed) fs.writeFileSync(cPath, JSON.stringify(courses, null, 2));
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/auth/me error:', e.message);
+    res.status(500).json({ error: 'delete failed' });
+  }
+});
+
 // ─────────────────────────────────────────────
 // Sign in with Apple（設計書44。iOS版はidentityTokenを直接POST、Web版はresponse_mode:'form_post'経由のcallback）
 // ─────────────────────────────────────────────

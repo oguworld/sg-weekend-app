@@ -6282,3 +6282,341 @@ builderが実装時に壊さないよう、planner側で事前に確認した内
 2026-07-19 planner設計。**ユーザー承認済み**（見出し文言は8節リスク1・2とも推奨案で確定：「アカウント」「サポート・情報」）。**実装はorchestratorへ委任**。
 
 **2026-07-19 実装完了**。`public/index.html`の`#screen-settings`を案C通り5セクション（プロフィール／アカウント／アプリ設定／サポート・情報／フィードバック）に再編成。`.settings-item`内部（id・onclick・class・data-i18n）は無変更。`public/app.js`のSTRINGS.ja/enに`secAccount`/`secSupport`（値更新）/`secFeedback`（既存値流用）を追加、死にキー`secLogin`/`secBackup`/`secOther`は`grep`で無参照確認のうえ削除。`public/app.css`・`server.js`は無変更（pm2再起動不要）。`app.js?v=20260719a`・`sw.js`の`CACHE_NAME`（v625）を更新。checkerで設計書との照合完了、Critical指摘なし。Web版で本番配信済み実データを確認、iOS版は次回TestFlightビルドで反映（見た目確認は未実施）。
+
+# 設計書65 — App Store審査提出（v1.5）に向けたプライバシーポリシー更新＋アカウント削除機能の実装
+
+## 0. 背景
+
+App Store審査提出（バージョン1.5、Google/Appleログイン・データバックアップ機能を含む初回審査）にあたり、以下2点の対応漏れが判明した。
+
+1. **`public/privacy.html`が古い**: 最終更新日2026年7月4日のまま、Google/Appleログイン（設計書20/35/36/44）・予定表バックアップ（設計書54/58）・共有カレンダーのパスフレーズ暗号化（設計書55）のいずれについても一切記載がない。
+2. **アカウント削除機能が存在しない**: コードベース全体を`delete.*account|deleteAccount|アカウント削除|退会`で検索したが該当箇所なし。App Store Review Guideline 5.1.1(v)「アプリ内でアカウント作成ができる場合、アプリ内でアカウント削除もできる必要がある」に抵触するおそれがある。本アプリはGoogle/Appleログインでアカウントが作成される（`data/users.json`へのupsert、設計書20/44）にもかかわらず、対応する削除機能がない。
+
+ユーザーは両方とも今回の審査提出前に対応することを選択した。
+
+## 1. 調査結果のまとめ
+
+### 1.1 認証・ユーザーデータの構造（`server.js`）
+
+- `USERS_PATH = data/users.json`（325行目）。`saveUsers()`（329行目）は配列全体を`writeFileSync`。
+- `genUserId()`（332行目）: `usr_` + `crypto.randomBytes(12).toString('hex')`（24桁hex）。
+- `upsertUser(provider, providerSub)`（337行目）: `provider`+`providerSub`をユニークキーにupsert。`withFileLock`パターンを使用。
+- `verifyAppJwtOptional(req)`（367行目）: `Authorization: Bearer <JWT>`を検証し`userId`を返す。ヘッダーなし/不正時はnull（例外を投げない）。
+- `requireAppAuth(req, res, next)`（380行目）: `verifyAppJwtOptional`が null なら401、成功時`req.authUserId`にセットして`next()`。
+- `GET /api/auth/me`（1526行目、`requireAppAuth`）: 既存のユーザー情報取得エンドポイント。
+- `getUserPlansFilePath(userId)`（1871行目）: `userId`が`/^usr_[a-f0-9]{24}$/`にマッチする既知フォーマットのみ許可（パストラバーサル対策）。`data/user-plans/{userId}.json`のパスを返す。
+- `GET/PUT /api/user-plans/me`（1877/1890行目、`requireAppAuth`）: 設計書54のバックアップデータ（`salt`+`encryptedData`のみ、平文は一切保存されない＝ゼロ知識暗号化）。
+- `POST /api/courses/publish`（2502行目）: `authedUserId = verifyAppJwtOptional(req); authorId = authedUserId || course.authorId;`。JWTがあればそちらを`authorId`として優先。
+- `DELETE /api/courses/:id`（2524行目）: `authedUserId`があり、対象コースの`authorId`と一致しない場合のみ403で拒否（ヘッダーなしなら従来通り無検証、完全後方互換）。**このエンドポイントは「1件ずつコース削除」の既存経路であり、アカウント削除に伴う一括処理とは別物**。
+
+### 1.2 既存の`DELETE`エンドポイントパターン
+
+- `DELETE /api/push-subscribe`（1613行目）
+- `DELETE /api/push-subscribe-ios`（1636行目）
+- `DELETE /api/calendar/:groupId/push-subscribe`（1777行目）
+- `DELETE /api/calendar/:groupId/push-subscribe-ios`（1808行目）
+- `DELETE /api/courses/:id`（2524行目、`verifyAppJwtOptional`使用）
+
+いずれも`withFileLock`で対象JSONを読み込み→フィルタ→書き戻す方式。今回追加する`DELETE /api/auth/me`もこのパターンを踏襲する。
+
+### 1.3 削除対象となりうるユーザー関連データの棚卸し
+
+| データ | 場所 | userIdとの紐づき | 今回の扱い |
+|---|---|---|---|
+| ユーザーレコード本体 | `data/users.json`（配列） | `userId`フィールドで直接紐づく | **削除する**（配列からレコードを除去） |
+| 予定表・全データバックアップ | `data/user-plans/{userId}.json` | ファイル名が`userId`そのもの | **削除する**（ファイル自体を`fs.unlink`） |
+| コミュニティコースの`authorId` | `data/{city}/community-courses.json` | `authorId`フィールドで紐づく（設計書20後付け、必須ではない） | **匿名化する（`authorId`をnullにする）。完全削除はしない** |
+| プッシュ通知トークン | `data/push-subscriptions.json` | **紐づいていない**（deviceToken/endpoint単位、CLAUDE.md「APNsプッシュ通知対応」節参照） | **対象外**（別軸の識別子のため、アカウント削除時に連動して消す仕組みがそもそも存在しない） |
+| 共有カレンダー参加情報 | `data/shared-calendars/{groupId}.json` | **紐づいていない**（設計書37 §3・設計書54 §4で「フェーズ1.5-B（joinedCalendarGroups）は今回もスコープ外」と明記され、ユーザーアカウントと共有カレンダー参加情報の紐づけ自体が未実装） | **対象外**（紐づけデータが存在しないため削除しようがない） |
+
+**コミュニティコースの`authorId`を完全削除ではなく匿名化にする理由（推奨案）**:
+- コミュニティコース（`community-courses.json`）は他ユーザーが既に閲覧・いいね（`likes`フィールド、CLAUDE.md「コース機能」節）している可能性がある公開データであり、コース機能の趣旨（設計書64 軸C「データの保全・引き継ぎ」とは異なる、コミュニティ共有の趣旨）は個人アカウントのライフサイクルと切り離すべき性質のものである。
+- `authorId`は「誰が削除・非公開化する権限を持つか」を判定するためだけに使われている（`DELETE /api/courses/:id`・`POST /api/courses/:id/unpublish`の403判定）。アカウント削除後にこの権限判定対象が消えても実害はなく、単に「今後は誰も削除操作できないコース」になるだけで実用上大きな問題はない（従来`authorId`なし＝ヘッダーなしアクセスと同じ扱いに戻るのみ、後方互換の考え方と一致する）。
+- 一方で`authorId`をキーに`courses.filter()`して**コース自体を削除**すると、他ユーザーが見ていた公開コンテンツが本人の意図と無関係に突然消えることになり、コミュニティ機能としての一貫性を損なう。
+- 結論: `data/{city}/community-courses.json`を全都市分（sg/bkk/syd、停止中都市も含めてファイルが存在すれば）走査し、`authorId === 削除対象userId`のレコードは`authorId: null`に置換する（コース自体・`spots`・`likes`・`isPublic`等は一切変更しない）。
+
+### 1.4 クライアント側（`public/app.js`）の関連実装
+
+- 設計書64で再編成された設定画面「アカウント」セクション（`secAccount`）: ログイン状態表示・連携解除ボタン（`#logout-btn`）・バックアップUIが同一セクション内に同居。
+- `handleLogoutClick()`（2761行目）: 確認ダイアログ（`confirm(t('confirmLogout'))`、設計書48）→`disableAutoSelect()`→`clearAuthToken()`→トースト表示→`refreshLoginUI()`→`renderBackupSection()`という流れ。**アカウント削除ボタンのUI/フロー設計の直接の参考パターン**。
+- `getAuthToken()`/`clearAuthToken()`（2640/2651行目）: JWTを`_authTokenCache`（同期キャッシュ）+`localStorage`+`_CapPrefs`（iOS版Preferences）のハイブリッド方式で保持（設計書49）。
+- `BACKUP_KEY_MATERIAL_KEY = 'app_backup_key_material'`（6156行目）: バックアップ鍵material。`_clearBackupKeyMaterial()`（6167行目）で`localStorage`+`_CapPrefs`両方から削除する既存ヘルパーが既にある。
+- `localStorage.getItem('app_backup_salt')`（6289/6405/6445/6484行目）: バックアップの salt。`localStorage.removeItem('app_backup_salt')`（6504行目）も既存。
+- `refreshLoginUI()`（2718行目）: ログイン状態表示の更新。アカウント削除後もこの関数を呼んで未ログイン表示に戻すのが自然。
+
+## 2. ユーザーストーリー
+
+**ストーリー1（アカウント削除機能）**
+Google/Appleでログインしたユーザーが、設定画面の「アカウント」セクションから自分のアカウントを完全に削除できる。削除すると、サーバー上のユーザーレコード・予定表バックアップデータが消え、二度と復元できない。誤操作防止のため、削除前に強い警告を伴う確認ダイアログが表示される。
+
+**ストーリー2（プライバシーポリシー更新）**
+審査担当者・ユーザーが最新のプライバシーポリシーを読んだとき、実際にアプリが行っている個人情報の取り扱い（Google/Appleログインで`sub`のみ保存、バックアップはゼロ知識暗号化、共有カレンダーもパスフレーズ方式、アカウント削除が可能）が正確に反映されている。
+
+## 3. 受け入れ基準
+
+### 正常系
+- 設定画面「アカウント」セクション（ログイン済み状態のみ表示）に「アカウント削除」ボタンが表示される。
+- ボタンを押すと確認ダイアログが表示され、「取り消せない」旨の強い警告文言が含まれる。
+- 確認後、`DELETE /api/auth/me`が`Authorization: Bearer <JWT>`付きで呼ばれ、成功時（200）に以下が起こる。
+  - `data/users.json`から該当レコードが削除される。
+  - `data/user-plans/{userId}.json`が存在すれば削除される。
+  - `data/{city}/community-courses.json`（sg/bkk/syd）内、該当userIdを`authorId`に持つレコードが`authorId: null`に置換される。
+  - クライアント側でJWT（`app_auth_token`、`_authTokenCache`/`localStorage`/`_CapPrefs`）・バックアップ鍵material（`app_backup_key_material`）・バックアップsalt（`app_backup_salt`）が全てクリアされる。
+  - 未ログイン状態の画面表示（`refreshLoginUI()`・`renderBackupSection()`）に戻る。
+  - 完了トーストが表示される。
+- プライバシーポリシー（`public/privacy.html`）に、Google/Appleログイン・バックアップ機能・共有カレンダー暗号化・アカウント削除方法の記載が追加され、最終更新日が更新される。
+
+### 失敗系
+- JWTなし/失効済みで`DELETE /api/auth/me`を呼んだ場合、401が返り、クライアントは「未ログイン」扱いとして扱う（ローカル状態のクリアのみ行い、エラートーストは出す）。
+- `data/users.json`書き込み中の失敗（ディスクエラー等）は500を返し、クライアントはローカル状態をクリアせずエラートーストを表示する（**中途半端な状態を残さない**: サーバー側の削除が確認できるまでローカルのJWT等は消さない設計とする）。
+- 確認ダイアログで「キャンセル」を選んだ場合、一切の処理を行わず何も変化しない（`handleLogoutClick()`の`confirm()`パターンと同じ）。
+
+### エッジケース
+- 削除対象ユーザーに`data/user-plans/{userId}.json`が存在しない場合（バックアップ未設定のまま削除）: ファイル削除はスキップし、エラーにしない。
+- 削除対象ユーザーが1件もコミュニティコースを公開していない場合: `authorId`置換処理は何もヒットせず、エラーにならない。
+- 削除対象ユーザーの`community-courses.json`が都市によっては存在しない（BKK/SYDは停止中のためファイル自体が無い可能性）: `fs.existsSync`チェックでスキップし、エラーにしない。
+- 同一ユーザーが短時間に2回`DELETE`を叩いた場合（二重タップ等）: 1回目で`users.json`からレコードが消えるため、2回目は`requireAppAuth`のJWT検証自体は通る（JWTはサーバー側で失効させる仕組みがないため、CLAUDE.md「ログアウト時のサーバー側状態変更は不要」という既存方針＝設計書20 §7と同じ）が、`data/users.json`に対象レコードが見つからないため404または冪等に200を返すか要検討（後述リスク参照。**推奨: 対象レコードが既に無くても200 `{ok:true}`を返す冪等な実装**とし、二重タップでエラー表示にならないようにする）。
+
+## 4. スコープ外（今回作らないもの）
+
+- **App Store Connect側の「Appプライバシー」（プライバシー「栄養成分表示」の申告フォーム）の更新**: ユーザーが手動でApp Store Connect上で行う必要がある領域であり、コード変更では対応できない。今回のタスクはコードベース側（`server.js`/`public/`）の変更のみを対象とする。
+- 共有カレンダー参加情報のアカウント紐づけ・削除連動（設計書37 §3・設計書54 §4で継続してスコープ外とされている「joinedCalendarGroups」機能自体が未実装のため、削除する対象データが存在しない）。
+- プッシュ通知トークンの削除連動（userIdと紐づいていないため対象外。プッシュ通知の解除は既存の「プッシュ通知」トグルOFFで別途行う想定、アカウント削除とは独立した操作のまま）。
+- アカウント削除の「猶予期間（Nデイ後に本削除）」「復元（アンドゥ）」機能: 即時削除のみを実装する。App Storeガイドライン上は即時削除で問題ないと判断（要確認、下記リスク参照）。
+- Google/Appleサーバー側のOAuth連携解除（Googleの「アプリのアクセス権」ページ等からの取り消し）: 本アプリのサーバー側データを削除するのみで、Google/Apple側のアカウント連携自体の取り消しはユーザーが各プラットフォームの設定画面で行う操作であり、今回は範囲外（一般的なアプリの実装慣行として妥当と判断）。
+- `data/x-post-history.json`等、ユーザーアカウントと無関係な運用データへの影響なし（変更しない）。
+
+## 5. A. アカウント削除機能の設計
+
+### 5.1 API設計
+
+**新規: `DELETE /api/auth/me`**（`requireAppAuth`必須）
+
+```
+DELETE /api/auth/me
+Headers: Authorization: Bearer <JWT>
+
+成功時: 200 { ok: true }
+失敗時:
+  401 { error: 'unauthorized' }  … JWTなし/不正/失効（requireAppAuthミドルウェアが担当）
+  500 { error: 'delete failed' } … ファイル操作中の例外
+```
+
+処理内容（`server.js`、`GET /api/auth/me`の直後に配置するのが自然）:
+
+```javascript
+app.delete('/api/auth/me', requireAppAuth, async (req, res) => {
+  const userId = req.authUserId;
+  try {
+    // 1. data/users.json からレコードを削除（冪等: 既に無くても成功扱い）
+    await withFileLock(USERS_PATH, () => {
+      const users = loadUsers();
+      const next = users.filter(u => u.userId !== userId);
+      saveUsers(next);
+    });
+
+    // 2. data/user-plans/{userId}.json を削除（存在すれば）
+    const fp = getUserPlansFilePath(userId);
+    if (fp && fs.existsSync(fp)) {
+      await withFileLock(fp, () => {
+        try { fs.unlinkSync(fp); } catch (_) {}
+      });
+    }
+
+    // 3. 全都市のコミュニティコースの authorId を匿名化（null化）
+    for (const city of ['sg', 'bkk', 'syd']) {
+      const cPath = path.join(__dirname, 'data', city, 'community-courses.json');
+      if (!fs.existsSync(cPath)) continue;
+      await withFileLock(cPath, () => {
+        const courses = JSON.parse(fs.readFileSync(cPath, 'utf8'));
+        let changed = false;
+        for (const c of courses) {
+          if (c.authorId === userId) { c.authorId = null; changed = true; }
+        }
+        if (changed) fs.writeFileSync(cPath, JSON.stringify(courses, null, 2));
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/auth/me error:', e.message);
+    res.status(500).json({ error: 'delete failed' });
+  }
+});
+```
+
+**設計判断メモ**:
+- `withFileLock`を3種類のファイル操作それぞれに個別に適用する（既存の`POST /api/courses/publish`等と同じ粒度）。1つのトランザクションとして全体をロックする仕組みは既存コードベースに存在しないため今回も導入しない（部分失敗のリスクは下記リスク欄に明記）。
+- `getUserPlansFilePath()`の既存のuserIdフォーマット検証（`/^usr_[a-f0-9]{24}$/`）をそのまま踏襲し、パストラバーサル対策も自動的に効く。
+- コミュニティコースのループは`for...of`の直列await（既存コードベースの他のマルチシティ処理と同じスタイル）。BKK/SYDが停止中でも`fs.existsSync`チェックで安全にスキップされる。
+
+### 5.2 削除処理の実装方針（対象データ範囲の最終確認）
+
+| 対象 | 処理 | 理由 |
+|---|---|---|
+| `data/users.json`のレコード | 削除（`filter`） | ユーザー本体データ、最も基本的な削除対象 |
+| `data/user-plans/{userId}.json` | ファイル削除（`fs.unlinkSync`） | 暗号化バックアップだが、ファイル自体は運営側に残っている状態は「アカウント削除」の趣旨に反するため削除する。中身は元々復号不能（ゼロ知識暗号化）だが、ファイルの存在自体を残さない方が誠実 |
+| `data/{city}/community-courses.json`の`authorId` | `null`に置換（匿名化、コース自体は残す） | 上記1.3節参照。コミュニティコンテンツの一貫性を優先 |
+| `data/push-subscriptions.json` | 変更しない | userIdと紐づいていないため対象外 |
+| `data/shared-calendars/*.json` | 変更しない | userIdと紐づく仕組みが存在しないため対象外 |
+| クライアント側ローカル状態（JWT・バックアップ鍵material・salt） | 全クリア | 5.3節参照 |
+
+### 5.3 クライアント側UI設計
+
+**配置**: 設計書64で再編成された設定画面「アカウント」セクション（`secAccount`）内、ログイン中の表示ブロック（`#login-section-logged-in`）に、既存の「連携解除」ボタン（`#logout-btn`）の下に新規「アカウント削除」ボタンを追加する。**未ログイン時は表示しない**（アカウントが存在しないので削除しようがない）。
+
+**マークアップ案**（`public/index.html`、`#login-section-logged-in`内、`#logout-btn`の直後）:
+```html
+<button id="delete-account-btn" class="settings-item settings-item--danger"
+        onclick="if(!_touchCapableDetected) handleDeleteAccountClick()">
+  <span data-i18n="deleteAccountBtn">アカウントを削除</span>
+</button>
+```
+- `.settings-item--danger`は新規クラス（赤系・警告色。既存の`.settings-item`をベースに文字色のみ変更する軽量スタイル、CSS変更は最小限に留める）。
+- 既存の「連携解除」ボタン（`#logout-btn`）と見た目上区別できるようにする（削除は非可逆操作であり、誤って連携解除と混同されるリスクを下げるため）。
+
+**JS実装案**（`public/app.js`、`handleLogoutClick()`の直後に配置）:
+```javascript
+async function handleDeleteAccountClick() {
+  if (!confirm(t('confirmDeleteAccount'))) return;
+  try {
+    const token = getAuthToken();
+    if (!token) { showToast(t('toastLoginError')); return; }
+    const res = await authedFetch(API_BASE + '/api/auth/me', { method: 'DELETE' });
+    if (res.status === 401) {
+      // 既に失効している場合はローカル状態のみクリアして終える
+      _clearAllAccountLocalState();
+      refreshLoginUI();
+      renderBackupSection();
+      showToast(t('toastDeleteAccountSuccess'));
+      return;
+    }
+    if (!res.ok) { showToast(t('toastDeleteAccountError')); return; }
+    // サーバー側削除確認後にローカル状態をクリア（中途半端な状態を残さない）
+    window.google?.accounts?.id?.disableAutoSelect?.();
+    _clearAllAccountLocalState();
+    showToast(t('toastDeleteAccountSuccess'));
+    refreshLoginUI();
+    renderBackupSection();
+  } catch (e) {
+    showToast(t('toastDeleteAccountError'));
+  }
+}
+
+// JWT・バックアップ鍵material・saltを全てクリアする共通ヘルパー
+function _clearAllAccountLocalState() {
+  clearAuthToken();
+  _clearBackupKeyMaterial();
+  try { localStorage.removeItem('app_backup_salt'); } catch (_) {}
+}
+```
+
+**設計判断メモ**:
+- `confirm(t('confirmDeleteAccount'))`は`handleLogoutClick()`と同じ`window.confirm()`パターンを踏襲するが、文言は「取り消せない」ことを明示した、より強い警告にする（5.4節i18n参照）。二段階確認（入力欄に確認文字列を打たせる等）は今回はスコープに含めない（既存の`confirm()`パターンとの一貫性を優先、必要ならユーザーレビュー時に追加検討）。
+- 500系エラー時はローカル状態を一切クリアしない（サーバー側削除が確認できてから消す設計。`handleLogoutClick()`とは異なり、こちらは「サーバー側に確実に削除リクエストが通ったこと」を確認する必要があるため、`refreshLoginUI()`の楽観的維持ロジック（設計書48課題2）とは逆の慎重さが必要）。
+- 401時（トークンが既に失効している＝実質サーバー側に削除すべきレコードがない可能性が高い）はローカルをクリアして終える（ユーザー体感として「アカウントが既に無い状態」を正しく反映する）。
+- `_clearAllAccountLocalState()`は新規共通ヘルパー関数。既存の`_clearBackupKeyMaterial()`（6167行目）をそのまま呼ぶだけで、JWT・鍵material・saltの3点セットを一括クリアする。
+
+### 5.4 i18n（新規キー案、ja/en同時追加必須）
+
+| キー | ja | en |
+|---|---|---|
+| `deleteAccountBtn` | アカウントを削除 | Delete account |
+| `confirmDeleteAccount` | アカウントを削除しますか？\nこの操作は取り消せません。予定表のバックアップデータもすべて削除されます。 | Delete your account?\nThis action cannot be undone. Your backed-up schedule data will also be permanently deleted. |
+| `toastDeleteAccountSuccess` | アカウントを削除しました | Account deleted |
+| `toastDeleteAccountError` | アカウントの削除に失敗しました。時間をおいて再度お試しください | Failed to delete account. Please try again later |
+
+`STRINGS.ja`/`STRINGS.en`（`public/app.js`）に同時追加する。CLAUDE.md「i18n 必須ルール」に従い、追加時は静的HTMLに直書きせず`data-i18n`属性を使う。
+
+### 5.5 CLAUDE.mdの既存パターンとの整合確認
+
+- **onclick属性＋touchendハンドラの二重登録パターン**: 新規ボタン`#delete-account-btn`は`onclick="if(!_touchCapableDetected) handleDeleteAccountClick()"`のガード付き記述にする（設計書38・46で確立済みのパターン）。既存の設定画面touchendハンドラ一覧（`public/app.js`）に`#delete-account-btn`の判定行を追加する必要がある（`#logout-btn`と同様の扱い）。**実装時の要チェック項目として明記**: 設計書46で「iOS版Googleボタンが表示されない」不具合の原因が「touchendガード一覧への追加漏れ」だったのと同型のミスをしないこと。
+- **TDZ教訓**: `handleDeleteAccountClick()`・`_clearAllAccountLocalState()`はいずれも関数宣言（巻き上げ対象）であり、起動時同期フロー（`loadEventData()`等）から呼ばれることはない（ユーザーのボタン操作起点のみ）。新規モジュールスコープ変数（`let`/`const`）は追加しないため、TDZリスクはない。
+- **z-index方針**: `confirm()`はブラウザ/WKWebViewネイティブダイアログのため、CSSのz-index管理下にない。新規モーダル・オーバーレイは今回作らないため、z-index方針への抵触なし。
+- **`server.js`編集時の注意**（コメントアウト範囲）: 新規ルート追加後、47〜200行目付近の無効化中Stripeコメントブロック範囲に入っていないか`grep -n "^/\*\|^\*/"`で確認すること（`GET /api/auth/me`の直後＝1526行目付近に配置予定であり、通常はコメント範囲外だが実装時に必ず再確認する）。
+
+## 6. B. プライバシーポリシー更新の設計
+
+### 6.1 現状構成（8章）
+
+1. 収集する情報
+2. 情報の利用目的
+3. 第三者への提供
+4. 利用する外部サービス
+5. Cookieについて
+6. 情報の保管と削除
+7. お問い合わせ
+8. ポリシーの変更
+
+### 6.2 追加・改訂する章立て案
+
+既存の8章構成を維持しつつ、該当箇所に加筆する（章番号の大幅な組み替えはせず、既存章の内容を拡張する方式を基本とする。新設が必要な箇所のみ章を追加する）。
+
+**第1章「収集する情報」に追記**:
+```html
+<li><strong>Google/Appleアカウントの識別子</strong>：Google/Appleでログインする場合、認証トークンから得られる一意の識別子（sub）のみをサーバーに保存します。メールアドレス・氏名・プロフィール画像は保存・利用しません。なお、ログイン時にGoogle/Appleの同意画面にメールアドレス等へのアクセス許可が表示されることがありますが、これは各社の認証機能の仕様によるものであり、当方のサーバーはこれらの情報を受け取っても保存・利用しません。</li>
+<li><strong>予定表・マイコース等のバックアップデータ</strong>：ログインしたユーザーが「データバックアップ」機能を利用する場合、予定表・マイコース・ジャンル設定等のデータをお使いのデバイス上でパスフレーズを用いて暗号化したうえでサーバーに保存します。暗号化・復号はすべてデバイス上で行われ、パスフレーズ自体はサーバーに送信・保存されません。そのため、当方を含む第三者がバックアップデータの内容を復号・閲覧することはできません（ゼロ知識暗号化）。パスフレーズを忘れた場合、バックアップデータを復元することはできません。</li>
+<li><strong>共有カレンダーのデータ</strong>：家族・友人と予定を共有する「共有カレンダー」機能では、参加者間で共有するパスフレーズを用いてデータを暗号化して保存します。パスフレーズを知らない第三者がカレンダーの内容を閲覧することはできません。</li>
+```
+
+**第6章「情報の保管と削除」を拡張**（アカウント削除機能の記載を追加）:
+```html
+<h2>6. 情報の保管と削除</h2>
+<p>プッシュ通知トークンはサービス停止時または登録解除時に削除されます。その他の設定情報はブラウザ・アプリのデータ削除により消去できます。</p>
+<p><strong>アカウントの削除</strong>：Google/Appleでログインしているユーザーは、アプリ内の設定画面「アカウント」セクションから、いつでも自分のアカウントを削除できます。削除を行うと、サーバーに保存されているアカウント情報（Google/Appleの識別子）および予定表バックアップデータは完全に削除され、復元できません。なお、公開したコースが他のユーザーに閲覧されている場合、コース自体は削除されず、作成者情報のみが匿名化されます。</p>
+```
+
+**「最終更新日」を本タスク実装日（実装時点の日付）に更新**。
+
+### 6.3 章追加が必要な場合の代替案（検討事項として提示）
+
+上記6.2案は既存章の拡張のみで対応可能と考えられるが、レビュー時の判断で「ログイン・認証」を独立章として切り出したい場合は、第1章と第4章の間（新第2章として挿入し、以降の章番号を1つずつ繰り下げ）にする案もありうる。**今回のデフォルト提案は「既存章拡張」（章番号を変更しない）方式とする**。理由: 章番号の変更は他ページからのアンカーリンク等（現状`privacy.html`内に章アンカーは無いため実害は小さいが）の破損リスクを避けるため、変更を最小限にする方針を優先する。
+
+### 6.4 文言方針
+
+- CLAUDE.mdに記録された技術的事実の範囲でのみ記述する（誇大な安全性主張をしない）。
+- 「ゼロ知識暗号化」「サーバー側は`sub`のみ保存」等の表現は、設計書35/39/54の実装事実（CLAUDE.md記載内容）と完全に一致する範囲でのみ使う。
+- 設計書39で判明した「Google同意画面自体にemail/profileスコープの許可表示が出ることは技術的に回避不可能」という事実を、ユーザーに誤解を与えないよう明記する（上記1章追記案に含めた）。
+
+## 7. 変更するファイル一覧
+
+| ファイル | 変更内容 |
+|---|---|
+| `server.js` | 新規`DELETE /api/auth/me`エンドポイント追加（`GET /api/auth/me`直後、1526行目付近） |
+| `public/index.html` | 「アカウント」セクション内、`#login-section-logged-in`ブロックに`#delete-account-btn`を追加。`data-i18n`属性使用 |
+| `public/app.js` | `handleDeleteAccountClick()`・`_clearAllAccountLocalState()`関数追加（`handleLogoutClick()`直後）。`STRINGS.ja`/`STRINGS.en`に4キー追加。設定画面touchendハンドラ一覧に`#delete-account-btn`を追加。`index.html`のキャッシュバスティング用クエリ文字列更新、`sw.js`の`CACHE_NAME`更新 |
+| `public/app.css`（必要なら） | `.settings-item--danger`（警告色）クラス追加。既存`.settings-item`ベースの最小差分 |
+| `public/privacy.html` | 第1章・第6章への追記、最終更新日の更新 |
+| `public/sw.js` | `CACHE_NAME`のバージョン番号更新（`app.css`変更を伴う場合のみ必須、`app.js`変更は常に伴うため必須） |
+
+## 8. データモデルの変更
+
+- `data/users.json`: スキーマ変更なし（既存レコードの削除処理を追加するのみ）。
+- `data/user-plans/{userId}.json`: スキーマ変更なし（ファイル削除処理を追加するのみ）。
+- `data/{city}/community-courses.json`: 既存`authorId`フィールドの値域に`null`が追加される（元々`req.body.userId || 'anonymous'`で`authorId`が入る設計であり、`null`は新しい状態だが、クライアント側で`authorId`の値を画面表示に使っている箇所がないか要確認 — 調査の結果、`authorId`は権限判定にのみ使われ画面表示には使われていないため、`null`化による表示崩れリスクはないと考えられる）。
+
+## 9. APIの変更
+
+- 新規: `DELETE /api/auth/me`（`requireAppAuth`必須）。既存の`GET /api/auth/me`とは独立した新規エンドポイントであり、既存APIのレスポンス構造には一切変更を加えない。
+- **後方互換性**: 旧バージョンのアプリ（このエンドポイントを知らない）には一切影響しない。新規エンドポイントの追加のみであり、既存エンドポイントの挙動・レスポンス構造は無変更。
+- **影響範囲**: Web版・iOS版両方で同時に有効になる（`server.js`の変更はサーバー側のみで完結し、`pm2 restart`で即時反映される）。ただし、削除ボタンのUI自体はクライアント側コード（`public/app.js`/`index.html`）に依存するため、**iOS版でこの機能を使えるようにするには次回TestFlightビルドが必須**（Web版はキャッシュバスティング後の配信で即時反映）。
+- **リリースタイミング**: API（`DELETE /api/auth/me`）はサーバーデプロイのみで有効になるが、削除ボタンのUIが無い状態（現行TestFlightビルド）でもAPIが露出すること自体は問題ない（`requireAppAuth`で保護されており、UIがなければ誰も呼び出さない）。审査提出用のTestFlightビルドをトリガーする際に、このクライアント変更を含めることが必須（App Store Guideline対応の実体はUIがあって初めて満たされる）。
+
+## 10. フロントエンドの変更
+
+5.3節参照。設定画面「アカウント」セクション内、ログイン中表示ブロックへのボタン追加のみ。新規モーダル・シートは作らない（`confirm()`ネイティブダイアログで完結させる、既存`handleLogoutClick()`と同じ軽量パターン）。
+
+## 11. リスク・未解決の質問
+
+1. **App Store Connect側の「Appプライバシー」申告フォーム更新は本設計書のスコープ外**。コード変更では対応できないため、ユーザーが審査提出前に手動でApp Store Connect上の「App Privacy」セクションを確認・更新する必要がある（特に「データ削除」に関する申告項目、Appleは"Account Deletion"のNutrition Labelの項目化を求めることがある）。**この作業はユーザー側のタスクとして明記し、実装完了だけでは審査対応が完結しない点に注意**。
+2. **削除の不可逆性と誤操作防止**: 現在の設計は`window.confirm()`1回のみで、二段階確認（例: "DELETE"と入力させる）は入れていない。誤タップで即削除されるリスクをどこまで許容するかはユーザー判断が必要（`handleLogoutClick()`と同水準の確認で十分と判断したが、要レビュー）。
+3. **部分失敗のリスク**: `DELETE /api/auth/me`内で3つの独立した`withFileLock`操作（users.json削除・user-plans削除・community-courses匿名化）を順に実行する設計のため、途中でサーバーがクラッシュした場合、一部だけ完了し残りが未完了のまま残る可能性がある（例: users.jsonからは削除されたが、community-coursesの匿名化は未実施）。既存コードベースにトランザクション機構は存在せず、他のマルチステップ処理（コース生成等）も同様の設計のため、今回もこのリスクは許容する前提とするが、明示的にリスクとして記載する。
+4. **二重タップ時の挙動**: 5節「エッジケース」で「対象レコードが既に無くても200を返す冪等設計」を推奨したが、これによりユーザーが「本当に削除されたか」を確認する手段が別途必要かは要検討（現状は削除後即座に未ログイン画面に遷移するため実害は小さいと考えられる）。
+5. **`authedFetch`のタイムアウト・リトライ**: 既存の`authedFetch()`ラッパーにタイムアウト処理があるか未確認（`不明`）。削除リクエストがネットワーク不安定で応答が返らない場合のUX（ボタンの二重押下防止等）は今回の設計に含めていない。実装時に既存の他の非同期ボタン処理（例: `_doBackupRestore()`）のローディング状態表現パターンを踏襲するか検討が必要。
+6. **実機・Web版双方での動作確認が必須**: アカウント削除機能は新規実装のため、CLAUDE.md「iOS/Capacitor開発ノウハウ」に記載の既存の教訓（onclick+touchendの二重登録、TDZ等）を踏まえても、**実機（TestFlight）でのタップ動作確認は次回ビルド後に必須**。Web版はマウス操作で先行検証可能。
+7. **プライバシーポリシーの法的正確性**: 本設計書の文言案は「実装内容と矛盾しないこと」を優先しており、法律専門家によるレビューは行っていない（`不明`：法務レビューの要否はユーザー判断）。
+8. **既存の「情報の保管と削除」章の「プッシュ通知トークンはサービス停止時または登録解除時に削除」という記述と、今回追加する「アカウント削除」の記述が、ユーザーから見て混同されないか**: プッシュ通知トークンの削除とアカウント削除は完全に別軸の操作である旨が明確に伝わる文言にする必要がある（6.2節の追記案では意識して書き分けたが、レビュー時に確認すること）。
+9. **`data/{city}/community-courses.json`の`authorId: null`化が、既存のマイコード（フロントエンド`localStorage`の`{city}_my_courses`、`published`フィールドで管理）側の表示にどう影響するか**: マイコースはあくまでクライアントローカルのlocalStorageで管理されており、サーバー側`authorId`とは独立した別データのため、削除操作によってユーザー本人の端末上の「マイコース」一覧が消えることはないと考えられる（`不明`：完全な確証は実装時のコードレビューで再確認が必要）。
+
+## 承認状況
+2026-07-19 planner設計。**ユーザー承認済み**。**実装完了**（orchestrator、2026-07-19）。詳細は`.claude/session-log.md`・`.claude/next.md`参照。

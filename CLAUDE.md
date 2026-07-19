@@ -202,6 +202,18 @@ sg-weekend-app/
   - 起動時初期化 `_initAuthToken`（非同期IIFE、旧同期`refreshLoginUI()`呼び出しを置換）: iOS版は`await _CapPrefs.get({key})`でトークン読み出し→`_authTokenCache`セット＋localStorageミラー。Preferencesに無くlocalStorageにあれば（旧バージョン移行）Preferencesへ書き込む。**Preferences読み出し完了「後」に`refreshLoginUI()`を呼ぶことが必須**（非同期のため同期で先に呼ぶとキャッシュ未初期化で匿名表示になる）。`ios-app/package.json`に`@capacitor/preferences@^6.0.0`追加
   - 一時計装`_sendDebugLog('auth_prefs_init', { hasPrefs, hasToken })`を`_initAuthToken`末尾に埋め込み済み。**原因確定後に削除する使い捨て**（`.claude/next.md`参照）
   - **未検証（次回フォロー）**: 実機（TestFlight）で「連携→アプリ完全終了→再起動して連携が維持されるか」、`logs/debug-nav.log`の`auth_prefs_init`で`hasPrefs:true`かつ再起動後も`hasToken:true`（Preferences永続化が機能しているか）の確認が必要
+- **2026-07-19実装（設計書65）: アカウント削除機能を追加（App Store Review Guideline 5.1.1(v)対応）**
+  - **サーバー**: 新規`DELETE /api/auth/me`（`requireAppAuth`必須、`server.js`の`GET /api/auth/me`直後）。(1)`data/users.json`から該当`userId`のレコードを`withFileLock`で削除、(2)`data/user-plans/{userId}.json`が存在すれば`withFileLock`で削除（`getUserPlansFilePath()`の既存バリデーション使用）、(3)全都市（sg/bkk/syd）の`data/{city}/community-courses.json`を走査し該当`authorId`を`null`に匿名化（**コース自体・`spots`・`likes`・`isPublic`は変更しない**。公開コースは他ユーザーが既に閲覧・いいねしている可能性がある公開データのため、削除ではなく作成者情報のみ匿名化する設計。`authorId`は権限判定にのみ使われ画面表示には使われないため`null`化による表示崩れなし）。冪等（対象レコードが既に無くても200 `{ok:true}`を返す）。プッシュ通知トークン（`data/push-subscriptions.json`）・共有カレンダー参加情報（userIdと紐づく仕組みが存在しない）は対象外
+  - **クライアント**: `public/app.js`の`handleDeleteAccountClick()`（`handleLogoutClick()`直後）が`confirm(t('confirmDeleteAccount'))`→`authedFetch(DELETE /api/auth/me)`→成功時`_clearAllAccountLocalState()`（JWT・バックアップ鍵material・saltの3点セットを一括クリア）→`refreshLoginUI()`/`renderBackupSection()`で未ログイン表示に戻す、という流れ。**500系エラー時はローカル状態を一切クリアしない**（サーバー側削除が確認できてから消す設計、`handleLogoutClick()`とは逆の慎重さ）。401時（トークン失効）はローカルクリアのみで完了トースト表示
+  - **UI配置**: 設定画面「アカウント」セクション、`#login-section-logged-in`（ログイン中表示ブロック）の直後に`#delete-account-section`を新設。**未ログイン時は非表示**（`refreshLoginUI()`/`_showLoggedInOptimistic()`の全分岐で`#login-section-logged-in`と表示/非表示を同期）。既存の「連携解除」ボタン（`#logout-btn`）とは別ブロックにし、`.settings-item--danger`（`var(--terracotta)`色、`public/app.css`新規）で視覚的に区別
+  - **touchendハンドラ追加漏れ対策**: 設定画面の`touchend`デリゲーション一覧（`public/app.js`、`#logout-btn`判定行の直後）に`#delete-account-btn`を追加済み。設計書46（iOS版Googleボタン表示漏れ）と同型のミスを踏まないための必須対応として実施
+  - **i18n**: `deleteAccountBtn`（アカウントを削除/Delete account）・`confirmDeleteAccount`（取り消せない旨の強い警告文言）・`toastDeleteAccountSuccess`・`toastDeleteAccountError`の4キーをja/en同時追加
+  - **リスク・スコープ外（設計書65 §11・§4に明記）**: 部分失敗リスク（3つの独立した`withFileLock`操作のため、途中クラッシュで一部だけ完了する可能性。既存の他マルチステップ処理と同水準のリスクとして許容）。「猶予期間」「復元（アンドゥ）」機能は実装せず即時削除のみ。Google/Appleサーバー側のOAuth連携解除（各プラットフォームの設定画面で行う操作）は範囲外。共有カレンダー参加情報の削除連動は、そもそも紐づけ機能自体が未実装（設計書37 §3・設計書54 §4）のためスコープ外
+  - **App Store Connect側「Appプライバシー」申告フォームの更新はコード変更では対応不可、ユーザーが審査提出前に手動対応が必要**（本タスクのスコープ外として明記）
+  - **未検証（次回フォロー）**: 削除ボタンのUIはクライアント側コードに依存するため、iOS版でこの機能を使えるようにするには次回TestFlightビルドが必須。実機でのタップ動作・削除フローのエンドツーエンド確認は未実施（Web版はcurl・目視で先行検証済み）
+
+## プライバシーポリシー更新（2026-07-19実装、設計書65）
+`public/privacy.html`第1章「収集する情報」に「Google/Appleアカウントの識別子（sub のみ保存、email/氏名/画像は保存しない。同意画面表示は各社仕様上回避不可能である旨も明記）」「予定表・マイコース等のバックアップデータ（ゼロ知識暗号化、パスフレーズはサーバー未送信）」「共有カレンダーのデータ（パスフレーズ暗号化）」の3項目を追記。第6章「情報の保管と削除」に「アカウントの削除」（設定画面からいつでも削除可能、公開コースは匿名化されるのみで削除されない旨）を追記。**章番号は変更せず既存章の拡張のみ**（第1〜8章の構成は維持）。最終更新日を2026年7月19日に更新。文言はCLAUDE.mdに記録された技術的事実の範囲でのみ記述（誇大な安全性主張はしない方針）。
 
 ## データバックアップ（端末移行用、ゼロ知識暗号化）＋共有カレンダーのパスフレーズ方式化（2026-07-17実装 設計書54・55 → 2026-07-18 設計書58で全データ対応に拡張）
 

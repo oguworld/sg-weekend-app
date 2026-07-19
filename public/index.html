@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260718a">
+  <link rel="stylesheet" href="/app.css?v=20260719b">
 </head>
 <body>
   </div>
@@ -316,6 +316,14 @@
         <button id="logout-btn" onclick="if(!_touchCapableDetected) handleLogoutClick()"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
           <span data-i18n="logoutBtn">連携解除</span>
+        </button>
+      </div>
+
+      <div id="delete-account-section" style="padding:4px 18px 12px;display:none;">
+        <button id="delete-account-btn" class="settings-item--danger"
+          onclick="if(!_touchCapableDetected) handleDeleteAccountClick()"
+          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid transparent;background:transparent;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;transition:all 0.18s;">
+          <span data-i18n="deleteAccountBtn">アカウントを削除</span>
         </button>
       </div>
 
@@ -1002,7 +1010,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260719a"></script>
+  <script src="/app.js?v=20260719b"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

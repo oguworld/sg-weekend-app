@@ -504,6 +504,10 @@
         toastLoginSuccess: '連携しました',
         toastLoginError: '連携に失敗しました。もう一度お試しください',
         toastLogoutSuccess: '連携を解除しました',
+        deleteAccountBtn: 'アカウントを削除',
+        confirmDeleteAccount: 'アカウントを削除しますか？\nこの操作は取り消せません。予定表のバックアップデータもすべて削除されます。',
+        toastDeleteAccountSuccess: 'アカウントを削除しました',
+        toastDeleteAccountError: 'アカウントの削除に失敗しました。時間をおいて再度お試しください',
         // データバックアップ（端末移行用。設計書54 → 設計書58で全データ対応に拡張）
         backupLoginRequired: 'バックアップを利用するにはアカウント連携が必要です',
         backupDisabledDesc: 'パスフレーズを設定すると、予定表・マイコースなどのデータをサーバーに暗号化してバックアップできます。パスフレーズを知っている本人以外は内容を読めません。',
@@ -739,6 +743,10 @@
         toastLoginSuccess: 'Account linked',
         toastLoginError: 'Linking failed. Please try again',
         toastLogoutSuccess: 'Account unlinked',
+        deleteAccountBtn: 'Delete account',
+        confirmDeleteAccount: 'Delete your account?\nThis action cannot be undone. Your backed-up schedule data will also be permanently deleted.',
+        toastDeleteAccountSuccess: 'Account deleted',
+        toastDeleteAccountError: 'Failed to delete account. Please try again later',
         // Data backup for device migration (design doc 54 -> expanded to all data in design doc 58)
         backupLoginRequired: 'Please link your account to use backup',
         backupDisabledDesc: 'Set a passphrase to back up your plans, my courses, and other data to the server, encrypted so only you can read them.',
@@ -2049,6 +2057,7 @@
         if (e.target.closest('#google-login-btn'))  { e.preventDefault(); handleGoogleLoginClick(); return; }
         if (e.target.closest('#apple-login-btn'))    { e.preventDefault(); handleAppleLoginClick();  return; }
         if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
+        if (e.target.closest('#delete-account-btn')) { e.preventDefault(); handleDeleteAccountClick(); return; }
         if (e.target.closest('#backup-section-content button')) {
           const btn = e.target.closest('button');
           e.preventDefault();
@@ -2712,6 +2721,8 @@
       }
       loggedOutEl.style.display = 'none';
       loggedInEl.style.display = '';
+      const deleteSectionEl = document.getElementById('delete-account-section');
+      if (deleteSectionEl) deleteSectionEl.style.display = '';
     }
 
     // 設定画面のログインセクション表示をログイン状態に合わせて更新する
@@ -2719,11 +2730,13 @@
       const loggedOutEl = document.getElementById('login-section-logged-out');
       const loggedInEl = document.getElementById('login-section-logged-in');
       const labelEl = document.getElementById('login-status-label');
+      const deleteSectionEl = document.getElementById('delete-account-section');
       if (!loggedOutEl || !loggedInEl) return;
       const token = getAuthToken();
       if (!token) {
         loggedOutEl.style.display = '';
         loggedInEl.style.display = 'none';
+        if (deleteSectionEl) deleteSectionEl.style.display = 'none';
         return;
       }
       try {
@@ -2733,6 +2746,7 @@
           clearAuthToken();
           loggedOutEl.style.display = '';
           loggedInEl.style.display = 'none';
+          if (deleteSectionEl) deleteSectionEl.style.display = 'none';
           return;
         }
         // 401 以外の失敗（500系など）はトークンを消さず、楽観的に「連携中」を維持する。
@@ -2751,6 +2765,7 @@
         }
         loggedOutEl.style.display = 'none';
         loggedInEl.style.display = '';
+        if (deleteSectionEl) deleteSectionEl.style.display = '';
       } catch (e) {
         // 通信エラー・fetch自体の失敗ではトークンを消さず、楽観的に「連携中」を維持する（設計書48・課題2）
         _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
@@ -2768,6 +2783,39 @@
       // 再ログイン時に同じ端末なら鍵を保持したまま同期を再開できるようにするための保守的な選択）。
       // 表示のみ「未ログイン」向けの案内に更新する。
       renderBackupSection();
+    }
+
+    // アカウント削除（設計書65）: JWT・バックアップ鍵material・saltを全てクリアする共通ヘルパー
+    function _clearAllAccountLocalState() {
+      clearAuthToken();
+      _clearBackupKeyMaterial();
+      try { localStorage.removeItem('app_backup_salt'); } catch (_) {}
+    }
+
+    async function handleDeleteAccountClick() {
+      if (!confirm(t('confirmDeleteAccount'))) return;
+      try {
+        const token = getAuthToken();
+        if (!token) { showToast(t('toastLoginError')); return; }
+        const res = await authedFetch(API_BASE + '/api/auth/me', { method: 'DELETE' });
+        if (res.status === 401) {
+          // 既に失効している場合はローカル状態のみクリアして終える
+          _clearAllAccountLocalState();
+          refreshLoginUI();
+          if (typeof renderBackupSection === 'function') renderBackupSection();
+          showToast(t('toastDeleteAccountSuccess'));
+          return;
+        }
+        if (!res.ok) { showToast(t('toastDeleteAccountError')); return; }
+        // サーバー側削除確認後にローカル状態をクリア（中途半端な状態を残さない）
+        window.google?.accounts?.id?.disableAutoSelect?.();
+        _clearAllAccountLocalState();
+        showToast(t('toastDeleteAccountSuccess'));
+        refreshLoginUI();
+        if (typeof renderBackupSection === 'function') renderBackupSection();
+      } catch (e) {
+        showToast(t('toastDeleteAccountError'));
+      }
     }
 
     // iOS版: Capacitorネイティブプラグイン経由でGoogleサインインを起動

@@ -1654,6 +1654,13 @@
       color: var(--warm-gray);
       font-weight: 300;
     }
+    /* アカウント削除等の破壊的操作用ボタン（設計書65） */
+    .settings-item--danger {
+      color: var(--terracotta);
+    }
+    .settings-item--danger:active {
+      opacity: 0.7;
+    }
 
     /* ─── Push toggle switch ─── */
     .toggle-switch {
