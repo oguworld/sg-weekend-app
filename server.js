@@ -1950,6 +1950,172 @@ app.put('/api/user-plans/me', requireAppAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// STAMP RALLY（スポット制覇スタンプラリー、設計書69）
+// スポットマスターは data/{city}/stamp-spots.json（人力キュレーション、gitignore対象・VPS直接編集）。
+// 進捗は data/stamp-progress/{userId}.json（既存 data/user-plans と同じディレクトリ分割パターン、requireAppAuth必須）。
+// v1ではGPS偽装対策（サーバー側距離検証）は行わず、クライアント申告のlat/lngをそのまま信用する（設計書69 承認済み暫定方針）。
+// ─────────────────────────────────────────────
+const STAMP_PROGRESS_DIR = path.join(__dirname, 'data', 'stamp-progress');
+if (!fs.existsSync(STAMP_PROGRESS_DIR)) fs.mkdirSync(STAMP_PROGRESS_DIR, { recursive: true });
+
+function getStampProgressFilePath(userId) {
+  // userId は upsertUser() が 'usr_' + hex24 で発行する既知フォーマットのみ許可（パストラバーサル対策）
+  if (!/^usr_[a-f0-9]{24}$/.test(userId)) return null;
+  return path.join(STAMP_PROGRESS_DIR, `${userId}.json`);
+}
+
+function loadStampSpots(city) {
+  const p = path.join(__dirname, 'data', city, 'stamp-spots.json');
+  if (!fs.existsSync(p)) return [];
+  try {
+    const spots = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return Array.isArray(spots) ? spots : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadStampProgress(userId) {
+  const fp = getStampProgressFilePath(userId);
+  if (!fp || !fs.existsSync(fp)) return { checkedInSpotIds: [], checkinLog: [] };
+  try {
+    const data = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    return {
+      checkedInSpotIds: Array.isArray(data.checkedInSpotIds) ? data.checkedInSpotIds : [],
+      checkinLog: Array.isArray(data.checkinLog) ? data.checkinLog : [],
+    };
+  } catch {
+    return { checkedInSpotIds: [], checkinLog: [] };
+  }
+}
+
+// 段階ゲートの解禁条件（実装判断: standard→local→niche→specialの順に、
+// 前レベルを一定数チェックインすると次レベルが解禁される。スポット総数が少数〈v1は14件〉のため閾値は控えめに設定）
+const STAMP_LEVEL_GATES = {
+  standard: null, // 常に解禁
+  local:   { requires: 'standard', count: 2 },
+  niche:   { requires: 'local',    count: 2 },
+  special: { requires: 'niche',    count: 2 },
+};
+const STAMP_LEVEL_ORDER = ['standard', 'local', 'niche', 'special'];
+
+// checkedInSpotIds と全スポットリストから、解禁済みレベルの配列を算出する
+function computeUnlockedLevels(allSpots, checkedInSpotIds) {
+  const checkedSet = new Set(checkedInSpotIds);
+  const countByLevel = {};
+  for (const s of allSpots) {
+    if (checkedSet.has(s.id)) countByLevel[s.level] = (countByLevel[s.level] || 0) + 1;
+  }
+  const unlocked = [];
+  for (const level of STAMP_LEVEL_ORDER) {
+    const gate = STAMP_LEVEL_GATES[level];
+    if (!gate) { unlocked.push(level); continue; }
+    if (unlocked.includes(gate.requires) && (countByLevel[gate.requires] || 0) >= gate.count) {
+      unlocked.push(level);
+    } else {
+      break; // レベルは順序通りにしか解禁されない
+    }
+  }
+  return unlocked;
+}
+
+// GET /api/stamp-spots?city=sg — スポットマスター一覧（認証不要、ただしログイン時は任意認証でスペシャル解禁状況を反映）
+// special レベルのスポットは、そのユーザーが解禁条件を満たしていない場合レスポンス自体から除外する
+// （フロントのフィルタだけでなくAPIレスポンス自体で「ピン自体を非表示にする」要件を担保するため）
+app.get('/api/stamp-spots', (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const allSpots = loadStampSpots(city).filter(s => s.active !== false);
+    const authedUserId = verifyAppJwtOptional(req);
+
+    let unlockedLevels;
+    if (authedUserId) {
+      const progress = loadStampProgress(authedUserId);
+      unlockedLevels = computeUnlockedLevels(allSpots, progress.checkedInSpotIds);
+    } else {
+      // 未ログイン時はフェイルセーフとして「未解禁」とみなす（specialは常に除外）
+      unlockedLevels = STAMP_LEVEL_ORDER.filter(l => l !== 'special');
+    }
+
+    const visibleSpots = allSpots.filter(s => s.level !== 'special' || unlockedLevels.includes('special'));
+    res.json({ spots: visibleSpots, unlockedLevels });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/stamp-progress/me — ログインユーザーの進捗（チェックイン済みスポット・履歴・解禁済みレベル）
+app.get('/api/stamp-progress/me', requireAppAuth, (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const allSpots = loadStampSpots(city).filter(s => s.active !== false);
+    const progress = loadStampProgress(req.authUserId);
+    const unlockedLevels = computeUnlockedLevels(allSpots, progress.checkedInSpotIds);
+    res.json({
+      checkedInSpotIds: progress.checkedInSpotIds,
+      checkinLog: progress.checkinLog,
+      unlockedLevels,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/stamp-progress/checkin — { spotId, lat, lng } を受け取りチェックインを記録する
+// v1はサーバー側の距離検証を行わない（クライアントの手動確認ボタン+GPS近接判定を信用する暫定方針、設計書69）
+// 冪等: 既にチェックイン済みのスポットへの再リクエストもエラーにせず200を返す
+app.post('/api/stamp-progress/checkin', requireAppAuth, async (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const { spotId, lat, lng } = req.body || {};
+    if (!spotId || typeof spotId !== 'string') return res.status(400).json({ error: 'spotId is required' });
+
+    const allSpots = loadStampSpots(city);
+    const spot = allSpots.find(s => s.id === spotId && s.active !== false);
+    if (!spot) return res.status(404).json({ error: 'spot not found' });
+
+    const fp = getStampProgressFilePath(req.authUserId);
+    if (!fp) return res.status(400).json({ error: 'invalid user' });
+
+    let alreadyCheckedIn = false;
+    await withFileLock(fp, () => {
+      let data = { userId: req.authUserId, city, checkedInSpotIds: [], checkinLog: [], updatedAt: null };
+      if (fs.existsSync(fp)) {
+        try {
+          const existing = JSON.parse(fs.readFileSync(fp, 'utf8'));
+          data = {
+            userId: req.authUserId,
+            city,
+            checkedInSpotIds: Array.isArray(existing.checkedInSpotIds) ? existing.checkedInSpotIds : [],
+            checkinLog: Array.isArray(existing.checkinLog) ? existing.checkinLog : [],
+            updatedAt: existing.updatedAt || null,
+          };
+        } catch { /* 破損時は初期状態で上書き */ }
+      }
+      if (data.checkedInSpotIds.includes(spotId)) {
+        alreadyCheckedIn = true;
+      } else {
+        data.checkedInSpotIds.push(spotId);
+        data.checkinLog.push({
+          spotId,
+          checkedInAt: new Date().toISOString(),
+          lat: typeof lat === 'number' ? lat : null,
+          lng: typeof lng === 'number' ? lng : null,
+        });
+      }
+      data.updatedAt = new Date().toISOString();
+      fs.writeFileSync(fp, JSON.stringify(data, null, 2));
+    });
+
+    const progress = loadStampProgress(req.authUserId);
+    const unlockedLevels = computeUnlockedLevels(allSpots.filter(s => s.active !== false), progress.checkedInSpotIds);
+    res.json({ ok: true, alreadyCheckedIn, checkedInSpotIds: progress.checkedInSpotIds, unlockedLevels });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────
 // COURSE API
 // ─────────────────────────────────────────────
 

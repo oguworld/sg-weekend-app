@@ -417,6 +417,23 @@
         courseScreenTitle: 'おでかけコース',
         courseTabEveryone: 'みんなのコース',
         courseTabMylist: 'マイコース',
+        courseTabStampMap: 'スタンプマップ',
+        stampMapLoginRequired: 'スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。',
+        stampLevelStandard: '定番',
+        stampLevelLocal: 'ローカル',
+        stampLevelNiche: 'ニッチ',
+        stampLevelSpecial: 'スペシャル',
+        stampProgressSummary: '{unlocked}レベル解禁中・{checked}/{total}スポット制覇',
+        stampCheckedInBadge: '✓ 制覇済み',
+        stampCheckinBtn: '現在地を確認中…',
+        stampCheckinBtnReady: 'チェックインする',
+        stampCheckinBtnTooFar: '近づくとチェックインできます',
+        stampCheckinBtnNoLocation: '位置情報を取得できません',
+        stampCheckinBtnLocked: 'このスポットはまだロックされています',
+        toastStampCheckinSuccess: '🎉 スタンプを獲得しました！',
+        toastStampCheckinError: 'チェックインに失敗しました。もう一度お試しください。',
+        toastStampLevelUnlocked: '🔓 新しいレベルが解禁されました！',
+        stampLocationPermDenied: '位置情報の利用が許可されていません。端末の設定から許可してください。',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '軸にするイベント',
         coursePinsHint: '軸にするイベントをタップして選んでください',
@@ -656,6 +673,23 @@
         courseScreenTitle: 'Outing Courses',
         courseTabEveryone: 'Explore',
         courseTabMylist: 'My Courses',
+        courseTabStampMap: 'Stamp Map',
+        stampMapLoginRequired: 'To save your stamp rally progress, please link your account from Settings.',
+        stampLevelStandard: 'Standard',
+        stampLevelLocal: 'Local',
+        stampLevelNiche: 'Niche',
+        stampLevelSpecial: 'Special',
+        stampProgressSummary: '{unlocked} level(s) unlocked · {checked}/{total} spots collected',
+        stampCheckedInBadge: '✓ Collected',
+        stampCheckinBtn: 'Checking your location…',
+        stampCheckinBtnReady: 'Check in',
+        stampCheckinBtnTooFar: 'Get closer to check in',
+        stampCheckinBtnNoLocation: 'Unable to get your location',
+        stampCheckinBtnLocked: 'This spot is still locked',
+        toastStampCheckinSuccess: '🎉 Stamp collected!',
+        toastStampCheckinError: 'Check-in failed. Please try again.',
+        toastStampLevelUnlocked: '🔓 A new level has been unlocked!',
+        stampLocationPermDenied: 'Location access is not allowed. Please enable it in device settings.',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: 'Base pinned event',
         coursePinsHint: 'Tap to select',
@@ -2116,6 +2150,8 @@
       ['cal-passphrase-overlay',    () => closeCalPassphraseSheet()],
       ['backup-passphrase-submit-btn', () => submitBackupPassphrase()],
       ['cal-passphrase-submit-btn',    () => submitCalPassphrase()],
+      ['stamp-spot-detail-overlay', () => closeStampSpotDetail()],
+      ['stamp-checkin-btn', () => doStampCheckin()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -3540,8 +3576,10 @@
       }
 
       // Pull to Refresh（設計書19、初回のみ登録。iOS版のみ有効化。
-      // コース画面には横スワイプ機構が存在しないため watchSwipeIntent=false で単独判定）
+      // コース画面には横スワイプ機構が存在しないため watchSwipeIntent=false で単独判定。
+      // スタンプマップタブでは地図操作とPTRが競合するため、そのタブの間はリフレッシュ処理自体を何もしない（設計書69）
       _initPtr(sc, 'ptr-indicator-course', async () => {
+        if (currentCourseTab === 'map') return;
         await switchCourseTab(currentCourseTab);
       }, false);
     }
@@ -3553,6 +3591,22 @@
         t.classList.toggle('active', t.dataset.tab === tab));
 
       const city = getCity();
+
+      // 既存2タブ（コース一覧）とスタンプマップは表示領域自体が別（副作用ゼロの追加分岐、設計書69）
+      const courseListEl = document.getElementById('course-list');
+      const stampMapViewEl = document.getElementById('stamp-map-view');
+      const courseFabEl = document.getElementById('course-fab');
+      if (tab === 'map') {
+        if (courseListEl) courseListEl.style.display = 'none';
+        if (stampMapViewEl) stampMapViewEl.style.display = 'block';
+        if (courseFabEl) courseFabEl.style.display = 'none';
+        await initStampMapTab();
+        return;
+      } else {
+        if (courseListEl) courseListEl.style.display = 'flex';
+        if (stampMapViewEl) stampMapViewEl.style.display = 'none';
+        if (courseFabEl) courseFabEl.style.display = '';
+      }
 
       if (tab === 'mylist') {
         const courses = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
@@ -3574,6 +3628,337 @@
       } catch(e) {
         document.getElementById('course-list').innerHTML =
           `<div style="text-align:center;padding:40px;color:var(--warm-gray);">${t('courseEmpty')}</div>`;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // スタンプラリー機能（設計書69）
+    // 既存コース機能（community-courses.json等）とはデータ・ロジックとも完全に独立。
+    // コースタブ「スタンプマップ」の入口のみ共有する。
+    // ═══════════════════════════════════════════════════════════
+    const STAMP_LEVEL_META = {
+      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '📍' },
+      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏘' },
+      niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🔎' },
+      special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨' },
+    };
+
+    let _stampLeafletMap = null;
+    let _stampMarkersLayer = null;
+    let _stampSpots = [];
+    let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'] };
+    let _stampCurrentPos = null; // { lat, lng } 直近の現在地取得結果
+    let _stampSelectedSpot = null;
+    let _stampMapInitialized = false;
+    let _stampLocationWatchStarted = false;
+
+    // Capacitor Geolocationプラグイン取得（registerPlugin優先→Pluginsフォールバック、既存Keyboard/PushNotificationsと同じ防御的パターン）
+    let _CapGeo = null;
+    function _getCapGeoPlugin() {
+      if (_CapGeo) return _CapGeo;
+      try {
+        if (window.Capacitor?.registerPlugin) {
+          _CapGeo = window.Capacitor.registerPlugin('Geolocation');
+        }
+      } catch (_) {}
+      if (!_CapGeo) _CapGeo = window.Capacitor?.Plugins?.Geolocation;
+      return _CapGeo;
+    }
+
+    // 現在地を1回取得する共通ヘルパー（iOS版はCapacitorプラグイン、Web版はnavigator.geolocationにフォールバック）
+    // 権限拒否・取得失敗時は null を返す（例外を投げない）
+    async function _getCurrentPositionOnce() {
+      try {
+        if (_isCapacitorApp) {
+          const plugin = _getCapGeoPlugin();
+          if (!plugin?.getCurrentPosition) return null;
+          const pos = await plugin.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+          return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        } else {
+          if (!navigator.geolocation) return null;
+          return await new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+              () => resolve(null),
+              { enableHighAccuracy: true, timeout: 10000 }
+            );
+          });
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Haversine距離（メートル）
+    function _haversineDistanceM(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const toRad = (d) => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // コースタブ「スタンプマップ」表示時のエントリポイント
+    async function initStampMapTab() {
+      const loginEl = document.getElementById('stamp-map-login-required');
+      const contentEl = document.getElementById('stamp-map-content');
+      if (!getAuthToken()) {
+        if (loginEl) loginEl.style.display = 'block';
+        if (contentEl) contentEl.style.display = 'none';
+        return;
+      }
+      if (loginEl) loginEl.style.display = 'none';
+      if (contentEl) contentEl.style.display = 'block';
+
+      await _loadStampSpotsAndProgress();
+      _ensureStampLeafletMap();
+      _renderStampMarkers();
+      _renderStampFog();
+      _renderStampLevelLegend();
+      _renderStampProgressSummary();
+
+      // 現在地を取得しておく（詳細シートを開いた際のチェックインボタン活性判定に使う）。
+      // 権限リクエストのタイミングはマップタブオープン時に一括で行う設計（実装判断、設計書69未解決事項8）
+      _getCurrentPositionOnce().then(pos => { _stampCurrentPos = pos; });
+    }
+
+    async function _loadStampSpotsAndProgress() {
+      try {
+        const city = getCity();
+        const [spotsRes, progressRes] = await Promise.all([
+          fetch(API_BASE + `/api/stamp-spots?city=${city}`),
+          authedFetch(API_BASE + `/api/stamp-progress/me?city=${city}`),
+        ]);
+        const spotsData = await spotsRes.json();
+        _stampSpots = Array.isArray(spotsData.spots) ? spotsData.spots : [];
+        if (progressRes.ok) {
+          const progressData = await progressRes.json();
+          _stampProgress = {
+            checkedInSpotIds: progressData.checkedInSpotIds || [],
+            unlockedLevels: progressData.unlockedLevels || ['standard'],
+          };
+        }
+      } catch (_) {
+        _stampSpots = [];
+      }
+    }
+
+    // Leafletマップの初期化（初回のみ、以降はinvalidateSize()のみ呼ぶ。設計書69未解決事項4への実装判断）
+    function _ensureStampLeafletMap() {
+      const mapEl = document.getElementById('stamp-leaflet-map');
+      if (!mapEl || typeof L === 'undefined') return;
+      if (!_stampLeafletMap) {
+        _stampLeafletMap = L.map(mapEl, { zoomControl: true, attributionControl: true })
+          .setView([1.3521, 103.8198], 12); // シンガポール中心
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(_stampLeafletMap);
+        _stampMarkersLayer = L.layerGroup().addTo(_stampLeafletMap);
+        _stampMapInitialized = true;
+      }
+      // タブ切替でdisplay:noneから復帰した直後はコンテナサイズが正しく取得できないことがあるため、
+      // 描画完了後に再計算させる
+      setTimeout(() => { _stampLeafletMap && _stampLeafletMap.invalidateSize(); }, 60);
+    }
+
+    function _stampSpotIsChecked(spotId) {
+      return _stampProgress.checkedInSpotIds.includes(spotId);
+    }
+
+    function _renderStampMarkers() {
+      if (!_stampMarkersLayer) return;
+      _stampMarkersLayer.clearLayers();
+      _stampSpots.forEach(spot => {
+        const checked = _stampSpotIsChecked(spot.id);
+        const meta = STAMP_LEVEL_META[spot.level] || STAMP_LEVEL_META.standard;
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="stamp-marker-icon ${checked ? 'stamp-marker-icon--checked' : 'stamp-marker-icon--unchecked'}"><span>${meta.emoji}</span></div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 30],
+        });
+        const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(_stampMarkersLayer);
+        marker.on('click', () => openStampSpotDetail(spot.id));
+      });
+    }
+
+    // フォグ・オブ・ウォー: チェックイン済みスポット周辺だけ霧を透明にする穴を開ける。
+    // mask-image/mask-composite（ブラウザ間の挙動差・iOS WKWebView実機での動作が未検証でリスクが高い）は使わず、
+    // 各穴をradial-gradientの「不透明→透明」のグラデーションをそのままbackgroundに複数枚重ねる、
+    // より枯れたシンプルな方式にする（設計書69未解決事項5への実装判断）。
+    // 霧本体の色（rgba(44,36,32,0.55)）を土台に、穴の部分だけ同じ色→透明のグラデーションを上書き合成する。
+    function _renderStampFog() {
+      const fogEl = document.getElementById('stamp-fog-overlay');
+      if (!fogEl || !_stampLeafletMap) return;
+      const FOG_COLOR = '44,36,32';
+      const checkedSpots = _stampSpots.filter(s => _stampSpotIsChecked(s.id));
+      if (!checkedSpots.length) {
+        fogEl.style.background = `rgba(${FOG_COLOR},0.55)`;
+        return;
+      }
+      const holes = checkedSpots.map(spot => {
+        const pt = _stampLeafletMap.latLngToContainerPoint([spot.lat, spot.lng]);
+        return `radial-gradient(circle 90px at ${pt.x}px ${pt.y}px, transparent 0%, transparent 55%, rgba(${FOG_COLOR},0.55) 100%)`;
+      });
+      // 穴のグラデーションを手前に重ね、一番奥に霧の地色を敷く
+      fogEl.style.background = `${holes.join(', ')}, rgba(${FOG_COLOR},0.55)`;
+    }
+
+    function _renderStampLevelLegend() {
+      const el = document.getElementById('stamp-level-legend');
+      if (!el) return;
+      el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
+        const meta = STAMP_LEVEL_META[level];
+        const unlocked = _stampProgress.unlockedLevels.includes(level);
+        return `<div class="stamp-level-chip ${unlocked ? '' : 'stamp-level-chip--locked'}">
+          <span class="stamp-level-chip-dot" style="background:${meta.color};"></span>
+          ${meta.emoji} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒'}
+        </div>`;
+      }).join('');
+    }
+    const STAMP_LEVEL_ORDER_CLIENT = ['standard', 'local', 'niche', 'special'];
+
+    function _renderStampProgressSummary() {
+      const el = document.getElementById('stamp-progress-summary');
+      if (!el) return;
+      const checked = _stampProgress.checkedInSpotIds.length;
+      const total = _stampSpots.length;
+      const unlockedCount = _stampProgress.unlockedLevels.length;
+      el.textContent = t('stampProgressSummary')
+        .replace('{unlocked}', String(unlockedCount))
+        .replace('{checked}', String(checked))
+        .replace('{total}', String(total));
+    }
+
+    // ─── スポット詳細シート ───
+    function openStampSpotDetail(spotId) {
+      const spot = _stampSpots.find(s => s.id === spotId);
+      if (!spot) return;
+      _stampSelectedSpot = spot;
+
+      const meta = STAMP_LEVEL_META[spot.level] || STAMP_LEVEL_META.standard;
+      const badgeEl = document.getElementById('stamp-spot-detail-level-badge');
+      if (badgeEl) {
+        badgeEl.textContent = `${meta.emoji} ${t(meta.labelKey)}`;
+        badgeEl.style.background = meta.color + '22';
+        badgeEl.style.color = meta.color;
+      }
+      const lang = getLang();
+      document.getElementById('stamp-spot-detail-name').textContent =
+        (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+      document.getElementById('stamp-spot-detail-area').textContent = spot.area || '';
+      document.getElementById('stamp-spot-detail-desc').textContent = spot.description || '';
+
+      const checked = _stampSpotIsChecked(spot.id);
+      const checkedEl = document.getElementById('stamp-spot-detail-checked');
+      if (checkedEl) checkedEl.style.display = checked ? 'block' : 'none';
+
+      _updateStampCheckinButton();
+
+      lockScroll();
+      document.getElementById('stamp-spot-detail-overlay').classList.add('visible');
+      document.getElementById('stamp-spot-detail-sheet').classList.add('visible');
+
+      // シートを開いたタイミングで現在地を再取得し、距離判定を最新化する
+      _getCurrentPositionOnce().then(pos => {
+        _stampCurrentPos = pos;
+        if (_stampSelectedSpot && _stampSelectedSpot.id === spot.id) _updateStampCheckinButton();
+      });
+    }
+
+    function closeStampSpotDetail() {
+      _blurIfFocusInside('stamp-spot-detail-sheet');
+      unlockScroll();
+      document.getElementById('stamp-spot-detail-overlay').classList.remove('visible');
+      document.getElementById('stamp-spot-detail-sheet').classList.remove('visible');
+      _stampSelectedSpot = null;
+    }
+
+    function _updateStampCheckinButton() {
+      const btn = document.getElementById('stamp-checkin-btn');
+      const distEl = document.getElementById('stamp-spot-detail-distance');
+      if (!btn || !_stampSelectedSpot) return;
+      const spot = _stampSelectedSpot;
+      const checked = _stampSpotIsChecked(spot.id);
+      const unlocked = _stampProgress.unlockedLevels.includes(spot.level);
+
+      if (checked) {
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
+        btn.textContent = t('stampCheckedInBadge');
+        if (distEl) distEl.textContent = '';
+        return;
+      }
+      if (!unlocked) {
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
+        btn.textContent = t('stampCheckinBtnLocked');
+        if (distEl) distEl.textContent = '';
+        return;
+      }
+      if (!_stampCurrentPos) {
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
+        btn.textContent = t('stampCheckinBtnNoLocation');
+        if (distEl) distEl.textContent = t('stampLocationPermDenied');
+        return;
+      }
+      const distanceM = _haversineDistanceM(_stampCurrentPos.lat, _stampCurrentPos.lng, spot.lat, spot.lng);
+      const radius = spot.checkinRadiusM || 200;
+      if (distEl) distEl.textContent = `📍 ${Math.round(distanceM)}m`;
+      if (distanceM <= radius) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.textContent = t('stampCheckinBtnReady');
+      } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
+        btn.textContent = t('stampCheckinBtnTooFar');
+      }
+    }
+
+    async function doStampCheckin() {
+      if (!_stampSelectedSpot || !_stampCurrentPos) return;
+      const spot = _stampSelectedSpot;
+      // タッチ環境ではtouchendハンドラがボタンのdisabled状態を経由せず直接この関数を呼ぶため、
+      // ここで改めて「制覇済み・未解禁・遠すぎる」の3条件を再検証する（disabled属性頼みにしない）
+      if (_stampSpotIsChecked(spot.id)) return;
+      if (!_stampProgress.unlockedLevels.includes(spot.level)) return;
+      const distanceM = _haversineDistanceM(_stampCurrentPos.lat, _stampCurrentPos.lng, spot.lat, spot.lng);
+      if (distanceM > (spot.checkinRadiusM || 200)) return;
+      const btn = document.getElementById('stamp-checkin-btn');
+      if (btn) btn.disabled = true;
+      try {
+        const city = getCity();
+        const res = await authedFetch(API_BASE + `/api/stamp-progress/checkin?city=${city}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ spotId: spot.id, lat: _stampCurrentPos.lat, lng: _stampCurrentPos.lng }),
+        });
+        if (!res.ok) throw new Error('checkin failed');
+        const data = await res.json();
+        const prevUnlockedCount = _stampProgress.unlockedLevels.length;
+        _stampProgress = {
+          checkedInSpotIds: data.checkedInSpotIds || [],
+          unlockedLevels: data.unlockedLevels || _stampProgress.unlockedLevels,
+        };
+        showToast(t('toastStampCheckinSuccess'));
+        if (_stampProgress.unlockedLevels.length > prevUnlockedCount) {
+          setTimeout(() => showToast(t('toastStampLevelUnlocked')), 1600);
+        }
+        _renderStampMarkers();
+        _renderStampFog();
+        _renderStampLevelLegend();
+        _renderStampProgressSummary();
+        const checkedEl = document.getElementById('stamp-spot-detail-checked');
+        if (checkedEl) checkedEl.style.display = 'block';
+        _updateStampCheckinButton();
+      } catch (_) {
+        showToast(t('toastStampCheckinError'));
+        if (btn) btn.disabled = false;
       }
     }
 

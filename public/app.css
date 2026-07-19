@@ -1895,6 +1895,34 @@
       padding: 3px; margin: 20px 0; gap: 2px;
     }
 
+    /* ─── STAMP RALLY（スポット制覇スタンプラリー、設計書69） ─── */
+    #stamp-leaflet-map { background: var(--sand); }
+    /* フォグ・オブ・ウォー: 半透明の霧レイヤーをLeafletコンテナに重ね、
+       チェックイン済みスポット周辺のみJSでradial-gradientの穴を動的生成して素の地図を透過させる */
+    #stamp-fog-overlay {
+      background: rgba(44,36,32,0.55);
+      backdrop-filter: grayscale(0.6) brightness(0.85);
+      -webkit-backdrop-filter: grayscale(0.6) brightness(0.85);
+      transition: opacity 0.4s ease;
+    }
+    .stamp-level-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 50px; font-size: 12px; font-weight: 700;
+      background: var(--sand);
+    }
+    .stamp-level-chip--locked { opacity: 0.45; }
+    .stamp-level-chip-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .stamp-marker-icon {
+      width: 30px; height: 30px; border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      border: 2px solid white;
+    }
+    .stamp-marker-icon span { transform: rotate(45deg); font-size: 14px; }
+    .stamp-marker-icon--checked { background: var(--caramel); }
+    .stamp-marker-icon--unchecked { background: var(--warm-gray); }
+
     .course-card {
       border-radius: 14px; overflow: hidden;
       background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.08);

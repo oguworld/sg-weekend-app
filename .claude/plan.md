@@ -7043,3 +7043,222 @@ Set export compliance in Info.plist
 
 ## 承認状況
 2026-07-19 planner設計。**ユーザー承認済み**。**実装完了**（orchestrator: builder→checker→closer）。checkerで🔴🟡🟢いずれもなし。ただし本対応の性質上、実際の成否は次回`release`ブランチへのpush・TestFlightビルドのCI実行結果でしか確認できない（詳細は`.claude/session-log.md`・`.claude/next.md`参照）。
+
+# 設計書69 — スポット制覇スタンプラリー機能
+
+（2026-07-19 planner作成。ユーザーとの事前ディスカッションで確定済みの仕様に基づく。コード実装は含まない）
+
+## 1. 背景・目的
+
+既存のコース機能（AIによるコース自動生成、みんなのコース/マイコースの2タブ構成）は「今回どこに行くか」を都度提案するフロー型の機能であり、継続利用の動機付けにはなりにくい。これに対し、シンガポール国内の実在スポットをレベル制で段階的に「制覇」していくスタンプラリー形式のコンテンツを追加し、アプリを定期的に開く理由（リテンション）を作ることが目的。
+
+既存コース機能とはデータ・生成ロジックともに完全に独立させ、UI（ボトムナビの「コース」タブ）のみを統合の入口とする。
+
+## 2. 確定済み仕様（ユーザー合意事項）
+
+1. データは既存のevents.json/model-courses.json/community-courses.jsonと完全独立の新規ファイル。UIはボトムナビ「コース」タブを差し替え、マップ画面をメインにしつつ既存の「みんなのコース」「マイコース」はサブタブとして同一画面内に共存させる
+2. 地図はLeaflet + OpenStreetMap（無料・APIキー不要）
+3. マップは初期状態でフォグ・オブ・ウォー（霧）がかかっており、スタンプ取得ごとに周辺の霧が晴れる。新規イラスト素材は使わず、CSSフィルター/オーバーレイで表現する
+4. レベルは「定番→ローカル→ニッチ→スペシャル(隠し)」の4段階、段階ゲート方式で解禁。スペシャルは解禁までピン自体を非表示にする
+5. スポットデータは人力キュレーションの固定リスト。当初は各レベル数個・合計20個未満の小規模スタート。エリア区分は既存`CITY_COURSE_AREAS.sg`との整合を検討する
+6. チェックインはGPS近接検知＋ユーザーの手動確認ボタンで確定（自動チェックインではない）。`@capacitor/geolocation`を新規導入（このアプリに位置情報コードは現状ゼロ）。iOS側は`NSLocationWhenInUseUsageDescription`をCIで追加
+7. 進捗保存はログイン必須。既存のGoogle/Apple Sign-In基盤（`requireAppAuth`）を使いサーバー側に保存。バックアップ機能(設計書54/58)のようなパスフレーズ暗号化は不要（認証で保護されていれば十分という想定、設計判断はplannerに委ねられている）
+8. 位置情報プッシュ通知（「近くに未制覇スポットがあります」等）はv1スコープ外。コンテンツ拡充は月1ペースの人力運用とし自動化しない
+9. 既存AIコースのマップ表示統合は将来の野望であり、v1では着手しない
+10. 都市はv1はSG限定。ただし将来のBKK/SYD復活を見据えた拡張しやすい設計が望ましい（必須ではない）
+
+## 3. 既存コードの調査結果（設計の前提事実）
+
+- ボトムナビは`switchNav(screen)`（`public/app.js` 3443行目〜）が`home/course/plan/settings`の4画面を`display:none`⇄`flex`で切り替える単純な構造。`screen==='course'`分岐で`initCourseScreen()`を呼んでいる（3499〜3503行目）
+- コース画面（`public/index.html` 141〜162行目、`#screen-course`）は現在「みんなのコース／マイコース」の2ピルタブ構成（`.course-tab-bar`、`data-tab="everyone"|"mylist"`）。`switchCourseTab(tab)`（`public/app.js` 3550行目〜）が`everyone`時に`GET /api/courses?tab=popular`と`tab=community`を並列取得し合成表示、`mylist`時はlocalStorageから読む。**CLAUDE.mdの「人気/公開コース/マイコースの3タブ」という記述は現行実装（2タブ）と乖離しているため、本設計は実装の現状（2タブ）を正とする**
+- コース画面のFAB（`#course-fab`）は`position:fixed`、コース一覧は`#course-list`（`.screen-content`内、内部スクロール）。PTR（プルトゥリフレッシュ）が`_initPtr()`で導入済み（`watchSwipeIntent=false`、コース画面には横スワイプ機構がないため単独判定）
+- エリア定数`CITY_COURSE_AREAS.sg`（`public/app.js` 827〜836行目）は7区分: `Central/East/West/North/North-East/Island-wide/Sentosa`
+- 認証基盤: `server.js`の`requireAppAuth`ミドルウェア（380行目）が`Authorization: Bearer <JWT>`を検証し`req.authUserId`をセット、401時は即エラー。`verifyAppJwtOptional(req)`（367行目）は任意認証用（例外を投げずnull）。フロントの`authedFetch(url, options)`（`public/app.js` 2669行目）が`localStorage`のJWTトークンを自動付与するfetchラッパー
+- データ永続化パターン: `withFileLock(filePath, fn)`（`server.js` 278行目、ロックマップ+ポーリング方式）でファイル排他制御。ユーザー単位ファイルの例として`data/user-plans/{userId}.json`があり、`getUserPlansFilePath(userId)`が`usr_[a-f0-9]{24}`形式の厳格な正規表現チェックでパストラバーサル対策している（1912〜1916行目）。同パターンを踏襲できる
+- CORSミドルウェア（`server.js` 403〜404行目）は`Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS`・`Access-Control-Allow-Headers: Content-Type, Authorization`。新規エンドポイントが上記メソッドの範囲内であれば追加変更不要（設計書63の教訓により、新規メソッドを使う場合は必ず`curl`でOPTIONSプリフライトを確認すること）
+- z-index方針: bottom-navは`9999`固定。モーダル/オーバーレイは3000番台（例: `.plan-modal-overlay`3099、`.plan-modal`3100、`#date-picker-overlay`3400/`#date-picker-modal`3401）。スタンプラリーの新規モーダル（スポット詳細シート、チェックイン確認シート等）もこの方針に従い3000番台の空き番号（後述）を割り当てる
+- iOS Info.plist追加パターン: `.github/workflows/ios-deploy.yml`88〜92行目「Set camera usage description」ステップがPlistBuddyで`NSCameraUsageDescription`を追加する既存例。`NSLocationWhenInUseUsageDescription`もこれと全く同じ`Add`/`Set`フォールバックパターンで追加できる（ネストしない単純な文字列キーのため、Google Sign-InのURL Scheme設定〈plistlib使用〉のような複雑な処理は不要）
+- Capacitorプラグイン取得の防御的パターン: `registerPlugin('Keyboard')`優先→`window.Capacitor.Plugins.Keyboard`フォールバック（`public/app.js` 246行目）が既存の標準パターン。`@capacitor/geolocation`導入時も同じ`registerPlugin('Geolocation')`優先パターンを踏襲する
+- `ios-app/package.json`は`@capacitor/core@^6.0.0`系。新規プラグイン追加時は必ず`npm view <pkg> peerDependencies`でCapacitor 6対応を確認すること（CLAUDE.md既存の教訓、Google Authプラグインで実際にハマった経緯あり）
+- i18n: `STRINGS`オブジェクト（`public/app.js` 302行目〜）が`ja`/`en`のキー値辞書。新規UI文言は必ず両言語同時追加が必須ルール
+
+## 4. スコープ（v1でやること／やらないこと）
+
+### v1でやること
+- Leafletベースのマップ画面（コースタブ差し替え、サブタブとして既存コース機能と共存）
+- フォグ・オブ・ウォー演出（CSSベース）
+- 4段階レベルゲート（定番/ローカル/ニッチ/スペシャル）
+- 人力キュレーションの固定スポットデータ（SG限定、20個未満）
+- GPS近接検知＋手動確認ボタンによるチェックイン
+- ログイン必須の進捗サーバー保存（`requireAppAuth`使用）
+- 進捗に応じたレベル解禁ロジック
+
+### v1でやらないこと（次フェーズ以降）
+- 位置情報プッシュ通知（「近くに未制覇スポットがあります」等）
+- 既存AIコース（model-courses.json/community-courses.json）のマップ上ルート表示統合
+- BKK/SYD等、SG以外の都市対応（データ・API・UIとも今回は考慮設計に留め実装しない）
+- スポットデータの自動収集・自動追加パイプライン（既存events.jsonのfetch-events.js的な仕組み）
+- 進捗データのゼロ知識暗号化バックアップ（既存設計書54/58のパスフレーズ方式との統合）
+- スタンプ獲得時のSNSシェア機能、バッジ・実績システムの拡張
+- 複数ユーザー間のランキング・比較機能
+- オフライン地図タイルのキャッシュ・事前ダウンロード機能
+- Android対応
+
+## 5. データモデル
+
+### 5-1. スポットマスターデータ（新規、人力キュレーション）
+
+`data/sg/stamp-spots.json`（配列）。既存`data/`配下のJSONファイルと違い、これは**ユーザー生成データではなく人力編集の静的マスターデータ**のため、事故防止のためgit管理下に置く案と、他の`data/`配下ファイルと運用を揃えるため`.gitignore`のまま人力でVPS上を直接編集する案の両方があり得る（後述リスク欄で判断を保留）。
+
+各要素のフィールド案:
+```
+{
+  id: "gardens-supertree",          // 一意なスラッグ
+  name: "Gardens by the Bay – Supertree Grove",
+  nameJa: "ガーデンズ・バイ・ザ・ベイ スーパーツリー",
+  lat: 1.2816,
+  lng: 103.8636,
+  level: "standard",                 // standard | local | niche | special
+  area: "Central",                   // CITY_COURSE_AREAS.sg のvalと揃える
+  category: "sightseeing",           // 独自カテゴリ体系（既存event/gourmet/sale/eduとは別軸、要検討）
+  description: "...",                // 説明文（日本語のみか、ja/en両対応かは要検討）
+  imageUrl: "...",                   // 任意
+  checkinRadiusM: 150,               // このスポット固有のGPS近接判定半径（デフォルト値との差分がある場合のみ）
+  active: true                       // 掲載中/掲載停止フラグ（既存sponsored-cards.jsonのactiveパターンを踏襲）
+}
+```
+
+- `level`の4値は英字keyで固定し、表示ラベル（定番/ローカル/ニッチ/スペシャル）はi18n（STRINGS）側で持つ
+- `area`は既存`CITY_COURSE_AREAS.sg`の7値（Central/East/West/North/North-East/Island-wide/Sentosa）と一致させることで、将来コース機能とのUI要素（エリアチップ等）の再利用可能性を残す
+- `category`は既存イベントのカテゴリ体系（event/gourmet/sale/edu）とは目的が異なる（コース同様「訪問先の性質」を表す）ため、新規に定義するか、コース機能側で使っている暗黙のスポット分類慣習と合わせるかは要検討（未解決事項に記載）
+- BKK/SYD拡張を見据え、ファイル自体は`data/{city}/stamp-spots.json`という都市別配置にしておく（v1はSGのみ作成、BKK/SYDファイルは作らない）
+
+### 5-2. ユーザー進捗データ（新規、gitignore対象）
+
+`data/stamp-progress/{userId}.json`（既存`data/user-plans/{userId}.json`と同じディレクトリ分割パターン）。
+
+```
+{
+  userId: "usr_xxxxx",
+  city: "sg",
+  checkedInSpotIds: ["gardens-supertree", "..."],
+  checkinLog: [
+    { spotId: "gardens-supertree", checkedInAt: "2026-07-19T10:00:00Z" }
+  ],
+  updatedAt: "2026-07-19T10:00:00Z"
+}
+```
+
+- 平文でよい（要件7の通り、暗号化不要という前提）。既存の`getUserPlansFilePath()`と同様の`usr_[a-f0-9]{24}`形式バリデーションを持つ`getStampProgressFilePath(userId)`を新設する想定
+- `checkedInSpotIds`は解禁ロジック（段階ゲート）の判定にそのまま使える単純配列。`checkinLog`は将来の実績・履歴表示用に日時を残しておく（v1で画面に使わなくても記録だけはしておく設計）
+- 複数都市対応を見据え`city`フィールドを持たせるが、v1は常に`"sg"`固定でよい
+
+### 5-3. 段階ゲートの解禁条件（データではなくロジック定数）
+
+サーバーまたはクライアントに定数として持つ想定（例: `STAMP_LEVEL_GATES = { local: { requires: 'standard', count: 3 }, niche: { requires: 'local', count: 3 }, special: { requires: 'niche', count: 2 } }`のようなイメージ）。具体的な閾値件数は現状20個未満という小規模想定のため、実データ確定時にplannerまたは実装時にユーザーと調整する（未解決事項）。
+
+## 6. API設計
+
+既存の`requireAppAuth`パターン・`withFileLock`パターンを踏襲する。全てSGのみ運用中のため`city`パラメータは受け取るが実質`sg`固定でよい（将来拡張の余地として残す）。
+
+- `GET /api/stamp-spots?city=sg`（認証不要）: スポットマスターデータを返す。**ただし`level==='special'`のスポットは、そのユーザーの解禁条件を満たしているかどうかで返却内容を出し分ける必要がある**ため、実際には認証状態に応じた挙動分岐が必要になる可能性が高い（後述）
+  - 未ログイン時: スペシャルスポット自体を除外して返す（フェイルセーフとして「未解禁とみなす」）
+  - ログイン時（`verifyAppJwtOptional`で任意認証、401にはしない）: そのユーザーの進捗を見て解禁済みなら含める。これにより「スペシャルスポットはピン自体を非表示にする」という要件6を、フロントエンドでのフィルタリングだけでなくAPIレスポンス自体でも担保できる（フロントのJS改変・DevTools閲覧でのネタバレ防止）
+- `GET /api/stamp-progress/me`（`requireAppAuth`必須）: そのユーザーの`checkedInSpotIds`/`checkinLog`と、現在解禁済みのレベル一覧を返す
+- `POST /api/stamp-progress/checkin`（`requireAppAuth`必須）: `{ spotId, lat, lng }`を受け取り、(1) `spotId`が実在するスポットか (2) 既にチェックイン済みでないか (3) サーバー側でも緯度経度から簡易距離判定（クライアントの手動確認ボタンに加えて、なりすまし対策として最低限のサーバー側距離チェックを入れるかは要検討）を確認したうえで、`withFileLock`で進捗ファイルに追記する。冪等性（既にチェックイン済みのスポットへの重複リクエストはエラーにせず200を返す）を既存の削除系API（`DELETE /api/auth/me`等）のパターンに倣って持たせる
+
+## 7. フロントエンド設計
+
+### 7-1. コース画面へのマップ統合方針
+
+`#screen-course`内の`.course-tab-bar`に新規タブ（例: `data-tab="map"`）を追加し、既存`everyone`/`mylist`と並列の3タブ構成にする。**`switchCourseTab(tab)`の分岐を拡張し、`tab==='map'`のときのみLeafletマップ・スタンプラリーUIをレンダリングする形にする**（既存の2タブのロジックには手を加えない、副作用ゼロの追加分岐）。
+
+- 初回`tab==='map'`表示時にLeafletの`L.map()`初期化を行う（Leafletは一度初期化したコンテナを`display:none`→`display:block`しても内部状態が壊れることがあるため、`invalidateSize()`呼び出しがタブ切替のたびに必要になる可能性が高い。要検討）
+- マップ表示中はコース画面のFAB（`#course-fab`、コース作成ボタン）を隠すか、マップ用の別FAB（現在地ボタン等）に差し替えるかは要検討
+- 既存のPTR（プルトゥリフレッシュ）機構は地図タブでは意味をなさないため、`tab==='map'`時はPTRの発火を無効化する対応が必要（`_initPtr`呼び出し側の条件分岐追加）
+
+### 7-2. Leaflet導入方法
+
+- **CDN読み込み vs npm経由バンドル**: Capacitorはローカルバンドル方式（`webDir: '../public'`）のためnpm経由でバンドルする場合は`public/`配下にLeafletのJS/CSSファイル自体を静的ファイルとして配置する必要がある（Web版・iOS版で全く同じファイルを参照させ差異をなくすため、npm installしたファイルを`public/vendor/leaflet/`のような形でコピーして同梱する方式が望ましいと考えられる）
+- CDN読み込み（`<script src="https://unpkg.com/leaflet/...">`）はWeb版では機能するが、**iOS版はオフライン起動時（機内モード等）にCDN自体に到達できず地図ライブラリのロードに失敗する**リスクがある。Capacitorはローカルバンドルなのでこの差が実際に生じる。ローカルバンドル方式を推奨（未解決事項として明記、実装時に確定）
+- 地図タイル自体（OpenStreetMapのタイル画像）はいずれの方式でもオンライン取得が前提（オフラインタイルキャッシュはv1スコープ外、要件9とは別に確定済み）。オフライン時はタイルが表示されない（グレーの空白グリッド）状態を許容する
+
+### 7-3. フォグ・オブ・ウォー演出
+
+- 新規イラスト素材なしでの実現方法として、Leafletの地図コンテナに重ねる半透明の霧レイヤー（`div`オーバーレイ、`filter: grayscale(1) brightness(0.4)`等）を敷き、チェックイン済みスポット周辺のみ`mask`/`clip-path`または円形グラデーション（`radial-gradient`）で穴を開けて素の地図を透過させる方式が候補になる
+- 具体的なCSS実装方法（`mix-blend-mode`、SVGマスク、Canvas併用等）は複数の選択肢があり、実機（iOS WKWebView）でのパフォーマンス・見た目の検証が必要（未解決事項）
+
+### 7-4. GPS/位置情報（`@capacitor/geolocation`）
+
+- 新規プラグイン`@capacitor/geolocation`をゼロから導入。既存の`registerPlugin('Keyboard')`パターンに倣い`registerPlugin('Geolocation')`優先→`Plugins.Geolocation`フォールバックの防御的実装にする
+- Web版はブラウザの`navigator.geolocation` APIで代替（Capacitorプラグインがない環境向けの分岐が別途必要。既存コードには位置情報関連の分岐が一切存在しないためゼロから設計する）
+- チェックインフロー: スポット詳細シートを開く→現在地取得→距離計算（Haversine等）→一定半径内なら「チェックインする」ボタンを活性化→ユーザーがボタンを押して`POST /api/stamp-progress/checkin`を呼ぶ、という要件6の「GPS検知＋手動確定」の2段階フローになる
+- 位置情報権限のリクエストタイミング（マップタブを開いた瞬間か、チェックインボタンを押した瞬間か）は要検討。既存アプリは位置情報を一切使っていないため、初回リクエストの文言・タイミングはユーザー体験上重要な設計判断になる（未解決事項）
+
+### 7-5. 新規モーダル・シートのz-index割り当て（案）
+
+既存方針（3000番台、bottom-nav=9999未満）に従い、空いている番号帯を新規に割り当てる。例:
+- `#stamp-spot-detail-overlay` 3600 / `#stamp-spot-detail-sheet` 3601
+- チェックイン確認シートは上記に内包する形（別シートにしない）か、独立させるかは要検討
+
+### 7-6. i18n
+
+新規文言（レベル名4種、チェックインボタン、解禁条件の説明文、進捗表示等）はすべて`STRINGS.ja`/`STRINGS.en`に同時追加する（必須ルール）。
+
+### 7-7. onclick/touchendパターン
+
+新規ボタン（チェックインボタン、レベルタブ切替、マップ内ピンタップ等）は、CLAUDE.mdの「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節に従う。特にLeafletのマーカークリックイベント（`marker.on('click', ...)`）はonclick属性方式ではなくLeaflet自体のイベントシステムを使うため、既存のゴーストクリック対策パターンがそのまま当てはまるかは要実機検証（Leafletのタッチイベント処理は独自実装のため、既存の`_touchCapableDetected`検出とは別のレイヤーで動作する可能性がある）。
+
+## 8. iOS対応（Capacitor）
+
+- `ios-app/package.json`に`@capacitor/geolocation@^6.0.0`を追加。追加前に`npm view @capacitor/geolocation peerDependencies`でCapacitor 6対応を確認する（CLAUDE.mdの既存教訓を踏襲）
+- `.github/workflows/ios-deploy.yml`に新規ステップ「Set location usage description in Info.plist」を、既存の「Set camera usage description in Info.plist」ステップ（88〜92行目）と全く同じPlistBuddy `Add`/`Set`フォールバックパターンで追加する:
+  ```
+  NSLocationWhenInUseUsageDescription: 「近くのスタンプラリースポットを検知するため位置情報を使用します」（文言例、要確定）
+  ```
+- 位置情報は「使用中のみ」（`WhenInUse`）で十分と想定（バックグラウンド位置情報・常時許可は不要、要件6の「手動確認ボタン」フローと整合）
+- Leafletのタイル読み込み・マーカー描画のiOS WKWebView実機パフォーマンスは未検証（20個未満の少数ピンであれば問題は起きにくいと推測されるが確証はない）
+
+## 9. 既存コース機能との統合における技術的懸念（要検討事項）
+
+- コース画面の`switchCourseTab()`は現在`everyone`/`mylist`の2値のみを想定した実装（`COURSE_TABS`定数等）になっている可能性が高く、3タブ目追加時に既存のスワイプ切り替え・PTR初期化ロジックへの影響を丁寧に確認する必要がある（設計書時点でコードを変更しないため、実装フェーズでの詳細調査が必要）
+- コース画面のFAB（コース作成ボタン）とマップタブの共存挙動（タブ切替時にFABを隠す/出し替えるロジックの追加箇所）は実装時に確定する
+
+## 10. 既知の未解決事項・次フェーズ課題
+
+1. **スポットマスターデータ（`stamp-spots.json`）をgit管理下に置くか`.gitignore`のままVPS直接編集にするか**: 他の`data/`配下ファイルは全てgitignore対象だが、これは人力キュレーションの静的コンテンツであり、他ファイルと性質が異なる。plan.mdルール同様「例外的にgit管理下に置く」判断もあり得る（要ユーザー確認）
+2. **段階ゲートの具体的な解禁閾値**（各レベル何個制覇したら次が解禁されるか）は、実際のスポット数が確定してから設計する
+3. **`category`フィールドの分類体系**: 既存イベントのevent/gourmet/sale/eduとは別軸が必要になりそうだが、具体的な列挙値は未確定
+4. **Leaflet導入方式（npm経由ローカルバンドル vs CDN）の最終決定**: オフライン起動時の挙動差を踏まえローカルバンドル推奨だが、バンドルサイズ増加とのトレードオフを含め要検討
+5. **フォグ・オブ・ウォーの具体的CSS実装方式**（mask/clip-path/canvas等）と実機パフォーマンスは未検証
+6. **スペシャル(隠し)スポットのAPIレベルでの非表示制御**: フロントエンドのフィルタだけでなくAPIレスポンス自体で出し分ける設計を提案したが、認証状態による分岐ロジック（未ログイン時の扱い含む）の詳細は未確定
+7. **サーバー側のなりすまし対策（GPS偽装で任意の場所からチェックインできてしまう問題）をv1でどこまで作り込むか**: クライアントの緯度経度をサーバーが鵜呑みにする設計だと不正チェックインが容易になる。最低限の距離検証をサーバー側に持たせるかどうかは未決定（過剰な検証はユーザー体験を損なうリスクとのバランス）
+8. **位置情報権限のリクエストタイミング・文言**: 初回マップタブオープン時かチェックイン試行時か、未確定
+9. **コース画面の`switchCourseTab`拡張時、既存の2タブロジック（PTR初期化・スワイプ切替）への影響範囲**: 実装フェーズでのコード詳細調査が必要
+10. **BKK/SYD拡張時の`stamp-spots.json`ファイル分割・進捗データの都市別管理方法**: 現状のフィールド設計（`city`フィールド持ち）で十分か、実際に復活する際に再検証が必要
+11. **「マイコース」的な進捗の可視化UI**（達成率、獲得スタンプ一覧画面等）の具体的なデザインは未設計。マップ上のピン表示だけで十分か、別途一覧画面が必要かは要検討
+
+## 11. リスク
+
+1. **Leaflet + フォグ・オブ・ウォー演出のiOS WKWebView実機パフォーマンス未検証**: Canvas/SVGマスクの多用は低スペック端末で描画負荷が高くなる可能性がある
+2. **GPS偽装によるチェックイン不正**: サーバー側検証を入れない場合、リテンション機能としての正当性（実際に現地に行った証明）が形骸化するリスク
+3. **位置情報権限の新規要求によるユーザー体験への影響**: 既存アプリは位置情報を一切要求してこなかったため、新規権限ダイアログの表示がユーザーの不安・離脱を招く可能性がある（要件・文言の丁寧な設計が必要）
+4. **スポットデータの人力運用が継続されない場合のコンテンツ枯渇リスク**: 月1ペースでの新規スポット追加が運用上継続されなければ、早期に「制覇し終わって飽きる」状態になりうる（v1では自動化しない前提のため、運用体制の継続性はユーザー側の責任範囲）
+5. **段階ゲート閾値の設定ミスによる早期コンプリート/詰まりリスク**: スポット数が20個未満と少数のため、閾値設計を誤ると「定番レベルを1つ制覇しただけでローカルが解禁される」「逆になかなか解禁されない」といった体験の悪化が起きやすい
+6. **既存コース画面のタブ機構拡張に伴う既存機能への回帰リスク**: `switchCourseTab`・PTR・スワイプロジックへの変更が、既存の「みんなのコース」「マイコース」タブの動作に予期せぬ影響を及ぼす可能性がある
+
+## 12. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 新規APIエンドポイント（`GET /api/stamp-spots`、`GET/POST /api/stamp-progress/*`）は既存エンドポイントに一切変更を加えない完全新規追加のため、旧バージョンのApp Store版アプリの動作には影響しない。旧バージョンはこの機能自体を知らないため単に呼び出さないだけで、既存機能（イベント一覧・コース・予定表等）への影響はゼロ
+2. **影響範囲**: 本機能はWeb版・App Store版の両方に同時に反映される変更である（`public/`配下の共通コードのため）。ただし新機能の解禁にはApp Storeの審査・TestFlightビルドが必要（iOS版は次回リリースまで機能が使えない状態が続く）。Web版は`pm2 restart`のみで即座に反映される
+3. **リリースタイミング**: 新規データファイル（`stamp-spots.json`）の投入とAPIエンドポイントの追加自体は既存機能に影響しないため、Web版への先行デプロイ自体はいつでも可能。ただし**フロントエンド（マップUI・コースタブ差し替え）はWeb版・iOS版で同一コードが同時に有効になる**ため、UIが未完成の状態でWeb版にデプロイすると、Web版ユーザー（テスト環境）に対して中途半端な機能が露出するリスクがある。段階的リリースをする場合、フィーチャーフラグ（例: 特定条件でのみコースタブに「マップ」タブを出す）を検討する余地がある（未実装、必要なら別途設計要）
+4. **位置情報権限の新規要求はApp Store審査上の追加対応が必要**: `NSLocationWhenInUseUsageDescription`の追加はApp Store Connect側の「Appプライバシー」申告フォーム更新（位置情報の収集・利用目的の申告）も必要になる可能性が高い。これはコード変更では対応不可、ユーザーが審査提出前に手動対応する必要がある（設計書65のアカウント削除機能時と同様の注意点）
+
+## 承認状況
+2026-07-19 planner設計。**ユーザー承認済み**。ただし未解決事項のうち以下3点は実装をブロックせず、次の暫定方針でv1を進め、残タスクとして持ち越す:
+
+1. **GPS偽装対策（未解決事項7）**: v1ではサーバー側の距離検証は行わず、クライアント申告（`lat`/`lng`）をそのまま信用する。既知の不正リスクとして残タスク化し、必要になれば後日サーバー側検証を追加する
+2. **スポットデータのgit管理（未解決事項1）**: 他の`data/`配下ファイルと運用を揃え、`.gitignore`のままVPS上で直接編集する方式で進める（git管理下への例外化は見送り、必要になれば後日再検討）
+3. **位置情報権限のApp Store Connect申告（データ共有影響4）**: コード実装（`NSLocationWhenInUseUsageDescription`のInfo.plist追加）は今回のスコープに含めるが、App Store Connect「Appプライバシー」申告フォームの更新はユーザー側の手動作業として次回TestFlight/審査提出前に別途対応する残タスクとする
+
+上記3点は`.claude/next.md`に残タスクとして記録すること（closer実施時）。それ以外の未解決事項（段階ゲート閾値、category分類体系、Leaflet導入方式、フォグ演出のCSS実装方式、権限リクエストタイミング等）はbuilderの実装判断に委ねる。
