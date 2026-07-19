@@ -835,6 +835,7 @@ document.addEventListener('touchstart', () => { _touchCapableDetected = true; },
 - `server.js`内、47〜200行目付近は無効化中のStripe決済コードが`/* ... */`で丸ごとコメントアウトされている。この範囲に新しいルートを追加すると**サイレントに一切発火しない**（エラーも出ない）ため要注意
 - ルート追加時は必ず追加後に`grep -n "^/\*\|^\*/"`等でコメントブロックの範囲を確認し、対象行が有効なコード領域にあるか確認する
 - 新規ルート追加後は`curl -H "Host: xxx"`等で実際にレスポンスを検証してから完了報告すること（行番号だけを頼りに配置場所を判断しない）
+- **新しいHTTPメソッド（PUT/PATCH等）を使うエンドポイントを追加する際は、`/api`向けCORSミドルウェア（392行目付近、`Access-Control-Allow-Methods`）にそのメソッドが含まれているか必ず確認する（2026-07-19設計書63の教訓）**: 設計書54で`PUT /api/user-plans/me`を追加した際にこの確認が漏れ、`Access-Control-Allow-Methods`が`POST, GET, DELETE, OPTIONS`のままだったため、Capacitor環境（`capacitor://localhost`オリジン、iOS App Store版）でOPTIONSプリフライトが拒否され、iOS実機でのみ`fetch()`が`TypeError: Load failed`で即座に失敗する不具合が約2日間気づかれずに残った（Web版はSame-Originのためこのミドルウェアの影響を受けず問題が露見しなかった）。新規メソッド追加時はコード追加だけでなくCORS許可リストの見直しをセットで行い、`curl -i -X OPTIONS -H "Origin: capacitor://localhost" -H "Access-Control-Request-Method: <メソッド>" <URL>`で`Access-Control-Allow-Methods`に含まれることを確認してから完了報告すること
 
 ## 実機デバッグ用ログ収集機能（2026-07-10追加）
 ユーザーはMacを保有しておらずSafari Web Inspectorでのリアルタイムデバッグができないため、**サーバーにログを送信し、ファイルとして記録する方式**を標準デバッグ手段として恒久的に用意している。

@@ -5947,3 +5947,134 @@ try {
 
 ## 承認状況
 2026-07-18 planner設計。ユーザー承認済み。2026-07-18 orchestratorにより実装完了（builder→checker完了、🔴Criticalなし）。ローカル`main`へコミット済み。releaseブランチへのpush・TestFlightビルドは未実施（ユーザー明示指示待ち）。
+
+# 設計書63 「データバックアップ」PUT失敗の根本原因確定と修正（CORS `Access-Control-Allow-Methods`にPUT未許可）
+
+## 背景
+
+設計書62でTestFlight実機に仕込んだ診断計装により、「データバックアップ」setupモード確定時の失敗原因が判明した。`logs/debug-nav.log`に以下が記録された。
+
+```json
+{"receivedAt":"2026-07-19T00:55:55.662Z","event":"backup_start","mode":"change","hasAuthToken":true,"isCapacitor":true}
+{"receivedAt":"2026-07-19T00:55:55.687Z","event":"backup_error","mode":"change","errorName":"TypeError","errorMessage":"Load failed","hasAuthToken":true,"isCapacitor":true}
+```
+
+`backup_start`から`backup_error`まで25ms。設計書62で仕込んだ`backup_put_response`（`authedFetch()`のPUTが応答を受け取った直後に発火するログ）が一切記録されておらず、`fetch()`自体が応答を受ける前に例外を投げたことを意味する。`errorName:"TypeError"`・`errorMessage:"Load failed"`はWebKit（Safari/WKWebView）の`fetch()`がネットワークレベルで即座に失敗した際の典型的な文言（CORSプリフライト拒否等）。
+
+## 原因（確定）
+
+`server.js` 392〜408行目付近、`/api`向けCORSミドルウェア:
+
+```js
+const ALLOWED_ORIGINS = [
+  'https://about.dosuru.app',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'http://localhost',
+];
+app.use('/api', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+```
+
+`Access-Control-Allow-Methods`に**`PUT`が含まれていない**。
+
+Capacitor環境（iOS App Store版）のWKWebViewは`capacitor://localhost`という独立したオリジンからページを読み込み、`https://dosuru.app`（`API_BASE`）へのfetchはクロスオリジンリクエストとしてCORS制約を受ける（`ALLOWED_ORIGINS`に`capacitor://localhost`が含まれ、この仕組み自体は既存で機能している）。ブラウザ/WKWebViewは`PUT`のような単純リクエストでないメソッドに対し事前にOPTIONSプリフライトを送るが、サーバーが返す`Access-Control-Allow-Methods`に`PUT`が無いためプリフライトで拒否され、実際の`PUT`リクエストがブロックされる。これが`fetch()`の`TypeError: Load failed`として現れていた。
+
+**傍証**: `GET /api/user-plans/me`（復元フロー、`_doBackupRestore()`が使用）はこれまでのテストで正常動作していた（誤ったパスフレーズで「パスフレーズが正しくありません」という正当なエラーを出せていた）。`GET`は`Access-Control-Allow-Methods`に含まれているためCORSの影響を受けず、`PUT`だけが許可リストから漏れていたことと完全に整合する。
+
+**経緯**: このCORS設定はGoogle/Apple Sign-In認証基盤導入時（設計書20/35/36/44）に`Authorization`ヘッダー許可と`DELETE`メソッド追加のために変更されたもので、当時`PUT`を使うエンドポイントは存在しなかった。その後設計書54で`PUT /api/user-plans/me`が新規追加された際、このCORS設定の見直しが漏れていた（後方互換の見落とし）。
+
+## 影響範囲の確認（`grep`実施済み）
+
+`server.js`内で`app.put(...)`は2箇所のみ存在する。
+
+| エンドポイント | 用途 | 追加された設計書 |
+|---|---|---|
+| `PUT /api/calendar/:groupId` | 共有カレンダーの予定同期（`customPlans`/`eventPlans`または`encryptedData`の更新） | 既存（旧来から存在） |
+| `PUT /api/user-plans/me` | 個人予定表バックアップ（暗号化ペイロード保存） | 設計書54（2026-07-17） |
+
+`public/app.js`側の呼び出し元を確認したところ、両エンドポイントとも`API_BASE + '/api/...'`形式で呼ばれており（`_syncBackupToServer()`＝6296行付近、共有カレンダー同期処理＝6704行付近、他複数箇所で同一パターンの`PUT`呼び出しあり）、iOS版ではいずれもクロスオリジンリクエストとなり同じCORS制約を受ける。
+
+**重要な追加所見**: 共有カレンダーの`PUT /api/calendar/:groupId`呼び出し箇所は、いずれも`catch(e) { /* 静かに諦める */ }`という設計（タイムアウト・ネットワーク断を握りつぶしてUIをブロックしない意図的な仕様）になっている。そのため、**iOS版では共有カレンダーの予定同期が同じCORSエラーで水面下で失敗し続けていた可能性が高いが、エラーがUIに一切表示されないため誰も気づいていなかった**と推測される（ローカル保存は成功するため、単一端末での利用では問題が露見しにくい）。これは今回の設計書63の直接のスコープ（バックアップPUTのCORS修正）に付随する重要な傍証であり、`PUT`をCORS許可リストに追加する今回の修正で共有カレンダー同期も同時に副次的に修復される見込みが高い。ただし、この共有カレンダー側の不具合自体は今回ユーザーから提示された確定原因（バックアップPUT）とは別の未確認事象であるため、本設計書では「修正によって一緒に直る可能性が高い副次効果」として記録するに留め、共有カレンダー同期の独立した実機検証は今回のスコープ外・次回フォローとする。
+
+## 修正内容
+
+`server.js` 403行目、1行のみ変更する。
+
+```diff
+-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, DELETE, OPTIONS');
++    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS');
+```
+
+## Web版への影響（確認事項）
+
+Web版（`dosuru.app`からの利用）はSame-Origin（`API_BASE`が空文字列のため`fetch('/api/...')`は常に同一オリジン）であり、そもそもこのCORSミドルウェア自体の判定対象（`req.headers.origin`が存在しないか、`ALLOWED_ORIGINS`と無関係）にならない。したがって本修正はWeb版の挙動に一切影響しない。
+
+## 変更ファイル一覧
+
+- `server.js`（1行変更、403行目付近の`Access-Control-Allow-Methods`のみ）
+
+## データモデルの変更
+
+なし。
+
+## APIの変更
+
+エンドポイントの入出力仕様・レスポンス構造は無変更。CORSレスポンスヘッダーの許可メソッド一覧に`PUT`を追加するのみ（サーバーが「このオリジンからのPUTリクエストを許可する」とブラウザに伝える設定を追加するだけであり、既存の`app.put(...)`ルート自体は最初から存在し実装済み。今回追加するのはCORS許可のみ）。
+
+## フロントエンドの変更
+
+なし。`public/app.js`のfetch呼び出しコード自体は変更不要（原因はサーバー側のCORSヘッダー欠落のみ）。
+
+## データ共有の影響（Web版/App Store版）確認
+
+- **後方互換性**: 影響なし。旧バージョンのApp Storeアプリ（バックアップ機能・共有カレンダー機能を使わない、または使っていても今回の修正でPUTが通るようになるだけ）が壊れることはない。CORS許可メソッドの追加は既存の許可を狭める変更ではなく広げる変更であり、後方互換性を損なわない。
+- **影響範囲**: この変更はサーバー側の`server.js`のみの修正であり、Web版・App Store版の両方に同時に反映される（データ層・APIエンドポイントは共有のため）。ただし実質的な挙動変化が生じるのはCapacitor環境（iOS App Store版・TestFlight版）のみで、Web版はSame-Originのため無影響（上記「Web版への影響」参照）。
+- **リリースタイミング**: `server.js`の変更は`pm2 restart`で即時反映され、アプリ側（`public/app.js`・iOSネイティブコード）の変更を伴わないため、TestFlightビルド・App Storeリリースとは独立して適用可能。App Store審査済みの現行バージョンのアプリからも、サーバー再起動後は即座に`PUT`が通るようになる（クライアント側の再ビルド・再配布は不要）。
+
+## 診断計装（設計書62）の扱いについての判断
+
+CLAUDE.mdの既存方針では「個々の調査のために追加した計装ポイントは使い捨てであり、原因特定後に削除してよい」とされている。しかし今回は**削除せず、次回実機確認で修正の効果を確認できるまで残すことを推奨する**。理由:
+
+1. 今回の修正（CORS 1行変更）は原因の推定に基づく妥当性の高い修正だが、**実機での動作確認はまだ行われていない**。もし何らかの理由で`PUT`がまだ失敗する場合（例: 他の見落としがある場合）、計装が残っていればすぐに追加調査ができる。計装を先に消してしまうと、修正が効かなかった場合に再度同じ計装を仕込み直すところからやり直しになり非効率。
+2. 計装のログ内容（`event`/`mode`/`hasAuthToken`/`status`/`ok`/`errorName`/`errorMessage`のみ）は設計書62のcheckerで秘密情報を含まないことが確認済みであり、残置してもセキュリティ・プライバシー上のリスクはない。
+3. 段階的アプローチとして、**今回のPRはCORS修正のみに限定し、計装削除は次回（実機でTestFlightビルドを行い、バックアップsetup/change/restoreが正常動作することを確認できてから）別タスクとして実施する**ことを推奨する。
+
+## 受け入れ基準
+
+### 正常系
+- `server.js`の`Access-Control-Allow-Methods`ヘッダーに`PUT`が含まれること（`curl -i -X OPTIONS -H "Origin: capacitor://localhost" -H "Access-Control-Request-Method: PUT" https://dosuru.app/api/user-plans/me`で`Access-Control-Allow-Methods`に`PUT`が返ること）
+- 次回TestFlightビルド後、iOS実機で設定画面「データバックアップ」→パスフレーズ設定（setup）→確定操作で`toastBackupError`が出ずバックアップが有効化されること
+- `logs/debug-nav.log`に`backup_put_response`（`status`が2xx）が記録され、`backup_error`が記録されないこと
+
+### 失敗系
+- 該当なし（今回は既存のCORS拒否によるエラーを解消する修正であり、新たなエラーパスを追加しない）
+
+### エッジケース
+- Web版・iOS版どちらでも既存の`GET`/`POST`/`DELETE`系エンドポイントの動作に変化がないこと（`Access-Control-Allow-Methods`への追加のみで既存許可メソッドは変更しないため、原理的に非破壊）
+- `PUT /api/calendar/:groupId`（共有カレンダー同期）も同じCORS許可の恩恵を受け、iOS版での同期エラーが解消される可能性が高いこと（副次効果として実機確認を推奨するが、今回のスコープの主目的ではない）
+
+## スコープ外（今回作らないもの）
+
+- 設計書62の診断計装（`backup_start`/`backup_put_response`/`backup_get_response`/`backup_error`、計12箇所）の削除。次回実機確認後に別タスクで実施する。
+- 共有カレンダー（`PUT /api/calendar/:groupId`）側の独立した実機検証・不具合修正。今回のCORS修正で副次的に直る可能性が高いという所見の記録に留め、能動的な検証・追加修正は行わない。
+- CORSミドルウェア自体の設計見直し（例: メソッド許可リストを動的化する、エンドポイント別に許可を分離する等）。今回は既存方式のまま最小差分で`PUT`を追加するのみ。
+- `server.js`の47〜200行目付近にある無効化中のStripeコメントブロックとの位置関係の見直し（今回の変更箇所はこのコメントブロックの範囲外＝392行目以降の有効なコード領域であることを確認済み）。
+
+## リスク・未解決の質問
+
+- **リスク（低）**: `Access-Control-Allow-Methods`にメソッドを追加する変更は許可を広げる方向の変更であり、セキュリティ上の後退はない（`ALLOWED_ORIGINS`ホワイトリスト自体は変更しないため、許可オリジン以外からのアクセスは引き続き拒否される）。
+- **未解決の質問1**: 今回の修正が実機で問題を解消するかどうかは、CLAUDE.mdの既存プロジェクトルール上、次回TestFlightビルド＋実機確認が必要（このタスクはplannerとして設計のみ行い、builder/orchestratorフローでの実装・実機確認は別途ユーザー承認後に進む）。
+- **未解決の質問2**: 共有カレンダー同期（`PUT /api/calendar/:groupId`）が実際に同じCORSエラーで失敗していたかどうかは、今回の実機ログ（バックアップ機能のみ計装済み）からは直接確認できていない。次回、共有カレンダー機能側にも同様の計装を仕込むか、今回の修正後に実機で素朴に動作確認するかの判断が必要（優先度は低いが記録しておく）。
+- **未解決の質問3**: `server.js`の変更は`pm2 restart`が必要（コード変更のため、CLAUDE.mdの「データファイルのみの変更ならrestart不要」ルールには該当しない）。restart後、Web版・iOS版旧バージョン双方の疎通を`curl`等で確認してからクローズすることを推奨する。
+
+## 承認状況
+2026-07-19 planner設計。ユーザー承認済み。同日実装完了（`server.js` 403行目、`Access-Control-Allow-Methods`に`PUT`追加、pm2 restart反映済み）。`curl`によるOPTIONSプリフライト確認で`PUT`を含む許可メソッドが返ることを確認済み。次回TestFlightビルド後の実機確認（バックアップsetup/change/restore・共有カレンダー同期）は引き続き未実施のためフォロー事項として残る。
