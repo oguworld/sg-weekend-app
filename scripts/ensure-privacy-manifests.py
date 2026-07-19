@@ -44,7 +44,7 @@ injected_body = (
     "      if is_target_match\n"
     "        manifest_name = privacy_manifest_targets.find { |n| target.name == n || target.name.start_with?(n) }\n"
     "        phase = target.new_shell_script_build_phase(\"Add Privacy Manifest\")\n"
-    "        phase.shell_script = \"cp \\\"${SRCROOT}/../PrivacyManifests/#{manifest_name}-PrivacyInfo.xcprivacy\\\" \\\"${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/PrivacyInfo.xcprivacy\\\"\"\n"
+    "        phase.shell_script = \"cp \\\"${SRCROOT}/../../../PrivacyManifests/#{manifest_name}-PrivacyInfo.xcprivacy\\\" \\\"${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/PrivacyInfo.xcprivacy\\\"\"\n"
     "        puts \"Injected privacy manifest build phase for target: #{target.name} (manifest: #{manifest_name})\"\n"
     "      end\n"
     "    end\n"
