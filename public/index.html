@@ -417,14 +417,12 @@
 
     </div>
 
-    <!-- 6. アカウント削除（設計書66で「アカウント」セクションから分離・最下部へ移動） -->
+    <!-- 6. アカウント削除（設計書66で「アカウント」セクションから分離・最下部へ移動、設計書67で見出しなし・中央寄せテキストのみに変更） -->
     <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secDangerZone" style="color:var(--terracotta);">アカウント削除</div>
-
       <div id="delete-account-section" style="padding:4px 18px 14px;display:none;">
         <button id="delete-account-btn" class="settings-item--danger"
           onclick="if(!_touchCapableDetected) handleDeleteAccountClick()"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid transparent;background:transparent;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;transition:all 0.18s;">
+          style="display:flex;justify-content:center;align-items:center;width:100%;padding:12px 18px;border:none;background:transparent;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;transition:all 0.18s;">
           <span data-i18n="deleteAccountBtn">アカウントを削除</span>
         </button>
       </div>
@@ -1015,7 +1013,7 @@
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
-  <script src="/app.js?v=20260719c"></script>
+  <script src="/app.js?v=20260719d"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

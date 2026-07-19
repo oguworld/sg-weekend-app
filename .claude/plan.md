@@ -6743,3 +6743,103 @@ function _clearAllAccountLocalState() {
 - `server.js`/`public/app.css`は無変更（設計書通り）
 - `node --check public/app.js`構文OK、curlで実配信内容を確認済み。Web版は`pm2 restart`不要（`server.js`無変更のため未実施）
 - **iOS版は次回TestFlightビルドまで未反映**（`.claude/next.md`にフォロー事項として記載）
+
+# 設計書67: 設定画面「アカウント削除」を見出しなし・中央寄せテキストのみの表示に変更（2026-07-19）
+
+### 背景
+設計書66でアカウント削除機能を独立セクション化した際、以下の2段構成で実装した。
+1. セクション見出し「アカウント削除」（`data-i18n="secDangerZone"`、赤系文字）
+2. ボタン風の見た目（pill形状・境界線・パディング）を持つ「アカウントを削除」テキスト
+
+ユーザーが実機スクリーンショットを確認した結果、「iOSアプリでよくある、アカウント削除は見出しなし・文字だけが中央寄せで表示されるパターンにしてほしい」との要望があった。ボタンの装飾（pill形状・border）とセクション見出しを取り除き、赤系テキスト1行のみを中央寄せで表示するシンプルな形に変更する。
+
+### 現状のコード（確認済み）
+`public/index.html` 419-431行目:
+```html
+<!-- 6. アカウント削除（設計書66で「アカウント」セクションから分離・最下部へ移動） -->
+<div class="settings-section">
+  <div class="settings-section-title" data-i18n="secDangerZone" style="color:var(--terracotta);">アカウント削除</div>
+
+  <div id="delete-account-section" style="padding:4px 18px 14px;display:none;">
+    <button id="delete-account-btn" class="settings-item--danger"
+      onclick="if(!_touchCapableDetected) handleDeleteAccountClick()"
+      style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid transparent;background:transparent;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;transition:all 0.18s;">
+      <span data-i18n="deleteAccountBtn">アカウントを削除</span>
+    </button>
+  </div>
+</div>
+```
+
+`public/app.css` 1657-1663行目（色を担うクラス。設計書65で追加、無変更で流用可能）:
+```css
+/* アカウント削除等の破壊的操作用ボタン（設計書65） */
+.settings-item--danger {
+  color: var(--terracotta);
+}
+.settings-item--danger:active {
+  opacity: 0.7;
+}
+```
+
+`secDangerZone`は`public/app.js`の`STRINGS.ja`（341行目）・`STRINGS.en`（581行目）にのみ定義があり、`index.html`の`data-i18n="secDangerZone"`（見出し削除対象の当該箇所のみ）以外に参照がないことを`grep`で確認済み。
+
+### 変更内容
+
+1. **セクション見出しを削除**: `<div class="settings-section-title" data-i18n="secDangerZone" ...>アカウント削除</div>` の行ごと削除する。
+2. **`#delete-account-btn`のインラインstyleを、装飾なし・中央寄せのテキスト行に変更する**:
+   - `display:inline-flex` → `display:flex; justify-content:center; width:100%;` に変更し、ボタンを横幅いっぱいにしてテキストを中央寄せにする
+   - `border-radius:50px; border:1.5px solid transparent; background:transparent` のうち、`border-radius`（pillの名残）を削除。`border:none; background:transparent;` はそのまま維持（クリック領域の当たり判定・タップ時のアクセシビリティのため`<button>`要素自体は維持する）
+   - `padding:8px 14px` は「1行の設定項目らしい上下の余白・タップ領域の広さ」を保つ目的で、既存の`.settings-item`の縦paddingに寄せた値（例: `padding:14px 18px`程度、正確な値は`public/app.css`の`.settings-item`定義を確認の上、既存パターンに合わせる）に調整する
+   - 文字色は`.settings-item--danger`クラス（`color:var(--terracotta)`）をそのまま維持し、インラインstyleでの色指定は追加しない（CLAUDE.md「UIスタイル規約」の生の色値禁止・既存CSS変数使用ルールに従う）
+3. **`#delete-account-section`のラッパーdivのpadding**（`padding:4px 18px 14px`）は、見出しが無くなることで上部の余白調整が必要になる可能性がある。実装時に実機/ブラウザで見た目を確認しながら微調整してよい（本設計書ではpx単位の厳密指定はしない）。
+4. **i18nキー整理**: `secDangerZone`は見出し削除に伴い`data-i18n`属性からの参照が無くなる。`STRINGS.ja`/`STRINGS.en`の他の箇所からも参照されていないことを`grep`で確認済みのため、**両言語から`secDangerZone`キー自体を削除してよい**（死にキーとして残す場合はコメントで理由を明記する。今回はCLAUDE.mdの緩やかな方針に従い削除を推奨）。`deleteAccountBtn`（ボタンテキスト本体）・`confirmDeleteAccount`（確認ダイアログ文言）は変更・削除しない。
+5. `handleDeleteAccountClick()`（`public/app.js`）のロジック・`onclick`属性のタッチガード（`if(!_touchCapableDetected) ...`）はそのまま維持し、一切変更しない。
+
+### 変更するファイル一覧
+- `public/index.html`（419-431行目付近: 見出しdiv削除、ボタンのインラインstyle変更）
+- `public/app.js`（`STRINGS.ja`/`STRINGS.en`から`secDangerZone`キーを削除する場合のみ、341行目・581行目付近）
+- `public/app.css`: **変更不要見込み**。既存`.settings-item--danger`（色定義）をそのまま流用できるため、新規クラス追加やスタイル変更は不要と想定。ただし実装時に中央寄せ・余白調整をインラインstyleではなく専用クラスとして切り出す方が既存コード規約（UIスタイル規約）に馴染む場合は、`.settings-item--danger`にレイアウト用プロパティ（`display:flex;justify-content:center;width:100%;`等）を統合してもよい（インラインstyle vs クラス化の判断は実装担当に委ねる、どちらでも受け入れ基準は満たせる）
+
+### データモデルの変更
+なし。
+
+### APIの変更
+なし。バックエンド（`server.js`）・`/api/*`エンドポイントは無関係。データ共有（Web版/App Store版）への影響もなし（純粋なフロントエンドの見た目調整のみ）。
+
+### フロントエンドの変更
+上記「変更内容」の通り。`handleDeleteAccountClick()`のロジック自体（確認ダイアログ表示→削除API呼び出し）は無変更。
+
+### 受け入れ基準
+
+**正常系**
+- 設定画面最下部に、セクション見出しが表示されず、「アカウントを削除」というテキストのみが1行、画面幅に対して中央寄せで表示される
+- テキストの色は赤系（`var(--terracotta)`）のまま維持されている
+- テキストをタップすると、従来通り`handleDeleteAccountClick()`が呼ばれ、確認ダイアログ（`confirmDeleteAccount`）が表示される
+- pill形状の枠線・背景色などのボタン装飾が見た目から消えている
+- 日本語・英語両モードで文字化け・キー名の直接表示（`secDangerZone`等）が発生しない
+
+**失敗系**
+- （UI表示調整のみのため、サーバーエラー等の失敗系は対象外）
+
+**エッジケース**
+- ダークモード（`html[data-theme="dark"]`）でも赤系文字色が視認可能であること（`var(--terracotta)`は既存のダークモード対応済み変数のため、追加対応は不要と想定だが目視確認は行う）
+- タップ領域が縮小しすぎて誤タップ・タップしづらさが生じないよう、上下paddingで一定のタップ領域を確保する
+
+### スコープ外
+- `handleDeleteAccountClick()`のロジック変更（確認ダイアログの文言・削除APIの挙動）
+- アカウント削除機能自体の仕様変更
+- 他の設定画面セクション（プロフィール・ログイン・通知等）のレイアウト変更
+- `secDangerZone`削除に伴う多言語対応チェック以外のi18n全体見直し
+
+### データ共有（Web版/App Store版）への影響確認
+- **後方互換性**: 影響なし。今回の変更は`public/index.html`・`public/app.js`（表示文字列辞書）・（必要なら）`public/app.css`のみのフロントエンド表示調整であり、`/api/*`のリクエスト/レスポンス構造・`data/`配下のデータファイルは一切変更しない。旧バージョンのApp Storeアプリが壊れる要素はない。
+- **影響範囲**: Web版・iOS App Store版の両方に同時に反映される変更（Capacitorはローカルバンドル方式のため、`public/`配下の変更はiOS版では次回TestFlightビルド・審査を経てのみ反映される。Web版は`pm2 restart`不要、CSS変更を伴う場合はCLAUDE.md記載のキャッシュバスティング手順（`index.html`の`?v=`とservice workerの`CACHE_NAME`同時更新）が必要）。
+- **リリースタイミング**: 破壊的変更を含まないため、Web版への反映とiOS版ビルドを同時に行う必要はない。ユーザーの明示指示があるまで`release`ブランチへのpushは行わない（既存プロジェクトルール通り）。
+
+### リスク・未解決の質問
+- ボタンの縦paddingの具体的な数値（`.settings-item`との統一値）は本設計書では厳密指定していない。実装時に実機/ブラウザのスクリーンショットで最終確認が必要。
+- `secDangerZone`キー削除の是非は「他に参照がない」ことをgrepで確認済みだが、削除せず死にキーとして残す判断でも受け入れ基準上は問題ない（実装担当の判断に委ねる）。
+- iOS版（TestFlight）での見た目確認は次回ビルド時に必要（今回はWeb版CSS変更のみでは検証しきれない実機差異が無いか、CLAUDE.md「TestFlightデバッグのコツ」に準じて念のため確認推奨）。
+
+## 承認状況
+2026-07-19 planner設計。**ユーザー承認済み**。**実装完了**（orchestrator: builder→checker→closer）。checkerで🔴🟡🟢いずれもなし。詳細は`.claude/session-log.md`・`.claude/next.md`参照。
