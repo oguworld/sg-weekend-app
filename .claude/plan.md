@@ -6843,3 +6843,203 @@ function _clearAllAccountLocalState() {
 
 ## 承認状況
 2026-07-19 planner設計。**ユーザー承認済み**。**実装完了**（orchestrator: builder→checker→closer）。checkerで🔴🟡🟢いずれもなし。詳細は`.claude/session-log.md`・`.claude/next.md`参照。
+
+# 設計書68: App Store審査差し戻し対応 — GoogleSignIn関連3フレームワークへのプライバシーマニフェスト（PrivacyInfo.xcprivacy）注入
+
+## 背景
+
+v1.5 build 111のApp Store審査提出が、Apple自動バイナリ検証（ITMS-91061 Missing privacy manifest）により差し戻された。対象は以下3つのフレームワークで、いずれもGoogle Sign-In関連のサードパーティSDKである。
+
+```
+ITMS-91061: Missing privacy manifest
+- Frameworks/GTMAppAuth.framework/GTMAppAuth
+- Frameworks/GTMSessionFetcher.framework/GTMSessionFetcher
+- Frameworks/GoogleSignIn.framework/GoogleSignIn
+```
+
+Appleは2024年以降、"commonly used third-party SDK"としてリスト化されたSDKに対し、バイナリ内に`PrivacyInfo.xcprivacy`（プライバシーマニフェスト）が含まれていることを機械的に検証しており、欠落しているとApp Store Connectへのアップロード（審査提出）自体が拒否される。
+
+## 調査結果（orchestratorによる事前調査を踏襲、plannerでの再調査なし）
+
+### 1. 根本原因
+`ios-app/package.json`が依存する`@codetrix-studio/capacitor-google-auth@^3.4.0-rc.4`（latest、公開から1年以上更新なし）のPodspec（`CodetrixStudioCapacitorGoogleAuth.podspec`）が、以下のようにGoogleSignIn SDKを古いバージョンに固定している。
+
+```ruby
+s.dependency 'GoogleSignIn', '~> 6.2.4'
+```
+
+`~> 6.2.4`はCocoaPodsのpessimistic version constraintで「6.2.4以上6.3.0未満」を意味する。プライバシーマニフェストがGoogleSignIn SDKに同梱されるようになったのはこれより後のバージョンであり、6.2.4系のバイナリには`PrivacyInfo.xcprivacy`が含まれていない。GitHub上のプラグイン本体（masterブランチ）も同一内容で、maintainerによる追随修正は行われていない（2025年4月時点のissue #412が未解決のまま放置されていることを確認済み）。
+
+`GTMAppAuth`・`GTMSessionFetcher`はGoogleSignIn 6.2.4系の依存先（トランジティブ依存）であり、これも同時に古いバージョンに固定されているため同じ問題を抱えている。
+
+### 2. 単純なバージョン引き上げが危険な理由
+プラグインのSwiftソース（`ios/Plugin/Plugin.swift`、`npx cap sync`時にCocoaPods経由で取り込まれるプラグイン本体）は以下のAPIを使用している。
+
+```swift
+import GoogleSignIn
+var googleSignInConfiguration: GIDConfiguration!;
+googleSignInConfiguration = GIDConfiguration.init(clientID: customClientId, serverClientID: serverClientId)
+```
+
+`GIDConfiguration.init(clientID:serverClientID:)`はGoogleSignIn-iOS 7.0以降の破壊的API変更（サインインフロー刷新）で扱いが変わっているAPIである。Podfile側で`GoogleSignIn`のバージョン制約を直接引き上げる（例: `pod 'GoogleSignIn', '~> 9.0'`をPodfileに明示追加してPodspec制約を上書きする）と、このプラグインのSwiftコードがコンパイルエラーになるリスクが高い。
+
+**したがって、GoogleSignIn SDK自体のバージョンを引き上げる対応は今回は採用しない。** 古いバージョンのフレームワークに対して、Google公式が現行バージョンで配布しているプライバシーマニフェストの内容をビルド時に後付けで注入する方式を採用する。
+
+### 3. Googleの公式プライバシーマニフェスト内容
+Google公式GitHubリポジトリ（`google/GoogleSignIn-iOS`・`google/GTMAppAuth`・`google/gtm-session-fetcher`）から、各フレームワークの現行`PrivacyInfo.xcprivacy`の内容を確認済み（詳細な内容はorchestratorの調査結果セクションを参照。plannerはXML全文をそのまま採用可能と判断）。
+
+- **GoogleSignIn**: `NSPrivacyTracking=false`、Name/EmailAddress/PhoneNumber/OtherDataTypes/CoarseLocation/UserID/DeviceID/OtherUsageDataの収集申告あり（全て`NSPrivacyCollectedDataTypeTracking=false`、目的は`AppFunctionality`または`Analytics`）、`NSPrivacyAccessedAPITypes`に`NSPrivacyAccessedAPICategoryUserDefaults`（理由コード`CA92.1`）
+- **GTMAppAuth**: 収集データ・API利用ともに空配列、`NSPrivacyTracking=false`
+- **GTMSessionFetcher**: `NSPrivacyAccessedAPICategoryUserDefaults`（理由コード`CA92.1`）のみ、収集データは空配列、`NSPrivacyTracking=false`
+
+これらはGoogle自身による最新版の自己申告内容であり、古い6.2.4系のAPI利用実態（特にUserDefaultsアクセス）も基本的に変わっていないと考えられるため、この内容をそのまま古いバージョンのフレームワーク成果物に注入する対応が最も正確かつ妥当と判断する。
+
+### 4. CI/ビルド構成の既存事実
+- `ios-app/ios/`はgitignore対象で、CI実行のたびに`npx cap add ios`で毎回新規生成される。この時点で`ios-app/ios/App/Podfile`も新規生成される
+- `npx cap sync ios`（`Sync Capacitor`ステップ）はCocoaPodsの`pod install`を内部的に実行し、プラグイン一覧に応じて`Podfile`の内容を書き換える可能性がある。**そのため「`cap add`直後にPodfileを編集しても、後続の`cap sync`で上書き・再生成されるリスクがある」という前提でCIステップの順序を設計する必要がある**
+- 既存の確立されたパターンとして`scripts/ensure-apns-bridge.py`（Capacitorが生成する`AppDelegate.swift`に対し、冪等に既知の文字列の有無を確認してから追記するPythonスクリプト、クラス開き波括弧が見つからない場合は`SystemExit(1)`で明示的にビルド失敗させる）が既にCIステップとして稼働しており、「生成されたファイルへの後付けパッチ」の確立手法として踏襲できる
+- Info.plist・entitlementsの操作は単純な操作にPlistBuddy、配列を含む複雑な操作にPython plistlibを使い分けている
+
+## 修正方針
+
+### 方針A（採用）: CocoaPodsの`post_install`フックでビルド時にPrivacyInfo.xcprivacyをフレームワーク成果物へコピーする
+
+3つのxcprivacyファイルをリポジトリに静的ファイルとして保存し、CIが生成したPodfileに対して、CocoaPodsインストール後フック（`post_install`）内で各対象ターゲットに「ビルド成果物ディレクトリへPrivacyInfo.xcprivacyをコピーするRun Scriptビルドフェーズ」を追加する。
+
+```ruby
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    if ['GoogleSignIn', 'GTMAppAuth', 'GTMSessionFetcher'].include?(target.name)
+      phase = target.new_shell_script_build_phase("Add Privacy Manifest")
+      phase.shell_script = "cp \"${SRCROOT}/../PrivacyManifests/#{target.name}-PrivacyInfo.xcprivacy\" \"${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/PrivacyInfo.xcprivacy\""
+    end
+  end
+end
+```
+
+⚠️ **重要な考慮事項（未検証・要CI実機確認、下記「未検証事項」参照）**:
+- **Apple/Googleが言うフレームワーク名（`GoogleSignIn`/`GTMAppAuth`/`GTMSessionFetcher`）と、CocoaPodsのPod/target名が完全一致するとは限らない**。特に`GTMSessionFetcher`は`GTMSessionFetcher/Core`のようなsubspec名でtargetが作られている可能性がある。`['GoogleSignIn', 'GTMAppAuth', 'GTMSessionFetcher'].include?(target.name)`という単純な文字列一致では対象を取りこぼす可能性がある。**そのため、builder実装時にまずCIログへ`installer.pods_project.targets.each { |t| puts "POD TARGET: #{t.name}" }`のようなデバッグ出力ステップを仕込み、実際のtarget名一覧を確認したうえで、必要であれば`target.name.start_with?('GTMSessionFetcher')`のような前方一致判定に調整することを実装方針に含める**
+- **既存の`post_install`ブロックとの衝突**: Capacitor 6標準のPodfileテンプレートには、最低iOSバージョン設定等のための`post_install do |installer| ... end`フックが既に含まれている可能性が高い。Rubyの言語仕様上、同一Podfile内に`post_install do |installer| ... end`ブロックが2つ存在すると、後に定義された方のみが有効になり最初のフックが無視される（上書きされる）。**したがって、新しい`post_install`ブロックを追記する設計ではなく、生成されたPodfile内に既存の`post_install do |installer|`ブロックが存在するかどうかを検出し、存在すればそのブロック内部（`end`の直前）に処理を挿し込み、存在しなければ新規に追記する、という2パターン対応の冪等スクリプトとして設計する**
+
+### 保存先ファイル
+3つのxcprivacyファイルは新規ディレクトリに配置する。
+
+- `ios-app/PrivacyManifests/GoogleSignIn-PrivacyInfo.xcprivacy`
+- `ios-app/PrivacyManifests/GTMAppAuth-PrivacyInfo.xcprivacy`
+- `ios-app/PrivacyManifests/GTMSessionFetcher-PrivacyInfo.xcprivacy`
+
+内容は上記「調査結果 3.」に記載したGoogle公式の内容をそのまま使用する（plannerが取得した正確なXML全文をbuilderがそのまま書き込んでよい。改変不要）。
+
+配置場所を`ios-app/`直下（`ios-app/ios/`の外）にする理由: `ios-app/ios/`はgitignore対象でCIのたびに使い捨てで再生成されるため、静的な参照元ファイルはgit管理下にある`ios-app/`直下に置く必要がある。Podfile側のシェルスクリプトから見た相対パスは`${SRCROOT}/../PrivacyManifests/...`（`SRCROOT`は`ios-app/ios/App`を指すため、1つ上がって`ios-app/ios/PrivacyManifests`ではなく`ios-app/PrivacyManifests`を指すよう、実際の`SRCROOT`の値をCIログで確認したうえでパスの`../`の数をbuilderが調整すること。設計書の意図は「gitで管理されている`ios-app/PrivacyManifests/`を参照する」ことであり、正確な相対パスの階層数は未検証）。
+
+### Podfileへの注入スクリプト
+新規スクリプト`scripts/ensure-privacy-manifests.py`を作成する。`scripts/ensure-apns-bridge.py`と同じ思想（冪等・失敗時は`SystemExit(1)`で明示的にビルド失敗させる）を踏襲するが、対象ファイル・ロジックが異なるため別ファイルとして分離する（既存スクリプトとの役割混在を避ける）。
+
+要件:
+1. 引数でPodfileのパスを受け取る（`python3 scripts/ensure-privacy-manifests.py ios-app/ios/App/Podfile`のような呼び出しを想定）
+2. 冪等性: Podfile内に本スクリプトが挿入するマーカー文字列（例: `# --- privacy manifest injection (設計書68) ---`）が既に存在する場合は何もせず終了する
+3. 既存`post_install do |installer|`ブロックの検出: 正規表現でPodfile内に`post_install do |installer|`が存在するか判定する
+   - 存在する場合: そのブロックの開始位置直後（または対応する`end`の直前）に、target判定・Run Scriptフェーズ追加処理を挿し込む
+   - 存在しない場合: Podfile末尾に新規`post_install do |installer| ... end`ブロックを追記する
+4. 挿入する処理には、target名のデバッグ出力（`installer.pods_project.targets.each { |t| puts "POD TARGET: #{t.name}" }`相当）を含める
+5. target名判定は完全一致（`GoogleSignIn`/`GTMAppAuth`/`GTMSessionFetcher`）に加え、`GTMSessionFetcher`については前方一致（`start_with?('GTMSessionFetcher')`）も許容する形にし、subspec名で作られている場合も取りこぼさないようにする
+6. 対応する`post_install`ブロックの終端（`end`）を正規表現で正しく検出できない場合は、`ensure-apns-bridge.py`と同様に`SystemExit(1)`でビルドを失敗させる（サイレント素通り禁止）
+
+### CIワークフローの変更（`.github/workflows/ios-deploy.yml`）
+既存の`(診断) Dump generated AppDelegate.swift`→`(課題1) Ensure APNs bridge methods`の並びと同じパターンで、`Sync Capacitor`ステップの後（`npx cap sync ios`実行後）に以下2ステップを追加する。
+
+1. **`(診断) Dump generated Podfile`**: 生成されたPodfile全文を`cat`し、既存`post_install`ブロックの有無を`grep`で表示する（次ビルドのログでPodfileの実体を確認するため）
+2. **`(App Store審査対応) Ensure privacy manifests for GoogleSignIn/GTMAppAuth/GTMSessionFetcher`**: `python3 scripts/ensure-privacy-manifests.py ios-app/ios/App/Podfile`を実行する
+
+その後、**Podfileへの追記を反映させるため、改めて`pod install`を手動実行する**ステップを追加する（`npx cap sync ios`が最後に`pod install`を実行済みだが、Podfile追記後にもう一度Xcodeプロジェクトへ反映させる必要があるため）。CocoaPodsコマンドは通常`ios-app/ios/App`ディレクトリで実行する（`Podfile`と同じ階層）。この`pod install`再実行ステップの後、`(診断) Dump generated AppDelegate.swift`以降の既存ステップ（Info.plist操作等）は順序を変えず維持する。
+
+ステップ順序（追加分を含めた全体像）:
+```
+Checkout
+Setup Node.js
+Install Capacitor dependencies
+Add iOS platform (npx cap add ios)
+Generate app icons and splash screen
+Sync Capacitor (npx cap sync ios)
+【新規】(診断) Dump generated Podfile
+【新規】(App Store審査対応) Ensure privacy manifests
+【新規】(App Store審査対応) Re-run pod install after Podfile patch
+(診断) Dump generated AppDelegate.swift
+(課題1) Ensure APNs bridge methods in AppDelegate.swift
+Set export compliance in Info.plist
+...(以下既存ステップ、無変更)
+```
+
+⚠️ 既存の`(診断) Dump generated AppDelegate.swift`はステップ名として`cd ios-app`から`ios/App/App/AppDelegate.swift`を参照している。今回追加する2ステップも同様に`cd ios-app`から相対パスで対象ファイルを参照する設計とする（既存パターンとの一貫性維持）。
+
+## 代替案の検討: 別プラグインへの乗り換え
+
+`@codetrix-studio/capacitor-google-auth`が長期未メンテのため、実際にメンテナンスされている別のCapacitor用Google Sign-Inプラグイン（例: `@capgo/capacitor-social-login`等）への乗り換えも選択肢として検討した。
+
+- **メリット**: プラグイン側が最新のGoogleSignIn SDK（プライバシーマニフェスト同梱済み）に追随していれば、今回のような後付けパッチが不要になる可能性がある
+- **デメリット・リスク**: 認証フロー全体（`_handleGoogleLoginIOS()`、`registerPlugin('GoogleAuth')`優先→`Plugins.GoogleAuth`フォールバックの防御的取得パターン、`capacitor.config.js`の`GoogleAuth`プラグイン設定、URL Scheme登録）の再実装・再テストが必要になる。既にリリース済みでユーザーが使っている認証機能（設計書20/35/36/38/44/46/48/49/50/51/52の一連の対応で安定化させてきた経緯がある）を壊すリスクが高く、審査差し戻しへの緊急対応としては不釣り合いに大きい変更になる
+- なお、plannerはWebSearch等の外部調査ツールを持たないため、代替プラグインの現在のメンテナンス状況・Capacitor 6との互換性・実際のプライバシーマニフェスト対応状況について一次情報での確認はできていない。「検討の余地がある」程度の言及に留める
+
+**結論**: 今回はプラグイン乗り換えは見送り、方針A（プライバシーマニフェストの後付け注入）を採用する。乗り換えは、今回の緊急対応とは切り離した将来的な技術的負債解消タスクとして別途検討する。
+
+## 変更するファイル一覧
+
+| ファイル | 変更内容 |
+|---|---|
+| `ios-app/PrivacyManifests/GoogleSignIn-PrivacyInfo.xcprivacy`（新規） | Google公式の内容をそのまま保存 |
+| `ios-app/PrivacyManifests/GTMAppAuth-PrivacyInfo.xcprivacy`（新規） | Google公式の内容をそのまま保存 |
+| `ios-app/PrivacyManifests/GTMSessionFetcher-PrivacyInfo.xcprivacy`（新規） | Google公式の内容をそのまま保存 |
+| `scripts/ensure-privacy-manifests.py`（新規） | Podfileへの`post_install`挿し込みスクリプト（冪等・失敗時SystemExit(1)） |
+| `.github/workflows/ios-deploy.yml`（変更） | `Sync Capacitor`直後に3ステップ追加（診断ダンプ・注入スクリプト実行・pod install再実行） |
+
+`server.js`・`public/` 配下・`data/` 配下は一切変更しない。
+
+## データモデルの変更
+なし。
+
+## APIの変更
+なし。
+
+## フロントエンドの変更
+なし。
+
+## データ共有（Web版/App Store版）への影響確認
+- **後方互換性**: 影響なし。今回の変更はiOSビルド成果物（Xcodeプロジェクト内のフレームワークバンドル）に静的ファイルを注入するCI/ビルド設定の変更のみであり、`/api/*`のリクエスト/レスポンス構造・`data/`配下のデータファイル・`public/`配下のWeb版配信物には一切触れない。旧バージョンのApp Storeアプリの動作にも影響しない
+- **影響範囲**: iOS版（TestFlight/App Store）のビルドプロセスのみに影響する変更。Web版（dosuru.app）には一切影響しない。`pm2 restart`は不要
+- **リリースタイミング**: 本対応はApp Store審査提出のブロッカー解消が目的のため、`release`ブランチへのpush・TestFlightビルドは通常のプロジェクトルール通り**ユーザーの明示指示を待って実施する**。ただし審査差し戻し対応という性質上、ユーザーが早期のpushを希望する可能性が高い点は留意する
+
+## 受け入れ基準
+
+**正常系**
+- CI（GitHub Actions）が正常に完走し、TestFlightビルドが生成される
+- 生成されたビルド成果物内の`Frameworks/GoogleSignIn.framework/`・`Frameworks/GTMAppAuth.framework/`・`Frameworks/GTMSessionFetcher.framework/`それぞれの直下に`PrivacyInfo.xcprivacy`が含まれる（**この点はXcodeビルドログ・IPAの中身を直接確認しないと断定できず、次回CI実行結果の確認が必須**）
+- App Store Connectへのアップロード時、ITMS-91061エラーが再発しない
+- 既存機能（Googleログイン・Apple ID連携・プッシュ通知等）が引き続き正常動作する（今回の変更はビルド成果物へのファイル追加のみで、アプリのSwift/JSロジックには一切触れていないため、回帰は理論上発生しないはずだが、実機確認を推奨）
+
+**失敗系**
+- `scripts/ensure-privacy-manifests.py`が、生成されたPodfile内で`post_install`ブロックの終端を正規表現で検出できない場合、`SystemExit(1)`で明示的にCIを失敗させる（サイレントに何もせず素通りしない）
+- Podfile内に対象target名（`GoogleSignIn`/`GTMAppAuth`/`GTMSessionFetcher`またはその前方一致）が1つも見つからない場合、警告ログを出力する（この場合はビルド自体は失敗させない方針とするか、失敗させるべきかはbuilder実装時に判断してよいが、**いずれの場合もCIログに明示的な警告メッセージを残すこと**。診断ステップでtarget名一覧が事前に出力されているため、原因調査は可能）
+
+**エッジケース**
+- 2回目以降のCI実行（Podfileが既にパッチ済みの状態で再度スクリプトが呼ばれるケースは通常発生しない、`ios-app/ios/`が毎回`npx cap add ios`で再生成されるため）でも、冪等性チェック（マーカー文字列の存在確認）により二重挿入が起きないこと
+- `GTMSessionFetcher`がsubspec名（例: `GTMSessionFetcher/Core`）でtargetが作られていた場合でも、前方一致判定によりプライバシーマニフェストが正しく注入されること（**この前方一致の要否自体、実際のtarget名を次回CIログで確認するまで確証がない**）
+
+## スコープ外
+- GoogleSignIn SDK自体のバージョン引き上げ（互換性リスクが高いため見送り）
+- `@codetrix-studio/capacitor-google-auth`から別プラグインへの乗り換え（上記「代替案の検討」参照、今回は見送り）
+- Apple/Google以外のサードパーティSDK（現状、他にプライバシーマニフェスト欠落の指摘は受けていない）への同様の対応
+- App Store Connect側の「Appプライバシー」申告フォームの内容更新（既存設計書65で「本タスクでは対応不可、ユーザーが審査提出前に手動で行う必要がある」と明記済みの事項であり、今回のバイナリ側対応とは別軸）
+- Podfileの`post_install`ブロック以外の箇所（`platform :ios`宣言やターゲット定義自体等）への変更
+
+## リスク・未解決の質問
+
+1. **【最重要・未検証】実際にCocoaPodsのtarget名がAppleの言うフレームワーク名と一致するか、次回CI実行のログで確認するまで確証がない**。特に`GTMSessionFetcher`がsubspec名で作られている可能性がある。診断ステップ（target名一覧のデバッグ出力）を先に仕込むことで、この不確実性に対処する設計にしているが、1回目のCI実行で目的の3ターゲットが見つからず、2回目の調整が必要になる可能性は十分にある
+2. **【未検証】生成されたPodfileに、Capacitor 6標準テンプレートによる既存`post_install`ブロックが実際に含まれているかどうか未確認**。含まれていない場合は新規追記で問題ないが、含まれている場合の「ブロック内部への挿し込み」ロジックの正規表現が、実際のPodfileのフォーマット（インデント・改行スタイル）に対して正しく機能するかは、次回CI実行結果でしか検証できない
+3. **【未検証】`${SRCROOT}/../PrivacyManifests/...`という相対パスの階層数が正しいか**。CocoaPodsのRun Scriptビルドフェーズにおける`SRCROOT`の実際の値（通常は`.xcodeproj`があるディレクトリ、今回は`ios-app/ios/App`が想定されるが、Pods自体のプロジェクトの`SRCROOT`が異なる可能性もある）を、次回CI実行のビルドログで確認する必要がある。誤っていれば、Run Scriptフェーズがコピー元ファイルを見つけられずビルド失敗、またはコピーがサイレントに失敗し元のITMS-91061エラーが再発する
+4. **【未検証】`pod install`再実行ステップが、Xcodeプロジェクト（`.xcodeproj`/`.xcworkspace`）を正しく更新するか**。`npx cap sync ios`が最後に実行する`pod install`とは別に手動で再実行することで、Podfile変更後のRun Scriptビルドフェーズが実際にXcodeプロジェクト設定に反映されることを意図しているが、CocoaPodsの挙動として想定通りに機能するかは未検証
+5. **本対応後もApple審査で他のプライバシーマニフェスト関連の指摘（例: 必須理由API `NSPrivacyAccessedAPITypes`のReason Code不足等）が新たに出てくる可能性は排除できない**。今回の対応はあくまで「ITMS-91061 Missing privacy manifest」への対処であり、プライバシーマニフェストの内容自体の妥当性審査（App Review本体）まで保証するものではない
+6. Podfileへの`post_install`挿し込みという構造上、Capacitorや`@codetrix-studio/capacitor-google-auth`の将来バージョンアップでPodfile生成テンプレートが変わった場合、本スクリプトの正規表現が機能しなくなる可能性がある（冪等性チェック・SystemExit(1)によるサイレント失敗防止で、少なくとも「気づかずに壊れる」事態は回避できる設計にしている）
+7. 今回の変更は「次回のCI実行でしか実機的な成否が確認できない」性質の変更である。builder実装後、実際に`release`ブランチへのpushとTestFlightビルドの実行、およびApp Store Connectへの再アップロード試行まで行って初めて、ITMS-91061エラーが解消されたことを確認できる
+
+## 承認状況
+2026-07-19 planner設計。**ユーザー承認済み**。**実装完了**（orchestrator: builder→checker→closer）。checkerで🔴🟡🟢いずれもなし。ただし本対応の性質上、実際の成否は次回`release`ブランチへのpush・TestFlightビルドのCI実行結果でしか確認できない（詳細は`.claude/session-log.md`・`.claude/next.md`参照）。

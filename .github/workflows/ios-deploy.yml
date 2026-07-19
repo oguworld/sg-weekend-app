@@ -37,6 +37,27 @@ jobs:
           cd ios-app
           npx cap sync ios
 
+      - name: (診断) Dump generated Podfile
+        run: |
+          cd ios-app
+          echo "===== pwd / ios-app/ios/App layout ====="
+          pwd
+          ls -la ios/App
+          echo "===== Podfile ====="
+          cat ios/App/Podfile
+          echo "==================="
+          grep -n "post_install" ios/App/Podfile || echo "!!! NO EXISTING post_install BLOCK FOUND !!!"
+
+      - name: (App Store審査対応) Ensure privacy manifests for GoogleSignIn/GTMAppAuth/GTMSessionFetcher
+        run: |
+          cd ios-app
+          python3 ../scripts/ensure-privacy-manifests.py ios/App/Podfile
+
+      - name: (App Store審査対応) Re-run pod install after Podfile patch
+        run: |
+          cd ios-app/ios/App
+          pod install
+
       - name: (診断) Dump generated AppDelegate.swift
         run: |
           cd ios-app
