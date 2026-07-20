@@ -154,6 +154,19 @@ sg-weekend-app/
 - **未検証（次回TestFlightビルド後）**: iOS実機でのボトムナビ「制覇」ラベル表示、コース画面内タブ「スタンプラリー」ラベル表示、地図表示から他画面経由でコース画面に戻った際の一覧表示リセット、画面内タブ切り替え時の地図/一覧選択保持の4点
 - **既知の未解決事項**: 英語訳「Conquer」「Stamp Rally」の適切性は未検証（将来的な再検討の余地あり）
 
+### スタンプスポット画像追加（Unsplash）＋画面タイトル変更（2026-07-20実装、設計書73）
+設計書69〜72実装後のユーザー追加要望2件（スポット詳細モーダルへの写真追加・コース画面見出しの「スタンプラリー」化）への対応。
+
+- **新規スクリプト`scripts/fill-stamp-spot-images.js`**: `data/{city}/stamp-spots.json`の`imageUrl`が空のスポットにUnsplash画像を補完する。既存`scripts/lib/unsplash.js`の`fetchUnsplashImage(query)`をそのまま再利用し、`fill-images.js`と異なりClaude APIによるキーワード生成は行わない（スポット名は既に確定した固有名詞のため）。検索クエリは`spot.name`に地名"Singapore"を付加した文字列（スポット名が既に"Singapore"を含む場合は付加しない重複回避処理あり）。`--dry-run`・インクリメンタル実行（`imageUrl`が既に設定済みのスポットはスキップ）対応。手動実行のみ、cron化なし
+- **実行結果**: 2026-07-20実行、14件中12件の画像補完に成功。`tekka-market`・`labrador-secret-tunnel`の2件はUnsplash `/photos/random`検索でヒットなし（`fetchUnsplashImage()`が`null`を返す既存の失敗時挙動）のため`imageUrl`は空文字列のまま据え置き（既存`fill-images.js`と同じ「失敗時はスキップし既存値を変更しない」方針）
+- **フロントエンド**: `public/index.html`の`#stamp-spot-detail-sheet`（`.plan-modal-body`内、スポット名表示の直前）に`<img id="stamp-spot-detail-image">`を新規追加（初期`display:none`、`aspect-ratio:16/9`、`object-fit:cover`、`border-radius:14px`、`onerror`で自身を`display:none`にする簡易フォールバック）。`public/app.js`の`openStampSpotDetail(spotId)`に、`spot.imageUrl`の有無で`src`セット＋表示/非表示を切り替える分岐を追加。**シートの使い回し方式（`_stampSelectedSpot`を毎回更新し同一DOM要素へ再セットする既存パターン）のため、`imageUrl`が空の場合は`src`属性ごと明示的に除去し非表示化する**（前回開いたスポットの画像が次回の詳細表示に残留しないようにするための必須分岐、既存の`#stamp-spot-detail-checked`のdisplay制御と同じ設計思想）
+- **ロック中スポットとの整合性**: `server.js`の既存`maskLockedStampSpot(spot)`（設計書71で追加済み、無変更）が未解禁`local`/`niche`スポットの`imageUrl`を含む4フィールドを既にマスクしているため、データ投入・フロントエンド変更いずれの段階でもロック中スポットの画像が意図せず露出することはない。フロントエンド側に追加のロック中判定コードは書いていない（`imageUrl`が空という結果だけを見て非表示にする既存分岐がそのまま機能する）
+- **`courseScreenTitle`変更**: `public/app.js` STRINGS.ja（`おでかけコース`→`スタンプラリー`）・STRINGS.en（`Outing Courses`→`Stamp Rally`）、`public/index.html`のdata-i18nデフォルト直書きテキストの計3箇所を変更（キー名は不変）。この見出しはスタンプラリー／みんなのコース／マイコースの3タブ共通ヘッダーであり、他タブ表示中も「スタンプラリー」の見出しが出続ける・設計書72で既に「スタンプラリー」に変更済みの`courseTabStampMap`（タブラベル）と文言が重複することはユーザー確認済みで許容
+- `server.js`は無変更（`GET /api/stamp-spots`のレスポンス構造・マスキングロジックとも無変更、`imageUrl`フィールドへの実データ投入という値の変化のみ）。`pm2 restart`不要（`data/`配下JSONファイルの直接編集のため）
+- キャッシュバスティング: `index.html` app.js?v=20260720d、`sw.js` CACHE_NAME=sg-weekend-v633（`app.css`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後）**: iOS実機でのスポット詳細モーダルの画像表示（アスペクト比・角丸・読み込み時のレイアウトシフト有無）、ロック中スポット詳細シートで画像が表示されないことの実機確認、見出し文言重複による見た目の違和感有無
+- **既知の未解決事項**: `tekka-market`・`labrador-secret-tunnel`の2件は画像取得失敗のまま空文字列（急ぎ対応不要、将来的な検索クエリ調整・手動URL設定の余地あり）。Unsplash URLの動的生成URLは将来失効・変更される可能性があり、既存`fill-images.js`によるイベント画像と同じ前提で運用（定期再取得の仕組みはスコープ外）
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

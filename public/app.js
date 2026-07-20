@@ -414,7 +414,7 @@
         scheduleNoPlans: '予定なし',
         customPlanTitlePlaceholder: 'タイトルを入力',
         navCourse: '制覇',
-        courseScreenTitle: 'おでかけコース',
+        courseScreenTitle: 'スタンプラリー',
         courseTabEveryone: 'みんなのコース',
         courseTabMylist: 'マイコース',
         courseTabStampMap: 'スタンプラリー',
@@ -676,7 +676,7 @@
         scheduleNoPlans: 'No plans',
         customPlanTitlePlaceholder: 'Enter title',
         navCourse: 'Conquer',
-        courseScreenTitle: 'Outing Courses',
+        courseScreenTitle: 'Stamp Rally',
         courseTabEveryone: 'Explore',
         courseTabMylist: 'My Courses',
         courseTabStampMap: 'Stamp Rally',
@@ -3959,10 +3959,22 @@
         badgeEl.style.color = meta.color;
       }
       const lang = getLang();
-      document.getElementById('stamp-spot-detail-name').textContent =
-        (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+      const displayName = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+      document.getElementById('stamp-spot-detail-name').textContent = displayName;
       document.getElementById('stamp-spot-detail-area').textContent = spot.area || '';
       document.getElementById('stamp-spot-detail-desc').textContent = spot.description || '';
+
+      const imgEl = document.getElementById('stamp-spot-detail-image');
+      if (imgEl) {
+        if (spot.imageUrl) {
+          imgEl.src = spot.imageUrl;
+          imgEl.alt = displayName;
+          imgEl.style.display = 'block';
+        } else {
+          imgEl.removeAttribute('src');
+          imgEl.style.display = 'none';
+        }
+      }
 
       const checked = _stampSpotIsChecked(spot.id);
       const checkedEl = document.getElementById('stamp-spot-detail-checked');
