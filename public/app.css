@@ -2075,12 +2075,21 @@
       filter: drop-shadow(0 2px 4px rgba(44,36,32,0.25));
     }
 
-    /* ─── レベル解禁演出モーダル（設計書70改善3） ─── */
+    /* ─── レベル解禁演出モーダル（設計書70改善3 → 設計書81でイラスト画像化） ─── */
     .stamp-unlock-emoji { font-size: 56px; line-height: 1; animation: stampUnlockPop 0.6s cubic-bezier(.32,2,.55,.89); }
+    .stamp-unlock-img {
+      width: 96px; height: 96px; object-fit: contain;
+      filter: drop-shadow(0 3px 6px rgba(44,36,32,0.25));
+    }
     @keyframes stampUnlockPop {
       0% { transform: scale(0.3); opacity: 0; }
       60% { transform: scale(1.15); opacity: 1; }
       100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* コレクション一覧「ページ」見出しのイラストアイコン（設計書81） */
+    .stamp-level-title-img {
+      width: 20px; height: 20px; object-fit: contain; vertical-align: middle;
     }
 
     .course-card {

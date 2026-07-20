@@ -264,6 +264,21 @@ sg-weekend-app/
 - キャッシュバスティング: `index.html` app.css/app.js `?v=20260720j`→`20260720k`、`sw.js` CACHE_NAME=`sg-weekend-v639`→`v640`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのイラストバッジ表示（40pxコンテナとのフィット感）、ダークモード時の視認性、6エリアとも達成時に正しい画像が表示されること、CSS印章→イラストへの切り替えの見た目は2026-07-20時点でWeb版目視確認のみ、実機未確認
 
+### AI生成レベルバッジイラストの統合（2026-07-20実装、設計書81）
+設計書80のエリアバッジ統合と同じ方針を、別軸の「レベルバッジ」（`STAMP_LEVEL_META`、定番/ローカル/ニッチ/スペシャル）に適用した。エリアバッジと異なり「達成/未達成の二値」がそのまま当てはまらない複数箇所（凡例・演出モーダル・一覧見出し・詳細バッジ・マップピン等、計6箇所）があるため、ユーザーが**実装対象を2箇所のみに確定**（レベル解禁演出モーダル・コレクション一覧「ページ」見出し）。他4箇所は絵文字表示のまま維持。
+
+- **画像アセット**: `public/images/stamp-badges/badge-level-{standard,local,niche,special}.png`（4枚、256×256px・透明背景）。**`public/images/`は`.gitignore`対象外の通常git管理対象**（設計書80のリスク7と同一の注意点、コミット対象に含めた）。レベル↔画像の対応: 定番=ヴィンテージカメラ、ローカル=自転車＋ショップハウス、ニッチ=虫眼鏡＋宝の地図、スペシャル=宝箱
+- **`STAMP_LEVEL_META`定数の拡張**（`public/app.js`）: 各要素（4レベル）に`img`フィールド（サイトルート相対パス）を追加。**`emoji`フィールドは削除せず維持**（凡例チップ・スポット詳細バッジ・マップピン・個別スポットスタンプの4箇所が引き続き参照するため）
+- **適用箇所1: レベル解禁演出モーダル**（`openStampLevelUnlockModal()`、`#stamp-level-unlock-emoji`）: `emojiEl.textContent = meta.emoji`を`emojiEl.innerHTML = '<img src="${meta.img}" class="stamp-unlock-img">'`に変更。既存の`@keyframes stampUnlockPop`ポップインアニメーション（`style.animation`の`none`→空文字リセットによる強制再生トリガー）はコンテナ要素`#stamp-level-unlock-emoji`自体に付いたまま無変更のため継続動作（テキストか画像かは`transform`/`opacity`アニメーションにとって無関係）。`public/index.html`の静的初期値`✨`は空文字列に変更（JS実行前のちらつき防止、画像はJSで都度生成）
+- **適用箇所2: コレクション一覧「ページ」見出し**（`_renderStampCollectionList()`内`.stamp-book-page-title`）: `${meta.emoji}`を`<img class="stamp-level-title-img">`（20×20px、`object-fit:contain`）に置き換え。ロック中ページ（`.stamp-book-page--locked`、opacity:0.6）でも画像は変わらず表示される
+- **CSS印章演出とは併用しない**（設計書80と同じ判断根拠）: `.stamp-unlock-img`（96×96px、`object-fit:contain`、`filter:drop-shadow`）・`.stamp-level-title-img`（20×20px）を新規追加
+- **対象外として明示的に維持**: レベル凡例チップ（`_renderStampLevelLegend()`、`#stamp-level-legend`）・スポット詳細シートのレベルバッジ（`openStampSpotDetail()`、`#stamp-spot-detail-level-badge`、`textContent`＋インラインstyle方式のまま）・マップ上のピン（`_renderStampMarkers()`、`.stamp-marker-icon`、30px雫形ピンの回転構造とイラストの相性が悪いため技術的制約により対象外）・コレクション一覧の個別スポットスタンプ中身（`.stamp-circle-mark`、ユーザー指定スコープ外）は、いずれも`meta.emoji`のまま完全無変更
+- i18n新規キーなし（`alt`属性は既存の`stampLevelStandard`等ラベルキーを流用）
+- `server.js`・`data/`配下は無変更（pm2 restart不要だが今回は実施済み）
+- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720k`→`20260720l`、`sw.js` CACHE_NAME=`sg-weekend-v640`→`v641`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのレベル解禁演出モーダル画像サイズ（96px）・コレクション一覧見出し画像サイズ（20px）のフィット感、ダークモード時の視認性は2026-07-20時点でWeb版目視確認のみ、実機未確認
+- **スコープ外（将来検討）**: レベル凡例チップ・スポット詳細シートのレベルバッジへのイラスト適用は今回見送り。将来ユーザーが希望すれば別設計書で再検討（`.claude/plan.md`「設計書81 §4-3・§4-4」に実装方針の概略あり）
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

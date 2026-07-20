@@ -3655,11 +3655,14 @@
     // 既存コース機能（community-courses.json等）とはデータ・ロジックとも完全に独立。
     // コースタブ「スタンプマップ」の入口のみ共有する。
     // ═══════════════════════════════════════════════════════════
+    // 設計書81: レベル解禁演出モーダル・コレクション一覧「ページ」見出しの2箇所のみ、
+    // Nano Banana生成イラストバッジ（img）に置き換える。凡例チップ・スポット詳細バッジは
+    // 絵文字のまま維持（emojiフィールドは全箇所で引き続き参照される、削除しない）。
     const STAMP_LEVEL_META = {
-      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '📍' },
-      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏘' },
-      niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🔎' },
-      special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨' },
+      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '📍', img: '/images/stamp-badges/badge-level-standard.png' },
+      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏘', img: '/images/stamp-badges/badge-level-local.png' },
+      niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🔎', img: '/images/stamp-badges/badge-level-niche.png' },
+      special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png' },
     };
 
     // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。
@@ -4025,8 +4028,9 @@
             ${isNext ? `<span class="stamp-stamp-cell-next-tag">${t('stampNextTargetLabel')}</span>` : ''}
           </div>`;
         }).join('');
+        const levelTitleImgHtml = `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">`;
         return `<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}">
-          <div class="stamp-book-page-title">${meta.emoji} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
+          <div class="stamp-book-page-title">${levelTitleImgHtml} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
           <div class="stamp-book-grid">${cellsHtml}</div>
         </div>`;
       }).join('');
@@ -4197,13 +4201,16 @@
       }
     }
 
-    // ─── レベル解禁演出モーダル（設計書70改善3） ───
+    // ─── レベル解禁演出モーダル（設計書70改善3 → 設計書81でイラスト画像化） ───
     function openStampLevelUnlockModal(level) {
       const meta = STAMP_LEVEL_META[level] || STAMP_LEVEL_META.standard;
       const emojiEl = document.getElementById('stamp-level-unlock-emoji');
       const nameEl = document.getElementById('stamp-level-unlock-name');
       if (emojiEl) {
-        emojiEl.textContent = meta.emoji;
+        // 設計書81: 絵文字textContentからイラスト<img>表示に変更。モーダルを開くたびに
+        // <img>要素を新規生成する方式（設計書75で確立、同一URL連続表示時のload/errorイベント
+        // 未発火リスク回避）。#stamp-level-unlock-emojiはコンテナとして扱う。
+        emojiEl.innerHTML = `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-unlock-img">`;
         // 同じレベルが連続で解禁演出されることは想定しないが、再生成でアニメーションを再生させる保険
         emojiEl.style.animation = 'none';
         void emojiEl.offsetWidth;

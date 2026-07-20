@@ -9368,3 +9368,257 @@ function _renderStampAreaBadges() {
 
 ## 承認状況
 2026-07-20 planner設計。ユーザーがNano Bananaで生成した6エリア分のイラストバッジ画像（`public/images/stamp-badges/`に配置済み）を、設計書78のCSS印章風エリアバッジの「達成時のみ」統合する設計。**ユーザー承認済み**。
+
+# 設計書81 — AI生成レベルバッジイラストの統合（Nano Banana生成、定番/ローカル/ニッチ/スペシャル）
+
+（2026-07-20 planner作成。設計書69〜80で実装済みの「スポット制覇スタンプラリー」機能のうち、設計書80でエリアバッジに統合したNano Banana生成イラストと同じ方針を、レベルバッジ（`STAMP_LEVEL_META`、定番/ローカル/ニッチ/スペシャル）に統合する設計。コード実装は含まない）
+
+## 1. 背景
+
+設計書80で、エリアバッジ（Central/East/West/North/North-East/Sentosa）にNano Banana生成のエナメルピン風イラスト画像を「達成時のみ」統合した。今回はそれとは別軸の「レベルバッジ」（定番/ローカル/ニッチ/スペシャル、`STAMP_LEVEL_META`）にも同様のイラストを統合する。メインエージェントが以下を事前に完了済み。
+
+- 4枚の画像を`public/images/stamp-badges/`に配置済み（Globで実在確認済み）: `badge-level-standard.png`（定番、ヴィンテージカメラ）／`badge-level-local.png`（ローカル、自転車＋ショップハウス）／`badge-level-niche.png`（ニッチ、虫眼鏡＋宝の地図）／`badge-level-special.png`（スペシャル、宝箱）
+- 各256×256pxにリサイズ・PNG圧縮済み（各35〜40KB、透明背景維持）と申告されている（設計書80と同様、plannerはファイル存在のみをGlobで確認しておりピクセルサイズ・実際の絵柄は目視未確認。builder実装時の確認を推奨）
+- **`public/images/`は`.gitignore`対象ではない**ため、この4ファイルは通常のgit管理対象（コミットが必要）。`data/`配下（gitignore対象）と混同しないこと（設計書80のリスク7と同一の注意点）
+
+エリアバッジ（設計書80）と異なり、レベルバッジは「達成/未達成」の二値だけでなく「解禁済み/ロック中」「常時表示の凡例・見出し」など文脈の異なる複数箇所で使われているため、本設計書では各箇所ごとに適用条件・優先順位を個別に判断する。
+
+## 2. 確定済み仕様（ユーザー承認済み・設計書80から踏襲する部分）
+
+1. 画像はイラストとして「完成した1枚絵」であるため、CSS側の追加演出（回転・二重リング・塗りつぶし背景色）とは併用しない（設計書80 §7-3の判断根拠をそのまま踏襲）。
+2. 4画像とレベルの対応:
+   - 定番（`standard`）= ヴィンテージカメラ（`badge-level-standard.png`）
+   - ローカル（`local`）= 自転車＋ショップハウス（`badge-level-local.png`）
+   - ニッチ（`niche`）= 虫眼鏡＋宝の地図（`badge-level-niche.png`）
+   - スペシャル（`special`）= 宝箱（`badge-level-special.png`）
+3. **エリアバッジ（設計書80）と異なり、「達成時のみ」という単純な条件がそのまま当てはまる箇所は無い**。各箇所の状態（解禁済み/ロック中、常時表示/一度きりの演出）に応じて、下記§7で個別に適用条件を判断する。
+
+## 3. 既存コードの調査結果（2026-07-20時点で実ファイルを確認、設計の前提事実）
+
+### 3-1. `STAMP_LEVEL_META`定数（`public/app.js` 3658〜3663行目）
+
+```js
+const STAMP_LEVEL_META = {
+  standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '📍' },
+  local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏘' },
+  niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🔎' },
+  special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨' },
+};
+```
+
+`labelKey`/`color`/`emoji`の3フィールドのみ。設計書80の`STAMP_BADGE_AREAS`と同様、**本設計書の変更対象**として画像パスを表す新規フィールド（例: `img`）を追加する想定。
+
+### 3-2. `meta.emoji`／`STAMP_LEVEL_META`の全参照箇所（`grep -n "STAMP_LEVEL_META\|meta\.emoji"`で洗い出し済み、計6箇所）
+
+ユーザー提示の4箇所に加え、**5つ目・6つ目として以下が判明した**（ユーザー提示リストには含まれていなかった箇所）:
+
+| # | 箇所 | 関数/要素 | 現在の実装 | 表示条件 |
+|---|---|---|---|---|
+| 1 | レベル凡例チップ | `_renderStampLevelLegend()`（3926〜3937行目）、`#stamp-level-legend` | `.stamp-level-chip`（pill形状、`meta.color`のドット＋`meta.emoji`＋ラベル文字列）。ロック中は末尾に` 🔒`付与、`.stamp-level-chip--locked`で`opacity:0.45` | 常時表示（4レベル分、マップ/一覧どちらのビューでも表示、`_applyStampViewMode()`の対象外） |
+| 2 | レベル解禁演出モーダル | `openStampLevelUnlockModal(level)`（4201〜4216行目）、`#stamp-level-unlock-emoji`（`.stamp-unlock-emoji`） | `emojiEl.textContent = meta.emoji`。`@keyframes stampUnlockPop`でポップインアニメーション（`scale(0.3)→scale(1.15)→scale(1)`） | 一度きりの演出（新しいレベルが解禁された瞬間のみモーダル表示） |
+| 3 | コレクション一覧「ページ」見出し | `_renderStampCollectionList()`（3995〜4032行目内、4029行目）、`.stamp-book-page-title` | `${meta.emoji} ${t(meta.labelKey)}`（ロック時は末尾に` 🔒 ` + 注意文） | 常時表示（4レベル分の見出し、レベルごとに1つ） |
+| 4 | マップ上のピン | `_renderStampMarkers()`（3882〜3902行目内、3889/3895行目）、`.stamp-marker-icon`内`<span>${meta.emoji}</span>` | Leaflet `divIcon`、雫形（`border-radius:50% 50% 50% 0`）を`-45deg`回転させたピン。中の`<span>`は`45deg`逆回転してemoji正立化。サイズ30×30px | スポットごとに1つ、マップ表示中は常時表示 |
+| **5（ユーザー未提示）** | **コレクション一覧「制覇済み」スタンプの中身** | `_renderStampCollectionList()`（4009行目）、`.stamp-circle-mark` | `checked`（制覇済み）スポットの円形スタンプ内に`<span class="stamp-circle-mark">${meta.emoji}</span>`表示。CSS印章表現（`.stamp-circle--checked`、塗りつぶし＋回転＋二重リング）と一体 | 個別スポットが制覇済みの場合のみ。**設計書81のスコープ外として明示済み**（ユーザー指示「個別スポットのスタンプ（`.stamp-stamp-cell`）へのレベルイラスト適用はスコープ外」に該当。表中には参考情報として記載するが対象外） |
+| **6（ユーザー未提示）** | **スポット詳細シートのレベルバッジ** | `openStampSpotDetail(spotId)`（4041〜4047行目）、`#stamp-spot-detail-level-badge` | `badgeEl.textContent = \`${meta.emoji} ${t(meta.labelKey)}\`; badgeEl.style.background = meta.color + '22'; badgeEl.style.color = meta.color;`（薄い色付きpillバッジ、テキストとして絵文字＋ラベルを表示） | スポット詳細シートを開くたびに表示（スポット1件ごと） |
+
+**#5は設計書のスコープ外指示に明示的に該当するため、本設計書では以降扱わない。#6は新たに判明した箇所であり、本設計書で扱う対象に追加する（詳細は§7-4）。**
+
+### 3-3. 関連CSS（`public/app.css`）
+
+- `.stamp-level-chip`（1908〜1914行目）: `display:inline-flex; padding:5px 12px; border-radius:50px; font-size:12px; font-weight:700; background:var(--sand);`。`.stamp-level-chip-dot`（8×8pxの色ドット）を内包
+- `.stamp-unlock-emoji`（2079行目）＋`@keyframes stampUnlockPop`（2080〜2084行目）: `font-size:56px; line-height:1;`
+- `.stamp-book-page-title`（1969〜1975行目）: `font-size:13px; font-weight:700;`、`display:flex; align-items:center; gap:6px;`
+- `.stamp-marker-icon`（1937〜1947行目）: 30×30pxの雫形ピン、`-45deg`回転
+- `.stamp-circle--area-img`／`.stamp-area-badge-img`（2064〜2076行目、設計書80で新規追加済み）: エリアバッジ用の画像表示クラス。**本設計書で流用できる参考実装として存在する**（`object-fit:contain`＋`filter:drop-shadow`のパターン）
+
+### 3-4. HTML（`public/index.html`）
+
+- `#stamp-level-legend`（179行目）: `<div id="stamp-level-legend" style="display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px 4px;"></div>`（空コンテナ）
+- `#stamp-level-unlock-emoji`（829行目）: `<div id="stamp-level-unlock-emoji" class="stamp-unlock-emoji">✨</div>`（静的初期値、JSで`textContent`上書き）
+- `#stamp-spot-detail-level-badge`（806行目）: `<div id="stamp-spot-detail-level-badge" style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:50px;"></div>`（空、JSで`textContent`＋インラインstyle上書き）
+
+## 4. 適用箇所の提案と優先順位（本設計書の中心的な判断）
+
+前提: エリアバッジ（設計書80）と異なり「達成/未達成の二値」という単純な条件がそのまま当てはまらないため、各箇所ごとに適用の是非・条件・優先度を以下の基準で判断する。
+
+- **A. 一度きりの演出・達成の瞬間を祝う文脈**: イラストを大きく使う価値が高い。優先度「高」
+- **B. 常時表示だが小サイズで済む・視覚的密度が低い文脈**: 小さめのイラストに差し替える余地があるが、UIの重さ（画像4枚同時ロード・レンダリング）とのトレードオフを要検討。優先度「中」
+- **C. 常時表示かつ視覚的密度が高い、または技術的制約が大きい文脈**: 絵文字のまま維持する方が安全。優先度「低」または対象外
+
+### 4-1. 優先度「高」: レベル解禁演出モーダル（`.stamp-unlock-emoji`）
+
+- **判断: 最優先で適用を提案する**。理由は設計書80の「達成時のみイラスト表示」という発想と最も自然に合致するため。ユーザーが新しいレベルを解禁した「その瞬間」だけに大きく表示される一度きりの演出であり、画像4枚同時ロードの心配もない（1回のモーダル表示につき1枚のみ読み込む）
+- 現状`font-size:56px`の絵文字1文字表示を、同サイズ程度（56〜72px四方程度）のイラスト`<img>`に置き換える案
+- `@keyframes stampUnlockPop`（ポップインアニメーション）は、画像`<img>`要素に対してもそのまま適用可能と考えられる（`transform:scale()`と`opacity`のみのアニメーションのため、対象が絵文字テキストか画像かは技術的に無関係）。**継続利用を推奨**（設計書80が「はんこの回転」と「イラストの固定感」の不一致を理由にCSS演出を切り離したのとは異なり、こちらは「ポップインで登場する」という演出自体がイラストと矛盾しないため）
+
+### 4-2. 優先度「中」: コレクション一覧「ページ」見出し（`.stamp-book-page-title`）
+
+- **判断: 適用を提案するが、サイズは絵文字と同程度の小さいインラインアイコンに留めることを推奨**
+- 現状`${meta.emoji} ${t(meta.labelKey)}`という「絵文字＋テキスト」のインライン表示（`display:flex; align-items:center; gap:6px;`のコンテナ内）を、`<img>`（例: 20〜24px四方）＋テキストに置き換える案
+- 常時表示（4レベル分の見出し、コレクション一覧ビューを開くたびに4枚ロード）だが、画像サイズが小さいためUIが重くなるリスクは低いと考えられる
+- ロック中レベルの見出し（末尾に` 🔒 ` + 注意文が付く）でも同様にイラストを表示するかは論点: ロック中でも「そのレベルが存在すること」を示す見出しのため、イラスト自体は表示してよいと考えられる（ロック済み感は既存の`.stamp-book-page--locked`の`opacity:0.6`で表現されているため、見出し内イラストの解禁/未解禁で出し分ける必要性は低い）。**最終判断はbuilder判断に委ねる**
+
+### 4-3. 優先度「中〜低」: レベル凡例チップ（`#stamp-level-legend`）
+
+- **判断: 適用するかどうかは要検討。以下の二案を提示する**
+  - **案イ（絵文字のまま維持）**: 4チップが横並びに常時表示される、視覚的に最も密度が高い箇所。既存の`.stamp-level-chip`は`padding:5px 12px`の小さなpill形状であり、絵文字1文字を画像に置き換えるメリットが薄い（小さすぎてイラストの意匠が判別しにくい可能性がある）。安全側の選択として絵文字のまま維持する
+  - **案ロ（小さい画像に差し替え）**: 設計書80の`.stamp-circle--area-img`と同様の思想で、`.stamp-level-chip-dot`（現状8×8pxの色ドット）を廃し、絵文字部分（現状インライン文字）を16px程度の小さい`<img>`に置き換える案。ドット（色）とイラスト（絵柄）で情報が重複するため、ドットを廃してイラストのみにするのが自然
+- **plannerの推奨: 案イ（現状維持）を推奨するが、ユーザーの美的判断次第で案ロも許容範囲**。理由: この凡例チップは常時表示・4枚同時ロードとなり、UIの視覚的ノイズが増えるリスクが他の箇所より高い。ユーザーへの確認事項として明記する（§9参照）
+
+### 4-4. 優先度「中〜低」: スポット詳細シートのレベルバッジ（`#stamp-spot-detail-level-badge`、ユーザー未提示・新規判明箇所）
+
+- **判断: 適用するかどうかは要検討。凡例チップと同様の理由で保留気味の優先度とする**
+- 現状は`textContent`によるテキスト（絵文字＋ラベル文字列）＋インラインstyleでの背景色/文字色設定という、他の5箇所と実装方式が異なる（`innerHTML`ではなく`textContent`＋JSプロパティでのstyle操作）。画像を追加するには`textContent`を`innerHTML`に変更する実装上の書き換えが必要になる
+- スポット詳細シートを開くたびに表示される（毎回1回のみのロードのため、UIが重くなるリスクは低い）
+- **plannerの見解: 優先度は中程度だが、実装コスト（`textContent`→`innerHTML`への書き換え、背景色・文字色のインラインstyle設定ロジックの見直しが必要）が他の箇所より高いため、時間・リスクの制約次第で見送っても実害は小さい**。ユーザー確認事項として明記する（§9参照）
+
+### 4-5. 対象外: マップ上のピン（`.stamp-marker-icon`）
+
+- **判断: 対象外とする**（ユーザー提示の推測通り）
+- 理由: 既存のピン形状（雫形、`border-radius:50% 50% 50% 0`を`-45deg`回転させた特殊形状、中の`<span>`は`45deg`逆回転してテキストのみ正立させる仕組み）は、絵文字1文字のような「回転しても違和感の少ない要素」を前提にした実装。正方形の透明背景イラストPNGを同じ回転操作の中に組み込むと、イラスト自体も一緒に回転してしまい不自然に見えるリスクが高い（イラスト内の意匠、例えばヴィンテージカメラの向き等が斜めになる）
+- 30×30pxという小サイズも、イラストの視認性を大きく損なう要因になる
+- 設計書80でもマップピンへのイラスト適用はスコープ外とされており（エリアバッジと同じ判断）、レベルバッジについても同じ判断を踏襲する
+
+### 4-6. 対象外（ユーザー指定通りスコープ外）: コレクション一覧の個別スポットスタンプ（`.stamp-circle-mark`、`.stamp-stamp-cell`内）
+
+- ユーザー指示により明示的にスコープ外（§3-2の表中#5参照）。個別スポットは既存のCSS印章表現（塗りつぶし＋回転＋二重リング＋絵文字/チェックマーク）のまま変更しない
+
+### 4-7. 優先順位まとめ
+
+| 優先度 | 箇所 | 適用方針 |
+|---|---|---|
+| 高（推奨） | レベル解禁演出モーダル（§4-1） | 適用を推奨。設計書80と同じ「達成の瞬間」の発想に最も合致 |
+| 中（推奨） | コレクション一覧「ページ」見出し（§4-2） | 適用を推奨。小サイズインラインアイコンとして |
+| 中〜低（要確認） | レベル凡例チップ（§4-3） | ユーザー判断待ち。plannerは現状維持を推奨 |
+| 中〜低（要確認） | スポット詳細シートのレベルバッジ（§4-4） | ユーザー判断待ち。実装コストがやや高い |
+| 対象外 | マップ上のピン（§4-5） | 技術的制約により対象外 |
+| 対象外（指定済み） | 個別スポットスタンプ（§4-6） | ユーザー指定スコープ外 |
+
+## 5. スコープ外（今回含めない）
+
+- エリアバッジ（設計書80で対応済み、変更しない）
+- 個別スポットのスタンプ（`.stamp-stamp-cell`、`_renderStampCollectionList()`内の各スポット円）へのレベルイラスト適用（ユーザー指定、§4-6参照）
+- マップ上のピン（`.stamp-marker-icon`）へのレベルイラスト適用（技術的制約、§4-5参照）
+- 画像の追加生成・差し替え（4枚で確定）
+- BKK/SYD対応（スタンプラリー機能自体がSG専用の既存方針を踏襲）
+- レベル凡例チップ・スポット詳細シートのレベルバッジへの適用可否の最終決定（§4-3・§4-4、ユーザー確認が必要な論点として保留）
+
+## 6. データモデルの変更点
+
+**変更なし**。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも無変更。画像パスは`STAMP_LEVEL_META`（フロントエンドのJS定数）にハードコードする方式とし、設計書80の`STAMP_BADGE_AREAS`と同じ設計判断（サーバー側データファイルに画像URLフィールドを持たせない、4件固定で今後変わる見込みが薄いため定数への直書きで十分）を踏襲する。
+
+## 7. APIの変更点
+
+**変更なし**。`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`のいずれもレスポンス構造の変更は不要。`server.js`は無変更。画像は`public/images/stamp-badges/`配下の静的ファイルとして、Expressの`express.static`経由でそのまま配信される想定（新規ルート追加不要）。
+
+## 8. フロントエンド設計
+
+### 8-1. `STAMP_LEVEL_META`定数への画像パス追加方法
+
+設計書80の`STAMP_BADGE_AREAS`と同じ命名パターンで、新規フィールド`img`を追加する案:
+
+```js
+const STAMP_LEVEL_META = {
+  standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '📍', img: '/images/stamp-badges/badge-level-standard.png' },
+  local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏘', img: '/images/stamp-badges/badge-level-local.png' },
+  niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🔎', img: '/images/stamp-badges/badge-level-niche.png' },
+  special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png' },
+};
+```
+
+- パスは設計書80と同じくサイトルート相対パス（`/images/...`）で固定。理由も同一（Capacitorローカルバンドル方式のため`public/images/`配下はiOSアプリ内に同梱される。Web環境も同一オリジンの静的ファイルのためAPI_BASEを付けない相対パスで両環境とも解決可能）
+- **`STAMP_LEVEL_META`はオブジェクト直下の値が`meta.emoji`のようにキーアクセスされる形式のため、設計書80の`_computeStampAreaProgress()`のような「分割代入・戻り値オブジェクトの両方に通す」という中間集計関数は存在しない**。各参照箇所が`STAMP_LEVEL_META[level]`または`STAMP_LEVEL_META[spot.level]`で直接`meta`オブジェクトを取得し、その場で`meta.img`にアクセスする形になるため、設計書80で警戒されていた「片方だけの見落とし」パターンのリスクは相対的に低い（構造がシンプル）。ただし§3-2の表で洗い出した6箇所（うち4〜5箇所を対象とする想定）それぞれで`meta.img`への参照を個別に追加する実装になるため、**箇所ごとの実装漏れ（ある箇所だけ画像化を忘れる）のリスクは別途存在する**点に注意（§10リスク参照）
+
+### 8-2. レベル解禁演出モーダルの書き換え方針（優先度「高」、§4-1）
+
+現状（`public/app.js` 4201〜4216行目）:
+```js
+function openStampLevelUnlockModal(level) {
+  const meta = STAMP_LEVEL_META[level] || STAMP_LEVEL_META.standard;
+  const emojiEl = document.getElementById('stamp-level-unlock-emoji');
+  const nameEl = document.getElementById('stamp-level-unlock-name');
+  if (emojiEl) {
+    emojiEl.textContent = meta.emoji;
+    emojiEl.style.animation = 'none';
+    void emojiEl.offsetWidth;
+    emojiEl.style.animation = '';
+  }
+  if (nameEl) nameEl.textContent = t(meta.labelKey);
+  ...
+}
+```
+
+`emojiEl.textContent = meta.emoji`という「テキストとして絵文字を代入する」実装のため、画像化するには`<div id="stamp-level-unlock-emoji">`自体を`innerHTML`で`<img>`を生成する方式に変更するか、`#stamp-level-unlock-emoji`要素自体を空コンテナ化し設計書75と同様のパターン（画像はモーダルを開くたびに新規生成）を踏襲するかの実装判断が必要（**最終的な実装方式はbuilder判断**）。
+
+- `@keyframes stampUnlockPop`のアニメーション再生トリガー（`style.animation = 'none'; void offsetWidth; style.animation = ''`という強制再生テクニック）は、対象がテキスト要素であっても`<img>`を包む`<div>`要素であっても同じ仕組みで機能するはずであり、大きな変更は不要と考えられる
+- HTML側（`public/index.html` 829行目）の`<div id="stamp-level-unlock-emoji" class="stamp-unlock-emoji">✨</div>`という静的初期値（絵文字✨のフォールバック値）は、画像読み込み前のちらつき防止・JS未実行時のフォールバックとして残すか、空にするかはbuilder判断
+
+### 8-3. コレクション一覧「ページ」見出しの書き換え方針（優先度「中」、§4-2）
+
+現状（`public/app.js` 4029行目）:
+```js
+return `<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}">
+  <div class="stamp-book-page-title">${meta.emoji} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
+  <div class="stamp-book-grid">${cellsHtml}</div>
+</div>`;
+```
+
+`${meta.emoji}`の部分を`<img>`タグに置き換える案:
+```js
+const levelIconHtml = `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">`;
+return `<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}">
+  <div class="stamp-book-page-title">${levelIconHtml} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
+  <div class="stamp-book-grid">${cellsHtml}</div>
+</div>`;
+```
+
+- 新規CSSクラス`.stamp-level-title-img`（例: `width:20px;height:20px;object-fit:contain;vertical-align:middle;`）を追加する想定。`.stamp-book-page-title`は既に`display:flex;align-items:center;gap:6px;`のため、絵文字を画像`<img>`に単純置換するだけで既存のレイアウト（flexアイテムとして横並び）はそのまま機能する見込み
+- ロック中ページ（`.stamp-book-page--locked`、`opacity:0.6`）でも画像は変わらず表示される（§4-2の判断通り）
+
+### 8-4. レベル凡例チップ・スポット詳細シートのレベルバッジ（優先度「中〜低」、要ユーザー確認）
+
+§4-3・§4-4で判断保留とした2箇所について、**ユーザーが適用を希望する場合の実装方針の概略のみ**を記載する（最終決定・具体的なCSS数値はユーザー確認後に別途詳細化する）。
+
+- レベル凡例チップ（`_renderStampLevelLegend()`）: `.stamp-level-chip-dot`（8×8pxの色ドット）を廃し、絵文字部分を`<img class="stamp-level-chip-img">`（例: 16×16px）に置き換える案。ロック中は`.stamp-level-chip--locked`の`opacity:0.45`がそのまま画像にも適用される（`opacity`はCSSプロパティのため画像・テキストを問わず機能する）
+- スポット詳細シートのレベルバッジ（`openStampSpotDetail()`）: 現状`textContent`＋インラインstyleでの背景色/文字色設定のため、`innerHTML`に切り替えて`<img>`＋テキストを両方セットする実装変更が必要。背景色（`meta.color + '22'`、16進数末尾に透明度を追加する簡易手法）・文字色（`meta.color`）は画像化してもテキストラベル部分には引き続き必要（画像自体は背景色付きpillの中に小さく添える形になる）
+
+### 8-5. ダークモード対応
+
+- 画像自体（PNG）はライト/ダーク共通の1種類のみ（ダークモード専用の別画像は生成していない、スコープ外）。設計書80と同じ前提
+- レベル解禁演出モーダルの背景（`var(--warm-white)`）・コレクション一覧「ページ」の背景（`var(--cream)`）とも既存CSS変数ベースのため、画像の視認性はダークモード切り替え時に目視確認が必要（§10未解決事項）
+
+## 9. i18n変更点
+
+- **新規i18nキーなし**。`alt`属性には`t(meta.labelKey)`（既存の`stampLevelStandard`/`stampLevelLocal`/`stampLevelNiche`/`stampLevelSpecial`キー、ja/en両方に既存定義済み）をそのまま使う。
+
+## 10. 既知の未解決事項
+
+1. **§4-3（レベル凡例チップ）・§4-4（スポット詳細シートのレベルバッジ）への適用可否は本設計書では最終決定していない**。ユーザーに以下を確認する必要がある:
+   - 凡例チップ4個を常時横並びで小さい画像に置き換えることを望むか、絵文字のまま維持してよいか
+   - スポット詳細シートのレベルバッジも画像化するか（実装コストがやや高いため、他3箇所を先行実装し様子を見てから追加判断する案も許容範囲）
+2. **画像とコンテナのフィット感の微調整**: 特にコレクション一覧見出し（20px程度想定）・凡例チップ（16px程度想定、適用する場合）という小サイズでの視認性は、Web版での目視確認をしながらbuilderが微調整する必要がある（設計書80の未解決事項1と同種の論点）
+3. **ダークモード時の視認性**: 暖色系（テラコッタ〜ブロンズ系と想定される4画像）のイラストが、ダークモード背景でどう見えるかは未検証
+4. **画像読み込み失敗時のフォールバック**: 4ファイルは配置済み確認済みだが、`onerror`によるフォールバック（絵文字表示への切り替え等）を追加するかは、設計書80の未解決事項3と同様builder判断に委ねる（必須要件ではない）
+5. **iOS実機での表示**: 設計書69〜80自体がTestFlightビルド未実施のため、本統合もWeb版での確認が先行する
+6. **`openStampLevelUnlockModal()`のHTML構造変更方法**: `textContent`によるテキスト代入から画像`<img>`表示への切り替え方法（要素自体をコンテナ化するか、`innerHTML`で都度上書きするか）は§8-2の通りbuilder判断に委ねている。設計書75で確立された「モーダルを開くたびに`<img>`要素を新規生成する」パターン（同一URL連続表示時のload/errorイベント未発火リスク回避）を踏襲することを推奨する
+7. **4画像の実際のピクセルサイズ・意匠の目視確認未実施**: plannerはGlobでファイル存在のみ確認しており、実際に4画像がヴィンテージカメラ/自転車＋ショップハウス/虫眼鏡＋宝の地図/宝箱のモチーフで正しく生成されているかは未確認（設計書80の未解決事項5と同種の注意点）。
+
+## 11. リスク
+
+1. **箇所ごとの実装漏れリスク**: §8-1で述べた通り、`STAMP_LEVEL_META`は分割代入を経由しないシンプルな構造のためエリアバッジ型の「片方だけ変更する見落とし」は起きにくいが、代わりに「6箇所中どこまで画像化するかがユーザー確認待ちで確定していない」ため、**実装対象箇スコープの認識齟齬（本来対象外の箇所を誤って変更する、または対象の箇所を変更し忘れる）のリスクがある**。builder着手前に、本設計書§4-7の優先順位表とユーザーの最終確認結果を突き合わせて対象範囲を確定させること。
+2. **`.stamp-circle--checked`／`.stamp-circle-mark`との混同リスク**: §4-6で明示した通り、個別スポットの制覇済みスタンプ（`.stamp-circle-mark`内の`meta.emoji`）はスコープ外。レベルバッジ関連の書き換え作業中に誤ってこの箇所まで変更しないよう、実装時に対象行番号を明確に区別すること（`_renderStampCollectionList()`内に「ページ見出し」（対象）と「個別スタンプの中身」（対象外）の両方が同居しているため、同一関数内での誤爆リスクがある）。
+3. **`openStampLevelUnlockModal()`のHTML構造変更に伴う既存アニメーションへの回帰リスク**: `@keyframes stampUnlockPop`の強制再生トリガー（`style.animation`の`none`→空文字リセット）が、テキスト要素から画像を包む要素に変わっても正しく動作するかは実装後の確認が必要。
+4. **画像のコンテナフィット感が実機で崩れるリスク**: 特に凡例チップ（適用する場合）のような16px級の極小サイズでは、`object-fit:contain`でも画像内の意匠が判別しにくくなる可能性がある。設計書80の未解決事項4と同種のリスク。
+5. **iOS実機未検証**: 設計書69〜80自体がTestFlightビルド未実施のため、本統合もWeb版での検証が先行する。
+6. **ダークモード時の見た目未検証**: 実装時にWeb版でのダークモード切り替え目視確認が必要。
+7. **画像ファイルがgit管理対象であることの見落としリスク**: `public/images/`は`.gitignore`対象外。builderがコミット時に画像ファイル4件を含め忘れないよう注意（設計書80のリスク7と同一）。
+
+## 12. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 本設計書はAPIレスポンス構造・データモデルに一切変更を加えない、フロントエンド（`public/app.js`・`public/app.css`）と静的画像ファイル（`public/images/stamp-badges/`配下の新規4ファイル）の追加のみのため、旧バージョンのApp Store版アプリへの影響はゼロ。設計書69〜80自体がまだTestFlightビルド・App Store配信されていないため、実質的な後方互換リスクはない。
+2. **影響範囲**: Web版・App Store版の両方に同時に反映される変更。`server.js`・`data/`配下のデータファイルには一切触れないため、Web版への反映は静的ファイルの追加＋キャッシュバスティングのみで即座に反映可能（`pm2 restart`不要）。iOS版はCapacitorのローカルバンドル方式のため、画像ファイルの反映には次回TestFlightビルド（`npx cap sync`を含むCIフロー）が必要。
+3. **リリースタイミング**: 設計書69〜80と合わせて次回のTestFlightビルドで一括リリースする形が自然。
+4. **App Store Connect側の追加対応は不要**: 新規権限・新規トラッキング等を一切伴わない、既存機能の見た目変更のみ。
+
+## 承認状況
+2026-07-20 planner設計。ユーザーがNano Bananaで生成した4レベル分のイラストバッジ画像（`public/images/stamp-badges/`に配置済み）を、設計書78のCSS印章風レベル表示に統合する設計。**ユーザー承認済み**。§4-3（レベル凡例チップ）は絵文字のまま維持（見送り）、§4-4（スポット詳細シートのレベルバッジ）も今回は見送り。**実装対象は§4-1（レベル解禁演出モーダル）・§4-2（コレクション一覧ページ見出し）の2箇所のみに確定**。
