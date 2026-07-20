@@ -434,6 +434,12 @@
         toastStampCheckinError: 'チェックインに失敗しました。もう一度お試しください。',
         toastStampLevelUnlocked: '🔓 新しいレベルが解禁されました！',
         stampLocationPermDenied: '位置情報の利用が許可されていません。端末の設定から許可してください。',
+        stampViewToggleMap: '🗺️ 地図で見る',
+        stampViewToggleList: '📖 一覧で見る',
+        stampCollectionLockedNote: 'このレベルはまだロック中です',
+        stampNextTargetLabel: '次はここ！',
+        stampLevelUnlockModalTitle: '新しいレベルが解禁されました！',
+        stampLevelUnlockModalClose: '閉じる',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '軸にするイベント',
         coursePinsHint: '軸にするイベントをタップして選んでください',
@@ -690,6 +696,12 @@
         toastStampCheckinError: 'Check-in failed. Please try again.',
         toastStampLevelUnlocked: '🔓 A new level has been unlocked!',
         stampLocationPermDenied: 'Location access is not allowed. Please enable it in device settings.',
+        stampViewToggleMap: '🗺️ Map view',
+        stampViewToggleList: '📖 List view',
+        stampCollectionLockedNote: 'This level is still locked',
+        stampNextTargetLabel: 'Next up!',
+        stampLevelUnlockModalTitle: 'New level unlocked!',
+        stampLevelUnlockModalClose: 'Close',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: 'Base pinned event',
         coursePinsHint: 'Tap to select',
@@ -2152,6 +2164,8 @@
       ['cal-passphrase-submit-btn',    () => submitCalPassphrase()],
       ['stamp-spot-detail-overlay', () => closeStampSpotDetail()],
       ['stamp-checkin-btn', () => doStampCheckin()],
+      ['stamp-view-toggle-btn', () => toggleStampViewMode()],
+      ['stamp-level-unlock-overlay', () => closeStampLevelUnlockModal()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -3651,6 +3665,7 @@
     let _stampSelectedSpot = null;
     let _stampMapInitialized = false;
     let _stampLocationWatchStarted = false;
+    let _stampViewMode = 'map'; // 'map' | 'list'（設計書70改善1、地図が主役という設計書69の元コンセプトを尊重しデフォルトはマップ）
 
     // Capacitor Geolocationプラグイン取得（registerPlugin優先→Pluginsフォールバック、既存Keyboard/PushNotificationsと同じ防御的パターン）
     let _CapGeo = null;
@@ -3713,15 +3728,57 @@
       if (contentEl) contentEl.style.display = 'block';
 
       await _loadStampSpotsAndProgress();
+      _applyStampViewMode();
       _ensureStampLeafletMap();
       _renderStampMarkers();
       _renderStampFog();
       _renderStampLevelLegend();
       _renderStampProgressSummary();
+      _renderStampCollectionList();
 
       // 現在地を取得しておく（詳細シートを開いた際のチェックインボタン活性判定に使う）。
       // 権限リクエストのタイミングはマップタブオープン時に一括で行う設計（実装判断、設計書69未解決事項8）
       _getCurrentPositionOnce().then(pos => { _stampCurrentPos = pos; });
+    }
+
+    // ─── マップ⇄一覧 表示切り替え（設計書70改善1） ───
+    // マップは一度初期化したLeafletインスタンスを破棄せず display:none にするのみ（既存の
+    // 「タブ切替でdisplay:noneから復帰した直後はコンテナサイズが正しく取得できない」注意点を踏襲し、
+    // 一覧⇄マップ切り替え時も invalidateSize() を呼ぶ）
+    function toggleStampViewMode() {
+      _stampViewMode = _stampViewMode === 'map' ? 'list' : 'map';
+      _applyStampViewMode();
+      if (_stampViewMode === 'map') {
+        setTimeout(() => { _stampLeafletMap && _stampLeafletMap.invalidateSize(); }, 60);
+      }
+    }
+
+    function _applyStampViewMode() {
+      const mapEl = document.getElementById('stamp-map-view-inner');
+      const legendEl = document.getElementById('stamp-level-legend');
+      const listEl = document.getElementById('stamp-collection-list');
+      const toggleBtn = document.getElementById('stamp-view-toggle-btn');
+      const isMap = _stampViewMode === 'map';
+      if (mapEl) mapEl.style.display = isMap ? 'block' : 'none';
+      if (legendEl) legendEl.style.display = isMap ? 'flex' : 'none';
+      if (listEl) listEl.style.display = isMap ? 'none' : 'block';
+      if (toggleBtn) toggleBtn.textContent = t(isMap ? 'stampViewToggleList' : 'stampViewToggleMap');
+    }
+
+    // ─── 「次はここ」判定（設計書70改善2） ───
+    // 解禁済みレベルを STAMP_LEVEL_ORDER_CLIENT の順に見ていき、そのレベル内で order 最小から
+    // 順に未チェックのスポットを探索し、最初に見つかったものを「次に狙うべきスポット」とする。
+    // 全解禁済みレベルを制覇済みの場合は null を返す（コンプリート状態、今回は特別演出なしの最小対応）
+    function _computeStampNextTarget() {
+      for (const level of STAMP_LEVEL_ORDER_CLIENT) {
+        if (!_stampProgress.unlockedLevels.includes(level)) continue;
+        const spotsInLevel = _stampSpots
+          .filter(s => s.level === level)
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        const next = spotsInLevel.find(s => !_stampSpotIsChecked(s.id));
+        if (next) return next;
+      }
+      return null;
     }
 
     async function _loadStampSpotsAndProgress() {
@@ -3771,12 +3828,17 @@
     function _renderStampMarkers() {
       if (!_stampMarkersLayer) return;
       _stampMarkersLayer.clearLayers();
+      const nextTarget = _computeStampNextTarget();
       _stampSpots.forEach(spot => {
         const checked = _stampSpotIsChecked(spot.id);
+        const isNext = !!nextTarget && nextTarget.id === spot.id;
         const meta = STAMP_LEVEL_META[spot.level] || STAMP_LEVEL_META.standard;
+        const badgeHtml = (typeof spot.order === 'number')
+          ? `<div class="stamp-marker-badge">${spot.order}</div>`
+          : '';
         const icon = L.divIcon({
           className: '',
-          html: `<div class="stamp-marker-icon ${checked ? 'stamp-marker-icon--checked' : 'stamp-marker-icon--unchecked'}"><span>${meta.emoji}</span></div>`,
+          html: `<div class="stamp-marker-icon ${checked ? 'stamp-marker-icon--checked' : 'stamp-marker-icon--unchecked'} ${isNext ? 'stamp-marker-icon--next' : ''}" style="position:relative;"><span>${meta.emoji}</span>${badgeHtml}</div>`,
           iconSize: [30, 30],
           iconAnchor: [15, 30],
         });
@@ -3831,6 +3893,53 @@
         .replace('{unlocked}', String(unlockedCount))
         .replace('{checked}', String(checked))
         .replace('{total}', String(total));
+    }
+
+    // ─── コレクション一覧ビュー（設計書70改善1・2） ───
+    // レベルごとにグルーピングし、各グループ内は order 昇順で表示。番号バッジ・「次はここ」ハイライトを併記する。
+    // special レベルは既存サーバー仕様（未解禁時は GET /api/stamp-spots のレスポンス自体から除外）をそのまま踏襲するため、
+    // フロント側で追加のフィルタ処理は不要（_stampSpots に含まれているものだけを描画すれば良い）
+    function _renderStampCollectionList() {
+      const el = document.getElementById('stamp-collection-list');
+      if (!el) return;
+      const nextTarget = _computeStampNextTarget();
+      const lang = getLang();
+
+      const groups = STAMP_LEVEL_ORDER_CLIENT
+        .map(level => ({ level, spots: _stampSpots.filter(s => s.level === level) }))
+        .filter(g => g.spots.length > 0);
+
+      el.innerHTML = groups.map(({ level, spots }) => {
+        const meta = STAMP_LEVEL_META[level];
+        const unlocked = _stampProgress.unlockedLevels.includes(level);
+        const sorted = [...spots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        const cardsHtml = sorted.map(spot => {
+          const checked = _stampSpotIsChecked(spot.id);
+          const isNext = unlocked && !!nextTarget && nextTarget.id === spot.id;
+          const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+          const cls = ['stamp-collection-card'];
+          if (!unlocked) cls.push('stamp-collection-card--locked');
+          if (checked) cls.push('stamp-collection-card--checked');
+          if (isNext) cls.push('stamp-collection-card--next');
+          const tagHtml = checked
+            ? `<span class="stamp-collection-card-tag stamp-collection-card-tag--checked">${t('stampCheckedInBadge')}</span>`
+            : isNext
+              ? `<span class="stamp-collection-card-tag stamp-collection-card-tag--next">${t('stampNextTargetLabel')}</span>`
+              : !unlocked ? `<span>🔒</span>` : '';
+          return `<div class="${cls.join(' ')}" ${unlocked ? `onclick="openStampSpotDetail('${spot.id}')"` : ''}>
+            <div class="stamp-collection-card-badge">${typeof spot.order === 'number' ? spot.order : '?'}</div>
+            <div class="stamp-collection-card-body">
+              <div class="stamp-collection-card-name">${name}</div>
+              <div class="stamp-collection-card-area">${spot.area || ''}</div>
+            </div>
+            ${tagHtml}
+          </div>`;
+        }).join('');
+        return `<div class="stamp-collection-group ${unlocked ? '' : 'stamp-collection-group--locked'}">
+          <div class="stamp-collection-group-title">${meta.emoji} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
+          ${cardsHtml}
+        </div>`;
+      }).join('');
     }
 
     // ─── スポット詳細シート ───
@@ -3947,12 +4056,15 @@
         };
         showToast(t('toastStampCheckinSuccess'));
         if (_stampProgress.unlockedLevels.length > prevUnlockedCount) {
-          setTimeout(() => showToast(t('toastStampLevelUnlocked')), 1600);
+          // 新しく解禁されたレベル（複数レベルが一度に解禁されるケースは想定しないが、念のため配列末尾＝最新を採用）
+          const newlyUnlockedLevel = _stampProgress.unlockedLevels[_stampProgress.unlockedLevels.length - 1];
+          setTimeout(() => openStampLevelUnlockModal(newlyUnlockedLevel), 1600);
         }
         _renderStampMarkers();
         _renderStampFog();
         _renderStampLevelLegend();
         _renderStampProgressSummary();
+        _renderStampCollectionList();
         const checkedEl = document.getElementById('stamp-spot-detail-checked');
         if (checkedEl) checkedEl.style.display = 'block';
         _updateStampCheckinButton();
@@ -3960,6 +4072,30 @@
         showToast(t('toastStampCheckinError'));
         if (btn) btn.disabled = false;
       }
+    }
+
+    // ─── レベル解禁演出モーダル（設計書70改善3） ───
+    function openStampLevelUnlockModal(level) {
+      const meta = STAMP_LEVEL_META[level] || STAMP_LEVEL_META.standard;
+      const emojiEl = document.getElementById('stamp-level-unlock-emoji');
+      const nameEl = document.getElementById('stamp-level-unlock-name');
+      if (emojiEl) {
+        emojiEl.textContent = meta.emoji;
+        // 同じレベルが連続で解禁演出されることは想定しないが、再生成でアニメーションを再生させる保険
+        emojiEl.style.animation = 'none';
+        void emojiEl.offsetWidth;
+        emojiEl.style.animation = '';
+      }
+      if (nameEl) nameEl.textContent = t(meta.labelKey);
+      lockScroll();
+      document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
+      document.getElementById('stamp-level-unlock-modal').classList.add('visible');
+    }
+
+    function closeStampLevelUnlockModal() {
+      unlockScroll();
+      document.getElementById('stamp-level-unlock-overlay').classList.remove('visible');
+      document.getElementById('stamp-level-unlock-modal').classList.remove('visible');
     }
 
     // コース一覧レンダリング

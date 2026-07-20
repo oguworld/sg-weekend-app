@@ -1922,6 +1922,62 @@
     .stamp-marker-icon span { transform: rotate(45deg); font-size: 14px; }
     .stamp-marker-icon--checked { background: var(--caramel); }
     .stamp-marker-icon--unchecked { background: var(--warm-gray); }
+    .stamp-marker-icon--next { animation: stampNextPulse 1.6s ease-in-out infinite; }
+    .stamp-marker-badge {
+      position: absolute; top: -6px; left: -6px;
+      width: 17px; height: 17px; border-radius: 50%;
+      background: var(--midnight); color: white;
+      font-size: 10px; font-weight: 700; line-height: 17px; text-align: center;
+      transform: rotate(45deg); border: 1.5px solid white;
+    }
+    @keyframes stampNextPulse {
+      0%, 100% { transform: rotate(-45deg) scale(1); }
+      50% { transform: rotate(-45deg) scale(1.18); }
+    }
+
+    /* ─── スタンプ帳/コレクション一覧ビュー（設計書70改善1・2） ─── */
+    .stamp-collection-group { margin-bottom: 18px; }
+    .stamp-collection-group-title {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 700; color: var(--warm-gray);
+      letter-spacing: 0.04em; margin-bottom: 8px;
+    }
+    .stamp-collection-group--locked .stamp-collection-group-title { opacity: 0.55; }
+    .stamp-collection-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 14px;
+      background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      margin-bottom: 8px; cursor: pointer;
+    }
+    .stamp-collection-card--locked { opacity: 0.5; cursor: default; }
+    .stamp-collection-card--checked { background: var(--caramel-pale); }
+    .stamp-collection-card--next { box-shadow: 0 0 0 2px var(--caramel); }
+    .stamp-collection-card-badge {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--sand); color: var(--midnight);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+    }
+    .stamp-collection-card--checked .stamp-collection-card-badge { background: var(--caramel); color: white; }
+    .stamp-collection-card-body { flex: 1; min-width: 0; }
+    .stamp-collection-card-name {
+      font-size: 14px; font-weight: 700; color: var(--midnight);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stamp-collection-card-area { font-size: 12px; color: var(--warm-gray); margin-top: 1px; }
+    .stamp-collection-card-tag {
+      flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 50px;
+    }
+    .stamp-collection-card-tag--next { background: var(--caramel); color: white; }
+    .stamp-collection-card-tag--checked { color: var(--caramel); }
+
+    /* ─── レベル解禁演出モーダル（設計書70改善3） ─── */
+    .stamp-unlock-emoji { font-size: 56px; line-height: 1; animation: stampUnlockPop 0.6s cubic-bezier(.32,2,.55,.89); }
+    @keyframes stampUnlockPop {
+      0% { transform: scale(0.3); opacity: 0; }
+      60% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
 
     .course-card {
       border-radius: 14px; overflow: hidden;

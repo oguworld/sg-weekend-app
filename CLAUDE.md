@@ -112,11 +112,23 @@ sg-weekend-app/
 - **段階ゲート**: `standard`は常時解禁。`local`/`niche`/`special`は前レベルを2件チェックインすると解禁（`server.js`の`STAMP_LEVEL_GATES`定数）。`special`レベルのスポットは未解禁ユーザーには`GET /api/stamp-spots`のレスポンス自体から除外される（フロントのフィルタだけに頼らず、ピンの存在自体をサーバー側で隠す設計）
 - **API**: `GET /api/stamp-spots?city=sg`（認証不要、`verifyAppJwtOptional`で任意認証しspecial出し分け）、`GET /api/stamp-progress/me`（`requireAppAuth`必須）、`POST /api/stamp-progress/checkin`（`requireAppAuth`必須、`{spotId,lat,lng}`、`withFileLock`、冪等）。**v1はサーバー側のGPS距離検証を行わずクライアント申告のlat/lngをそのまま信用する**（GPS偽装対策は既知の残課題、必要になれば後日サーバー側検証を追加）
 - **フロントエンド**: Leaflet 1.9.4を`public/vendor/leaflet/`にローカルバンドル（CDNではなくオフライン起動時の読み込み失敗リスクを回避）、OpenStreetMapタイル使用（APIキー不要）。フォグ・オブ・ウォーは新規イラスト素材なし、`#stamp-fog-overlay`に複数の`radial-gradient`を`background`として重ねてチェックイン済みスポット周辺だけ霧を薄くする方式（`mask-image`/`mask-composite`はブラウザ間差のリスクを考慮し不採用）。GPS近接判定+手動確認ボタンの2段階チェックイン（`@capacitor/geolocation`新規導入、Web版は`navigator.geolocation`フォールバック、Haversine距離計算で`checkinRadiusM`圏内のみボタン活性化）。ログイン必須（`getAuthToken()`で判定、未ログイン時は連携案内のみ表示）、パスフレーズ暗号化は無し（既存`requireAppAuth`保護で十分という設計判断）
-- z-index: `#stamp-spot-detail-overlay`3700/`#stamp-spot-detail-sheet`3701
+- z-index: `#stamp-spot-detail-overlay`3700/`#stamp-spot-detail-sheet`3701（設計書70で`#stamp-level-unlock-overlay`3702/`#stamp-level-unlock-modal`3703を追加、下記参照）
 - iOS: `ios-app/package.json`に`@capacitor/geolocation@^6.0.0`追加、`.github/workflows/ios-deploy.yml`に`NSLocationWhenInUseUsageDescription`のInfo.plist追加ステップを新設
 - スコープ外（v1未実装）: 位置情報プッシュ通知、既存AIコースのマップ統合、BKK/SYD対応、スポットデータの自動収集、進捗のゼロ知識暗号化バックアップ、SNSシェア・複数ユーザーランキング、Android対応
 - **App Store Connect「Appプライバシー」申告フォームの位置情報利用に関する更新はコード対応不可、ユーザー側の手動作業として次回審査提出前に必要**（設計書65のアカウント削除機能時と同様の注意点）
 - **未検証（次回TestFlightビルド後）**: 実機でのLeafletタッチ操作・フォグ演出の見た目とパフォーマンス・位置情報権限ダイアログの表示タイミング・実際のGPSでのチェックインフロー
+
+### スタンプラリー体験改善（2026-07-20実装、設計書70）
+設計書69実装後のユーザーフィードバック「ワクワク感・順番に制覇していく感・コンプ感がない」を受けた改善。3点実装。
+
+- **データ**: `data/sg/stamp-spots.json`の既存14件全件に`order`フィールド（各レベル内1始まりの連番）を追加。単純な配列順ではなく、**各レベル内で地理的に回りやすい順番**（緯度経度から見て近い場所同士が近い番号）を人力で検討して割り当てた（standard: merlion-park1→marina-bay-sands2→gardens-supertree3→singapore-zoo4、local: tiong-bahru1→chinatown2→tekka3→east-coast4、niche: haw-par-villa1→rail-corridor2→kampong-glam3→pulau-ubin4、special: istana1→labrador2）。`name`/`lat`/`lng`等の既存フィールドは無変更。サーバーコード変更なしで`GET /api/stamp-spots`のレスポンスに自動反映（`loadStampSpots()`がファイルをそのままパースして返すため）
+- **改善1（コレクション一覧ビュー）**: コース画面「スタンプマップ」タブ内に、地図⇄一覧の表示切り替えトグル（`#stamp-view-toggle-btn`）を新設。デフォルトは地図表示（`_stampViewMode='map'`、設計書69の「地図が主役」コンセプトを尊重）。一覧はレベルごとにグルーピングし各グループ内`order`昇順、制覇済み/未制覇/ロック中の3状態を視覚的に区別（`_renderStampCollectionList()`、新規CSS `.stamp-collection-*`）。マップ切替時はLeafletインスタンスを破棄せず`display:none`のみ、地図に戻る際は`invalidateSize()`を再呼び出し
+- **改善2（「順番」の示唆）**: `_computeStampNextTarget()`が解禁済みレベルを順に見ていき、レベル内で`order`最小から未チェックのスポットを探索して「次に狙うべきスポット」を算出（クライアント側実装のみ、サーバー側の対応関数は未実装）。マップ上のピンに番号バッジ（`.stamp-marker-badge`）追加、「次はここ」スポットは脈動アニメーション（`.stamp-marker-icon--next`）。一覧ビューにも同じ番号バッジと「次はここ！」タグを表示し、マップ・一覧で一貫した視覚的手がかりを使用
+- **改善3（レベル解禁演出モーダル）**: 新規`#stamp-level-unlock-overlay`(z-index 3702)/`#stamp-level-unlock-modal`(z-index 3703)。既存`.plan-modal`パターン（スライドイン、`.visible`トグル）を踏襲。`doStampCheckin()`内の`setTimeout(() => showToast(...), 1600)`を`openStampLevelUnlockModal(level)`呼び出しに置き換え（チェックイン成功トースト自体・1.6秒後のタイミングは維持）。レベル絵文字にCSSバウンスアニメーション。confetti等のライブラリは未導入
+- i18n: `stampViewToggleMap`/`stampViewToggleList`/`stampCollectionLockedNote`/`stampNextTargetLabel`/`stampLevelUnlockModalTitle`/`stampLevelUnlockModalClose`の6キーをja/en同時追加。既存`toastStampLevelUnlocked`キーは呼び出し元がなくなったが死にキーとして残置
+- キャッシュバスティング: `index.html` app.js?v=20260720a、app.css?v=20260720a、`sw.js` CACHE_NAME=sg-weekend-v630
+- スコープ外（今回未実装）: 完全制覇時のフィナーレ演出、段階ゲート閾値変更、BKK/SYD対応、GPS偽装対策（設計書69から持ち越しの既存未解決事項）
+- **未検証（次回TestFlightビルド後）**: iOS実機でのLeaflet地図上の番号バッジタップ精度・「次はここ」脈動アニメーション・レベル解禁モーダルのスライドイン滑らかさ・一覧⇄マップ切替の挙動
 
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）

@@ -7262,3 +7262,197 @@ Set export compliance in Info.plist
 3. **位置情報権限のApp Store Connect申告（データ共有影響4）**: コード実装（`NSLocationWhenInUseUsageDescription`のInfo.plist追加）は今回のスコープに含めるが、App Store Connect「Appプライバシー」申告フォームの更新はユーザー側の手動作業として次回TestFlight/審査提出前に別途対応する残タスクとする
 
 上記3点は`.claude/next.md`に残タスクとして記録すること（closer実施時）。それ以外の未解決事項（段階ゲート閾値、category分類体系、Leaflet導入方式、フォグ演出のCSS実装方式、権限リクエストタイミング等）はbuilderの実装判断に委ねる。
+
+# 設計書70 — スタンプラリー体験改善（コレクション一覧・順番の示唆・解禁演出）
+
+（2026-07-20 planner作成。設計書69で実装済みの「スポット制覇スタンプラリー」機能に対するユーザーフィードバック「ワクワク感・順番に制覇していく感・コンプ感がない」を受けた体験改善設計。コード実装は含まない）
+
+## 1. 背景
+
+設計書69で実装済みのスタンプラリー機能（コース画面「スタンプマップ」タブ、Leaflet地図＋フォグ・オブ・ウォー＋4段階レベルゲート）をユーザーがレビューした結果、以下のフィードバックを受けた。
+
+> 「ワクワク感というか順番に制覇していく感、コンプ感がない」
+
+メインエージェントとユーザーの相談により、原因は次の3点に整理され、それぞれへの対策が合意された。
+
+1. 地図上のピンでしか進捗が見えず、全体像（あと何個・どのレベルが残っているか）を俯瞰できない → **改善1: コレクション一覧ビュー**
+2. スポットに「順番」の概念が一切なく、次にどこを狙うべきかの示唆がない → **改善2: 「順番」の示唆**
+3. レベル解禁という機能上最も気持ちよくあるべき瞬間が、テキストのみの`showToast()`2連発という控えめな通知に留まっている → **改善3: レベル解禁演出の強化**
+
+3つとも実装対象としてユーザー承認済み（優先順位は1→4→3の順で提示されたが、最終的に3つとも今回のスコープに含む）。
+
+## 2. 既存コード調査結果（設計の前提事実、2026-07-20時点で実ファイルを確認）
+
+- `public/app.js`
+  - `STAMP_LEVEL_META`（3639〜3644行目）: `{ standard: {labelKey, color, emoji}, local, niche, special }`の4段階メタ情報
+  - `STAMP_LEVEL_ORDER_CLIENT`（3822行目）= `['standard', 'local', 'niche', 'special']`
+  - `_stampSpots`（3648行目）: `GET /api/stamp-spots`のレスポンス配列をそのまま保持するモジュールスコープ変数
+  - `_stampProgress`（3649行目）: `{ checkedInSpotIds: [], unlockedLevels: ['standard'] }`
+  - `switchCourseTab(tab)`（3588〜3632行目）: `tab==='map'`のとき`#course-list`を隠し`#stamp-map-view`を表示、`initStampMapTab()`を呼ぶ。既存2タブ（`everyone`/`mylist`）ロジックは無変更の副作用ゼロ追加分岐
+  - `initStampMapTab()`（3704〜3725行目）: ログイン必須チェック→`_loadStampSpotsAndProgress()`→`_ensureStampLeafletMap()`→`_renderStampMarkers()`/`_renderStampFog()`/`_renderStampLevelLegend()`/`_renderStampProgressSummary()`の順で呼ぶ
+  - `_renderStampMarkers()`（3771〜3786行目）: `_stampSpots`を単純`forEach`し、`L.divIcon`でチェック済み/未チェックの2色マーカーを生成、`marker.on('click', () => openStampSpotDetail(spot.id))`
+  - `_renderStampLevelLegend()`（3810〜3821行目）: レベルチップ一覧（`.stamp-level-chip`）をレンダリング。ロック中は`stamp-level-chip--locked`（opacity 0.45）+ 🔒サフィックス
+  - `_renderStampProgressSummary()`（3824〜3834行目）: `#stamp-progress-summary`に1行テキスト（`stampProgressSummary`キー、`{unlocked}/{checked}/{total}`埋め込み）をセットするのみ
+  - `openStampSpotDetail(spotId)`（3837〜3870行目）/`closeStampSpotDetail()`（3872〜3878行目）: スポット詳細シートの開閉。`_stampSelectedSpot`にセットしてから`.classList.add('visible')`
+  - `_updateStampCheckinButton()`（3880〜3921行目）: チェックインボタンの活性・文言制御（制覇済み/未解禁/位置情報なし/遠い/OK の5状態）
+  - `doStampCheckin()`（3923〜3963行目）: チェックインAPI呼び出し。成功時`showToast(t('toastStampCheckinSuccess'))`、レベル解禁時（`unlockedLevels.length > prevUnlockedCount`）は`setTimeout(() => showToast(t('toastStampLevelUnlocked')), 1600)`という**トースト2連発のみ**でモーダル演出は無し
+  - `showToast(msg)`（6526〜6531行目）: `#toast`要素に`textContent`セット→`.show`クラス付与→2.5秒後除去、という汎用の1行テキストトースト。改善3のレベル解禁モーダルはこれとは別に新設が必要
+  - `.plan-modal`パターン（`public/app.css` 2644〜2699行目）: `position:fixed;bottom:0`+`transform:translateY(100%)→0`のスライドインアニメーション（`transition: transform 0.3s cubic-bezier(.32,2,.55,.89)`）。`.plan-modal-overlay`は`opacity`トランジション。既存スタンプ詳細シート（`#stamp-spot-detail-sheet`/`#stamp-spot-detail-overlay`、z-index 3701/3700）が同パターンを踏襲済み
+  - i18nキー体系: `STRINGS.ja`（302行目〜）/`STRINGS.en`（約556行目〜）に`stamp*`/`toastStamp*`キーが計17個ずつ存在（421〜436行目 ja、677〜692行目 en）。`t(key)`関数で参照
+  - `_touchCapableDetected`によるonclick属性ガードパターン（CLAUDE.md記載の必須パターン）: 既存スタンプ詳細シートの✕ボタン・チェックインボタンは`onclick="if(!_touchCapableDetected) 関数(...)"`方式を採用済み
+- `public/index.html`
+  - `.course-tab-bar`（147〜151行目）: `everyone`/`mylist`/`map`の3ピルタブ（`onclick="switchCourseTab('...')"`直書き、touchendデリゲーションの対象かどうかは別途確認要）
+  - `#stamp-map-view`（162〜177行目）: `#stamp-map-login-required`（未ログイン案内）と`#stamp-map-content`（`#stamp-progress-summary`テキスト＋Leaflet地図コンテナ`#stamp-leaflet-map`＋フォグ`#stamp-fog-overlay`＋`#stamp-level-legend`）の2状態
+  - `#stamp-spot-detail-overlay`（796行目、z-index:3700）/`#stamp-spot-detail-sheet`（797〜815行目、z-index:3701、`.plan-modal`クラス使用、`.plan-modal-body`ラッパーあり）: レベルバッジ・スポット名・エリア・説明・制覇済みバッジ・距離表示・チェックインボタンの構成
+- `server.js`
+  - `STAMP_LEVEL_GATES`（1994〜1999行目）: `{ standard: null, local: {requires:'standard',count:2}, niche: {requires:'local',count:2}, special: {requires:'niche',count:2} }`
+  - `STAMP_LEVEL_ORDER`（2000行目）= `['standard', 'local', 'niche', 'special']`（クライアント側`STAMP_LEVEL_ORDER_CLIENT`と同じ並び、サーバー・クライアントで重複定義されている）
+  - `computeUnlockedLevels(allSpots, checkedInSpotIds)`（2002〜2020行目）: レベル順に閾値判定、`break`で以降のレベルを解禁対象外にする段階ゲートロジック
+  - `GET /api/stamp-spots`（2025〜2045行目、認証不要・`verifyAppJwtOptional`で任意認証）: `special`レベルは未解禁ユーザーに対しレスポンス自体から除外（`visibleSpots`フィルタ）。**レスポンスは`{ spots, unlockedLevels }`のみで、スポットへの順序番号フィールドは持たない**
+  - `GET /api/stamp-progress/me`（2048〜2062行目、`requireAppAuth`必須）: `{ checkedInSpotIds, checkinLog, unlockedLevels }`を返す
+  - `POST /api/stamp-progress/checkin`（2067〜2116行目、`requireAppAuth`必須）: `{ spotId, lat, lng }`受信、`withFileLock`で`data/stamp-progress/{userId}.json`に追記、冪等（既チェックイン済みは`alreadyCheckedIn:true`で200）。レスポンスは`{ ok, alreadyCheckedIn, checkedInSpotIds, unlockedLevels }`
+- `data/sg/stamp-spots.json`（14件、固定配列）
+  - 各要素のフィールドは`id/name/nameJa/lat/lng/level/area/category/description/imageUrl/checkinRadiusM/active`のみ。**`order`や順序を示すフィールドは存在しない**
+  - レベル別内訳: `standard`4件（gardens-supertree, marina-bay-sands-skypark, merlion-park, singapore-zoo）、`local`4件（chinatown-heritage, tiong-bahru, east-coast-park, tekka-market）、`niche`4件（haw-par-villa, pulau-ubin, kampong-glam, rail-corridor）、`special`2件（istana-open-house, labrador-secret-tunnel）
+  - 配列内の並び順は各レベル内で人力キュレーション時に追加した順であり、地理的・体験的な意味を持った順序ではない（設計書69時点でも「特に意味はまだない」とメインエージェント調査コメントに記載の通り、実ファイル確認でも確定）
+
+## 3. 確定仕様（今回追加する3改善、ユーザー承認済み）
+
+### 改善1: スタンプ帳/コレクション一覧ビュー
+- 新規タブは増やさず、既存「スタンプマップ」タブ内でマップ表示⇄一覧表示を切り替えるトグルUIを設ける
+- 一覧はレベルごとにグルーピング表示。制覇済みは視覚的に区別（チェックマーク等）、未制覇はグレーアウト解除された通常表示、未解禁レベルはロック表示
+- スペシャルレベルは未解禁時、一覧にもスポット自体を出さない（`GET /api/stamp-spots`が未解禁時に`special`を除外する既存サーバー仕様をそのまま踏襲。フロント側で追加のフィルタ処理は不要）
+
+### 改善2（要望の4番目）: 「順番」の示唆
+- 各レベル内のスポットに番号（①②③…）を振る
+- マップ上のピン・一覧ビューの両方に番号バッジを表示
+- 「次に狙うべきスポット」を1つハイライトする。判定ロジック: 現在解禁済みレベルの中で番号順に見て最初の未制覇スポットを「次はここ」として強調表示
+
+### 改善3: レベル解禁演出の強化
+- 現状のトースト2連発（チェックイン成功→1.6秒後レベル解禁）のうち、レベル解禁側をモーダル演出に格上げ
+- チェックイン成功トースト自体は残す
+- 既存`.plan-modal`パターン・3000番台z-index方針を踏襲。スタンプ関連は3700番台使用中のため後続の空き番号（3702/3703）を割り当てる
+- CSSアニメーション程度の演出に留める（confetti等のライブラリ導入は不要）
+
+## 4. スコープ外（今回含めない）
+
+- 完全制覇時の特別なフィナーレ演出（将来の別タスク）
+- プログレスバー等、進捗表示自体のビジュアル強化全般（今回は「一覧ビュー」「順番の示唆」で代替）
+- スポットデータの追加・変更（14件のまま、内容変更なし）
+- BKK/SYD対応
+- 段階ゲート閾値（`STAMP_LEVEL_GATES`）の変更
+- GPS偽装対策等、設計書69から持ち越した既存の未解決事項（本設計書はそれらに一切触れない）
+
+## 5. データモデルの変更点
+
+### 5-1. `data/sg/stamp-spots.json` への `order` フィールド追加（要ユーザー判断・下記「未解決事項」参照）
+
+現状スポットの並び順に意味がないため、「順番の示唆」（改善2）を実現するには何らかの順序値が必要になる。2案を提示する。
+
+- **案A（推奨）: 新規`order`フィールドを各要素に追加**（例: `"order": 1`、レベル内で1始まりの連番）。配列内の物理的な並び順とは独立させることで、将来スポットを追加する際に配列末尾に足すだけでよくなる（順序を配列の並び替えに依存させない）。サーバー・クライアントとも「`order`昇順でソートしてから番号を振る」処理を追加する必要がある
+- **案B: 配列順そのものを順序として採用**（新規フィールド追加なし）。実装コストは最小だが、CLAUDE.mdに記録されている**コース機能の既知の教訓**「`spots`配列順がそのまま表示順に使われるため、手動で順序を変える際は配列要素の並び替え自体が必要」と同種の運用上の脆さを持ち込むことになる（次回スポット追加時、意図した位置に配列要素を挿入し忘れると順序が崩れる）
+
+**plannerは案A（`order`フィールド追加）を推奨する**。理由: (1) 14件全件に`order`を付与する一括更新は今回のデータ変更で1回のみのコストで済む、(2) 将来の運用（月1ペースでのスポット追加、設計書69 §11 リスク4参照）で配列末尾への追記のみで完結し、既存要素の並び替えが不要になる、(3) `data/sg/stamp-spots.json`は「スポットデータの追加・変更なし」がスコープ外である一方、`order`フィールドの追加は「データ内容の変更」ではなく「メタデータの付与」であり、既存14件の`name`/`lat`/`lng`等の実体は変更しないため、スコープ外条項（§4）と矛盾しないと判断する。ただし既存14件全件への1フィールド追加はデータファイルの直接編集を伴うため、実装時にユーザーへの再確認を推奨する（未解決事項参照）
+
+いずれの案でも、`data/sg/stamp-spots.json`自体は`.gitignore`対象のままVPS直接編集方式を維持する（設計書69の既存方針を変更しない）。
+
+### 5-2. `data/stamp-progress/{userId}.json` の変更
+
+変更なし。「次に狙うべきスポット」の判定は`checkedInSpotIds`（既存フィールド）とスポットマスターの`order`から都度計算可能なため、進捗データ側への保存は不要（案A採用時）。
+
+## 6. APIの変更点
+
+### 6-1. `GET /api/stamp-spots?city=sg`
+- レスポンスの各スポット要素に`order`フィールドが追加される（案A採用時、データファイル側の変更がそのまま反映されるのみでサーバーコード自体の変更は不要な可能性が高い。既存実装は`loadStampSpots()`でファイルをそのままパースして返しているため、フィールド追加はサーバーコード無変更で自動的に反映される）
+- **後方互換性**: 既存レスポンス構造への追加フィールドのみで、既存フィールド（`id/name/nameJa/lat/lng/level/area/category/description/imageUrl/checkinRadiusM/active`）は一切変更しない。旧バージョンのApp Store版アプリ（`order`フィールドを認識しないクライアント）は単に新フィールドを無視するだけで、既存の地図表示・チェックインフローは影響を受けない（JSONの未知フィールド追加は一般に後方互換）
+
+### 6-2. `GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`
+- レスポンス構造の変更は不要と想定（「次に狙うべきスポット」の算出はクライアント側で`_stampSpots`の`order`と`_stampProgress.checkedInSpotIds`から計算可能なため）。ただし、同じ計算をクライアント・サーバー両方で独自実装すると将来ロジックがズレるリスクがあるため、サーバー側で「次に狙うべきスポットID」を算出しレスポンスに含める設計も選択肢としてあり得る（未解決事項として後述、builderの判断に委ねる）
+
+### 6-3. 新規APIエンドポイントは不要
+- 改善1（一覧ビュー）・改善2（順番の示唆）は既存`GET /api/stamp-spots`・`GET /api/stamp-progress/me`のレスポンスで賄える設計とする（`order`フィールド追加のみで完結）
+- 改善3（解禁演出モーダル）はクライアント側の表示ロジック変更のみで、既存`POST /api/stamp-progress/checkin`のレスポンス（`unlockedLevels`）は変更不要（現状の`data.unlockedLevels.length > prevUnlockedCount`判定ロジックがそのまま使える）
+
+## 7. フロントエンド設計
+
+### 7-1. マップ⇄一覧 表示切り替えトグル（改善1）
+
+- 配置案: `#stamp-map-content`内、`#stamp-progress-summary`と同じ行または直後に、アイコンボタン1つ（例: 🗺️/📖の絵文字切り替え、または「一覧で見る」/「地図で見る」というテキストトグル）を配置する。既存の`#event-filter-btn`（`.sort-btn`クラス、`public/index.html` 67行目）のような軽量アイコンボタンパターンを踏襲することを推奨
+- 新規モジュールスコープ変数（例: `_stampViewMode = 'map'`、`'map'|'list'`の2値）で状態を保持
+- トグル操作時、`#stamp-leaflet-map`を含むマップコンテナ（地図+フォグ）と、新規`#stamp-collection-list`（一覧コンテナ）の表示/非表示を切り替える。マップは一度初期化したLeafletインスタンスを破棄せず`display:none`にするのみ（設計書69の`_ensureStampLeafletMap()`が「初回のみ初期化、以降は`invalidateSize()`」という既存パターンを持つため、一覧⇄マップ切り替え後に再度マップタブを表示する際も同じ`invalidateSize()`呼び出しが必要になる可能性が高い。既存の「タブ切替でdisplay:noneから復帰した直後はコンテナサイズが正しく取得できない」既知の注意点がそのまま踏襲される想定）
+- 一覧ビュー本体: レベルごとに見出し（`STAMP_LEVEL_META`の`emoji`+`labelKey`を流用）+ スポットカードのリスト。各カードは制覇済み/未制覇/ロック中の3状態を持つ
+  - 制覇済み: チェックマーク（✓）等の視覚的マーク、通常の文字色・背景
+  - 未制覇（レベル解禁済み）: 通常表示（グレーアウトなし）
+  - ロック中（レベル未解禁）: グレーアウト＋🔒アイコン（既存`.stamp-level-chip--locked`のopacity 0.45パターンを流用可能）
+- 各カードタップで既存`openStampSpotDetail(spotId)`をそのまま呼び出す（詳細シートは改修不要、マップ経由・一覧経由どちらからでも同じ関数に合流させる設計とする）
+- CSS新規クラス案: `.stamp-collection-group`（レベル見出し+カード群のラッパー）、`.stamp-collection-card`（個別スポットカード、既存`.course-card`のスタイル方針を参考にしつつ新規定義）、`.stamp-collection-card--locked`（ロック時修飾）、`.stamp-collection-card--checked`（制覇済み修飾）
+
+### 7-2. 番号バッジ・「次はここ」ハイライト（改善2）
+
+- 前提: `order`フィールド採用の場合、`_stampSpots`をレベルごとにグルーピングし、各グループ内で`order`昇順ソートした上で1始まりの連番を割り振る（`order`値自体を直接表示するのではなく、ソート後のインデックス+1を表示するか、`order`値をそのまま連番として表示するかはデータ設計次第。案Aで各レベル内`order`を1,2,3,4と隙間なく付与するなら両者は一致する）
+- マップ上のピン: `_renderStampMarkers()`内、`L.divIcon`のhtml文字列に番号バッジ（例: ピン左上に小さい丸バッジで数字を重ねる、または`meta.emoji`の代わりに番号を主表示にしチェック状態を色で表現する等）を追加。既存の`.stamp-marker-icon`（雫形ピン、45度回転）のスタイル自体は変更せず、内部に追加要素を重ねる方式を推奨（大幅なピンデザイン変更は今回のスコープに含まれていないため）
+- 一覧ビュー: 各`.stamp-collection-card`の先頭に番号バッジ（①②③のような丸数字、またはシンプルな`No.1`テキスト）を表示
+- 「次はここ」判定ロジック: 解禁済みレベルを`STAMP_LEVEL_ORDER_CLIENT`の順に見ていき、そのレベル内で`order`最小から順に未チェックのスポットを探索し、最初に見つかったものを「次に狙うべきスポット」とする（レベル1つ内で完結せず、あるレベルが全制覇済みなら次の解禁済みレベルに進んで探索する設計を推奨。全解禁済みレベルを制覇済みの場合は「次はここ」表示自体を出さない＝コンプリート状態の扱いは今回スコープ外のフィナーレ演出に譲る）
+- ハイライト表現: マップ上は該当ピンを目立たせる（例: 一回り大きく表示する、脈動する`animation`、既存`@keyframes ribbon-pulse`や`@keyframes mic-pulse`等の脈動アニメーションパターンを流用検討）。一覧ビューは該当カードを先頭固定またはハイライト背景色（例: `var(--caramel-pale)`）で強調する。マップ・一覧どちらの表現もbuilderの実装判断に委ねるが、両ビューで一貫した視覚的手がかり（同じ色・同じアイコン等）を使うことを推奨
+- サーバー・クライアントの二重計算リスク: 「次はここ」判定ロジックをクライアントのみに実装するか、サーバー側`computeUnlockedLevels()`と同じファイルで`computeNextTargetSpot()`のような関数を新設しレスポンスに含めるかは、6-2節の通り未解決事項としてbuilderに委ねる
+
+### 7-3. レベル解禁演出モーダル（改善3）
+
+- 新規モーダル`#stamp-level-unlock-overlay`/`#stamp-level-unlock-modal`（仮称、命名はbuilder判断）を新設。既存`.plan-modal`クラスパターン（`transform:translateY(100%)→0`のスライドイン、`.visible`トグル方式、CLAUDE.md「オーバーレイの表示切替は`classList.toggle('visible')`方式に統一する」ルールに準拠）を踏襲する
+- 表示内容案: 解禁されたレベル名（`STAMP_LEVEL_META[level].labelKey`）・レベルの絵文字（`STAMP_LEVEL_META[level].emoji`）・簡単な祝福メッセージ・「閉じる」ボタン1つ
+- 演出案: モーダル本体のスライドインに加え、レベル絵文字部分に軽いCSSアニメーション（例: `@keyframes popUp`〈既存2041行目付近に類似の`fadeUp`等が存在、またはscale拡大→縮小のバウンス効果〉）を追加する程度。confetti等のJSライブラリは導入しない（ユーザー承認済みスコープ）
+- `doStampCheckin()`内、既存の`setTimeout(() => showToast(t('toastStampLevelUnlocked')), 1600)`を、新規`openStampLevelUnlockModal(level)`のような関数呼び出しに置き換える（チェックイン成功トースト自体は既存のまま残す。設計書69由来の「チェックイン成功→1.6秒後」というタイミング設計は踏襲するか、モーダル表示にふさわしいタイミング調整をするかはbuilder判断とする）
+- 新規z-index: 3702（overlay）/3703（modal）を割り当てる（下記z-index一覧参照）
+- 新規onclick属性には`if(!_touchCapableDetected)`ガードパターンを適用する（CLAUDE.md必須ルール）
+
+## 8. i18n追加キー案（ja/en同時追加が必須、CLAUDE.md必須ルール）
+
+以下は案であり、文言の最終確定・キー名の細部はbuilder判断に委ねる。
+
+- `stampViewToggleMap`（例: ja「地図で見る」/en「Map view」）
+- `stampViewToggleList`（例: ja「一覧で見る」/en「List view」）
+- `stampCollectionLockedNote`（例: ja「このレベルはまだロック中です」/en「This level is still locked」、一覧ビューのロック中グループ見出し脇に添える説明文）
+- `stampNextTargetLabel`（例: ja「次はここ！」/en「Next up!」、「次に狙うべきスポット」のハイライトバッジ文言）
+- `stampLevelUnlockModalTitle`（例: ja「新しいレベルが解禁されました！」/en「New level unlocked!」、既存トーストの`toastStampLevelUnlocked`と役割が重複するため、置き換えの場合は既存キーの流用可否も含めbuilder判断）
+- `stampLevelUnlockModalClose`（例: ja「閉じる」/en「Close」）
+
+既存キー`toastStampLevelUnlocked`（トースト用）は、モーダルへの置き換えに伴い**呼び出し元が変わるだけで、キー自体を削除するかどうかは未確定**（他の箇所から参照されていないか要確認、削除する場合はCLAUDE.md記載の「死にキー削除」慣習に従いgrep確認の上で行う）。
+
+## 9. z-index割り当て
+
+既存スタンプ関連z-indexは3700（`#stamp-spot-detail-overlay`）/3701（`#stamp-spot-detail-sheet`）。今回追加分は後続の空き番号を割り当てる。
+
+| 要素 | z-index |
+|---|---|
+| `#stamp-level-unlock-overlay`（新規） | 3702 |
+| `#stamp-level-unlock-modal`（新規） | 3703 |
+
+bottom-nav（9999）未満の3000番台方針に準拠。一覧ビュー（`#stamp-collection-list`）自体は独立モーダルではなく`#stamp-map-view`内の表示切り替えのため、新規z-indexは不要（既存の画面フロー内に収まる）。
+
+## 10. 既知の未解決事項
+
+1. **`order`フィールド追加方式（案A）の採用可否**: §5-1で案A（新規フィールド追加、推奨）と案B（配列順採用）を提示した。案Aは既存14件データファイルへの一括編集を伴うため、実装着手前にユーザーへの再確認を推奨する
+2. **「次はここ」判定ロジックの実装場所**: クライアント専用実装か、サーバー側`computeUnlockedLevels()`と対になる`computeNextTargetSpot()`をレスポンスに含めるか未確定。サーバー実装の場合`GET /api/stamp-progress/me`のレスポンス構造変更を伴う（後方互換は追加フィールドのみのため問題ないと想定されるが、実装時に確認要）
+3. **一覧ビューとマップビューの初期表示状態**: マップタブを開いた際、デフォルトでマップ・一覧のどちらを表示するかは未確定（現状のユーザー行動データがないため、plannerとしては「地図が主役」という設計書69の元コンセプトを尊重しデフォルトはマップのままを推奨するが、確定はbuilder/ユーザー判断とする）
+4. **「次はここ」ハイライトの永続性**: チェックイン直後に「次はここ」が別スポットに移った場合、リアルタイムに再計算・再ハイライトする必要があるが、マップ上のピン再描画（`_renderStampMarkers()`の再呼び出し）に統合すれば自然に解決すると考えられる。詳細な実装フローはbuilder判断
+5. **全レベル制覇後（コンプリート状態）の「次はここ」表示の扱い**: §7-2で「表示自体を出さない」という暫定方針を示したが、これがスコープ外とした「フィナーレ演出」と表現がバッティングしないか、実装時に境界線を明確にする必要がある（今回は「特別な演出はしない、単に非表示にするだけ」という最小対応に留める）
+6. **レベル解禁演出モーダルとチェックイン成功トーストの同時発生時のUX**: 既存は「トースト→1.6秒後トースト」の直列表示だったが、「トースト→モーダル」に変更した場合、トースト表示中にモーダルがせり上がってくる重なり方が不自然にならないか実機確認が必要（Web版では確認可能、iOS実機は次回TestFlightビルド後）
+7. **一覧ビューの`.stamp-collection-card`のビジュアルデザイン詳細**: 既存`.course-card`を参考にする程度の方針しか示していない。画像（`imageUrl`）の扱い（現状全スポット`imageUrl:""`のため表示するものがない）、カードの高さ・レイアウト詳細はbuilder判断
+
+## 11. リスク
+
+1. **既存14件データへの`order`一括付与ミス**: 案A採用時、レベル内の並び順（地理的な近さ・回りやすさ等）を考慮せず機械的に付与すると、「順番の示唆」自体の意味が薄れる（せっかく番号を振っても地理的に非効率な順序だと「巡る楽しみ」を損なう）。人力での吟味が必要になり、設計書69の「人力キュレーション」という運用方針の延長線上にある追加コストとして許容する
+2. **マップ⇄一覧トグルによる`switchCourseTab`・`initStampMapTab`との相互作用**: 既存の`initStampMapTab()`はマップ初期化を前提としたフローになっており、一覧ビュー表示中にタブを離れて戻ってきた際の状態復元（マップ表示のままか、一覧表示のままか）を丁寧に設計しないと、CLAUDE.mdに記載の「チップ・タブの表示/非表示制御と、固定配列でのインデックス操作の相互作用」と同種の副作用リスクが再発する可能性がある
+3. **レベル解禁モーダルの追加によるコード分岐増加**: `doStampCheckin()`の成功処理にモーダル呼び出しを追加することで、既存のトースト表示ロジック（`_renderStampMarkers()`等の再描画呼び出し順序）に予期せぬタイミング干渉が生じないか、実装時の丁寧なレビューが必要
+4. **番号バッジの視覚的複雑化によるマップの見やすさ低下**: 既存ピン（雫形、45度回転、絵文字1つ）に番号バッジを追加で重ねると、Leaflet地図上での視認性・タップ精度に悪影響が出る可能性がある（特に14件が密集するエリアがある場合）。実機・実ブラウザでの見た目確認が必要
+5. **iOS実機未検証**: 設計書69自体がTestFlightビルド未実施・実機未確認のまま今回の改善に着手することになるため、今回の3改善もWeb版での検証が先行し、iOS版での見た目・操作感（特にLeaflet地図上の番号バッジタップ精度、モーダルのスライドインアニメーション滑らかさ）は次回TestFlightビルド後まで未確定のリスクを引き継ぐ
+
+## 12. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: `GET /api/stamp-spots`レスポンスへの`order`フィールド追加（採用する場合）は既存フィールドを一切変更しない追加のみのため、旧バージョンのApp Store版アプリ（設計書69がまだ反映されていない、またはこの改善が未反映のバージョン）は新フィールドを単に無視するだけで動作に影響しない。既存の`GET/POST /api/stamp-progress/*`のレスポンス構造変更（未解決事項2のサーバー側「次はここ」算出を採用する場合）も同様に追加フィールドのみであれば後方互換性は保たれる。**ただし、そもそも設計書69自体がまだTestFlightビルド・App Store配信されていない（2026-07-20時点でローカルコミットのみ）ため、現時点でこの機能に依存している旧バージョンのApp Store版ユーザーは存在しない**。実質的な後方互換リスクは低い
+2. **影響範囲**: 本改善はWeb版・App Store版の両方に同時に反映される変更（`public/`配下の共通コードのため）。新規データフィールド（`order`）の投入自体は`data/sg/stamp-spots.json`の直接編集のためAPIエンドポイント追加を伴わずWeb版へ即座に反映可能（`pm2 restart`不要、サーバーは`fs.readFileSync`で都度読み込む既存アーキテクチャのため）。ただしフロントエンド（一覧ビュー・番号バッジ・解禁モーダル）はWeb版・iOS版で同一コードが同時に有効になるため、機能が未完成の状態でWeb版にデプロイすると中途半端な機能がテスト環境ユーザーに露出するリスクがある点は設計書69から変わらない
+3. **リリースタイミング**: 設計書69自体がまだ本番リリース前（TestFlightビルド未実施）のステータスのため、本改善は設計書69と合わせて次回のTestFlightビルドで一括リリースする形が自然と考えられる（設計書69単体を先にリリースし、その後に本改善を追いかけてリリースする「段階的リリース」も技術的には可能だが、ユーザー体験上「コンプ感のない状態」を一度リリースしてすぐ改善版を出す運用になるため、まとめてリリースすることを推奨。最終判断はユーザーに委ねる）
+4. **App Store Connect側の追加対応は不要と想定**: 位置情報権限申告（設計書69から持ち越し）以外に、本改善で新たにApp Store Connect側の申告が必要になる要素（新規権限、新規トラッキング等）は無い
+
+## 承認状況
+2026-07-20 planner設計。ユーザーからの改善要望3点（コレクション一覧・順番の示唆・解禁演出強化）を踏まえて作成。**ユーザー承認済み**。§5-1の未解決事項1は**案A（`order`フィールド新規追加）で確定**。既存14件データへの`order`一括付与は、単純な配列順の機械的な連番ではなく、**レベル内で地理的に回りやすい順番**（近い場所同士が近い番号になるよう）を意識して割り当てることとする（ユーザー承認済み、builder実装時に地理的順序を検討して付与すること）。
