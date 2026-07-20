@@ -3665,13 +3665,14 @@
     // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。
     // 既存コース機能の CITY_COURSE_AREAS には依存しない独立定数（スタンプラリー機能は既存コース機能と完全独立という設計方針を踏襲）。
     // 設計書78: スタンプ帳デザイン刷新に伴い emoji/labelText に分割（円形スタンプの中身に絵文字だけを表示するため）。
+    // 設計書80: 達成時のみ表示するNano Banana生成イラストバッジの画像パスを追加。
     const STAMP_BADGE_AREAS = [
-      { val: 'Central',    emoji: '🏙', labelText: 'Central' },
-      { val: 'East',       emoji: '🌅', labelText: 'East' },
-      { val: 'West',       emoji: '🌇', labelText: 'West' },
-      { val: 'North',      emoji: '🌿', labelText: 'North' },
-      { val: 'North-East', emoji: '🌳', labelText: 'North-East' },
-      { val: 'Sentosa',    emoji: '🏖', labelText: 'Sentosa' },
+      { val: 'Central',    emoji: '🏙', labelText: 'Central',    img: '/images/stamp-badges/badge-central.png' },
+      { val: 'East',       emoji: '🌅', labelText: 'East',       img: '/images/stamp-badges/badge-east.png' },
+      { val: 'West',       emoji: '🌇', labelText: 'West',       img: '/images/stamp-badges/badge-west.png' },
+      { val: 'North',      emoji: '🌿', labelText: 'North',      img: '/images/stamp-badges/badge-north.png' },
+      { val: 'North-East', emoji: '🌳', labelText: 'North-East', img: '/images/stamp-badges/badge-north-east.png' },
+      { val: 'Sentosa',    emoji: '🏖', labelText: 'Sentosa',    img: '/images/stamp-badges/badge-sentosa.png' },
     ];
 
     let _stampLeafletMap = null;
@@ -3805,11 +3806,11 @@
     // 該当エリアの件数・チェックイン済み件数を数え、全件チェックイン済みなら達成と判定する。
     // サーバー側の変更は不要、クライアント側計算のみで完結させる方針（§2-3・§6）。
     function _computeStampAreaProgress() {
-      return STAMP_BADGE_AREAS.map(({ val, emoji, labelText }) => {
+      return STAMP_BADGE_AREAS.map(({ val, emoji, labelText, img }) => {
         const spotsInArea = _stampSpots.filter(s => s.area === val);
         const total = spotsInArea.length;
         const checked = spotsInArea.filter(s => _stampSpotIsChecked(s.id)).length;
-        return { area: val, emoji, labelText, checked, total, achieved: total > 0 && checked === total };
+        return { area: val, emoji, labelText, img, checked, total, achieved: total > 0 && checked === total };
       });
     }
 
@@ -3939,17 +3940,26 @@
     // ─── エリア制覇バッジのレンダリング（設計書77） ───
     // #stamp-area-badges はマップ/一覧どちらの表示モードでも常時表示させるため、
     // _applyStampViewMode() の display 切替対象には含めない（一覧ビュー中に消える回帰バグを避けるための実装上の必須事項）。
+    // 設計書80: 達成時のみNano Banana生成イラストバッジ（<img>）を表示する。CSS印章表現（塗りつぶし・
+    // 二重リング・回転、.stamp-circle--checked）とは併用しない別系統の見た目のため .stamp-circle--checked
+    // クラスは達成時でも付与しない（§7-3）。未達成（ロック中含む）は既存のCSS印章表現を完全に無変更のまま維持する。
     function _renderStampAreaBadges() {
       const el = document.getElementById('stamp-area-badges');
       if (!el) return;
       const progress = _computeStampAreaProgress();
-      el.innerHTML = progress.map(({ area, emoji, labelText, checked, total, achieved }) => {
-        const rotate = achieved ? _stampRotateDeg(area) : 0;
-        const style = achieved ? `--stamp-color:var(--caramel);--stamp-rotate:${rotate}deg;` : '';
+      el.innerHTML = progress.map(({ area, emoji, labelText, img, checked, total, achieved }) => {
+        let circleHtml;
+        if (achieved) {
+          circleHtml = `<div class="stamp-circle stamp-circle--area stamp-circle--area-img">
+            <img src="${img}" alt="${labelText}" class="stamp-area-badge-img">
+          </div>`;
+        } else {
+          circleHtml = `<div class="stamp-circle stamp-circle--area " style="">
+            <span class="stamp-circle-mark">${emoji}</span>
+          </div>`;
+        }
         return `<div class="stamp-area-stamp">
-          <div class="stamp-circle stamp-circle--area ${achieved ? 'stamp-circle--checked' : ''}" style="${style}">
-            <span class="stamp-circle-mark">${achieved ? '✓' : emoji}</span>
-          </div>
+          ${circleHtml}
           <div class="stamp-area-stamp-label">${labelText}</div>
           <div class="stamp-area-stamp-progress">${checked}/${total}</div>
         </div>`;

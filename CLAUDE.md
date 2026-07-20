@@ -249,6 +249,21 @@ sg-weekend-app/
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのグリッドセル縦方向の高さ不揃い（制覇済み/未制覇混在時、`.stamp-book-grid`はflex-wrap方式のため崩れリスクは低いと想定）、長い説明文の2行省略後の可読性、日時ラベルの視認性は2026-07-20時点でWeb版目視確認のみ、実機未確認
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での円形スタンプグリッドの表示密度・スクロール量（23件）、長い英語スポット名での2行折り返しレイアウト崩れの有無、エリアバッジ（40px）の二重リング表現が潰れて見えないか、回転角のばらつきが実機で不自然に見えないか、ダークモード切り替え時の実機での見た目、`box-shadow`多重指定によるiOS WKWebView実機でのレンダリング負荷は、いずれも2026-07-20時点でWeb版目視確認のみ完了、実機未確認
 
+### AI生成エリアバッジイラストの統合（2026-07-20実装、設計書80）
+設計書78でエリアバッジ（`.stamp-circle.stamp-circle--area`）をCSSのみの印章風デザインに刷新していたが、ユーザーから「もっとちゃんとデザインしたバッジにしたい」との要望があり、Nano Banana（Google Gemini画像生成）で生成したエナメルピン風のイラスト画像6エリア分（Central/East/West/North/North-East/Sentosa）を**達成時のみ**表示するよう統合した。データモデル・API変更なし、`public/images/stamp-badges/`配下の静的PNG（256×256px・透明背景、各15〜37KB）を`STAMP_BADGE_AREAS`定数にパスとしてハードコードする方式。
+
+- **画像アセット**: `public/images/stamp-badges/badge-{central,east,west,north,north-east,sentosa}.png`（6枚）。**`public/images/`は`.gitignore`対象外の通常git管理対象**（`data/`配下と混同しないこと）。エリア↔画像の対応: Central=マーライオン、East=プラナカン様式ショップハウス、West=ドラゴン像＋楼門（Haw Par Villaモチーフ）、North=枝にとまる鳥（Bird Paradiseモチーフ）、North-East=水路の木造ボート（カンポン風景）、Sentosa=ヤシの木＋ケーブルカー
+- **`STAMP_BADGE_AREAS`定数の拡張**（`public/app.js`）: 各要素に`img`フィールド（サイトルート相対パス、例: `/images/stamp-badges/badge-central.png`。`API_BASE`は付与しない。Capacitor環境はローカルバンドル方式のためアプリ内に同梱される）を追加。`_computeStampAreaProgress()`の分割代入・戻り値オブジェクトの両方に`img`を通した（片方だけの見落としに注意して両方確認済み）
+- **`_renderStampAreaBadges()`の分岐**: `achieved`時のみ`<img src="${img}" class="stamp-area-badge-img">`を表示。**未達成（ロック中含む）時のHTML生成ロジックは設計書78実装時から完全に無変更**（点線円＋絵文字のCSS印章表現のまま）
+- **CSS印章演出（塗りつぶし・二重リング・回転）とイラストは併用しない**（結論確定、理由3点）: (1) 画像自体が既に「完成した1枚絵」（金属リムの縁取り・光沢・立体感を含む）であり、CSSの二重リング`box-shadow`や塗りつぶし背景を重ねると視覚的に競合する、(2) `.stamp-circle--checked`の`background`プロパティと`<img>`要素は共存の意味がない（背後に隠れるだけ）、(3) 回転演出（`_stampRotateDeg()`）は「はんこ」メタファー由来だが、画像側は「エナメルピン」という固定形状物のメタファーのため無理に継承する必然性がない。達成時のHTML生成では`.stamp-circle--checked`クラス自体を付与せず、新規CSS修飾子`.stamp-circle--area-img`（`border:none;background:transparent;box-shadow:none`）のみ付与する
+- **CSS（`public/app.css`）**: `.stamp-circle--area-img`と`.stamp-area-badge-img`（`width/height:100%;object-fit:contain`＝画像は正方形PNGのため円形コンテナ内で欠けずに収まるようcontainを採用、`filter:drop-shadow(...)`で軽い影を付与）を新規追加。`.stamp-circle--area`のコンテナサイズ（40px）はそのまま踏襲（拡大等の微調整は今回見送り）
+- **ダークモード対応**: 画像自体はライト/ダーク共通の1種類のみ（専用画像は生成していない、透明背景のため背景色`var(--sand)`のダーク変種の上にそのまま乗る）。視認性は次回TestFlightビルド後の実機確認が必要
+- **画像読み込み失敗時のフォールバック**: 今回は追加していない（6ファイルとも配置済み確認済みのため必須要件外と判断。将来ファイル名変更等でパスが壊れた場合は`<img>`の`onerror`で`.stamp-circle--area-img`を外す等の追加が可能）
+- スコープ外（今回未実装）: レベルバッジ（`STAMP_LEVEL_META`）へのイラスト適用、コレクション一覧（`.stamp-stamp-cell`）個別スポットへのイラスト適用、未達成時のイラスト表示、画像の追加生成・差し替え、マップビュー（Leafletピン）へのイラスト適用、BKK/SYD対応
+- `server.js`・`data/`配下は無変更（pm2 restart不要だが今回は実施済み）。i18n新規キーなし（`<img>`の`alt`属性には既存の非i18n対象`labelText`をそのまま使用）
+- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720j`→`20260720k`、`sw.js` CACHE_NAME=`sg-weekend-v639`→`v640`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのイラストバッジ表示（40pxコンテナとのフィット感）、ダークモード時の視認性、6エリアとも達成時に正しい画像が表示されること、CSS印章→イラストへの切り替えの見た目は2026-07-20時点でWeb版目視確認のみ、実機未確認
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

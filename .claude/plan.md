@@ -9092,3 +9092,279 @@ const checkinMeta = checked ? `<div class="stamp-stamp-cell-meta">
 
 ## 承認状況
 2026-07-20 planner設計。ユーザー要望「チェックインした時間や場所の簡単な説明も保存・表示したい」「コレクターを意識した作りにしたい」を受け、コレクション一覧ビューへのコンパクトな追加表示という方針で作成。**ユーザー承認済み**。
+
+# 設計書80 — AI生成エリアバッジイラストの統合（Nano Banana生成、達成時のみ表示）
+
+（2026-07-20 planner作成。設計書69〜79で実装済みの「スポット制覇スタンプラリー」機能のうち、設計書78でCSS印章風に刷新したエリアバッジ（`.stamp-circle.stamp-circle--area`）に、ユーザーがNano Bananaで生成したイラスト画像を統合する設計。コード実装は含まない）
+
+## 1. 背景
+
+設計書78でエリアバッジ（`.stamp-circle.stamp-circle--area`）をCSSのみの印章風デザイン（塗りつぶし円＋回転＋二重リング＋絵文字/チェックマーク）に刷新したが、ユーザーから「もっとちゃんとデザインしたバッジにしたい」との要望があった。これを受け、Nano Banana（Google Gemini画像生成）でエナメルピン風のイラストバッジを6エリア分（Central/East/West/North/North-East/Sentosa）生成し、メインエージェントが以下を事前に完了済み。
+
+- 6枚の画像を`public/images/stamp-badges/`に配置済み: `badge-central.png` / `badge-east.png` / `badge-west.png` / `badge-north.png` / `badge-north-east.png` / `badge-sentosa.png`
+- 表示サイズ（エリアバッジは現状40px程度、`.stamp-circle--area`）に合わせ、`sharp`で256×256pxにリサイズ・PNG圧縮済み（各15〜37KB、透明背景維持）
+- **`public/images/`は`.gitignore`対象ではない**ため、この6ファイルは通常のgit管理対象（コミットが必要）。`data/`配下（gitignore対象）と混同しないこと
+
+## 2. 確定済み仕様（ユーザー承認済み）
+
+1. **達成時（`achieved`）のみ**、このイラスト画像を表示する。**未達成（ロック中含む）は現状のCSS印章表現（点線の空白丸＋絵文字、設計書78実装済み）のまま変更しない**（ユーザーが以前の会話で確定した方針）
+2. 画像はエリアごとに1対1で対応:
+   - Central = マーライオン（`badge-central.png`）
+   - East = プラナカン様式のショップハウス（`badge-east.png`）
+   - West = ドラゴン像＋楼門（Haw Par Villaモチーフ、`badge-west.png`）
+   - North = 枝にとまる鳥（Bird Paradiseモチーフ、`badge-north.png`）
+   - North-East = 水路の木造ボート（カンポン風景、`badge-north-east.png`）
+   - Sentosa = ヤシの木＋ケーブルカー（`badge-sentosa.png`）
+3. デザインテイスト: エナメルピン/ゲームバッジ風（金属リムの縁取り・光沢のハイライト・立体感のあるベベル、暖色のテラコッタ〜ブロンズ系カラー）。透明背景のPNG。**画像自体が既に金属リム・光沢・立体感を含む「完成した1枚絵」である**ことが、下記7-3（CSS印章演出との併用可否）の判断根拠になる
+
+## 3. 既存コードの調査結果（2026-07-20時点で実ファイルを確認、設計の前提事実）
+
+### 3-1. `public/app.js`
+
+- **`STAMP_BADGE_AREAS`定数**（3668〜3675行目、設計書78で`{val, emoji, labelText}`構造に分割済み）:
+  ```js
+  const STAMP_BADGE_AREAS = [
+    { val: 'Central',    emoji: '🏙', labelText: 'Central' },
+    { val: 'East',       emoji: '🌅', labelText: 'East' },
+    { val: 'West',       emoji: '🌇', labelText: 'West' },
+    { val: 'North',      emoji: '🌿', labelText: 'North' },
+    { val: 'North-East', emoji: '🌳', labelText: 'North-East' },
+    { val: 'Sentosa',    emoji: '🏖', labelText: 'Sentosa' },
+  ];
+  ```
+  **本設計書の変更対象**。各要素に画像パスを追加する（詳細は§7-1）。
+
+- **`_computeStampAreaProgress()`**（3807〜3814行目）:
+  ```js
+  function _computeStampAreaProgress() {
+    return STAMP_BADGE_AREAS.map(({ val, emoji, labelText }) => {
+      const spotsInArea = _stampSpots.filter(s => s.area === val);
+      const total = spotsInArea.length;
+      const checked = spotsInArea.filter(s => _stampSpotIsChecked(s.id)).length;
+      return { area: val, emoji, labelText, checked, total, achieved: total > 0 && checked === total };
+    });
+  }
+  ```
+  `STAMP_BADGE_AREAS`の分割代入で`val, emoji, labelText`のみ取り出し、戻り値オブジェクトに詰め替えている。**本設計書の変更対象**。新規追加する`imageUrl`（仮称、命名はbuilder判断）フィールドもこの分割代入・戻り値オブジェクトの両方に通す必要がある（片方だけ変更すると`undefined`になる典型的な見落としパターンのため、実装時に両方の代入を確認すること）。
+
+- **`_renderStampAreaBadges()`**（3942〜3957行目、本設計書のメイン改修対象）:
+  ```js
+  function _renderStampAreaBadges() {
+    const el = document.getElementById('stamp-area-badges');
+    if (!el) return;
+    const progress = _computeStampAreaProgress();
+    el.innerHTML = progress.map(({ area, emoji, labelText, checked, total, achieved }) => {
+      const rotate = achieved ? _stampRotateDeg(area) : 0;
+      const style = achieved ? `--stamp-color:var(--caramel);--stamp-rotate:${rotate}deg;` : '';
+      return `<div class="stamp-area-stamp">
+        <div class="stamp-circle stamp-circle--area ${achieved ? 'stamp-circle--checked' : ''}" style="${style}">
+          <span class="stamp-circle-mark">${achieved ? '✓' : emoji}</span>
+        </div>
+        <div class="stamp-area-stamp-label">${labelText}</div>
+        <div class="stamp-area-stamp-progress">${checked}/${total}</div>
+      </div>`;
+    }).join('');
+  }
+  ```
+  呼び出し元（`initStampMapTab()` 3755行目・`doStampCheckin()`の再描画呼び出し列）は無変更でよい（`_renderStampAreaBadges()`本体の内部実装のみ変更するため）。
+
+- **`_stampRotateDeg(str)`**（3818〜3825行目）: 文字列ハッシュから-5°〜+5°の回転角を決定的に算出するヘルパー。現状`achieved`時に`_stampRotateDeg(area)`を呼び、CSSの`--stamp-rotate`変数経由で`.stamp-circle--checked`に回転を適用している。**本設計書での取り扱いは§7-3で判断（画像に切り替える場合、この回転演出を続けるかどうかが論点）**。
+
+### 3-2. `public/app.css`
+
+- **`.stamp-circle`**（2011〜2019行目）: 基本形状（56px、`border:2px dashed`、`background:transparent`）。エリアバッジは`.stamp-circle--area`と併記して40pxに縮小される。
+- **`.stamp-circle--checked`**（2026〜2036行目）:
+  ```css
+  .stamp-circle--checked {
+    border: none;
+    background: var(--stamp-color, var(--caramel));
+    color: white;
+    cursor: pointer;
+    transform: rotate(var(--stamp-rotate, -3deg));
+    box-shadow:
+      0 0 0 3px var(--cream),
+      0 0 0 5px var(--stamp-color, var(--caramel)),
+      2px 3px 6px rgba(44,36,32,0.25);
+  }
+  .stamp-circle--checked .stamp-circle-mark {
+    transform: rotate(calc(var(--stamp-rotate, -3deg) * -1));
+    display: inline-block;
+  }
+  ```
+  `background`色塗りつぶし＋`transform:rotate()`＋`box-shadow`多重指定（二重リング＋影）で「はんこ」を表現している。**この`background`と画像`<img>`は同居できない**（`background`はCSSプロパティで、画像を子要素`<img>`として置く場合`background`指定自体が視覚的に無意味になるか、`<img>`の下に隠れて見えなくなるかのどちらか。共存させる設計にしない）。
+- **`.stamp-circle--area`**（2054〜2062行目）:
+  ```css
+  .stamp-circle--area {
+    width: 40px; height: 40px; font-size: 14px;
+  }
+  .stamp-circle--area.stamp-circle--checked {
+    box-shadow:
+      0 0 0 2px var(--cream),
+      0 0 0 3.5px var(--stamp-color, var(--caramel)),
+      1px 2px 4px rgba(44,36,32,0.25);
+  }
+  ```
+  エリアバッジ専用のサイズ縮小＋二重リング幅縮小のオーバーライド。**本設計書での改修対象（画像用の新規修飾子を追加する）**。
+
+### 3-3. `public/index.html`
+
+- `#stamp-area-badges`（174行目）: `<div id="stamp-area-badges" class="stamp-area-badges-page"></div>`。`_renderStampAreaBadges()`が`innerHTML`をセットする空コンテナ。**本設計書での変更は不要**（画像は`_renderStampAreaBadges()`が生成するHTML文字列内の`<img>`タグとして注入される）。
+
+## 4. スコープ外（今回含めない）
+
+- レベルバッジ（`STAMP_LEVEL_META`、定番/ローカル/ニッチ/スペシャル）へのイラスト適用
+- コレクション一覧ビュー本体（`.stamp-stamp-cell`、個別スポットのスタンプ、`_renderStampCollectionList()`）へのイラスト適用。個別スポットは引き続きCSSの印章表現のまま
+- 未達成時（ロック中含む）のイラスト表示。ユーザー確定済み方針により、現状のCSS印章表現（点線の空白丸＋絵文字）を維持する
+- 画像の追加生成・差し替え。6枚で確定、追加のエリア画像生成・修正生成は今回のタスク外
+- 画像のCDN配信・最適化パイプライン化。今回は`public/images/stamp-badges/`への静的配置＋既存Service Worker（`sw.js`）キャッシュ機構への自然な組み込みのみ
+- BKK/SYD対応（`STAMP_BADGE_AREAS`自体がSG固有定数、既存の「スタンプラリー機能はSG専用」という設計方針を踏襲）
+- マップビュー側（Leafletピン、`.stamp-marker-icon`）へのイラスト適用（今回はエリアバッジ行の`#stamp-area-badges`のみ対象）
+- 「次はここ」ハイライト（`.stamp-circle--next`）への画像適用（未達成状態のバリエーションのため、上記「未達成時のイラスト表示」スコープ外の一部として扱う）
+
+## 5. データモデルの変更点
+
+**変更なし**。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも無変更。画像パスは`STAMP_BADGE_AREAS`（フロントエンドのJS定数）にハードコードする方式とし、サーバー側データファイルに画像URLフィールドを持たせる設計にはしない（エリア名↔画像ファイルの対応は6件固定・今後変わる見込みが薄いため、定数への直書きで十分。過剰設計を避ける）。
+
+## 6. APIの変更点
+
+**変更なし**。`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`のいずれもレスポンス構造の変更は不要。`server.js`は無変更。画像は`public/images/stamp-badges/`配下の静的ファイルとして、Expressの`express.static`（`public/`配下を静的配信する既存の仕組み）経由でそのまま配信される想定（新規ルート追加不要）。
+
+## 7. フロントエンド設計
+
+### 7-1. `STAMP_BADGE_AREAS`定数への画像パス追加方法
+
+各要素に画像パスを表す新規フィールドを追加する。命名例: `img`（短く簡潔、他の`val`/`emoji`/`labelText`と並びが揃う）。
+
+```js
+const STAMP_BADGE_AREAS = [
+  { val: 'Central',    emoji: '🏙', labelText: 'Central',    img: '/images/stamp-badges/badge-central.png' },
+  { val: 'East',       emoji: '🌅', labelText: 'East',       img: '/images/stamp-badges/badge-east.png' },
+  { val: 'West',       emoji: '🌇', labelText: 'West',       img: '/images/stamp-badges/badge-west.png' },
+  { val: 'North',      emoji: '🌿', labelText: 'North',      img: '/images/stamp-badges/badge-north.png' },
+  { val: 'North-East', emoji: '🌳', labelText: 'North-East', img: '/images/stamp-badges/badge-north-east.png' },
+  { val: 'Sentosa',    emoji: '🏖', labelText: 'Sentosa',    img: '/images/stamp-badges/badge-sentosa.png' },
+];
+```
+
+- パスは`API_BASE`を付与せず**サイトルート相対パス（`/images/...`）で固定**でよい。理由: Capacitor環境（`_isCapacitorApp`）はローカルバンドル方式（`webDir: '../public'`、CLAUDE.md「iOSアプリ化」節参照）のため、`public/images/`配下のファイルはiOSアプリ内にビルド時同梱される。Web環境でも同一オリジンの静的ファイルのため、既存の画像参照パターン（例: `public/vendor/leaflet/`のCSS/JS参照）と同様にAPI_BASEを付けない相対パスで両環境とも解決できる。**念のためbuilder実装時に、既存コードで`_isCapacitorApp`かどうかで画像パスの組み立てを分岐している類似箇所（あれば）がないかgrep確認し、無ければこの相対パス方式のままでよい**。
+- `_computeStampAreaProgress()`の分割代入・戻り値オブジェクトの両方に`img`を通す（3-1節で指摘した「片方だけ変更する見落とし」に注意）:
+  ```js
+  function _computeStampAreaProgress() {
+    return STAMP_BADGE_AREAS.map(({ val, emoji, labelText, img }) => {
+      const spotsInArea = _stampSpots.filter(s => s.area === val);
+      const total = spotsInArea.length;
+      const checked = spotsInArea.filter(s => _stampSpotIsChecked(s.id)).length;
+      return { area: val, emoji, labelText, img, checked, total, achieved: total > 0 && checked === total };
+    });
+  }
+  ```
+
+### 7-2. `_renderStampAreaBadges()`の達成時分岐の書き換え方針
+
+現状の実装は、`achieved`の真偽だけで「印章色塗りつぶし＋回転」を一律に付与し、中身の`<span class="stamp-circle-mark">`をチェックマーク（✓）か絵文字かで出し分けている。これを「未達成時はCSS印章表現のまま」「達成時のみ画像`<img>`表示」に分岐を追加する形に書き換える。
+
+**書き換え後の構造案**（クラス名・変数名は例、最終命名はbuilder判断）:
+
+```js
+function _renderStampAreaBadges() {
+  const el = document.getElementById('stamp-area-badges');
+  if (!el) return;
+  const progress = _computeStampAreaProgress();
+  el.innerHTML = progress.map(({ area, emoji, labelText, img, checked, total, achieved }) => {
+    let circleHtml;
+    if (achieved) {
+      // 達成時: Nano Banana生成のイラストバッジ画像を表示。CSS印章の塗りつぶし・二重リング・回転は付与しない（§7-3参照）
+      circleHtml = `<div class="stamp-circle stamp-circle--area stamp-circle--area-img">
+        <img src="${img}" alt="${labelText}" class="stamp-area-badge-img">
+      </div>`;
+    } else {
+      // 未達成（ロック中含む）: 従来通りCSSの印章表現（点線の空白丸＋絵文字）のまま、一切変更しない
+      circleHtml = `<div class="stamp-circle stamp-circle--area">
+        <span class="stamp-circle-mark">${emoji}</span>
+      </div>`;
+    }
+    return `<div class="stamp-area-stamp">
+      ${circleHtml}
+      <div class="stamp-area-stamp-label">${labelText}</div>
+      <div class="stamp-area-stamp-progress">${checked}/${total}</div>
+    </div>`;
+  }).join('');
+}
+```
+
+- 未達成時の分岐は**既存コードと完全に同一のHTML構造**にする（`achieved`が偽の場合、旧実装は`.stamp-circle--checked`クラスを付与せず`${emoji}`をそのまま`<span class="stamp-circle-mark">`に入れていたので、上記の`else`分岐はそれをそのまま維持しているだけであり、見た目・DOM構造とも無変更）。**「未達成時は現状維持」の確認観点として、builderは実装後この分岐が旧実装のHTML文字列と一致することをdiffで確認すること**。
+- 達成時分岐では、旧実装にあった`_stampRotateDeg(area)`の呼び出し・`--stamp-color`/`--stamp-rotate`インラインstyle付与・`.stamp-circle--checked`クラス付与を**行わない**（画像側に切り替えるため、これらCSS印章の演出変数は達成時には不要になる。詳細理由は次節）。
+- `achieved`時の`<img>`の`alt`属性には`labelText`（英語表記のエリア名）を入れる。i18n観点では`labelText`自体が非i18n対象の既存定数値のため、`alt`もそのまま使い回してよい（新規i18nキーは不要、詳細は§8）。
+
+### 7-3. 画像とCSS印章演出（回転・二重リング）の併用可否 — 結論: 併用しない
+
+**結論: 達成時、画像に切り替える場合は`.stamp-circle--checked`クラス自体を付与せず、CSSの回転（`_stampRotateDeg`）・二重リング（`box-shadow`多重指定）・塗りつぶし背景（`background:var(--stamp-color)`）はいずれも適用しない。**
+
+理由:
+1. **画像自体が既に「完成した1枚絵」である**（§2確定仕様3「エナメルピン/ゲームバッジ風（金属リムの縁取り・光沢のハイライト・立体感のあるベベル）」）。CSSの二重リング（`box-shadow: 0 0 0 2px var(--cream), 0 0 0 3.5px var(--stamp-color), ...`）や塗りつぶし背景をさらに重ねると、画像側の金属リム・光沢表現と視覚的に競合し「縁取りの中に別の縁取りがある」過剰な二重表現になるリスクが高い。
+2. **`.stamp-circle--checked`の`background`プロパティと`<img>`要素は共存の意味がない**（3-2節参照）。`background`は`<img>`の背後に隠れるだけの無駄な指定になる。
+3. **回転演出（`transform:rotate(var(--stamp-rotate))`）についても、画像側デザインが既に「エナメルピン」という物理的に固定された形状物のメタファーであるため、CSSでランダムに傾けると、はんこ（紙に押されたインク）のメタファーとは異なる不自然さが出る可能性がある**。CSS印章表現（§2-2「はんこ」メタファー）と画像イラスト表現（エナメルピン、固定されたバッジ）は異なるメタファーであり、無理に同じ回転演出を継承する必然性はない。
+
+**推奨実装**: 達成時は新規CSS修飾子`.stamp-circle--area-img`（仮称）を`.stamp-circle--area`と併記し、以下のようなスタイルとする。
+
+```css
+/* 達成時のイラストバッジ表示（設計書80）。.stamp-circle--checkedのCSS印章表現（塗りつぶし・二重リング・回転）とは
+   併用しない別系統の見た目。.stamp-circle--areaのサイズ（40px）はそのまま踏襲する */
+.stamp-circle--area-img {
+  border: none;
+  background: transparent;
+  box-shadow: none; /* .stamp-circle--checked由来のbox-shadowが万一クラス併記で残っても打ち消す保険 */
+}
+.stamp-area-badge-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* 画像は正方形256x256pxの透明背景PNGのため、円形コンテナ内で欠けずに収まるようcontainを使う（coverだと画像の縁が切れる恐れ） */
+  filter: drop-shadow(0 2px 4px rgba(44,36,32,0.25)); /* 印章の「影」演出を、画像用に軽いdrop-shadowとして踏襲（任意、builder判断で微調整可） */
+}
+```
+
+- `.stamp-circle`本体（40px円形コンテナ、`display:flex;align-items:center;justify-content:center;`）はそのまま流用し、中身の`<img>`を`width:100%;height:100%;object-fit:contain;`で収める設計とする。コンテナ自体を円形に保つ（`border-radius:50%`は`.stamp-circle`基本クラスに既存）ことで、画像がはみ出さずレイアウトが崩れない。
+- `object-fit:contain`を推奨する理由: 画像は正方形（256×256px）の透明背景PNGであり、エナメルピン自体の輪郭（六角形・盾形等の可能性がある）が画像内のどこに収まっているか不明なため、`cover`（円形コンテナいっぱいに拡大し縁を切り取る）だと意図しないトリミングが起きるリスクがある。`contain`なら画像全体が必ず収まる。**画像の実際の見た目（円形コンテナとのフィット感）はbuilder実装時にWeb版で目視確認し、必要なら`.stamp-circle--area-img`自体の`width`/`height`を若干拡大する（例: 40px→44px程度、コンテナからわずかにはみ出させて存在感を出す）等の微調整を許容する**。
+- `drop-shadow`によるうっすらとした影は任意（無くても機能上問題はない）。CSS印章表現の「影」演出（`box-shadow: 2px 3px 6px rgba(44,36,32,0.25)`）からの発想の踏襲だが、必須ではないためbuilder判断で省略・調整してよい。
+
+### 7-4. ダークモード対応
+
+- 画像自体（PNG）はライト/ダーク共通の1種類のみ（ダークモード専用の別画像は生成していない、スコープ外）。透明背景のため、`.stamp-area-badges-page`の背景色（`var(--sand)`、ダークモード時は自動的にダーク配色に切り替わる既存CSS変数）の上に画像がそのまま乗る形になる。
+- ダークモード時に画像の視認性が低下しないか（暖色系のイラストが暗い背景に馴染むかどうか）は、実装時にWeb版のダークモード切り替えで目視確認が必要（§9未解決事項に記載）。
+
+### 7-5. 未達成→達成への遷移時の見た目変化について
+
+チェックインにより`achieved`が偽から真に変わる瞬間（`doStampCheckin()`の再描画呼び出しで`_renderStampAreaBadges()`が呼ばれるタイミング）、CSS印章（点線円＋絵文字）から画像バッジへの表示が瞬時に切り替わる。アニメーション遷移（フェードイン等）は今回のスコープに含めない（`_renderStampAreaBadges()`は`innerHTML`一括再代入方式であり、他のスタンプ描画処理と同様に既存はアニメーションなしの即時切り替えのため、この設計を踏襲する）。
+
+## 8. i18n変更点
+
+- **新規i18nキーなし**。`alt`属性には`labelText`（既存の非i18n対象の英語エリア名定数）をそのまま使う。
+- 既存i18nキー`stampAreaBadgesTitle`は無変更（見出しテキスト自体は変更なし）。
+
+## 9. 既知の未解決事項
+
+1. **画像とコンテナ（40px円形）のフィット感の微調整**: `object-fit:contain`での見た目、コンテナサイズを画像に合わせて拡大すべきか（例: 40px→44px）は、Web版での目視確認をしながらbuilderが微調整する必要がある。
+2. **ダークモード時の視認性**: 暖色系（テラコッタ〜ブロンズ系）のイラストが、ダークモード背景（`var(--sand)`のダーク変種）でどう見えるかは未検証。
+3. **画像読み込み失敗時のフォールバック**: 6ファイルは配置済み確認済みだが、将来的にファイル名変更・削除等でパスが壊れた場合の挙動（`<img>`の`onerror`ハンドラで絵文字表示にフォールバックするか）は今回未設計。CLAUDE.mdの既存パターン（イベントカード画像・コース詳細画像等）は`onerror="this.style.display='none';"`等のフォールバックを持つ場合が多いため、**builder判断で同様の軽量フォールバック（`onerror`で`.stamp-circle--area-img`を外しCSS印章表現に戻す等）を追加してもよいが、必須要件ではない**（6ファイルとも配置済み・パス直書きのため通常は発生しない想定）。
+4. **iOS実機での表示**: 設計書69〜79自体がTestFlightビルド未実施のため、本統合もWeb版での確認が先行する。Capacitorローカルバンドル方式のため画像はアプリ内に同梱されるはずだが、次回TestFlightビルド時に実機で表示を確認する必要がある（CIワークフロー・`ios-app/`側の変更は不要という前提、`public/`配下の追加ファイルはCapacitorの`npx cap sync`で自動的にバンドルに含まれる想定）。
+5. **画像ファイルの実サイズ・圧縮結果の最終確認**: メインエージェントの事前作業で256×256px・各15〜37KBにリサイズ・圧縮済みと申告されているが、本設計書作成時点でplannerはファイルの存在のみをGlobで確認しており、画像の実際のピクセルサイズ・内容（意図した6エリアのモチーフが正しく描画されているか）は目視確認していない。builder実装時に念のため実ファイルを確認することを推奨する。
+
+## 10. リスク
+
+1. **`STAMP_BADGE_AREAS`定数の構造変更に伴う参照箇所の見落としリスク**: `_computeStampAreaProgress()`が唯一の参照元であることは設計書78の調査で確認済みだが、実装時に`grep -n "STAMP_BADGE_AREAS"`で再確認すること。
+2. **`.stamp-circle--checked`クラスとの意図しない併用リスク**: 達成時のHTML生成で誤って`.stamp-circle--checked`クラスも同時に付与してしまうと、`background`（画像の下に隠れて無駄になるだけで実害は小さい）よりも、`box-shadow`（二重リング）が画像の外周に残ってしまい「画像＋CSSリングの二重表現」になる回帰が起きうる。実装時、達成時のHTML文字列に`.stamp-circle--checked`が含まれていないことをdiffで確認すること。
+3. **未達成時の分岐に意図しない差分が混入するリスク**: 本設計書の主目的は「達成時のみ変更」であり、未達成時のHTML生成ロジックは一切変更しないことが確認基準。実装後、未達成時のHTML文字列が変更前と完全一致することを確認すること。
+4. **画像のコンテナフィット感が実機で崩れるリスク**: `object-fit:contain`採用時、画像内の余白（透明部分）が大きい場合、40pxコンテナ内で意図より小さく見える可能性がある。Web版での目視確認を実装完了の確認基準に含めること。
+5. **iOS実機未検証**: 設計書69〜79自体がTestFlightビルド未実施のため、本統合もWeb版での検証が先行する。
+6. **ダークモード時の見た目未検証**: 実装時にWeb版でのダークモード切り替え目視確認が必要。
+7. **画像ファイルがgit管理対象であることの見落としリスク**: `public/images/`は`.gitignore`対象外（`data/`とは異なる）。builderがコミット時に画像ファイル6件を含め忘れないよう注意（`git status`で`public/images/stamp-badges/`配下6ファイルがuntrackedとして検出されるはずなので、`git add`漏れがないか確認すること）。
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 本設計書はAPIレスポンス構造・データモデルに一切変更を加えない、フロントエンド（`public/app.js`・`public/app.css`）と静的画像ファイル（`public/images/stamp-badges/`）の追加のみのため、旧バージョンのApp Store版アプリへの影響はゼロ。設計書69〜79自体がまだTestFlightビルド・App Store配信されていないため、実質的な後方互換リスクはない。
+2. **影響範囲**: Web版・App Store版の両方に同時に反映される変更。`server.js`・`data/`配下のデータファイルには一切触れないため、Web版への反映は静的ファイルの追加＋キャッシュバスティングのみで即座に反映可能（`pm2 restart`不要）。iOS版はCapacitorのローカルバンドル方式のため、画像ファイルの反映には次回TestFlightビルド（`npx cap sync`を含むCIフロー）が必要。
+3. **リリースタイミング**: 設計書69〜79と合わせて次回のTestFlightビルドで一括リリースする形が自然。
+4. **App Store Connect側の追加対応は不要**: 新規権限・新規トラッキング等を一切伴わない、既存機能の見た目変更のみ。
+
+## 承認状況
+2026-07-20 planner設計。ユーザーがNano Bananaで生成した6エリア分のイラストバッジ画像（`public/images/stamp-badges/`に配置済み）を、設計書78のCSS印章風エリアバッジの「達成時のみ」統合する設計。**ユーザー承認済み**。

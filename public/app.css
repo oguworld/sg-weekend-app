@@ -2061,6 +2061,20 @@
         1px 2px 4px rgba(44,36,32,0.25);
     }
 
+    /* 達成時のイラストバッジ表示（設計書80）。.stamp-circle--checkedのCSS印章表現（塗りつぶし・二重リング・回転）とは
+       併用しない別系統の見た目。.stamp-circle--areaのサイズ（40px）はそのまま踏襲する */
+    .stamp-circle--area-img {
+      border: none;
+      background: transparent;
+      box-shadow: none; /* .stamp-circle--checked由来のbox-shadowが万一クラス併記で残っても打ち消す保険 */
+    }
+    .stamp-area-badge-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* 画像は正方形256x256pxの透明背景PNGのため、円形コンテナ内で欠けずに収まるようcontainを使う（coverだと画像の縁が切れる恐れ） */
+      filter: drop-shadow(0 2px 4px rgba(44,36,32,0.25));
+    }
+
     /* ─── レベル解禁演出モーダル（設計書70改善3） ─── */
     .stamp-unlock-emoji { font-size: 56px; line-height: 1; animation: stampUnlockPop 0.6s cubic-bezier(.32,2,.55,.89); }
     @keyframes stampUnlockPop {
