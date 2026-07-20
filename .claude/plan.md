@@ -9622,3 +9622,182 @@ return `<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}
 
 ## 承認状況
 2026-07-20 planner設計。ユーザーがNano Bananaで生成した4レベル分のイラストバッジ画像（`public/images/stamp-badges/`に配置済み）を、設計書78のCSS印章風レベル表示に統合する設計。**ユーザー承認済み**。§4-3（レベル凡例チップ）は絵文字のまま維持（見送り）、§4-4（スポット詳細シートのレベルバッジ）も今回は見送り。**実装対象は§4-1（レベル解禁演出モーダル）・§4-2（コレクション一覧ページ見出し）の2箇所のみに確定**。
+
+# 設計書82 — スタンプサイズの拡大（レベル見出しアイコン・エリアバッジ・個別スポット円）
+
+（2026-07-20 planner作成。設計書69〜81で実装済みの「スポット制覇スタンプラリー」機能のうち、設計書81で追加したレベル見出しアイコンを含む3種類のスタンプ表現のサイズが小さすぎて目立たないというユーザーフィードバックを受けたサイズ拡大設計。コード実装は含まない）
+
+## 1. 背景
+
+設計書81でコレクション一覧の各レベル見出し（`.stamp-book-page-title`）にNano Banana生成のレベルバッジイラスト（`.stamp-level-title-img`、20px）をインラインアイコンとして追加したが、ユーザーが実機スクリーンショットを確認したところ「変わっていない」と誤解するほど小さく、目立たなかった。メインエージェントとの相談の結果、レベル見出しアイコンだけでなく、既存のエリアバッジ（設計書77/78/80）・コレクション一覧の個別スポット円（設計書69/70/78）も含めた3種類のスタンプ表現サイズをまとめて拡大する方針で合意した。
+
+## 2. 確定済み仕様（ユーザー承認済み）
+
+以下3箇所のサイズをすべて拡大する（目安サイズはユーザーとの相談で出た数値、実装時の最終調整（±数px程度）はbuilder判断に委ねる）。
+
+| # | 対象 | 現状 | 拡大後の目安 |
+|---|---|---|---|
+| 1 | レベル見出しアイコン（`.stamp-level-title-img`、設計書81新規） | 20px | 32px程度 |
+| 2 | エリアバッジ（`.stamp-circle--area`、設計書77/78/80） | 40px | 56px程度（個別スポット円の現行サイズと同程度） |
+| 3 | 個別スポットの円（`.stamp-circle`本体、設計書69/70/78） | 56px | 72px程度 |
+
+## 3. 既存コードの調査結果（2026-07-20時点で実ファイルを確認、設計の前提事実）
+
+### 3-1. `public/app.css`
+
+- **`.stamp-circle`本体**（2011〜2019行目）: 個別スポット円の基本形状。`width:56px;height:56px;border-radius:50%;font-size:20px;`。**本設計書の主要変更対象（#3）**。
+- **`.stamp-circle--locked`**（2022〜2025行目）: `border-color`と`opacity`のみのオーバーライドで、サイズに連動する値は持たない。変更不要。
+- **`.stamp-circle--checked`**（2026〜2040行目）: `box-shadow`多重指定で二重リング・影を表現（`0 0 0 3px var(--cream), 0 0 0 5px var(--stamp-color,...), 2px 3px 6px rgba(...)`）。**円のサイズ（56px→72px）に対し、このリング幅（3px/5px）・影オフセット（2px 3px 6px）は現状の比率を保つよう比例的に調整するか検討が必要**（詳細は§7-3）。
+- **`.stamp-circle-order`・`.stamp-circle-lock`**（2020〜2021行目）: 円内の番号・鍵アイコンの`font-size:16px`。円本体の`font-size:20px`（絵文字・チェックマーク用）とは別に個別指定されている。**円のサイズ拡大に伴い、これらのfont-sizeも拡大しないと相対的に小さく見える可能性がある**。
+- **`.stamp-circle--area`**（2053〜2062行目）: エリアバッジ専用の縮小オーバーライド。`width:40px;height:40px;font-size:14px;`＋達成時（`.stamp-circle--area.stamp-circle--checked`）の二重リング幅縮小（`0 0 0 2px, 0 0 0 3.5px, 1px 2px 4px`）。**本設計書の主要変更対象（#2）**。56px程度に拡大する場合、`.stamp-circle--area`という「縮小オーバーライド」自体の存在意義が薄れる（`.stamp-circle`本体とほぼ同サイズになるため）。**この点は§7-2で設計方針を提示する**。
+- **`.stamp-circle--area-img`・`.stamp-area-badge-img`**（2064〜2076行目、設計書80）: 達成時のイラストバッジ表示。`.stamp-circle--area-img`自体はサイズ指定を持たない（`border:none;background:transparent;box-shadow:none;`のみ）。実際のサイズは併記される`.stamp-circle--area`の40px指定に依存している。`.stamp-area-badge-img`は`width:100%;height:100%;object-fit:contain;filter:drop-shadow(...)`。**`.stamp-circle--area`のサイズ変更に自動的に追従するため、`.stamp-circle--area-img`/`.stamp-area-badge-img`自体の書き換えは不要と推測されるが、`drop-shadow`のオフセット値（`0 2px 4px`）は拡大後の見た目に対して相対的に小さくなる可能性があり、比例調整の要否は実装時のWeb版目視確認が必要**。
+- **`.stamp-level-title-img`**（2090〜2093行目、設計書81新規）: `width:20px;height:20px;object-fit:contain;vertical-align:middle;`。**本設計書の主要変更対象（#1）**。単独の`<img>`要素でありコンテナ側のサイズ指定は無いため、この1クラスの`width`/`height`変更のみで完結する見込み。
+- **`.stamp-unlock-img`**（2080〜2083行目、設計書81）: レベル解禁演出モーダルの96pxイラスト。**スコープ外（§4参照）、変更しない**。
+- **`.stamp-book-grid`**（1977〜1979行目）: `display:flex;flex-wrap:wrap;gap:16px 10px;`。個別スポット円を並べるグリッドコンテナ自体。`gap`はセル間の余白でありセル幅（`.stamp-stamp-cell`側）には連動しないが、円が大きくなった分、視覚的な密度は上がる。
+- **`.stamp-stamp-cell`**（1980〜1983行目）: `display:flex;flex-direction:column;align-items:center;gap:6px;width:74px;`。**円56px→72pxへの拡大に伴い、この固定幅74pxでは円がはみ出す（72px円に対し左右余白がわずか1pxしかなくなる）ため、拡大が必須**。目安90px程度（詳細は§7-1）。
+- **`.stamp-stamp-cell-name`**（1984〜1989行目）: `font-size:11px;`、2行省略（`-webkit-line-clamp:2`）。セル幅の拡大に伴い、テキストの折り返し位置が変わる（1行あたりに入る文字数が増える）。フォントサイズ自体の変更は必須ではないが、セル全体のバランスを見て調整可能（builder判断）。
+- **`.stamp-stamp-cell-meta`・`.stamp-stamp-cell-date`・`.stamp-stamp-cell-desc`**（1994〜2008行目、設計書79）: `.stamp-stamp-cell-meta`は`width:100%`（親`.stamp-stamp-cell`の幅に追従）、`.stamp-stamp-cell-desc`も`width:100%`。**セル幅の拡大に自動追従するため、この3クラス自体の書き換えは不要と推測される**。ただし2行省略時の折り返し文字数が変わるため、実装後の見た目確認（説明文が窮屈に見えないか）は必要。
+- **`.stamp-stamp-cell-next-tag`**（1990〜1993行目）: 「次はここ」タグ。`font-size:10px;padding:1px 7px;`。セル幅拡大の影響は軽微だが、円の拡大とのバランスで小さく見える可能性があり、比例調整はbuilder判断で可。
+
+### 3-2. `public/app.js`
+
+- **`_renderStampCollectionList()`**（3988〜4037行目）: HTML生成ロジック自体はクラス名を出力するのみで、サイズ数値はCSS側に完全に分離されている。**本設計書はCSSのみの変更でJS変更は不要と推測される**（念のためbuilder実装時に`px`のインラインstyle直書きがJS側に紛れ込んでいないかgrep確認すること）。
+- **`_renderStampAreaBadges()`**（3949〜3970行目）: 同上、クラス名出力のみ。JS変更不要と推測される。
+- **`meta.img`を使う`levelTitleImgHtml`生成箇所**（4031行目）: `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">`。クラス名を変更しない前提であれば、この行自体の変更は不要（CSS側の`.stamp-level-title-img`定義のみ変更すれば反映される）。
+
+### 3-3. `public/index.html`
+
+- `#stamp-area-badges`（`class="stamp-area-badges-page"`のみ、インラインstyleなし）・`#stamp-collection-list`ともサイズを直接指定するインラインstyleは持たない。**本設計書での変更は不要と推測される**。
+
+## 4. スコープ外（今回含めない）
+
+- スタンプの中身（イラスト画像自体・CSS印章表現のロジック）の変更。サイズのみの変更で、画像ファイル自体の差し替え・新規生成は行わない
+- レベル解禁演出モーダルのイラスト（`.stamp-unlock-img`、96px）。既に十分な大きさのため対象外
+- チェックイン日時・説明文の表示条件変更（設計書79の仕様のまま、制覇済みのみ表示を維持）
+- マップ上のピン（`.stamp-marker-icon`、30px、設計書69）のサイズ変更
+- データモデル・API変更。純粋にCSSサイズ変更のみ（`server.js`・`data/`配下は無変更）
+- BKK/SYD対応（スタンプラリー機能自体がSG専用のため対象外）
+- レベル凡例チップ（`.stamp-level-chip`、`#stamp-level-legend`）・スポット詳細シート内のレベルバッジ表示のサイズ変更（設計書81でイラスト適用自体が見送られた箇所のため、本設計書でも対象外）
+
+## 5. データモデルの変更点
+
+**変更なし**。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも無変更。
+
+## 6. APIの変更点
+
+**変更なし**。`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`のいずれもレスポンス構造変更は不要。`server.js`は無変更。
+
+## 7. フロントエンド設計
+
+### 7-1. 個別スポット円（`.stamp-circle`）とセル幅（`.stamp-stamp-cell`）の拡大
+
+```css
+.stamp-circle {
+  width: 72px; height: 72px; border-radius: 50%;
+  /* display/align-items/justify-content/position/margin/flex-shrinkは無変更 */
+  font-size: 24px; /* 20px→24px程度、円のスケール比（72/56≈1.29）に近い比率で拡大。絵文字・チェックマークの視認性向上のため */
+}
+.stamp-circle-order { font-size: 20px; font-weight: 700; opacity: 0.5; } /* 16px→20px */
+.stamp-circle-lock { font-size: 20px; opacity: 0.6; } /* 16px→20px */
+```
+
+- `.stamp-stamp-cell`の固定幅も連動して拡大する:
+```css
+.stamp-stamp-cell {
+  width: 90px; /* 74px→90px程度。72px円+左右余白9pxずつ */
+}
+```
+- `.stamp-book-grid`の`gap`（`16px 10px`）は現状維持を推奨（セル自体が大きくなるため、gapを広げすぎると1行あたりの表示数が過度に減る）。ただし実装後の見た目確認で窮屈・間延びいずれかの印象があれば、builder判断で微調整してよい
+- `.stamp-stamp-cell-name`のfont-sizeは11px据え置きでよい（セル幅拡大により折り返し文字数が増えるため、可読性はむしろ向上する見込み）。ただし円が大きくなった分、名前ラベルとのバランスで拡大したい場合はbuilder判断で12px程度への微調整を許容する
+
+### 7-2. `.stamp-circle--checked`の二重リング・影の比例調整
+
+円のサイズが56px→72pxになる（約1.29倍）ため、二重リング幅・影オフセットも比例的に拡大することを推奨する。ただし「リングが太すぎて絵文字が圧迫される」ような過剰な拡大は避けること。
+
+```css
+.stamp-circle--checked {
+  /* border/background/color/cursor/transformは無変更 */
+  box-shadow:
+    0 0 0 4px var(--cream),                          /* 3px→4px */
+    0 0 0 6.5px var(--stamp-color, var(--caramel)),   /* 5px→6.5px */
+    2.5px 4px 8px rgba(44,36,32,0.25);                /* 影もやや強調 */
+}
+```
+
+具体的な数値（4px/6.5px/8px）はあくまで目安であり、実装時のWeb版目視確認でバランスを見てbuilderが微調整してよい。
+
+### 7-3. エリアバッジ（`.stamp-circle--area`）の拡大方針
+
+エリアバッジを56px程度（個別スポット円の**現行**56pxに合わせる、拡大後の個別スポット円72pxとは異なる点に注意）に拡大すると、「エリアバッジ専用の縮小オーバーライド」という現状の設計意図が薄れる。以下2案を提示する（**最終選択はbuilder判断に委ねる**、いずれも見た目・機能上の実害はない）。
+
+**案A（推奨・変更が小さい）**: `.stamp-circle--area`のオーバーライド値をそのまま56pxに書き換える。クラス構造自体は変更しない。
+```css
+.stamp-circle--area {
+  width: 56px; height: 56px; font-size: 18px; /* 40px/14px → 56px/18px */
+}
+.stamp-circle--area.stamp-circle--checked {
+  box-shadow:
+    0 0 0 3px var(--cream),                         /* 2px→3px、.stamp-circle--checked本体の値に近づける */
+    0 0 0 5px var(--stamp-color, var(--caramel)),    /* 3.5px→5px */
+    2px 3px 6px rgba(44,36,32,0.25);                 /* 1px 2px 4px → 2px 3px 6px */
+}
+```
+
+**案B（構造の簡素化）**: エリアバッジと個別スポット円が同サイズになる以上、`.stamp-circle--area`の`width`/`height`指定自体を削除し（`.stamp-circle`本体のサイズをそのまま継承させる）、`.stamp-circle--area`には`font-size`のみ残すか、クラス自体を実質的に空にする。ただし、この場合`.stamp-circle--area-img`・`.stamp-area-badge-img`（設計書80、達成時イラスト表示）もサイズ指定を持たず`.stamp-circle`本体の72px（!）を継承することになり、**個別スポット円と同じ72pxになってしまう**（ユーザー確定仕様「56px程度」からはみ出る）。案Bを採用する場合、`.stamp-circle--area`に明示的な`width:56px;height:56px;`を残す必要があり、結局案Aとほぼ同じ記述量になる。
+
+**→ 上記の理由により、案Aを標準採用案として推奨する**（案Bは実質的なメリットが薄いため）。
+
+- `.stamp-circle--area-img`・`.stamp-area-badge-img`（設計書80のイラスト達成表示）は、`.stamp-circle--area`のサイズ変更（40px→56px）に自動追従するため、明示的な変更は不要と推測される。ただし`.stamp-area-badge-img`の`filter:drop-shadow(0 2px 4px rgba(...))`は、56pxコンテナに対してやや控えめに見える可能性があるため、`0 3px 5px`程度への微調整をbuilder判断で許容する
+- `.stamp-area-stamp`（エリアバッジ全体のラッパー、`width:62px`）・`.stamp-area-stamp-label`（`max-width:62px`）も、56pxの円に対して幅62pxではほぼ余白が無くなる。**`.stamp-area-stamp`の`width`を72px程度に拡大する必要がある可能性が高い**（実装時に円のはみ出し・ラベルの折り返し崩れがないか確認すること）
+```css
+.stamp-area-stamp {
+  width: 72px; /* 62px→72px程度 */
+}
+.stamp-area-stamp-label {
+  max-width: 72px; /* 62px→72px */
+}
+```
+- `.stamp-area-badges-page`（ラッパーコンテナ、`display:flex;flex-wrap:wrap;gap:14px;`）のレイアウトは、6エリア分のバッジ幅が62px→72pxへ拡大することで、画面幅次第では1行に収まる個数が変わる（現状のスマホファースト幅で6個が2行程度に収まっている想定）。**この折り返しパターンの変化は実装後のWeb版目視確認が必要**（詳細は§9）
+
+### 7-4. レベル見出しアイコン（`.stamp-level-title-img`）の拡大
+
+```css
+.stamp-level-title-img {
+  width: 32px; height: 32px; object-fit: contain; vertical-align: middle;
+}
+```
+
+- `.stamp-book-page-title`は`display:flex;align-items:center;gap:6px;font-size:13px;`のまま無変更でよい。`align-items:center`により、32pxアイコンとテキスト（13px）の垂直方向の中央揃えは自動的に保たれる
+- アイコンが32pxに拡大されることで、`.stamp-book-page-title`全体の行高が拡大アイコンに引っ張られて高くなる（現状20pxアイコン基準の見出し行から、32pxアイコン基準に変わる）。`padding-bottom:8px;border-bottom:1px dashed ...`との組み合わせで、見出し全体の縦方向のボリュームが増すため、**アイコンとテキストのバランス（アイコンが大きすぎてテキストが埋もれないか）は実装時のWeb版目視確認が必要**。過剰に大きく感じる場合はbuilder判断で28px程度への微調整を許容する
+
+## 8. i18n変更点
+
+**変更なし**。新規文言の追加・変更はない（純粋なサイズ変更のため）。
+
+## 9. 既知の未解決事項
+
+1. **エリアバッジ拡大（40px→56px）に伴う`.stamp-area-badges-page`の折り返しレイアウト変化**: 6エリア分のバッジが1行あたり何個収まるか（現状レイアウトからどう変わるか）は、実装後のWeb版目視確認が必要。極端に窮屈・間延びした印象になる場合、`.stamp-area-badges-page`の`gap`（現状14px）を調整する余地をbuilderに残す
+2. **個別スポット円拡大（56px→72px）に伴う`.stamp-stamp-cell`固定幅（74px→90px程度）の最終値**: §7-1で提示した90pxは目安であり、実際のスポット名の折り返し・「次はここ」タグ・チェックイン日時/説明文（設計書79）を含めたセル全体の見た目バランスは、実装時のWeb版目視確認をしながらbuilderが微調整する必要がある
+3. **`.stamp-circle--checked`の二重リング・影オフセットの比例調整値（§7-2の4px/6.5px/8px）**: あくまで目安の数値であり、実機（および現時点ではWeb版）での視認性・バランスは実装後に確認が必要
+4. **エリアバッジのサイズ拡大方式（案A vs 案B）**: §7-3で案Aを推奨案として提示したが、最終的な採用可否はbuilder実装時の判断に委ねる
+5. **23件（設計書77で9件追加済み）のスポットを、拡大後の円（72px）でグリッド表示した際の1画面あたりの表示密度・スクロール量**: 円が大きくなった分、1画面に収まる件数が減りスクロール量が増える。実機・実ブラウザでの見た目確認が必要
+6. **レベル見出しアイコン拡大（20px→32px）が、見出しテキストとのバランスにおいて「大きすぎる」印象を与えないか**: §7-4に記載の通り、実装時のWeb版目視確認とbuilderによる微調整の余地を残す
+
+## 10. リスク
+
+1. **既存デザイン変更に伴う回帰リスクの範囲は限定的**: データ取得・API呼び出し・状態管理には一切触れないため、機能面（チェックイン・レベル解禁・進捗計算）への回帰リスクは低い（設計書78のリスク1と同種）
+2. **CSSサイズ値の連鎖的な調整漏れリスク**: `.stamp-circle`本体の拡大に伴い、`.stamp-circle-order`/`.stamp-circle-lock`（円内テキストのfont-size）・`.stamp-circle--checked`のbox-shadow値・`.stamp-stamp-cell`の固定幅など、複数の連動するCSS値を漏れなく調整する必要がある。実装時に本設計書§3・§7で洗い出した箇所を一つずつチェックリスト的に確認すること
+3. **エリアバッジ拡大に伴う`.stamp-area-stamp`/`.stamp-area-stamp-label`の幅（62px）の調整漏れリスク**: §7-3で指摘した通り、`.stamp-circle--area`自体のサイズだけでなく、それを包む`.stamp-area-stamp`（幅62px固定）も連動して拡大しないと、円がラッパー幅からはみ出るレイアウト崩れが起きる
+4. **`.stamp-circle--area-img`（設計書80のイラスト達成表示）が、`.stamp-circle--area`のサイズ変更に正しく追従するかの確認漏れリスク**: `.stamp-area-badge-img`は`width:100%;height:100%`のためコンテナサイズに自動追従する設計だが、実装後に達成済みエリア（イラスト表示）でも意図通り56px相当に拡大されて表示されるか、Web版で実際に確認する必要がある（現状すべてのエリアが未達成の場合、この確認ができない可能性がある点に注意。テスト用にダミーでチェックイン状態を作るか、コード上のクラス付与ロジックのみで確認するかはbuilder判断）
+5. **iOS実機未検証**: 設計書69〜81自体がTestFlightビルド未実施のため、本拡大もWeb版での検証が先行する
+6. **ダークモード時の見た目未検証**: サイズ変更自体はCSS変数を使った色指定に影響しないため、ダークモード対応自体への回帰リスクは低いと推測されるが、念のためWeb版でのダークモード切り替え目視確認を実装完了の確認基準に含めることを推奨する
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 本設計書はAPIレスポンス構造・データモデルに一切変更を加えない、`public/app.css`（一部`public/app.js`のインラインstyle直書き確認のみ、変更は基本的に不要と推測）のみの変更のため、旧バージョンのApp Store版アプリへの影響はゼロ。設計書69〜81自体がまだTestFlightビルド・App Store配信されていないため、実質的な後方互換リスクはない
+2. **影響範囲**: Web版・App Store版の両方に同時に反映される変更。`server.js`・`data/`配下のデータファイルには一切触れないため、Web版への反映は静的ファイルのキャッシュバスティングのみで即座に反映可能（`pm2 restart`不要）
+3. **リリースタイミング**: 設計書69〜81と合わせて次回のTestFlightビルドで一括リリースする形が自然
+4. **App Store Connect側の追加対応は不要**: 新規権限・新規トラッキング等を一切伴わない、既存機能の見た目変更のみ
+
+## 承認状況
+2026-07-20 planner設計。ユーザーが実機スクリーンショットを確認し「レベル見出しアイコンが小さすぎて変わっていないと誤解した」とのフィードバックを受け、レベル見出しアイコン（20px→32px）・エリアバッジ（40px→56px）・個別スポット円（56px→72px）の3種類のスタンプサイズを拡大する方針で合意。**ユーザー承認済み**。

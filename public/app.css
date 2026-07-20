@@ -1925,12 +1925,12 @@
     }
     .stamp-area-stamp {
       display: flex; flex-direction: column; align-items: center; gap: 4px;
-      width: 62px;
+      width: 72px;
     }
     .stamp-area-stamp-label {
       font-size: 10px; font-weight: 700; color: var(--midnight);
       text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      max-width: 62px;
+      max-width: 72px;
     }
     .stamp-area-stamp-progress { font-size: 10px; color: var(--warm-gray); }
 
@@ -1979,7 +1979,7 @@
     }
     .stamp-stamp-cell {
       display: flex; flex-direction: column; align-items: center; gap: 6px;
-      width: 74px;
+      width: 90px;
     }
     .stamp-stamp-cell-name {
       font-size: 11px; color: var(--midnight); text-align: center;
@@ -2009,16 +2009,16 @@
 
     /* ─── スタンプ円（設計書78 §7-3） ─── */
     .stamp-circle {
-      width: 56px; height: 56px; border-radius: 50%;
+      width: 72px; height: 72px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       position: relative; margin: 0 auto; flex-shrink: 0;
-      font-size: 20px;
+      font-size: 24px;
       border: 2px dashed var(--sand-dark);
       background: transparent;
       color: var(--warm-gray);
     }
-    .stamp-circle-order { font-size: 16px; font-weight: 700; opacity: 0.5; }
-    .stamp-circle-lock { font-size: 16px; opacity: 0.6; }
+    .stamp-circle-order { font-size: 20px; font-weight: 700; opacity: 0.5; }
+    .stamp-circle-lock { font-size: 20px; opacity: 0.6; }
     .stamp-circle--locked {
       border-color: var(--sand);
       opacity: 0.5;
@@ -2030,9 +2030,9 @@
       cursor: pointer;
       transform: rotate(var(--stamp-rotate, -3deg));
       box-shadow:
-        0 0 0 3px var(--cream),
-        0 0 0 5px var(--stamp-color, var(--caramel)),
-        2px 3px 6px rgba(44,36,32,0.25);
+        0 0 0 4px var(--cream),
+        0 0 0 6.5px var(--stamp-color, var(--caramel)),
+        2.5px 4px 8px rgba(44,36,32,0.25);
     }
     .stamp-circle--checked .stamp-circle-mark {
       transform: rotate(calc(var(--stamp-rotate, -3deg) * -1));
@@ -2050,19 +2050,19 @@
       50%      { box-shadow: 0 0 0 6px rgba(200,128,74,0); }
     }
 
-    /* エリアバッジ用の小さいスタンプ円（.stamp-circle と併記して使う） */
+    /* エリアバッジ用の小さいスタンプ円（.stamp-circle と併記して使う）（設計書82でサイズ拡大: 40px→56px） */
     .stamp-circle--area {
-      width: 40px; height: 40px; font-size: 14px;
+      width: 56px; height: 56px; font-size: 18px;
     }
     .stamp-circle--area.stamp-circle--checked {
       box-shadow:
-        0 0 0 2px var(--cream),
-        0 0 0 3.5px var(--stamp-color, var(--caramel)),
-        1px 2px 4px rgba(44,36,32,0.25);
+        0 0 0 3px var(--cream),
+        0 0 0 5px var(--stamp-color, var(--caramel)),
+        2px 3px 6px rgba(44,36,32,0.25);
     }
 
     /* 達成時のイラストバッジ表示（設計書80）。.stamp-circle--checkedのCSS印章表現（塗りつぶし・二重リング・回転）とは
-       併用しない別系統の見た目。.stamp-circle--areaのサイズ（40px）はそのまま踏襲する */
+       併用しない別系統の見た目。.stamp-circle--areaのサイズ（設計書82で56pxに拡大）はそのまま踏襲する */
     .stamp-circle--area-img {
       border: none;
       background: transparent;
@@ -2072,7 +2072,7 @@
       width: 100%;
       height: 100%;
       object-fit: contain; /* 画像は正方形256x256pxの透明背景PNGのため、円形コンテナ内で欠けずに収まるようcontainを使う（coverだと画像の縁が切れる恐れ） */
-      filter: drop-shadow(0 2px 4px rgba(44,36,32,0.25));
+      filter: drop-shadow(0 3px 5px rgba(44,36,32,0.25));
     }
 
     /* ─── レベル解禁演出モーダル（設計書70改善3 → 設計書81でイラスト画像化） ─── */
@@ -2087,9 +2087,9 @@
       100% { transform: scale(1); opacity: 1; }
     }
 
-    /* コレクション一覧「ページ」見出しのイラストアイコン（設計書81） */
+    /* コレクション一覧「ページ」見出しのイラストアイコン（設計書81 → 設計書82でサイズ拡大: 20px→32px） */
     .stamp-level-title-img {
-      width: 20px; height: 20px; object-fit: contain; vertical-align: middle;
+      width: 32px; height: 32px; object-fit: contain; vertical-align: middle;
     }
 
     .course-card {
