@@ -195,6 +195,24 @@ sg-weekend-app/
 - **教訓（再発防止策として記録）**: 「サーバー側は正常なのに実機だけ失敗する」系の不具合では、ユーザー環境要因（VPN・Private Relay・広告ブロッカー・キャリアの通信最適化プロキシ等）を疑うタイミングを早めるべきだった。「サーバー・CDN側は正常」「特定の1URLだけでなく全スポットで一貫して失敗」という状況証拠が揃った時点（設計書75の時点）で、追加のコード修正より先にユーザー環境の確認を行うべきだった
 - **このタスクをもってスタンプスポット詳細画像の不具合調査（設計書73〜76）は解決済み**。未検証事項なし
 
+### エリア制覇バッジ機能＋スポットデータ拡充（2026-07-20実装、設計書77）
+ユーザー要望「スタンプラリーにもっとハマる仕掛けを」を受け、既存のレベル制（定番/ローカル/ニッチ/スペシャル）とは別軸の「エリア制覇バッジ」を追加した。あわせて、既存14スポットのエリア分布の偏り（Central 8件・West 3件・North/East/North-East各1件・Island-wide/Sentosa各0件）を是正するため9件の新規スポットを追加した。
+
+- **`data/sg/stamp-spots.json`に9件追加（14件→23件）**: `bird-paradise`（standard/North）・`siloso-beach`（standard/Sentosa）・`sea-aquarium`（standard/Sentosa）・`katong-joo-chiat`（local/East）・`punggol-waterway-park`（local/North-East）・`sembawang-hot-spring`（niche/North）・`changi-chapel-museum`（niche/East）・`lorong-halus-wetland`（niche/North-East）・`fort-siloso`（niche/Sentosa）。追加後のレベル別内訳は`standard`7件・`local`6件・`niche`8件・`special`2件（変更なし）。追加後のエリア分布はCentral 8/West 3/North 3/East 3/North-East 3/Sentosa 3（Island-wide 0件は変更なし）。`order`は各レベル内の既存最大値の続きから採番（standard新規3件=order5-7、local新規2件=order5-6、niche新規4件=order5-8）、重複なしを確認済み。`imageUrl`は9件とも空文字列のまま（`scripts/fill-stamp-spot-images.js`の再実行は別タスク）。座標はユーザー提示の概算値をそのまま採用、実装時に既知の実在地と照合し大きなズレがないことを確認済み
+- **`data/sg/stamp-spots.json`は`.gitignore`対象のためVPS上で直接編集する既存運用方針を踏襲**（設計書69〜70と同様）。`server.js`は無変更・`pm2 restart`不要（既存の`fs.readFileSync`都度読み込みアーキテクチャのため）
+- **「Island-wide」エリアはバッジ対象外**: GPSチェックイン前提の1地点スポットと概念的に相性が悪いため、対象エリアはCentral/East/West/North/North-East/Sentosaの6エリアに限定。同エリアへのスポット追加も行っていない
+- **新規定数`STAMP_BADGE_AREAS`**（`public/app.js`、`STAMP_LEVEL_META`直後）: 上記6エリアの`{val, label}`配列。既存`CITY_COURSE_AREAS`（AIコース生成用、Sentosa含む7区分）には依存しない独立定数として新設（スタンプラリー機能は既存コース機能と完全独立という設計書69からの方針を踏襲）
+- **新規関数`_computeStampAreaProgress()`**: `_stampSpots`・`_stampProgress.checkedInSpotIds`から各エリアの`{area, label, checked, total, achieved}`をクライアント側のみで算出（サーバー側APIは無変更）。ロック中`local`/`niche`スポットも`area`フィールド自体はサーバー側`maskLockedStampSpot()`でマスク対象外のため分母に含まれる（意図通りの仕様、全スポット制覇が達成条件のため）
+- **新規関数`_renderStampAreaBadges()`**: `#stamp-area-badges`（`#stamp-map-content`内、進捗サマリ行の直後・地図/一覧コンテナの手前に新設）へ`.stamp-area-badge`チップ形式で6エリア分の進捗（例: 「🏙 Central 2/8」）を描画。達成時は`.stamp-area-badge--achieved`（`background:var(--caramel);color:white`）＋チェックマーク接頭辞を付与
+- **表示は常時（マップ/一覧どちらのビューでも消えない）**: `_applyStampViewMode()`の`display`切替対象（`mapEl`/`legendEl`/`listEl`）に`#stamp-area-badges`を含めていない。一覧ビュー中にエリアバッジが消える回帰を防ぐための実装上必須の対応（設計書77 §7-3で明記済みのリスク）
+- **呼び出し漏れ防止**: `initStampMapTab()`・`doStampCheckin()`両方の既存描画関数呼び出し列（`_renderStampMarkers()`/`_renderStampFog()`/`_renderStampLevelLegend()`/`_renderStampProgressSummary()`/`_renderStampCollectionList()`）に`_renderStampAreaBadges()`を追加済み
+- **CSS新規クラス**: `.stamp-area-badge`（`.stamp-level-chip`ベース、`public/app.css`）・`.stamp-area-badge--achieved`・`.stamp-area-badge-check`
+- **i18n**: 新規キー`stampAreaBadgesTitle`（ja「エリア制覇バッジ」/en「Area Badges」）をja/en同時追加、バッジ行直上のセクション見出しとして使用。エリア名自体（`Central`/`East`等）は既存`CITY_COURSE_AREAS`と同じ絵文字付き英語表記のまま新規i18nキー化せず流用（既存パターンとの一貫性を優先）
+- **APIエンドポイント（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`）は無変更**。レスポンス構造の変更なし、後方互換性への影響なし
+- **達成時の専用演出（レベル解禁演出`#stamp-level-unlock-overlay`相当のモーダル等）は今回スコープ外**。進捗表示と達成マークの視覚変化のみ
+- キャッシュバスティング: `index.html` app.js?v=20260720h・app.css?v=20260720h、`sw.js` CACHE_NAME=sg-weekend-v637
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのエリアバッジの見た目・折り返しレイアウト・チェックイン後の進捗更新アニメーション、新規9スポットの座標精度（現地訪問でのチェックイン可否）は2026-07-20時点でWeb版API検証のみ完了、実機未確認。設計書69〜76自体もまだTestFlightビルド未実施のため、これらは次回一括リリース時にまとめて確認する想定
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

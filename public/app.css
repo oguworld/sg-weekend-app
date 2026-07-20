@@ -1912,6 +1912,17 @@
     }
     .stamp-level-chip--locked { opacity: 0.45; }
     .stamp-level-chip-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ─── エリア制覇バッジ（設計書77） ─── */
+    .stamp-area-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 50px; font-size: 12px; font-weight: 700;
+      background: var(--sand); color: var(--midnight);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .stamp-area-badge--achieved { background: var(--caramel); color: white; }
+    .stamp-area-badge-check { font-size: 11px; }
+
     .stamp-marker-icon {
       width: 30px; height: 30px; border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);

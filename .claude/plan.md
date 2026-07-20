@@ -8402,3 +8402,216 @@ event.respondWith(
 ## 承認状況（更新）
 
 2026-07-20 メインエージェントによるユーザー確認により**根本原因が判明・解決済み**。コード側の不具合ではなくユーザー環境（VPN）が原因だったため、追加のコード修正は不要。設計書74・75の診断ログ削除のみを実施する。**ユーザー承認済み**。
+
+# 設計書77 — エリア制覇バッジ機能＋スポットデータ拡充（9件追加）
+
+（2026-07-20 planner作成。設計書69〜76で実装済みの「スポット制覇スタンプラリー」機能に対し、ユーザー要望「スタンプラリーにもっとハマる仕掛けを」を受けた相談の結果確定した新機能。コード実装は含まない）
+
+## 1. 背景
+
+設計書69〜76で実装済みのスタンプラリー機能（コース画面「スタンプラリー」タブ、Leaflet地図＋フォグ・オブ・ウォー＋4段階レベルゲート＋コレクション一覧＋「次はここ」示唆＋レベル解禁演出）に対し、ユーザーから「スタンプラリーにもっとハマる仕掛けを」という追加要望が出た。メインエージェントとの相談の結果、既存のレベル制（定番/ローカル/ニッチ/スペシャル）とは別軸の「エリア制覇バッジ」（既存のエリア区分ごとに全スポット制覇でバッジ獲得）を最初に実装することで合意した。
+
+ただし、現状14スポットのエリア分布を確認したところ非常に偏っており（Central 8件、West 3件、North/East/North-East各1件、Island-wide/Sentosa各0件）、このままではエリアによって「1件チェックインするだけでバッジ獲得」「そもそも対象外」といった不均一なバッジ体験になってしまう。この課題についてもユーザーと相談し、以下の対応で合意済み。
+
+## 2. 確定済み仕様（ユーザー承認済み）
+
+### 2-1. 新規スポットデータの追加（9件）
+各エリア最低3件を目標に、以下9件の実在するシンガポールの名所を`data/sg/stamp-spots.json`に新規追加する。
+
+| id | name | nameJa | lat | lng | level | area | category |
+|---|---|---|---|---|---|---|---|
+| bird-paradise | Bird Paradise | バードパラダイス | 1.4127 | 103.7890 | standard | North | nature |
+| sembawang-hot-spring | Sembawang Hot Spring Park | セムバワン温泉公園 | 1.4489 | 103.8203 | niche | North | nature |
+| katong-joo-chiat | Katong / Joo Chiat | カトン／ジュチアット | 1.3110 | 103.9010 | local | East | culture |
+| changi-chapel-museum | Changi Chapel and Museum | チャンギ・チャペル・アンド・ミュージアム | 1.3389 | 103.9770 | niche | East | culture |
+| punggol-waterway-park | Punggol Waterway Park | プンゴル・ウォーターウェイ・パーク | 1.4050 | 103.9020 | local | North-East | nature |
+| lorong-halus-wetland | Lorong Halus Wetland | ローロン・ハルス・ウェットランド | 1.3860 | 103.9280 | niche | North-East | nature |
+| siloso-beach | Siloso Beach | シロソビーチ | 1.2494 | 103.8106 | standard | Sentosa | sightseeing |
+| sea-aquarium | Singapore Oceanarium (S.E.A. Aquarium) | シンガポール・オセアノアリウム | 1.2586 | 103.8206 | standard | Sentosa | sightseeing |
+| fort-siloso | Fort Siloso | フォート・シロソ | 1.2530 | 103.8090 | niche | Sentosa | culture |
+
+追加後のエリア分布は Central 8 / West 3 / North 3 / East 3 / North-East 3 / Sentosa 3（Island-wideは対象外、下記2-2参照）となり、バッジ対象6エリアすべてが最低3件を満たす。
+
+**レベル別内訳（正確な集計、実装時はこの数値を正とすること）**: 新規9件は standard 3件（bird-paradise, siloso-beach, sea-aquarium）／local 2件（katong-joo-chiat, punggol-waterway-park）／niche 4件（sembawang-hot-spring, changi-chapel-museum, lorong-halus-wetland, fort-siloso）／special 0件。既存14件（standard4/local4/niche4/special2）と合算すると、追加後は **standard 7件・local 6件・niche 8件・special 2件、合計23件**になる。
+
+### 2-2. 「Island-wide」エリアはバッジ対象外
+既存エリア区分7つ（Central/East/West/North/North-East/Island-wide/Sentosa）のうち、「Island-wide」は本来「シンガポール全域」を指す広域カテゴリであり、GPSチェックイン前提の1地点スポットとは概念的に相性が悪いと判断し、**バッジ対象を6エリア（Central/East/West/North/North-East/Sentosa）に限定**する。`Island-wide`エリアのスポット自体を今回追加することもしない。
+
+### 2-3. エリア制覇バッジ機能
+既存のレベル制（定番/ローカル/ニッチ/スペシャル、段階ゲート）とは別軸で、エリアごとに「そのエリア内の全スポットをチェックインしたら達成」というバッジを表示する。
+
+- 対象エリアは上記6エリア（Island-wide除く）
+- 達成条件は「そのエリア内に存在する全スポット（レベル問わず、現在APIレスポンスに含まれている＝見えているもののみが対象。未解禁のスペシャルスポット等、レスポンスから除外されているものは自動的にカウント対象外でよい）を全てチェックインすること」
+- 各エリアの進捗（例: 「Central 2/8」）と、達成時の見た目の変化（例: バッジが色付き・チェックマーク付きになる）を表示する
+- 表示場所: スタンプラリー画面（マップ/一覧どちらの表示モードでも共通して見える位置。既存の`#stamp-progress-summary`・`#stamp-level-legend`と同じ並びに、新規「エリアバッジ」の行を追加する）に、既存の`.stamp-level-chip`と似たデザインのチップ形式で6エリア分を横並びまたは折り返しで表示する
+- 集計方法: サーバー側APIの変更は不要とし、クライアント側（`public/app.js`）で`_stampSpots`（エリア情報を含む）と`_stampProgress.checkedInSpotIds`から計算する（既存の「次はここ」判定ロジックと同じ、クライアント側計算で完結させる設計を踏襲する）
+
+## 3. 既存コードの調査結果（2026-07-20時点で実ファイルを確認、設計の前提事実）
+
+### 3-1. スポットデータ（`data/sg/stamp-spots.json`）
+- 14件の固定配列。フィールドは`id/name/nameJa/lat/lng/level/area/category/description/imageUrl/checkinRadiusM/active/order`（設計書70で`order`追加済み）
+- `order`はレベル内で1始まりの連番。現状の最大値: `standard`=4（gardens-supertree=3, marina-bay-sands-skypark=2, merlion-park=1, singapore-zoo=4）、`local`=4（tiong-bahru=1, chinatown-heritage=2, tekka-market=3, east-coast-park=4）、`niche`=4（haw-par-villa=1, rail-corridor=2, kampong-glam=3, pulau-ubin=4）、`special`=2（istana-open-house=1, labrador-secret-tunnel=2）
+- 現行エリア分布（実ファイル確認済み、ユーザー記載と完全一致）: Central 8件（gardens-supertree, marina-bay-sands-skypark, merlion-park, chinatown-heritage, tiong-bahru, tekka-market, kampong-glam, istana-open-house）／West 3件（haw-par-villa, rail-corridor, labrador-secret-tunnel）／North 1件（singapore-zoo）／East 1件（east-coast-park）／North-East 1件（pulau-ubin）／Island-wide 0件／Sentosa 0件
+- `tekka-market`・`labrador-secret-tunnel`の2件は`imageUrl`が空文字列のまま（設計書73で判明したUnsplash未ヒット、既知の許容リスク、本設計書は対象外）
+- このファイルは`.gitignore`対象のままVPS上で直接編集する運用方針（設計書69で確定、設計書70の`order`追加時も踏襲）。本設計書もこの方針を踏襲する
+
+### 3-2. `CITY_COURSE_AREAS.sg`（`public/app.js` 873〜882行目）
+```js
+const CITY_COURSE_AREAS = {
+  sg: [
+    { val: 'Central',     label: '🏙 Central' },
+    { val: 'East',        label: '🌅 East' },
+    { val: 'West',        label: '🌇 West' },
+    { val: 'North',       label: '🌿 North' },
+    { val: 'North-East',  label: '🌳 North-East' },
+    { val: 'Island-wide', label: '🗺️ Island-wide' },
+    { val: 'Sentosa',     label: '🏖 Sentosa' },
+  ],
+  ...
+```
+7区分（`Sentosa`は設計書24で追加済み）。この定数はAIコース生成のエリアチップ用であり、スタンプラリー機能は現状これを参照していない（`_stampSpots`の`area`フィールドは自由文字列として保持されているのみ）。エリアバッジ機能では、この7区分から`Island-wide`を除いた6区分を新規定数として持つか、この定数を`.filter()`して使うかは実装判断（未解決事項参照）。
+
+### 3-3. サーバー側（`server.js`）
+- `loadStampSpots(city)`（1967〜1976行目）: `data/{city}/stamp-spots.json`をそのままパースして返すだけの単純関数
+- `STAMP_LEVEL_GATES`（1994〜1999行目）・`STAMP_LEVEL_ORDER`（2000行目）・`computeUnlockedLevels()`（2003〜2020行目）: レベル制の段階ゲートロジック。エリアという概念には一切関与しない
+- `maskLockedStampSpot(spot)`（2025〜2033行目）: 未解禁`local`/`niche`スポットの`name`/`nameJa`/`description`/`imageUrl`をプレースホルダー化。`area`フィールドはマスク対象外（設計書71既知の未解決事項として明記済み、現状も継続）
+- `GET /api/stamp-spots`（2038〜2065行目付近）: `special`未解禁時はスポット自体を除外、`local`/`niche`未解禁時は`maskLockedStampSpot()`でマスクして返す。**`area`フィールドは常にそのまま返る**ため、ロック中スポットでも「どのエリアに何件あるか」の内訳自体はクライアントから見えている（名前は「？？？」だが件数・エリア分布は分かる状態）
+- `GET /api/stamp-progress/me`（2067〜2085行目付近）・`POST /api/stamp-progress/checkin`（2086行目〜）: エリアバッジに関わるレスポンス変更は不要（後述§5・§6参照）
+
+### 3-4. クライアント側（`public/app.js`）
+- `STAMP_LEVEL_META`（3656〜3661行目）: レベルごとの`{labelKey, color, emoji}`。エリア用の同種メタ定数は現状存在しない
+- `_stampSpots`（3665行目）・`_stampProgress`（3666行目、`{checkedInSpotIds, unlockedLevels}`）: モジュールスコープ変数。エリアバッジの集計元データとしてそのまま使える
+- `_stampViewMode`（3671行目、`'map'|'list'`初期値`'list'`）: マップ⇄一覧トグルの状態。エリアバッジ表示はこのトグルとは独立に、常時表示する設計とする（§2-3で確定済み「マップ/一覧どちらでも共通して見える位置」）
+- `initStampMapTab()`（3722〜3745行目）: マップタブ表示時の一連の描画呼び出し（`_renderStampMarkers()`/`_renderStampFog()`/`_renderStampLevelLegend()`/`_renderStampProgressSummary()`/`_renderStampCollectionList()`）。新規`_renderStampAreaBadges()`（仮称）もこの並びに追加する想定
+- `_renderStampLevelLegend()`（3875〜3886行目）: `STAMP_LEVEL_ORDER_CLIENT`をmapしてチップHTML文字列を生成、`#stamp-level-legend`に`innerHTML`セット。エリアバッジのレンダリング関数もこれと同型のパターン（`Array.map().join('')`→`innerHTML`セット）で実装できる
+- `_renderStampProgressSummary()`（3889〜3899行目）: `#stamp-progress-summary`にテキストのみセット。既存の1行進捗表示。
+- `_computeStampNextTarget()`（3775〜3785行目）: `STAMP_LEVEL_ORDER_CLIENT`の順にレベルを見て`order`最小の未チェックスポットを返す。**クライアント側計算のみで完結**しているパターンであり、エリアバッジの集計ロジック（§2-3で確定済み「クライアント側で計算」）もこの実装パターンをそのまま踏襲できる
+- `_stampSpotIsChecked(spotId)`（3827〜3829行目）: `_stampProgress.checkedInSpotIds.includes(spotId)`の単純ヘルパー。エリア集計でもそのまま再利用できる
+- `doStampCheckin()`（4054〜4097行目）: チェックイン成功時、既存の描画関数群（`_renderStampMarkers()`/`_renderStampFog()`/`_renderStampLevelLegend()`/`_renderStampProgressSummary()`/`_renderStampCollectionList()`）を再呼び出しして画面を更新している。新規`_renderStampAreaBadges()`もこの並びへの追加が必要（呼び出し漏れ防止のため、既存5関数と同じ並びに追加することを強く推奨）
+- `openStampLevelUnlockModal()`/`closeStampLevelUnlockModal()`（4100〜4121行目）: レベル解禁専用のモーダル演出。**エリアバッジ達成時の同様の専用演出は今回スコープ外**（§4参照）
+
+### 3-5. CSS（`public/app.css`）
+- `.stamp-level-chip`（1908〜1914行目）: `display:inline-flex; padding:5px 12px; border-radius:50px; background:var(--sand)`のpillチップ。`.stamp-level-chip--locked`で`opacity:0.45`
+- `.stamp-collection-*`（1938〜1972行目）: 一覧ビュー用のカード・グループスタイル
+- エリアバッジ用の新規クラス（例: `.stamp-area-badge`）は`.stamp-level-chip`と似たデザインという要件（§2-3）のため、既存`.stamp-level-chip`のスタイルをベースに新規クラスとして定義するか、`.stamp-level-chip`自体を汎用化して共用するかは実装判断（未解決事項参照）
+
+## 4. スコープ外（今回含めない）
+
+- 「Island-wide」エリアのバッジ化・同エリアへのスポット追加
+- エリアバッジ達成時の特別演出（レベル解禁演出のような専用モーダル`#stamp-level-unlock-overlay`/`#stamp-level-unlock-modal`相当の新規モーダル等）。まずは進捗表示と達成マークのみ
+- 新規追加9スポットへの画像補完（`scripts/fill-stamp-spot-images.js`の再実行）は今回のタスクに含めない（後日別タスク）
+- 段階ゲート（`STAMP_LEVEL_GATES`）の閾値変更
+- BKK/SYD対応
+- 既存West（3件、niche/niche/specialのみでstandard/localが無い）のレベル偏りの是正（今回の「最低3件」目標は満たしているため対象外）
+- エリアバッジ達成の可視化を目的とした`data/stamp-progress/{userId}.json`へのフィールド追加（§5-2の通りサーバー側データモデル変更は行わない前提）
+- サーバー側でのエリアバッジ達成状況の算出・レスポンス組み込み（§2-3の通りクライアント側計算のみで完結させる方針のため）
+
+## 5. データモデルの変更点
+
+### 5-1. `data/sg/stamp-spots.json` への9件追加
+既存14件のデータ構造（`id/name/nameJa/lat/lng/level/area/category/description/imageUrl/checkinRadiusM/active/order`）をそのまま踏襲し、配列末尾に9件を追加する。
+
+- `id`: ユーザー提示の英字スラッグをそのまま採用（既存命名パターン`kebab-case`と一致）
+- `name`/`nameJa`: ユーザー提示の名称をそのまま採用
+- `lat`/`lng`: ユーザー提示の概算値をそのまま採用。**builder実装時に大きくズレていないか確認すること**（ユーザー指定の要求事項）
+- `level`/`area`/`category`: §2-1の表の通り
+- `description`: 既存14件と同じトーン（日本語、一文〜二文程度）でbuilderが作成する
+- `imageUrl`: 空文字列のまま（`scripts/fill-stamp-spot-images.js`の再実行は今回のタスク外）
+- `checkinRadiusM`: 既存の運用幅（150〜300m程度、公園等の広いスポットは大きめ・単一施設は小さめ）に倣ってbuilderが設定する。参考: 既存の広域公園系（`east-coast-park`=300, `pulau-ubin`=400）、単一施設系（`marina-bay-sands-skypark`=150, `merlion-park`=150）
+- `active`: `true`固定
+- `order`: 各レベル内の既存最大値の続きから採番する（**正確な採番方針**、§2-1の「レベル別内訳」を正とする）
+  - `standard`（新規3件: bird-paradise, siloso-beach, sea-aquarium）: 既存最大`order`は`singapore-zoo`の4のため、新規3件は`order:5, 6, 7`を採番する（3件間の順序はbuilder判断でよい、地理的な回遊性を厳密に作る必要はない）
+  - `local`（新規2件: katong-joo-chiat, punggol-waterway-park）: 既存最大`order`は`east-coast-park`の4のため、新規2件は`order:5, 6`を採番する
+  - `niche`（新規4件: sembawang-hot-spring, changi-chapel-museum, lorong-halus-wetland, fort-siloso）: 既存最大`order`は`pulau-ubin`の4のため、新規4件は`order:5, 6, 7, 8`を採番する
+  - `special`: 新規追加なし、既存の`order:1, 2`のまま変更しない
+  - **設計書70の既存方針（「機械的な連番ではなく、レベル内で地理的に回りやすい順番を意識して割り当てる」）は今回のエリア追加でも踏襲するが、追加分は既存スポットと地理的に離れた新規エリア（North/East/North-East/Sentosa）が中心のため、既存エリアとの回遊性を厳密に意識した順序調整は難度が高い。builderは各レベル内で「既存の連番の続き」として機械的に付与してよい（既存スポットとの地理的連続性を無理に作る必要はない）**
+
+追加後のレベル別内訳（§2-1の再掲、正確な数値）: `standard`7件（既存4+新規3）・`local`6件（既存4+新規2）・`niche`8件（既存4+新規4）・`special`2件（変更なし）、合計23件。
+
+### 5-2. `data/stamp-progress/{userId}.json` の変更
+**変更なし**。エリアバッジの達成判定は`checkedInSpotIds`（既存フィールド）とスポットマスターの`area`から都度クライアント側で計算可能なため（§2-3で確定済み方針）、進捗データ側への保存・新規フィールド追加は不要。
+
+### 5-3. `CITY_COURSE_AREAS.sg`（`public/app.js`）
+**変更なし**。この定数はAIコース生成用であり、エリアバッジ対象6エリアの定義は新規の別定数として持つ想定（§7-1参照、既存定数の書き換え・共用はしない）。
+
+## 6. APIの変更点
+
+**変更なし**。既存3エンドポイント（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`）はいずれもレスポンス構造の変更を必要としない。
+
+- `GET /api/stamp-spots`は既存のまま`area`フィールドを含む全スポット（ロック中はマスク済みだが`area`は維持）を返す。エリアバッジの集計に必要な情報（各スポットの`area`・`level`・`id`）は既存レスポンスで既に取得可能
+- `GET /api/stamp-progress/me`も既存のまま`checkedInSpotIds`を返す。エリアバッジ達成判定に必要な情報は既存レスポンスで既に取得可能
+- `POST /api/stamp-progress/checkin`もレスポンス構造変更不要（クライアント側が`_stampSpots`/`_stampProgress`更新後に再計算するのみ）
+
+### 6-1. 後方互換性
+API変更が一切ないため後方互換性への影響はない。ただし`data/sg/stamp-spots.json`への9件追加は`GET /api/stamp-spots`のレスポンス件数増加（14件→23件）という**データ量の変化**を伴う。既存クライアントコード（設計書69〜76のロジック）はいずれもスポット件数に依存したハードコードを持たない設計（`_stampSpots.length`を動的に参照するのみ）のため、件数増加自体による既存機能への悪影響はないと考えられる。
+
+## 7. フロントエンド設計
+
+### 7-1. エリア対象定数の新設
+新規定数（例: `STAMP_BADGE_AREAS = ['Central', 'East', 'West', 'North', 'North-East', 'Sentosa']`、命名はbuilder判断）を、既存`STAMP_LEVEL_META`（3656行目付近）と同じ並びに新設する。`CITY_COURSE_AREAS.sg`から動的に`Island-wide`を除外して生成する方式（`CITY_COURSE_AREAS.sg.filter(a => a.val !== 'Island-wide')`）も選択肢としてあり得るが、スタンプラリー機能は既存コース機能の定数に依存しない完全独立設計（設計書69§1で明記済みの方針）のため、**独立した新規定数として持つことを推奨**する（既存`CITY_COURSE_AREAS`側の変更・参照が将来のBKK/SYD対応時に混線するリスクを避けるため）。
+
+### 7-2. エリア進捗の集計ロジック
+新規関数（例: `_computeStampAreaProgress()`）を、既存`_computeStampNextTarget()`（3775〜3785行目）と同じ実装パターン（`_stampSpots`・`_stampProgress.checkedInSpotIds`をループしてクライアント側で完結）で新設する。
+
+- 対象6エリアそれぞれについて、`_stampSpots.filter(s => s.area === area)`で該当エリアの全スポット（=現在APIレスポンスに含まれている、ロック中マスク済みも含む見えているスポットのみ）を抽出し、`total = 該当スポット数`・`checked = 該当スポットのうち_stampSpotIsChecked(s.id)がtrueな数`を算出する
+- `checked === total && total > 0`のとき「達成」と判定する
+- 戻り値の形は`[{area, checked, total, achieved}]`のような配列を想定（実装詳細はbuilder判断）
+
+**注意点（ロック中スポットの扱い）**: `local`/`niche`スポットは未解禁時サーバー側でマスクされる（`maskLockedStampSpot()`）が、`area`フィールド自体はマスク対象外（§3-3で確認済み）ため、`_stampSpots`には常に全件の`area`情報が含まれる。したがって「見えているスポットのみが対象」（ユーザー確定仕様）は、実質的に「レスポンスに含まれる全スポット（`special`未解禁時に除外されたものを除く）」と同義になる。ロック中の`local`/`niche`スポットも、名前は「？？？」のままだが**エリア集計の分母には含まれる**（チェックイン自体は当然できないため達成の妨げにはなるが、これは意図された仕様〈全スポット制覇が条件〉と整合する）。
+
+### 7-3. エリアバッジのレンダリング
+新規関数（例: `_renderStampAreaBadges()`）を、既存`_renderStampLevelLegend()`（3875〜3886行目）と同型のパターン（`Array.map()`でHTML文字列を生成し`innerHTML`にセット）で新設する。
+
+- 配置: `#stamp-map-content`内、既存`#stamp-level-legend`と同じ並びに新規`#stamp-area-badges`（仮称、id命名はbuilder判断）を追加する。マップ/一覧どちらの表示モードでも共通して見える位置という要件（§2-3）を満たすには、`_applyStampViewMode()`（3759〜3769行目）の`display`切り替え対象（`mapEl`/`legendEl`/`listEl`）に含めず、常時`display:block`のまま独立した行として配置することを推奨する（既存`#stamp-level-legend`は`isMap`判定で表示/非表示が切り替わる実装になっているため、**同じ扱いにすると一覧ビュー表示中にエリアバッジが消えてしまう**。これは§2-3の要件「マップ/一覧どちらでも見える位置」に反するため、エリアバッジ用の新規コンテナは`_applyStampViewMode()`の表示切替対象から除外する実装上の注意点として明記する）
+- 各バッジは既存`.stamp-level-chip`と似たデザインのチップ形式（§2-3のユーザー確定仕様）。「Central 2/8」のような進捗テキストを表示し、達成時は色付き・チェックマーク付きに変化させる（例: 未達成は`background:var(--sand)`、達成時は`background:var(--caramel); color:white`＋接頭辞に✓、既存`.stamp-collection-card--checked`の配色パターンを参考にできる）
+- 呼び出しタイミング: `initStampMapTab()`（3722〜3745行目）の既存描画呼び出し列（`_renderStampMarkers()`/`_renderStampFog()`/`_renderStampLevelLegend()`/`_renderStampProgressSummary()`/`_renderStampCollectionList()`）に新規`_renderStampAreaBadges()`を追加し、`doStampCheckin()`（4085〜4089行目）のチェックイン成功後の再描画呼び出し列にも同様に追加する（**呼び出し漏れは進捗が更新されないバグに直結するため、既存2箇所の呼び出し列に確実に追加すること**をbuilderへの実装上の必須注意点とする）
+
+### 7-4. CSS新規クラス
+- `.stamp-area-badge`（仮称）: `.stamp-level-chip`をベースにした新規クラス、または`.stamp-level-chip`自体を汎用化して両方から使う設計はbuilder判断に委ねる。ただし既存`.stamp-level-chip`はロック演出（`--locked`修飾子でopacity 0.45）を持つのに対し、エリアバッジには「ロック」の概念がない（未解禁レベルのスポットも分母に含まれるのみ）ため、意味合いが異なる修飾子（`.stamp-area-badge--achieved`のような達成状態を表す新規クラス）を用意することを推奨する
+- 既存`.stamp-collection-card--checked`（`background: var(--caramel-pale)`）・`.stamp-collection-card--checked .stamp-collection-card-badge`（`background: var(--caramel); color: white`）の配色パターンをエリアバッジの達成時表現に流用できる
+
+### 7-5. i18n
+新規文言はすべて`STRINGS.ja`/`STRINGS.en`に同時追加する（CLAUDE.md必須ルール）。想定される新規キー（案、最終確定はbuilder判断）:
+- `stampAreaBadgesTitle`（例: ja「エリア制覇バッジ」/en「Area Badges」、セクション見出しが必要な場合）
+- エリア名自体（`Central`/`East`/`West`/`North`/`North-East`/`Sentosa`）は既存`CITY_COURSE_AREAS.sg`の`label`（絵文字付き英語表記、例: `🏙 Central`）が既にi18n不要の表記として使われている前例があるため、エリアバッジでも同様に英語表記のまま流用するか、新規i18nキー化するかは要検討（未解決事項参照）
+- 進捗テキスト（例: 「{checked}/{total}」）は既存`stampProgressSummary`（`'{unlocked}レベル解禁中・{checked}/{total}スポット制覇'`）と同じプレースホルダー置換パターン（`.replace('{checked}', ...)`）を踏襲できる
+
+### 7-6. onclick/touchendパターン
+エリアバッジ自体はタップ操作を持たない単純な表示要素（進捗表示のみ）として設計する想定のため、新規のonclick/touchendガード対応は原則不要と考えられる。ただし将来的にバッジタップで該当エリアのスポット一覧へフィルタする等のインタラクションを追加する場合は、CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節に従う必要がある（今回のスコープには含めない、§4参照）。
+
+## 8. i18n変更点まとめ
+
+| キー | ja（案） | en（案） |
+|---|---|---|
+| `stampAreaBadgesTitle`（新規、要否はbuilder判断） | エリア制覇バッジ | Area Badges |
+
+上記1件（またはbuilder判断で追加する数キー）を`STRINGS.ja`/`STRINGS.en`に同時追加する。既存キー（`stampProgressSummary`等）の値変更は想定していない。
+
+## 9. 既知の未解決事項
+
+1. **エリアバッジ用HTML要素の具体的な配置場所・id命名**: §7-3で「既存`#stamp-level-legend`と同じ並びに新規コンテナ」という方針を示したが、`#stamp-map-content`内の正確な挿入位置（進捗サマリの直後か、レベルチップの前後か）はbuilder判断とする
+2. **エリア名表示の多言語対応方式**: 既存`CITY_COURSE_AREAS.sg`の`label`（絵文字付き英語表記のみ、i18nキー化されていない）をそのまま流用するか、エリアバッジでは日本語ラベル（例: 「セントラル」「セントーサ」）を新規i18nキーとして用意するかは未確定。既存パターン（コース作成画面のエリアチップは英語表記のまま）との一貫性を優先するなら流用が自然だが、ユーザー向け表示としての分かりやすさを優先するなら日本語化が望ましい可能性がある
+3. **達成時の視覚表現の詳細**: §2-3「バッジが色付き・チェックマーク付きになる」という要件に対する具体的なCSS・アイコンはbuilder判断に委ねる
+4. **新規9スポットの`description`文言**: ユーザー提示の表は名称・座標・レベル・エリア・カテゴリのみで、説明文は「builderが作成してよい」とされている。既存14件のトーン（一文〜二文、簡潔な特徴紹介）を踏襲する必要がある
+5. **新規9スポットの`checkinRadiusM`**: 既存の運用幅を参考にbuilderが個別判断する必要がある（特にBird Paradise・Sembawang Hot Spring Park等の広域施設は既存の`east-coast-park`(300)・`pulau-ubin`(400)クラスの大きめ半径が妥当と考えられるが確定値は未定）
+6. **座標の精度**: ユーザー自身が「緯度経度は概算、builder実装時に大きくズレていないか確認すること」と明記している通り、9件すべての`lat`/`lng`が実際のスポット位置と大きくズレていないか、実装時に地図等で目視確認する必要がある（GPS近接チェックインの半径判定に直接影響するため、大きくズレていると「現地に行ってもチェックインボタンが活性化しない」不具合につながるリスクがある）
+
+## 10. リスク
+
+1. **座標精度不足によるチェックイン不可リスク**: 上記未解決事項6の通り、ユーザー提示の概算座標が実際のスポット中心から`checkinRadiusM`を超えてズレていた場合、実際に現地を訪れてもチェックインボタンが活性化しない不具合になりうる。builder実装時の座標確認が必須
+2. **エリア集計ロジックの二重実装リスク**: 既存の「次はここ」判定（`_computeStampNextTarget()`）と同型のクライアント側計算を新設する設計のため、将来サーバー側にも同種のロジックが必要になった場合（例: プッシュ通知等での利用）、クライアント・サーバーでロジックがズレるリスクがある。ただし今回はクライアント側のみで完結させる方針が確定済みのため、現時点では実害なし
+3. **`_applyStampViewMode()`の表示切替対象からエリアバッジコンテナを除外し忘れるリスク**: §7-3で指摘した通り、既存`#stamp-level-legend`と同じ扱いにしてしまうと一覧ビュー表示中にエリアバッジが消える回帰バグになる。実装時に明示的な確認が必要
+4. **描画関数の呼び出し漏れリスク**: §7-3で指摘した通り、新規`_renderStampAreaBadges()`を`initStampMapTab()`・`doStampCheckin()`の両方の再描画呼び出し列に追加し忘れると、初回表示または進捗更新時にバッジが更新されない不具合になる
+5. **9件追加によるスポット総数増加（14→23、+64%）が既存パフォーマンスに与える影響は未検証**: 特にLeaflet地図上のマーカー描画・フォグ・オブ・ウォーの穴あけ処理はスポット数に比例して処理負荷が増える設計になっている
+6. **iOS実機未検証**: 設計書69〜76自体がTestFlightビルド未実施・実機未確認のまま（2026-07-20時点でローカルコミットのみ）今回の追加に着手することになるため、本追加もWeb版での検証が先行する
+7. **`order`採番ミスによる「順番の示唆」機能への悪影響**: レベル内の`order`最大値を正しく把握せずに採番すると、重複した`order`値が生まれ「次はここ」判定・番号バッジ表示に不整合が生じる可能性がある（§5-1の正確な採番方針を必ず参照すること）
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: `data/sg/stamp-spots.json`への9件追加、および対応するクライアント側変更（新規関数・新規CSS・新規i18nキー）は、既存API（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`）のレスポンス構造を一切変更しない。既存フィールドの追加・削除・型変更もない。したがって**旧バージョンのApp Store版アプリへの影響はゼロ**と判断できる。ただし§6-1で述べた通り、**そもそも設計書69〜76自体が2026-07-20時点でまだTestFlightビルド・App Store配信されていない**（ローカル`main`ブランチへのコミットのみ、`release`ブランチ未マージ）ため、現時点でこの機能に依存している旧バージョンのApp Store版ユーザーは存在しない。実質的な後方互換リスクはない
+2. **影響範囲**: 本機能はWeb版・App Store版の両方に同時に反映される変更（`public/`配下の共通コードのため）。新規データ（`stamp-spots.json`への9件追加）自体はAPIエンドポイント追加を伴わずWeb版へ即座に反映可能（`pm2 restart`不要、`server.js`は`fs.readFileSync`で都度読み込む既存アーキテクチャのため）。ただしフロントエンド（エリアバッジUI）はWeb版・iOS版で同一コードが同時に有効になるため、機能が未完成の状態でWeb版にデプロイすると中途半端な機能がテスト環境ユーザーに露出するリスクがある点は設計書69〜76から変わらない
+3. **リリースタイミング**: 設計書69〜76自体がまだ本番リリース前（TestFlightビルド未実施）のステータスのため、本追加も設計書69〜76と合わせて次回のTestFlightビルドで一括リリースする形が自然と考えられる
+4. **App Store Connect側の追加対応は不要と想定**: 位置情報権限申告（設計書69から持ち越し、既存の残タスク）以外に、本機能追加で新たにApp Store Connect側の申告が必要になる要素はない
+
+## 承認状況
+2026-07-20 planner設計。ユーザーとの事前ディスカッション（「スタンプラリーにもっとハマる仕掛けを」→「エリア制覇バッジ」の合意、エリア分布の偏り確認→9件追加・Island-wide対象外の合意）に基づき作成。**ユーザー承認済み**。§5-1のレベル別内訳・`order`採番方針は本追記時に正確な数値へ修正済み（standard 7件・local 6件・niche 8件・special 2件、合計23件）。

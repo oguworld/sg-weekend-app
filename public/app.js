@@ -440,6 +440,7 @@
         stampNextTargetLabel: '次はここ！',
         stampLevelUnlockModalTitle: '新しいレベルが解禁されました！',
         stampLevelUnlockModalClose: '閉じる',
+        stampAreaBadgesTitle: 'エリア制覇バッジ',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '軸にするイベント',
         coursePinsHint: '軸にするイベントをタップして選んでください',
@@ -702,6 +703,7 @@
         stampNextTargetLabel: 'Next up!',
         stampLevelUnlockModalTitle: 'New level unlocked!',
         stampLevelUnlockModalClose: 'Close',
+        stampAreaBadgesTitle: 'Area Badges',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: 'Base pinned event',
         coursePinsHint: 'Tap to select',
@@ -3660,6 +3662,17 @@
       special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨' },
     };
 
+    // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。
+    // 既存コース機能の CITY_COURSE_AREAS には依存しない独立定数（スタンプラリー機能は既存コース機能と完全独立という設計方針を踏襲）。
+    const STAMP_BADGE_AREAS = [
+      { val: 'Central',    label: '🏙 Central' },
+      { val: 'East',       label: '🌅 East' },
+      { val: 'West',       label: '🌇 West' },
+      { val: 'North',      label: '🌿 North' },
+      { val: 'North-East', label: '🌳 North-East' },
+      { val: 'Sentosa',    label: '🏖 Sentosa' },
+    ];
+
     let _stampLeafletMap = null;
     let _stampMarkersLayer = null;
     let _stampSpots = [];
@@ -3738,6 +3751,7 @@
       _renderStampLevelLegend();
       _renderStampProgressSummary();
       _renderStampCollectionList();
+      _renderStampAreaBadges();
 
       // 現在地を取得しておく（詳細シートを開いた際のチェックインボタン活性判定に使う）。
       // 権限リクエストのタイミングはマップタブオープン時に一括で行う設計（実装判断、設計書69未解決事項8）
@@ -3782,6 +3796,20 @@
         if (next) return next;
       }
       return null;
+    }
+
+    // ─── エリア制覇バッジの進捗集計（設計書77） ───
+    // 対象6エリア（STAMP_BADGE_AREAS）それぞれについて、_stampSpots（現在APIレスポンスに含まれている＝見えているスポットのみ、
+    // ロック中の local/niche はマスクされていても area フィールド自体は維持されるため分母には含まれる）から
+    // 該当エリアの件数・チェックイン済み件数を数え、全件チェックイン済みなら達成と判定する。
+    // サーバー側の変更は不要、クライアント側計算のみで完結させる方針（§2-3・§6）。
+    function _computeStampAreaProgress() {
+      return STAMP_BADGE_AREAS.map(({ val, label }) => {
+        const spotsInArea = _stampSpots.filter(s => s.area === val);
+        const total = spotsInArea.length;
+        const checked = spotsInArea.filter(s => _stampSpotIsChecked(s.id)).length;
+        return { area: val, label, checked, total, achieved: total > 0 && checked === total };
+      });
     }
 
     async function _loadStampSpotsAndProgress() {
@@ -3885,6 +3913,20 @@
       }).join('');
     }
     const STAMP_LEVEL_ORDER_CLIENT = ['standard', 'local', 'niche', 'special'];
+
+    // ─── エリア制覇バッジのレンダリング（設計書77） ───
+    // #stamp-area-badges はマップ/一覧どちらの表示モードでも常時表示させるため、
+    // _applyStampViewMode() の display 切替対象には含めない（一覧ビュー中に消える回帰バグを避けるための実装上の必須事項）。
+    function _renderStampAreaBadges() {
+      const el = document.getElementById('stamp-area-badges');
+      if (!el) return;
+      const progress = _computeStampAreaProgress();
+      el.innerHTML = progress.map(({ label, checked, total, achieved }) => {
+        return `<div class="stamp-area-badge ${achieved ? 'stamp-area-badge--achieved' : ''}">
+          ${achieved ? '<span class="stamp-area-badge-check">✓</span>' : ''}${label} ${checked}/${total}
+        </div>`;
+      }).join('');
+    }
 
     function _renderStampProgressSummary() {
       const el = document.getElementById('stamp-progress-summary');
@@ -4087,6 +4129,7 @@
         _renderStampLevelLegend();
         _renderStampProgressSummary();
         _renderStampCollectionList();
+        _renderStampAreaBadges();
         const checkedEl = document.getElementById('stamp-spot-detail-checked');
         if (checkedEl) checkedEl.style.display = 'block';
         _updateStampCheckinButton();
