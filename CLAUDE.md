@@ -213,6 +213,28 @@ sg-weekend-app/
 - キャッシュバスティング: `index.html` app.js?v=20260720h・app.css?v=20260720h、`sw.js` CACHE_NAME=sg-weekend-v637
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのエリアバッジの見た目・折り返しレイアウト・チェックイン後の進捗更新アニメーション、新規9スポットの座標精度（現地訪問でのチェックイン可否）は2026-07-20時点でWeb版API検証のみ完了、実機未確認。設計書69〜76自体もまだTestFlightビルド未実施のため、これらは次回一括リリース時にまとめて確認する想定
 
+### スタンプ帳（パスポート）風デザインへの刷新（2026-07-20実装、設計書78）
+設計書70（コレクション一覧ビュー）・設計書77（エリア制覇バッジ）の見た目に対するユーザーフィードバック「ダサい」を受け、「スタンプ帳（パスポート風の物理的なスタンプラリー冊子）」のメタファーで両箇所を全面刷新した。データモデル・API・集計ロジックは無変更、フロントエンドの見た目のみの変更。
+
+- **`STAMP_BADGE_AREAS`定数の構造変更**（`public/app.js`）: `{val, label}`（絵文字+英語ラベルの結合文字列）から`{val, emoji, labelText}`（分離）に変更。円形スタンプの中身に絵文字だけを表示するための対応。参照箇所は`_computeStampAreaProgress()`のみで、この関数の戻り値にも`emoji`/`labelText`を追加済み
+- **新規ヘルパー`_stampRotateDeg(str)`**: 文字列（スポットID等）から`-5〜+5`度の範囲の回転角を決定的にハッシュ算出する（`hash = hash*31 + charCode`を`|0`で32bit整数化し`Math.abs(hash) % 11 - 5`）。制覇済みスタンプの「はんこらしい」わずかな傾きを、再描画のたびに角度が変わらないよう一貫させるために使用
+- **`_renderStampAreaBadges()`刷新**: 丸ピルチップ（旧`.stamp-area-badge`）から円形スタンプ（`.stamp-circle.stamp-circle--area`、40px）に変更。達成時は塗りつぶし+チェックマーク（`--checked`修飾子）、未達成時はエリア絵文字を表示。X/Y進捗はスタンプ下に小さく併記
+- **`_renderStampCollectionList()`刷新**: 「レベル＝ページ（`.stamp-book-page`）、スポット＝円形スタンプグリッド（`.stamp-book-grid`内の`.stamp-stamp-cell`、56px円+スポット名2行折り返し）」に変更。**レベル別グルーピングという既存の情報構造自体は維持**（エリア別への再グルーピングは意図的に行っていない。レベル解禁ゲート表現・「次はここ」判定〈`_computeStampNextTarget()`〉がレベル軸で動作する既存ロジックのため、構造変更すると破綻するリスクがあった。設計書78 §7-1参照）。各スタンプ円の`onclick`に`if(!_touchCapableDetected)`ガードを新規付与（CLAUDE.md必須パターンへの準拠、旧実装はガードなしだった）
+- **スタンプ円のCSS（`.stamp-circle`とその修飾子、`public/app.css`）**:
+  - デフォルト（未制覇・解禁済み）: 点線円（`border:2px dashed var(--sand-dark)`）+ スポット番号（`order`）を薄く表示
+  - `--locked`（ロック中）: より薄い点線（`var(--sand)`）+ `opacity:0.5` + 🔒アイコン
+  - `--checked`（制覇済み）: レベルカラー塗りつぶし + `box-shadow`の多重指定による二重リング（内側`var(--cream)`の白縁+外側同色濃淡リング+ずれた影）+ `_stampRotateDeg()`による決定的回転（中の絵文字は逆回転させ正立表示）
+  - `--next`（「次はここ」）: 実線の点線→ソリッド枠に切り替え+新規`@keyframes stampNextPulseRing`によるパルスリング（既存マップピンの`@keyframes stampNextPulse`＝拡大縮小パルスとは別の新規アニメーション、統一感のある表現として追加）
+  - `--area`: 上記本体スタイルを共通化しサイズのみ40pxに縮小した併記用クラス（`.stamp-circle.stamp-circle--area`のように両クラスを併記して使用）
+- **「ページ」らしい紙質感の背景**: `.stamp-book-page`（`var(--cream)`背景+`var(--sand-dark)`枠線+角丸16px）、`.stamp-area-badges-page`（`var(--sand)`背景、同様の枠線・角丸）を新規追加。`public/index.html`の`#stamp-area-badges`のインラインstyleを`class="stamp-area-badges-page"`に置き換え済み
+- **ダークモード対応**: 新規クラスはすべて`var(--cream)`/`var(--sand)`/`var(--sand-dark)`/`var(--midnight)`/`var(--warm-gray)`ベースで実装し、`html[data-theme="dark"]`ブロックでの変数再定義により自動追従する設計にした。旧`.stamp-collection-card`が抱えていた`background: white`直書き（ダークモード非対応の既存の見落とし、設計書78 §3-4で指摘済み）は今回再発させていない
+- **既存ロジックへの影響なし**: `_applyStampViewMode()`（マップ⇄一覧切替）・`_computeStampNextTarget()`（「次はここ」判定）・`doStampCheckin()`のチェックイン成功後の再描画呼び出し列はいずれも無変更。`#stamp-area-badges`は引き続き`_applyStampViewMode()`の`display`切替対象に含まれず、マップ/一覧どちらのビューでも常時表示される制約を維持（設計書77の実装上必須事項を踏襲）
+- 旧CSS（`.stamp-area-badge`系・`.stamp-collection-group`/`.stamp-collection-card`系）は削除済み、参照残存なし
+- `server.js`・`data/`配下は無変更（pm2 restart不要）。i18n新規キーなし（既存の`stampAreaBadgesTitle`/`stampCollectionLockedNote`/`stampNextTargetLabel`を再利用）
+- スコープ外（今回未実装）: スポット詳細モーダル自体・マップビュー（Leafletピン）自体・レベル解禁演出モーダルのデザイン変更、新規イラスト・画像アセット追加、コレクション一覧のエリア別再グルーピング、完全制覇時の特別演出
+- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720i`、`sw.js` CACHE_NAME=`sg-weekend-v638`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での円形スタンプグリッドの表示密度・スクロール量（23件）、長い英語スポット名での2行折り返しレイアウト崩れの有無、エリアバッジ（40px）の二重リング表現が潰れて見えないか、回転角のばらつきが実機で不自然に見えないか、ダークモード切り替え時の実機での見た目、`box-shadow`多重指定によるiOS WKWebView実機でのレンダリング負荷は、いずれも2026-07-20時点でWeb版目視確認のみ完了、実機未確認
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

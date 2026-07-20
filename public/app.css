@@ -1913,15 +1913,26 @@
     .stamp-level-chip--locked { opacity: 0.45; }
     .stamp-level-chip-dot { width: 8px; height: 8px; border-radius: 50%; }
 
-    /* ─── エリア制覇バッジ（設計書77） ─── */
-    .stamp-area-badge {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 5px 12px; border-radius: 50px; font-size: 12px; font-weight: 700;
-      background: var(--sand); color: var(--midnight);
-      transition: background 0.2s ease, color 0.2s ease;
+    /* ─── エリア制覇バッジ（設計書77 → 設計書78でスタンプ帳風デザインに刷新） ─── */
+    .stamp-area-badges-page {
+      display: flex; flex-wrap: wrap; gap: 14px;
+      background: var(--sand);
+      border: 1px solid var(--sand-dark);
+      border-radius: 16px;
+      padding: 14px 12px;
+      margin: 0 16px 10px;
+      box-shadow: 0 1px 3px rgba(44,36,32,0.06);
     }
-    .stamp-area-badge--achieved { background: var(--caramel); color: white; }
-    .stamp-area-badge-check { font-size: 11px; }
+    .stamp-area-stamp {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      width: 62px;
+    }
+    .stamp-area-stamp-label {
+      font-size: 10px; font-weight: 700; color: var(--midnight);
+      text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 62px;
+    }
+    .stamp-area-stamp-progress { font-size: 10px; color: var(--warm-gray); }
 
     .stamp-marker-icon {
       width: 30px; height: 30px; border-radius: 50% 50% 50% 0;
@@ -1946,41 +1957,94 @@
       50% { transform: rotate(-45deg) scale(1.18); }
     }
 
-    /* ─── スタンプ帳/コレクション一覧ビュー（設計書70改善1・2） ─── */
-    .stamp-collection-group { margin-bottom: 18px; }
-    .stamp-collection-group-title {
+    /* ─── スタンプ帳/コレクション一覧ビュー（設計書70改善1・2 → 設計書78でスタンプ帳風デザインに刷新） ─── */
+    .stamp-book-page {
+      background: var(--cream);
+      border: 1px solid var(--sand-dark);
+      border-radius: 16px;
+      padding: 16px 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(44,36,32,0.06);
+    }
+    .stamp-book-page-title {
       display: flex; align-items: center; gap: 6px;
       font-size: 13px; font-weight: 700; color: var(--warm-gray);
-      letter-spacing: 0.04em; margin-bottom: 8px;
+      letter-spacing: 0.04em; margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed var(--sand-dark);
     }
-    .stamp-collection-group--locked .stamp-collection-group-title { opacity: 0.55; }
-    .stamp-collection-card {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 14px; border-radius: 14px;
-      background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-      margin-bottom: 8px; cursor: pointer;
+    .stamp-book-page--locked { opacity: 0.6; }
+    .stamp-book-grid {
+      display: flex; flex-wrap: wrap; gap: 16px 10px;
     }
-    .stamp-collection-card--locked { opacity: 0.5; cursor: default; }
-    .stamp-collection-card--checked { background: var(--caramel-pale); }
-    .stamp-collection-card--next { box-shadow: 0 0 0 2px var(--caramel); }
-    .stamp-collection-card-badge {
-      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
-      background: var(--sand); color: var(--midnight);
+    .stamp-stamp-cell {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      width: 74px;
+    }
+    .stamp-stamp-cell-name {
+      font-size: 11px; color: var(--midnight); text-align: center;
+      line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .stamp-stamp-cell-next-tag {
+      font-size: 10px; font-weight: 700; color: white;
+      background: var(--caramel); padding: 1px 7px; border-radius: 50px;
+    }
+
+    /* ─── スタンプ円（設計書78 §7-3） ─── */
+    .stamp-circle {
+      width: 56px; height: 56px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700;
+      position: relative; margin: 0 auto; flex-shrink: 0;
+      font-size: 20px;
+      border: 2px dashed var(--sand-dark);
+      background: transparent;
+      color: var(--warm-gray);
     }
-    .stamp-collection-card--checked .stamp-collection-card-badge { background: var(--caramel); color: white; }
-    .stamp-collection-card-body { flex: 1; min-width: 0; }
-    .stamp-collection-card-name {
-      font-size: 14px; font-weight: 700; color: var(--midnight);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .stamp-circle-order { font-size: 16px; font-weight: 700; opacity: 0.5; }
+    .stamp-circle-lock { font-size: 16px; opacity: 0.6; }
+    .stamp-circle--locked {
+      border-color: var(--sand);
+      opacity: 0.5;
     }
-    .stamp-collection-card-area { font-size: 12px; color: var(--warm-gray); margin-top: 1px; }
-    .stamp-collection-card-tag {
-      flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 50px;
+    .stamp-circle--checked {
+      border: none;
+      background: var(--stamp-color, var(--caramel));
+      color: white;
+      cursor: pointer;
+      transform: rotate(var(--stamp-rotate, -3deg));
+      box-shadow:
+        0 0 0 3px var(--cream),
+        0 0 0 5px var(--stamp-color, var(--caramel)),
+        2px 3px 6px rgba(44,36,32,0.25);
     }
-    .stamp-collection-card-tag--next { background: var(--caramel); color: white; }
-    .stamp-collection-card-tag--checked { color: var(--caramel); }
+    .stamp-circle--checked .stamp-circle-mark {
+      transform: rotate(calc(var(--stamp-rotate, -3deg) * -1));
+      display: inline-block;
+    }
+    .stamp-circle:not(.stamp-circle--checked):not(.stamp-circle--locked) { cursor: pointer; }
+    .stamp-circle--next {
+      border-style: solid;
+      border-color: var(--caramel);
+      color: var(--caramel);
+      animation: stampNextPulseRing 1.6s ease-in-out infinite;
+    }
+    @keyframes stampNextPulseRing {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(200,128,74,0.4); }
+      50%      { box-shadow: 0 0 0 6px rgba(200,128,74,0); }
+    }
+
+    /* エリアバッジ用の小さいスタンプ円（.stamp-circle と併記して使う） */
+    .stamp-circle--area {
+      width: 40px; height: 40px; font-size: 14px;
+    }
+    .stamp-circle--area.stamp-circle--checked {
+      box-shadow:
+        0 0 0 2px var(--cream),
+        0 0 0 3.5px var(--stamp-color, var(--caramel)),
+        1px 2px 4px rgba(44,36,32,0.25);
+    }
 
     /* ─── レベル解禁演出モーダル（設計書70改善3） ─── */
     .stamp-unlock-emoji { font-size: 56px; line-height: 1; animation: stampUnlockPop 0.6s cubic-bezier(.32,2,.55,.89); }

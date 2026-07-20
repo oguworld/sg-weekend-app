@@ -3664,13 +3664,14 @@
 
     // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。
     // 既存コース機能の CITY_COURSE_AREAS には依存しない独立定数（スタンプラリー機能は既存コース機能と完全独立という設計方針を踏襲）。
+    // 設計書78: スタンプ帳デザイン刷新に伴い emoji/labelText に分割（円形スタンプの中身に絵文字だけを表示するため）。
     const STAMP_BADGE_AREAS = [
-      { val: 'Central',    label: '🏙 Central' },
-      { val: 'East',       label: '🌅 East' },
-      { val: 'West',       label: '🌇 West' },
-      { val: 'North',      label: '🌿 North' },
-      { val: 'North-East', label: '🌳 North-East' },
-      { val: 'Sentosa',    label: '🏖 Sentosa' },
+      { val: 'Central',    emoji: '🏙', labelText: 'Central' },
+      { val: 'East',       emoji: '🌅', labelText: 'East' },
+      { val: 'West',       emoji: '🌇', labelText: 'West' },
+      { val: 'North',      emoji: '🌿', labelText: 'North' },
+      { val: 'North-East', emoji: '🌳', labelText: 'North-East' },
+      { val: 'Sentosa',    emoji: '🏖', labelText: 'Sentosa' },
     ];
 
     let _stampLeafletMap = null;
@@ -3804,12 +3805,23 @@
     // 該当エリアの件数・チェックイン済み件数を数え、全件チェックイン済みなら達成と判定する。
     // サーバー側の変更は不要、クライアント側計算のみで完結させる方針（§2-3・§6）。
     function _computeStampAreaProgress() {
-      return STAMP_BADGE_AREAS.map(({ val, label }) => {
+      return STAMP_BADGE_AREAS.map(({ val, emoji, labelText }) => {
         const spotsInArea = _stampSpots.filter(s => s.area === val);
         const total = spotsInArea.length;
         const checked = spotsInArea.filter(s => _stampSpotIsChecked(s.id)).length;
-        return { area: val, label, checked, total, achieved: total > 0 && checked === total };
+        return { area: val, emoji, labelText, checked, total, achieved: total > 0 && checked === total };
       });
+    }
+
+    // ─── スタンプの決定的回転角（設計書78 §7-3） ───
+    // 文字列から-5〜+5度の範囲の回転角を決定的に算出する（再描画のたびに角度が変わらないようにする）。
+    function _stampRotateDeg(str) {
+      let hash = 0;
+      const s = String(str || '');
+      for (let i = 0; i < s.length; i++) {
+        hash = (hash * 31 + s.charCodeAt(i)) | 0;
+      }
+      return (Math.abs(hash) % 11) - 5;
     }
 
     async function _loadStampSpotsAndProgress() {
@@ -3921,9 +3933,15 @@
       const el = document.getElementById('stamp-area-badges');
       if (!el) return;
       const progress = _computeStampAreaProgress();
-      el.innerHTML = progress.map(({ label, checked, total, achieved }) => {
-        return `<div class="stamp-area-badge ${achieved ? 'stamp-area-badge--achieved' : ''}">
-          ${achieved ? '<span class="stamp-area-badge-check">✓</span>' : ''}${label} ${checked}/${total}
+      el.innerHTML = progress.map(({ area, emoji, labelText, checked, total, achieved }) => {
+        const rotate = achieved ? _stampRotateDeg(area) : 0;
+        const style = achieved ? `--stamp-color:var(--caramel);--stamp-rotate:${rotate}deg;` : '';
+        return `<div class="stamp-area-stamp">
+          <div class="stamp-circle stamp-circle--area ${achieved ? 'stamp-circle--checked' : ''}" style="${style}">
+            <span class="stamp-circle-mark">${achieved ? '✓' : emoji}</span>
+          </div>
+          <div class="stamp-area-stamp-label">${labelText}</div>
+          <div class="stamp-area-stamp-progress">${checked}/${total}</div>
         </div>`;
       }).join('');
     }
@@ -3958,31 +3976,31 @@
         const meta = STAMP_LEVEL_META[level];
         const unlocked = _stampProgress.unlockedLevels.includes(level);
         const sorted = [...spots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        const cardsHtml = sorted.map(spot => {
+        const cellsHtml = sorted.map(spot => {
           const checked = _stampSpotIsChecked(spot.id);
           const isNext = unlocked && !!nextTarget && nextTarget.id === spot.id;
           const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
-          const cls = ['stamp-collection-card'];
-          if (!unlocked) cls.push('stamp-collection-card--locked');
-          if (checked) cls.push('stamp-collection-card--checked');
-          if (isNext) cls.push('stamp-collection-card--next');
-          const tagHtml = checked
-            ? `<span class="stamp-collection-card-tag stamp-collection-card-tag--checked">${t('stampCheckedInBadge')}</span>`
-            : isNext
-              ? `<span class="stamp-collection-card-tag stamp-collection-card-tag--next">${t('stampNextTargetLabel')}</span>`
-              : !unlocked ? `<span>🔒</span>` : '';
-          return `<div class="${cls.join(' ')}" ${unlocked ? `onclick="openStampSpotDetail('${spot.id}')"` : ''}>
-            <div class="stamp-collection-card-badge">${typeof spot.order === 'number' ? spot.order : '?'}</div>
-            <div class="stamp-collection-card-body">
-              <div class="stamp-collection-card-name">${name}</div>
-              <div class="stamp-collection-card-area">${spot.area || ''}</div>
+          const circleCls = ['stamp-circle'];
+          if (checked) circleCls.push('stamp-circle--checked');
+          if (!unlocked) circleCls.push('stamp-circle--locked');
+          if (isNext) circleCls.push('stamp-circle--next');
+          const style = checked ? `--stamp-color:${meta.color};--stamp-rotate:${_stampRotateDeg(spot.id)}deg;` : '';
+          const markHtml = checked
+            ? `<span class="stamp-circle-mark">${meta.emoji}</span>`
+            : !unlocked
+              ? `<span class="stamp-circle-lock">🔒</span>`
+              : `<span class="stamp-circle-order">${typeof spot.order === 'number' ? spot.order : '?'}</span>`;
+          return `<div class="stamp-stamp-cell">
+            <div class="${circleCls.join(' ')}" style="${style}" ${unlocked ? `onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"` : ''}>
+              ${markHtml}
             </div>
-            ${tagHtml}
+            <div class="stamp-stamp-cell-name">${name}</div>
+            ${isNext ? `<span class="stamp-stamp-cell-next-tag">${t('stampNextTargetLabel')}</span>` : ''}
           </div>`;
         }).join('');
-        return `<div class="stamp-collection-group ${unlocked ? '' : 'stamp-collection-group--locked'}">
-          <div class="stamp-collection-group-title">${meta.emoji} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
-          ${cardsHtml}
+        return `<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}">
+          <div class="stamp-book-page-title">${meta.emoji} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
+          <div class="stamp-book-grid">${cellsHtml}</div>
         </div>`;
       }).join('');
     }

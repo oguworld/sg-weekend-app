@@ -8615,3 +8615,276 @@ API変更が一切ないため後方互換性への影響はない。ただし`d
 
 ## 承認状況
 2026-07-20 planner設計。ユーザーとの事前ディスカッション（「スタンプラリーにもっとハマる仕掛けを」→「エリア制覇バッジ」の合意、エリア分布の偏り確認→9件追加・Island-wide対象外の合意）に基づき作成。**ユーザー承認済み**。§5-1のレベル別内訳・`order`採番方針は本追記時に正確な数値へ修正済み（standard 7件・local 6件・niche 8件・special 2件、合計23件）。
+
+# 設計書78 — スタンプ帳（パスポート）風デザインへの刷新（エリアバッジ・コレクション一覧ビュー）
+
+（2026-07-20 planner作成。設計書69〜77で実装済みの「スポット制覇スタンプラリー」機能のうち、エリアバッジ（設計書77）とコレクション一覧ビュー（設計書70）の見た目に対するユーザーフィードバック「ダサい」を受けたデザイン刷新設計。コード実装は含まない）
+
+## 1. 背景
+
+設計書70で実装したコレクション一覧ビュー（`.stamp-collection-card`、スポット名を横並びで表示する縦積みカードリスト）と、設計書77で実装したエリア制覇バッジ（`.stamp-area-badge`、単なる丸ピルチップ）について、ユーザーから「見た目に『コレクター感』『達成感』が薄い、ダサい」というフィードバックを受けた。メインエージェントとの相談の結果、「スタンプ帳（パスポート風の物理的なスタンプラリー冊子）」のメタファーを両箇所に適用するデザイン方針で確定した。
+
+## 2. 確定済みデザイン方針（ユーザー承認済み）
+
+### 2-1. 全体コンセプト
+「スタンプ帳（パスポート風の物理的なスタンプラリー冊子）」のメタファーを、エリアバッジ・コレクション一覧ビューの両方に適用する。
+
+### 2-2. スタンプの見た目（丸い印章／はんこ風）
+- **未制覇（チェックイン可能な状態）**: 点線の空白丸。スポットの番号（`order`）を薄く中に表示
+- **ロック中（未解禁レベル）**: 点線の空白丸＋鍵アイコン、より控えめな見た目
+- **制覇済み（チェックイン済み）**: レベルカラーで塗りつぶされた円形の「スタンプ」。わずかに回転（-5°〜+5°程度、スポットごとに一貫した回転角。`spot.id`等から決定的に算出し再描画のたびに角度が変わらないようにする）、二重リング等ではんこらしい質感を出す。中に絵文字またはチェックマークを配置
+- **「次はここ」ハイライト**: 既存のマップピンの脈動アニメーション（`.stamp-marker-icon--next`、`@keyframes stampNextPulse`）と統一感のある強調表現（パルスするリング等）
+
+### 2-3. 適用範囲
+1. コレクション一覧ビュー全体を「スタンプ帳」風に刷新。エリアごとに「ページ」のようなセクションに区切り、各スポットは横並びカードではなく、円形スタンプのグリッド表示に変更する（スタンプ円の下に小さくスポット名を添える）
+2. エリアバッジ行も、丸ピルチップから、小さめの円形スタンプアイコン（エリア絵文字＋達成時は塗りつぶし、未達成時は空白）に統一する。X/Y進捗はスタンプの下か脇に小さく添える
+3. コレクション一覧・エリアバッジとも、全体を包む「スタンプ帳」らしい背景（温かみのある紙質感の背景色、既存CSS変数`--cream`/`--sand`を活用）を持たせる
+
+## 3. 既存コードの調査結果（2026-07-20時点で実ファイルを確認、設計の前提事実）
+
+### 3-1. `public/app.js`
+
+- **`STAMP_LEVEL_META`**（3658〜3663行目）: `{ standard: {labelKey, color, emoji}, local, niche, special }`の4段階メタ情報。色は`standard:'#C8804A'`（caramelとほぼ同色）・`local:'#7A9B6E'`（緑系）・`niche:'#9370B0'`（紫系）・`special:'#C4705A'`（terracotta系）。**スタンプ塗りつぶし色としてそのまま活用可能**（変更不要）
+- **`STAMP_BADGE_AREAS`**（3667〜3674行目）: エリア制覇バッジ対象6エリア定数（`{val, label}`の配列、`label`は絵文字付き英語表記例:`🏙 Central`）。変更不要、そのまま流用
+- **`_computeStampAreaProgress()`**（3806〜3813行目）: `STAMP_BADGE_AREAS`をmapし各エリアの`{area, label, checked, total, achieved}`を返す。**集計ロジックとしてそのまま再利用可能、変更不要**
+- **`_computeStampNextTarget()`**（3789〜3799行目）: 「次はここ」スポットを1件返す。変更不要
+- **`_stampSpotIsChecked(spotId)`**（3855〜3857行目）: 単純ヘルパー。変更不要
+- **`_renderStampAreaBadges()`**（3920〜3929行目）: `_computeStampAreaProgress()`の結果をmapしHTML文字列を生成、`#stamp-area-badges`に`innerHTML`セットするのみの単純関数。**本設計書の対象、HTML生成部分のみ書き換える**。呼び出し元（`initStampMapTab()`3754行目・`doStampCheckin()`4132行目）は変更不要
+- **`_renderStampCollectionList()`**（3947〜3988行目）: `STAMP_LEVEL_ORDER_CLIENT`ごとにグルーピングし、各グループ内は`order`昇順でスポットをmapしてHTML文字列を生成、`#stamp-collection-list`に`innerHTML`セット。**本設計書の対象、HTML生成部分のみ書き換える**。呼び出し元（`initStampMapTab()`3753行目・`doStampCheckin()`4131行目）は変更不要
+- **`_renderStampMarkers()`**（3859〜3879行目）: マップピンの`.stamp-marker-icon`生成。**本設計書のスコープ外（マップビュー自体は変更しない）**。ただし「次はここ」の`.stamp-marker-icon--next`脈動アニメーション（`@keyframes stampNextPulse`、3944〜3947行目 CSS側）は、新デザインのハイライト表現の参考として流用する（コピーではなく「統一感のある別実装」、マップ側のCSSクラス自体は無変更）
+- `openStampSpotDetail(spotId)`（3991行目〜）: スポット詳細シート。**本設計書のスコープ外**（詳細シート自体は変更しない、カード/バッジをタップした際に呼ばれる遷移先として無変更のまま利用）
+
+### 3-2. `public/app.css`
+
+- `.stamp-area-badge`（1917〜1922行目）・`.stamp-area-badge--achieved`（1923行目）・`.stamp-area-badge-check`（1924行目）: 現行の丸ピルチップ実装。**削除し、新規スタンプ風クラスに置き換える**
+- `.stamp-level-chip`（1908〜1914行目）: レベル凡例チップ（`#stamp-level-legend`用）。**本設計書のスコープ外**（変更しない。ただし視覚的な作り込みの参考にはできる）
+- `.stamp-marker-icon`（1926〜1936行目）・`.stamp-marker-icon--checked`/`--unchecked`/`--next`・`@keyframes stampNextPulse`（1944〜1947行目）: マップピンの雫形アイコン＋脈動アニメーション。**本設計書のスコープ外（変更しない）**。参考にする脈動の実装（`transform: scale(1) → scale(1.18)`、`animation: 1.6s ease-in-out infinite`）はそのまま踏襲元として扱う
+- `.stamp-collection-group`（1950行目）・`.stamp-collection-group-title`（1951〜1955行目）・`.stamp-collection-group--locked`（1956行目）: レベルごとのグルーピング見出し。**「エリアごとのページ」構造に変更するため、この既存グルーピング構造〈レベルごと〉自体は維持しつつ〈レベル＝ページという構造は変えない、7-1参照〉、見た目のみ刷新する**
+- `.stamp-collection-card`（1957〜1961行目）〜`.stamp-collection-card-tag--checked`（1983行目）: 現行の横並びカードリスト実装一式。**削除し、円形スタンプグリッド用の新規クラス一式に置き換える**
+- `.stamp-unlock-emoji`・`@keyframes stampUnlockPop`（1986〜1991行目）: レベル解禁演出モーダル用。**本設計書のスコープ外（変更しない）**
+
+### 3-3. `public/index.html`
+
+- `#stamp-area-badges`（174行目）: `<div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 10px;">`の空コンテナ。`_renderStampAreaBadges()`が`innerHTML`をセットする。**インラインstyleの調整、または新規ラッパーdivの追加が必要になる可能性がある（背景の紙質感演出のため）**
+- `#stamp-collection-list`（180行目）: `<div style="display:none;padding:2px 16px 4px;">`の空コンテナ。`_renderStampCollectionList()`が`innerHTML`をセットする。同上、背景演出のためのラッパー追加を検討
+- 直上の`#stamp-progress-summary`（169行目）・`#stamp-level-legend`（179行目）は**本設計書のスコープ外**（変更しない）
+
+### 3-4. ダークモード対応の既存パターン
+
+- `html[data-theme="dark"]`ブロック（`public/app.css` 2870行目〜）で、`--cream`/`--sand`/`--sand-dark`/`--midnight`/`--warm-gray`等のCSS変数がダーク配色に再定義される。**新規クラスは可能な限りこれらのCSS変数を使うことで、ダークモード対応が自動的に効く**設計にすること
+- 既存`.stamp-collection-card`は`background: white;`（1960行目、直書き）となっており、実はダークモードでも白背景のまま変化しない**既存の潜在的な見落とし**があった（`html[data-theme="dark"] .spot-card, ... .plan-modal ...`の一括指定リスト〈2884〜2895行目〉に`.stamp-collection-card`が含まれていない）。本設計書での刷新にあたっては、新規クラスの背景色を`white`直書きではなく`var(--cream)`または`var(--warm-white)`のようなCSS変数ベースにするか、上記ダークモード一括指定リストに新規クラス名を追加するかのいずれかで、この既存の見落としを踏襲しないよう配慮すること（新規に同じ問題を作らない）
+
+## 4. スコープ外（今回含めない）
+
+- スポット詳細モーダル（`#stamp-spot-detail-sheet`）自体のデザイン変更
+- マップビュー（Leafletピン、`.stamp-marker-icon`）自体のデザイン変更。既存のピン＋番号バッジ表示は維持し、「次はここ」の脈動アニメーションは参考にするのみで変更しない
+- レベル解禁演出モーダル（設計書70改善3、`#stamp-level-unlock-overlay`/`#stamp-level-unlock-modal`）のデザイン変更
+- 新規イラスト・画像アセットの追加。すべてCSSのみで表現する（設計書69がフォグ・オブ・ウォーをCSSのみで表現したアプローチを踏襲、新規画像ファイルは追加しない）
+- データモデル・API変更。純粋にフロントエンドの見た目変更のみ（`_computeStampAreaProgress()`・`_stampSpotIsChecked()`等の集計ロジックは無変更で再利用）
+- スタンプ帳コンセプトの完全制覇時の特別演出（設計書70で既にスコープ外とされている「フィナーレ演出」、今回も対象外）
+- `#stamp-progress-summary`（進捗テキスト行）・`#stamp-level-legend`（レベル凡例チップ）自体のデザイン変更（今回はエリアバッジ・コレクション一覧ビューのみが対象）
+- コレクション一覧ビューの「レベルごとのグルーピング」という既存の情報構造自体の変更（レベル＝ページ、という構造は維持する。エリアごとの再グルーピングは行わない。理由は§7-1参照）
+
+## 5. データモデルの変更点
+
+**変更なし**。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも無変更。既存フィールド（`id/name/nameJa/lat/lng/level/area/category/description/imageUrl/checkinRadiusM/active/order`）をそのまま利用する。
+
+## 6. APIの変更点
+
+**変更なし**。`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`のいずれもレスポンス構造の変更は不要。`server.js`は無変更。
+
+## 7. フロントエンド設計
+
+### 7-1. コレクション一覧ビューの構造方針（レベル別グルーピングを維持する理由）
+
+背景説明の「エリアごとに『ページ』のようなセクションに区切り」という要件と、既存実装の「レベルごとのグルーピング」（`_renderStampCollectionList()`が`STAMP_LEVEL_ORDER_CLIENT`でグルーピング）は一見矛盾するように見えるが、以下の理由により**既存の「レベル別グルーピング」という情報構造自体は維持し、見た目の表現（各グループを「ページ」らしく見せる）のみを変更する**方針とする。
+
+- 理由1: エリア別に再グルーピングすると、レベル解禁ゲート（`unlocked`判定）の表現が破綻する。現行はレベル単位で「ロック中グループ」全体を`opacity`で覆う実装になっており、これはエリア軸には存在しない情報（レベル軸固有の状態）
+- 理由2: `_computeStampNextTarget()`（「次はここ」判定）はレベル軸で動作する既存ロジックであり、エリア別再グルーピングをすると「次はここ」ハイライトの表示位置に矛盾が生じるリスクがある
+- 理由3: 本設計書はスコープを「見た目の刷新」のみに限定しており、情報構造（データのグルーピング軸）を変えることはAPIロジックの変更を伴わないとはいえ相応の設計・実装コストとリスクを伴う
+
+そのため、「ページ」のメタファーは**既存の「レベルごとのグループ」1つ1つを、1ページ分のスタンプ帳台紙のように見せる**（グループタイトルを見出し帯として強調し、グループ全体を紙質感の背景カードで包む）ことで実現する。各ページ内のスポットカードを、円形スタンプのグリッド表示に変更する。
+
+### 7-2. コレクション一覧ビュー（改修対象: `_renderStampCollectionList()`本体、`public/app.js` 3947〜3988行目）
+
+**HTML構造案**（クラス名は例、最終命名はbuilder判断）:
+
+```
+<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}">
+  <div class="stamp-book-page-title">${meta.emoji} ${t(meta.labelKey)}${ロック時は🔒+説明文}</div>
+  <div class="stamp-book-grid">
+    <!-- スポットごとに1つの .stamp-stamp-cell -->
+    <div class="stamp-stamp-cell">
+      <div class="stamp-circle ${checked ? 'stamp-circle--checked' : ''} ${!unlocked ? 'stamp-circle--locked' : ''} ${isNext ? 'stamp-circle--next' : ''}"
+           style="${checked ? `--stamp-color:${meta.color}; --stamp-rotate:${回転角}deg;` : ''}">
+        <!-- checked: 塗りつぶし円+絵文字/チェックマーク。unchecked&unlocked: 点線の空白丸+order番号。locked: 点線の空白丸+🔒 -->
+        ${checked ? `<span class="stamp-circle-mark">${meta.emoji}</span>` : (!unlocked ? '<span class="stamp-circle-lock">🔒</span>' : `<span class="stamp-circle-order">${spot.order}</span>`)}
+      </div>
+      <div class="stamp-stamp-cell-name">${name}</div>
+      ${isNext ? `<span class="stamp-stamp-cell-next-tag">${t('stampNextTargetLabel')}</span>` : ''}
+    </div>
+  </div>
+</div>
+```
+
+- 各`.stamp-stamp-cell`のタップハンドラは既存通り`unlocked`時のみ`onclick="openStampSpotDetail('${spot.id}')"`を付与（既存コードの`unlocked ? onclick... : ''`パターンをそのまま踏襲。現行実装は素の`onclick="openStampSpotDetail(...)"`でガードなしだが、CLAUDE.mdの必須パターンに寄せて`onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"`に変更するかはbuilder判断に委ねる〈やらなくても既存動作を壊すものではないため必須ではない〉）
+- グリッドレイアウト: `.stamp-book-grid`は`display:flex;flex-wrap:wrap;gap:16px;justify-content:flex-start;`（または`display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));`）で、円形スタンプを横並びグリッド表示する。1セルの目安幅は70〜80px程度（スタンプ円56px＋名前ラベル分の余白）
+- スポット名の表示: 円の下に小さく（`font-size:11px`程度）、既存の1行省略表示ではなく、グリッドセルの性質上2行程度の折り返し表示（`display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;`）を推奨
+
+### 7-3. スタンプ円のCSS実装方針（builderが迷わず実装できる具体案）
+
+**サイズ・基本形状**:
+```css
+.stamp-circle {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; margin: 0 auto;
+  font-size: 20px;
+}
+```
+
+**未制覇（チェックイン可能、`unlocked`かつ`!checked`）— 点線の空白丸＋番号**:
+```css
+.stamp-circle {
+  /* デフォルト（未制覇・解禁済み）状態 */
+  border: 2px dashed var(--sand-dark);
+  background: transparent;
+  color: var(--warm-gray);
+}
+.stamp-circle-order { font-size: 16px; font-weight: 700; opacity: 0.5; }
+```
+
+**ロック中（未解禁レベル）— 点線の空白丸＋鍵、より控えめ**:
+```css
+.stamp-circle--locked {
+  border: 2px dashed var(--sand);   /* --sand-darkより薄い色でさらに控えめに */
+  opacity: 0.5;
+}
+.stamp-circle-lock { font-size: 16px; opacity: 0.6; }
+```
+
+**制覇済み（チェックイン済み）— レベルカラー塗りつぶし＋回転＋二重リング＋影**:
+```css
+.stamp-circle--checked {
+  border: none;
+  background: var(--stamp-color, var(--caramel));
+  color: white;
+  transform: rotate(var(--stamp-rotate, -3deg));
+  /* 二重リング: 内側の白いリング＋外側の同色濃淡リングをbox-shadowの多重指定で表現 */
+  box-shadow:
+    0 0 0 3px white,                              /* 内側: 白い縁取り（紙に押されたインクの縁が滲まない部分） */
+    0 0 0 5px var(--stamp-color, var(--caramel)), /* 外側: もう一段太いリング（実際のはんこの二重円デザイン） */
+    2px 3px 6px rgba(44,36,32,0.25);               /* 影: わずかにずれた位置に落ちる、紙に押した時の凹凸感 */
+}
+.stamp-circle-mark {
+  transform: rotate(calc(var(--stamp-rotate, -3deg) * -1)); /* 中の絵文字は円の回転を打ち消して正立させる（絵文字が傾いて読みにくくなるのを防止） */
+}
+```
+
+- **回転角の決定的算出方法**: `spot.id`（文字列）から決定的にハッシュ値を算出し、`-5°〜+5°`の範囲にマッピングする。実装例（builderへの具体的なアルゴリズム提示）:
+  ```js
+  function _stampRotateDeg(spotId) {
+    let hash = 0;
+    for (let i = 0; i < spotId.length; i++) {
+      hash = (hash * 31 + spotId.charCodeAt(i)) | 0;
+    }
+    return (Math.abs(hash) % 11) - 5;
+  }
+  ```
+  このヘルパー関数を`_renderStampCollectionList()`内で各`checked`スポットに対して呼び出し、生成したCSS文字列（`style="--stamp-color:${meta.color};--stamp-rotate:${_stampRotateDeg(spot.id)}deg;"`）をインラインstyleとして`.stamp-circle`要素に付与する
+- **二重リングの表現について補足**: `border`ではなく`box-shadow`の多重指定を採用する理由は、円のサイズ自体（`width`/`height`）を変えずにリングを重ねられるため
+- **「次はここ」ハイライト（`.stamp-circle--next`）**: `isNext`は常に`!checked`の状態でのみ真になる（`_computeStampNextTarget()`は未チェックスポットのみを返すため）。`.stamp-circle--next`は「未制覇・解禁済みの点線円」に対する追加装飾になる:
+  ```css
+  .stamp-circle--next {
+    border-style: solid;
+    border-color: var(--caramel);
+    color: var(--caramel);
+    animation: stampNextPulseRing 1.6s ease-in-out infinite;
+  }
+  @keyframes stampNextPulseRing {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200,128,74,0.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(200,128,74,0); }
+  }
+  ```
+  既存の`@keyframes stampNextPulse`（マップピンの`scale`拡大パルス）とは別の新規`@keyframes`とする
+
+### 7-4. 「ページ」らしい背景演出（`.stamp-book-page`）
+
+```css
+.stamp-book-page {
+  background: var(--cream);
+  border: 1px solid var(--sand-dark);
+  border-radius: 16px;
+  padding: 16px 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(44,36,32,0.06);
+}
+.stamp-book-page-title {
+  font-size: 13px; font-weight: 700; color: var(--warm-gray);
+  letter-spacing: 0.04em; margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--sand-dark);
+}
+.stamp-book-page--locked { opacity: 0.6; }
+```
+
+- `--cream`（ライトモード`#FFF9F2`、ダークモード`#1C1410`）を背景に使うことで、CSS変数の切り替えのみでダークモード対応が自動的に効く（§3-4の既存の見落としを踏襲しない）
+- 画面全体の背景も`--cream`系のため、`.stamp-book-page`をわずかに異なる色調（`--sand`寄り）にすると「台紙が浮いている」質感がより出る。最終的な色の組み合わせはbuilderが実装時にWeb版で見た目を確認しながら微調整してよい
+
+### 7-5. エリアバッジ（改修対象: `_renderStampAreaBadges()`本体、`public/app.js` 3920〜3929行目、CSSは`.stamp-area-badge`一式）
+
+**HTML構造案**:
+```
+<div class="stamp-area-stamp">
+  <div class="stamp-circle stamp-circle--area ${achieved ? 'stamp-circle--checked' : ''}"
+       style="${achieved ? `--stamp-color:${areaAchievedColor}; --stamp-rotate:${_stampRotateDeg(area)}deg;` : ''}">
+    <span class="stamp-circle-mark">${achieved ? '✓' : areaEmoji}</span>
+  </div>
+  <div class="stamp-area-stamp-label">${areaLabelText}</div>
+  <div class="stamp-area-stamp-progress">${checked}/${total}</div>
+</div>
+```
+
+- §2-3で確定済みの通り「小さめの円形スタンプアイコン（エリア絵文字＋達成時は塗りつぶし、未達成時は空白）」という要件のため、`.stamp-circle`と同じ設計（`--checked`修飾子・二重リング・回転）を**サイズだけ小さくした別クラス**`.stamp-circle--area`（例: `width:40px;height:40px;font-size:14px;`）として流用する。7-3節の`.stamp-circle`本体スタイル一式を共通化し、`.stamp-circle--area`はサイズ差分のみを上書きする実装を推奨（`.stamp-circle.stamp-circle--area`のように両クラス併記でHTML側に付与する設計）
+- 回転角の算出は`_stampRotateDeg(area)`（§7-3のヘルパーをエリア文字列にも流用可能）
+- 未達成時の中身: 「エリア絵文字」を表示する新規要件のため、`STAMP_BADGE_AREAS`の各要素に絵文字は既に含まれている（`label: '🏙 Central'`のように絵文字+英語ラベルが1文字列として結合されている）。**中の絵文字だけを抽出する必要があるため、`STAMP_BADGE_AREAS`定数を`{val, emoji, labelText}`のように分割する変更が必要になる**。この変更は`STAMP_BADGE_AREAS`を参照する唯一の関数`_computeStampAreaProgress()`（3806〜3813行目）の`label`の使い方も合わせて修正が必要（`{area, label, checked, total, achieved}`の戻り値に`emoji`/`labelText`を追加する形が自然）
+- X/Y進捗（`checked/total`）はスタンプ円の下に小さく（`font-size:10px;color:var(--warm-gray);`）添える。円の直下にラベルと並べて2行で表示するレイアウトを推奨
+- 配置: `#stamp-area-badges`は`display:flex;flex-wrap:wrap;gap:8px;`（既存インラインstyle）から、6個の円形スタンプを横並びグリッドで並べるレイアウトに変更。紙質感の背景（`.stamp-book-page`と似たラッパー）を追加することを推奨
+
+### 7-6. マップ/一覧どちらでも表示される制約の継続
+
+既存の設計書77での実装上の必須事項（`_applyStampViewMode()`の表示切替対象に`#stamp-area-badges`を含めない）は、本設計書によるデザイン変更後も**継続して守られなければならない**。HTML構造・CSSクラスを変更しても、`_applyStampViewMode()`（`public/app.js` 3773〜3783行目）のロジック自体には一切触れないため、この制約は自動的に維持される。builderは実装後、念のため`_applyStampViewMode()`に新規要素IDへの参照が紛れ込んでいないか確認すること。
+
+## 8. i18n変更点
+
+- 既存キー`stampAreaBadgesTitle`・`stampCollectionLockedNote`・`stampNextTargetLabel`はそのまま流用（表示位置・見た目が変わるだけでテキスト自体は変更なし）
+- 新規に必要になる可能性がある文言はなしと想定される。ただし実装の過程で新規補助テキストを追加する場合は、CLAUDE.md必須ルール通り`STRINGS.ja`/`STRINGS.en`に同時追加すること
+- `STAMP_BADGE_AREAS`定数の構造変更（`label`を`{emoji, labelText}`に分割する場合）は、i18nの観点では影響なし（エリア名自体は既存パターン通り英語表記のまま、i18nキー化はしない）
+
+## 9. 既知の未解決事項
+
+1. **`STAMP_BADGE_AREAS`定数の構造変更（`label`一体型 → `{val, emoji, labelText}`分離型）の具体的な移行方法**: 既存の`label`をそのまま`labelText`として使い回し新規`emoji`フィールドを追加する形が最小改修になると考えられるが、最終的なフィールド名・移行方法はbuilder判断
+2. **`.stamp-book-page`の背景色と`.stamp-circle`（未制覇時）の背景色の組み合わせ**: 最終的な明度・コントラストの調整はWeb版での目視確認をしながらbuilderが微調整する必要がある
+3. **円形グリッドのスポット名表示（2行折り返し）が実機で見切れないか**: 特に長い英語名（例: `Singapore Oceanarium (S.E.A. Aquarium)`）でレイアウトが崩れないか実装時に確認が必要
+4. **既存`.stamp-collection-card`の`onclick`にガード（`_touchCapableDetected`）が付いていなかった件への対応要否**: 新規カードでガードを追加するかどうかは判断次第（後方互換上は必須ではない、あくまで推奨）
+5. **23件（設計書77で9件追加済み）のスポットを円形グリッドで表示した際の、1画面あたりの表示密度・スクロール量**: 実機・実ブラウザでの見た目確認が必要
+6. **エリアバッジの「二重リング」表現が、コレクション一覧のスタンプ円よりもサイズが小さい（40px想定）場合に潰れて見えないか**: サイズ比に応じてリング幅を調整する必要があるかもしれない
+
+## 10. リスク
+
+1. **既存デザイン変更に伴う回帰リスクの範囲は限定的**: データ取得・API呼び出し・状態管理には一切触れないため、機能面（チェックイン・レベル解禁・進捗計算）への回帰リスクは低い
+2. **`STAMP_BADGE_AREAS`定数の構造変更に伴う参照箇所の見落としリスク**: 実装時に`grep`で再確認する必要がある
+3. **回転角（`_stampRotateDeg()`）の見た目が実機で「ランダムすぎる/揃いすぎる」印象を与えないか**: 実装時のWeb版目視確認が必要
+4. **CSS `box-shadow`多重指定によるiOS WKWebView実機でのレンダリング負荷**: 23件同時レンダリング時の実機確認が必要
+5. **iOS実機未検証**: 設計書69〜77自体がTestFlightビルド未実施のため、本刷新もWeb版での検証が先行する
+6. **ダークモード時の見た目未検証**: 新規CSSクラスがCSS変数ベースで正しくダークモード追従するかは、Web版でのダークモード切り替え目視確認が必要
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 本設計書はAPIレスポンス構造・データモデルに一切変更を加えない、フロントエンドのみの変更のため、旧バージョンのApp Store版アプリへの影響はゼロ。設計書69〜77自体がまだTestFlightビルド・App Store配信されていないため、実質的な後方互換リスクはない
+2. **影響範囲**: Web版・App Store版の両方に同時に反映される変更。`server.js`・`data/`配下のデータファイルには一切触れないため、Web版への反映は静的ファイルのキャッシュバスティングのみで即座に反映可能（`pm2 restart`不要）
+3. **リリースタイミング**: 設計書69〜77と合わせて次回のTestFlightビルドで一括リリースする形が自然
+4. **App Store Connect側の追加対応は不要**: 新規権限・新規トラッキング等を一切伴わない、既存機能の見た目変更のみ
+
+## 承認状況
+2026-07-20 planner設計。ユーザーフィードバック「エリアバッジ・コレクション一覧ビューの見た目がダサい」を受けた相談の結果、「スタンプ帳（パスポート風）」のデザインコンセプトで合意し作成。**ユーザー承認済み**。
