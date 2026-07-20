@@ -8888,3 +8888,207 @@ API変更が一切ないため後方互換性への影響はない。ただし`d
 
 ## 承認状況
 2026-07-20 planner設計。ユーザーフィードバック「エリアバッジ・コレクション一覧ビューの見た目がダサい」を受けた相談の結果、「スタンプ帳（パスポート風）」のデザインコンセプトで合意し作成。**ユーザー承認済み**。
+
+# 設計書79 — コレクション一覧にチェックイン日時・説明文を追加（コレクター体験の強化）
+
+（2026-07-20 planner作成。設計書69〜78で実装済みの「スポット制覇スタンプラリー」機能への追加要望に基づく。コード実装は含まない）
+
+## 1. 背景
+
+ユーザーから「スタンプだけでなく、そのスポットに紐づく情報も保存できるようにしたい。チェックインした時間とか、場所の簡単な説明とか」との要望があった。加えて「とにかくコレクターを意識した作り、仕様にしていきたい」という方針が併せて示されており、単なる制覇記録（スタンプの有無のみ）ではなく、旅行記・パスポートのように「いつ、どこを訪れたか」が記録として残る体験を重視している。
+
+相談の結果、表示場所は**コレクション一覧ビュー（設計書78で刷新済みの「スタンプ帳」風グリッド、`_renderStampCollectionList()`）の各スタンプの下に、コンパクトに表示する**方針で確定した。新規タブ・新規画面・スポット詳細モーダルへの追加表示は行わない。
+
+## 2. 確定済み仕様（ユーザー承認済み）
+
+1. **表示場所**: `.stamp-stamp-cell`（設計書78で実装済み、スタンプ円＋スポット名の縦積み構造）に、**制覇済み（チェックイン済み）のスポットのみ**、チェックイン日時と説明文をコンパクトに追加表示する
+2. **チェックイン日時**: サーバー側は既に`data/stamp-progress/{userId}.json`の`checkinLog: [{spotId, checkedInAt, lat, lng}]`に保存済みで、`GET /api/stamp-progress/me`のレスポンスにも`checkinLog`が既に含まれている（サーバー側変更は不要）。**クライアント側の`_stampProgress`が現状`checkinLog`を保持していない**ため、クライアント側の状態管理を拡張する必要がある
+3. **説明文**: 既存の`spot.description`フィールド（`_stampSpots`に既に含まれる、`data/sg/stamp-spots.json`の各スポットに存在）をそのまま利用する。グリッドセルの表示スペースが限られるため、コンパクトに収まるよう省略表示（CSS line-clamp等）にする
+
+## 3. 既存コードの調査結果（2026-07-20時点で実ファイルを確認、設計の前提事実）
+
+### 3-1. `server.js`（変更不要、確認のみ）
+
+- `POST /api/stamp-progress/checkin`（2118〜2123行目）: チェックイン成功時、`data.checkinLog.push({ spotId, checkedInAt: new Date().toISOString(), lat, lng })`で記録。ただしこのエンドポイントのレスポンス自体（2129行目以降、`loadStampProgress()`の戻り値を使って構築）に`checkinLog`が含まれているかは実装時に再確認が必要（設計書は「サーバー側変更は不要」という前提だが、レスポンス構造の詳細を`server.js`実ファイルでbuilderが再確認すること）
+- `GET /api/stamp-progress/me`（2067〜2080行目）: レスポンスに`checkinLog: progress.checkinLog`が既に含まれている（2075行目）。**この点は変更不要**
+- いずれのエンドポイントも`checkedInAt`はISO 8601形式の文字列（`new Date().toISOString()`）で保存されている
+
+### 3-2. `public/app.js`（本設計書の変更対象）
+
+- `let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'] };`（3680行目）: **`checkinLog`フィールドを持っていない**。本設計書で拡張が必要な箇所
+- `_loadStampSpotsAndProgress()`内の代入（3838〜3841行目）:
+  ```js
+  _stampProgress = {
+    checkedInSpotIds: progressData.checkedInSpotIds || [],
+    unlockedLevels: progressData.unlockedLevels || ['standard'],
+  };
+  ```
+  `GET /api/stamp-progress/me`のレスポンスに含まれる`checkinLog`を代入せず捨てている。**修正対象1**
+- `doStampCheckin()`内の代入（4135〜4138行目）:
+  ```js
+  _stampProgress = {
+    checkedInSpotIds: data.checkedInSpotIds || [],
+    unlockedLevels: data.unlockedLevels || _stampProgress.unlockedLevels,
+  };
+  ```
+  `POST /api/stamp-progress/checkin`のレスポンスに`checkinLog`が含まれているかは§3-1の通り実装時確認が必要。含まれていない場合、チェックイン直後の一覧再描画では新しいチェックイン日時がまだ反映されない可能性がある（後述リスク・未解決事項参照）。**修正対象2**
+- `_renderStampCollectionList()`（3965〜4006行目）: 各`.stamp-stamp-cell`は現在スタンプ円（`.stamp-circle`）→スポット名（`.stamp-stamp-cell-name`）の順で構成。`checked`変数（3980行目）で制覇済み判定を既に持っている。本設計書はこの`checked`判定を再利用し、`checked`が真の場合のみ日時・説明のHTMLを追加する
+- `_stampSpots`配列の各要素は`data/sg/stamp-spots.json`のフィールドをそのまま持つため、`spot.description`は既に利用可能（実ファイル確認済み、例: `"description": "シンガポールの象徴、巨大な人工樹「スーパーツリー」がそびえる庭園。夜のライトショーも必見。"`）
+- 既存の日付フォーマットパターン: コードベース内で「M/D」形式（`${d.getMonth()+1}/${d.getDate()}`）が複数箇所（例: `public/app.js` 4619行目`_cpBanner.textContent`内）で使われている。本設計書の日時表示もこのパターンを踏襲する（新規の日付フォーマット関数を作らず、既存の書き方に合わせる）
+
+### 3-3. `public/app.css`（本設計書の変更対象）
+
+- `.stamp-book-grid`（1977〜1979行目）: `display:flex;flex-wrap:wrap;gap:16px 10px;`
+- `.stamp-stamp-cell`（1980〜1983行目）: `display:flex;flex-direction:column;align-items:center;gap:6px;width:74px;`。**固定幅74px**のため、追加する日時・説明テキストもこの幅に収める前提でCSS設計する必要がある
+- `.stamp-stamp-cell-name`（1984〜1989行目）: `font-size:11px;color:var(--midnight);text-align:center;line-height:1.3;`＋`-webkit-line-clamp:2`による2行省略。本設計書で追加するクラスもこのトーン（フォントサイズ・カラー・省略表示の手法）を踏襲する
+
+## 4. スコープ外（今回含めない）
+
+- スポット詳細モーダル（`#stamp-spot-detail-sheet`）自体への日時表示追加（既存のまま変更しない）
+- 新規「訪問記録」タブ・新規画面の作成
+- AIイラスト生成したエリアバッジ画像の統合（別タスク、ユーザーがNano Bananaで生成中）
+- チェックイン日時の編集・削除機能
+- `checkinLog`の`lat`/`lng`（位置情報）の表示（今回は`checkedInAt`のみ使用）
+- データモデル・API変更（`server.js`は無変更、既存の`checkinLog`をクライアントが利用するだけ）
+- BKK/SYD対応
+- 説明文の多言語対応（`spot.description`は現状日本語のみのフィールドであり、英語版`descriptionEn`のようなフィールドは`data/sg/stamp-spots.json`に存在しない。i18n言語切替時の説明文表示は今回スコープ外、日本語のまま表示する）
+- マップビュー（Leafletピン）側への日時・説明表示
+
+## 5. データモデルの変更点
+
+**変更なし**。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも無変更。既存フィールド（`checkinLog`・`description`）をそのまま利用する。
+
+## 6. APIの変更点
+
+**原則変更なし**。`GET /api/stamp-progress/me`は既に`checkinLog`を返している（変更不要）。
+
+**要確認事項（builderが実装着手時に必ず確認）**: `POST /api/stamp-progress/checkin`のレスポンス構造（`server.js` 2129行目以降）に`checkinLog`が含まれているかを実ファイルで確認すること。
+
+- 含まれていれば`server.js`は無変更のままでよい
+- 含まれていない場合、2つの対応案がある
+  - 案A（推奨・変更不要側に倒す）: `doStampCheckin()`のクライアント側で、レスポンスに`checkinLog`が無ければ`_stampProgress.checkinLog`に新規チェックインエントリ（`{spotId, checkedInAt: 現在時刻のISO文字列, lat, lng}`）を自前でpushして即時反映する。サーバー側は無変更のままでよく、後方互換性・データ共有の影響もゼロ
+  - 案B: `server.js`の`POST /api/stamp-progress/checkin`レスポンスに`checkinLog: data.checkinLog`を追加する。既存レスポンス構造へのフィールド追加のみのため後方互換（旧バージョンAppは単に新フィールドを無視する）だが、`server.js`の変更を伴うため`pm2 restart`が必要になる
+
+いずれの案を採るかはbuilder判断に委ねるが、**案Aの方が変更範囲が小さく、`server.js`無変更でWeb版に即座に反映できるため優先的に検討すること**。
+
+## 7. フロントエンド設計
+
+### 7-1. `_stampProgress`の状態拡張
+
+`let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'] };`（3680行目）に`checkinLog: []`を追加する。
+
+```js
+let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'], checkinLog: [] };
+```
+
+`_loadStampSpotsAndProgress()`内の代入（3838〜3841行目）・`doStampCheckin()`内の代入（4135〜4138行目）の両方に`checkinLog: progressData.checkinLog || []`（または`data.checkinLog || _stampProgress.checkinLog`、§6の要確認事項の結論に応じてbuilderが選択）を追加する。**2箇所の代入漏れがないよう`grep -n "_stampProgress\s*="`で確認すること**（`_stampProgress`単独ではなく代入箇所として2箇所存在することは本設計書調査時点で確認済み）。
+
+### 7-2. 新規ヘルパー関数 `_stampCheckinDateFor(spotId)`
+
+`_stampProgress.checkinLog`から該当`spotId`のエントリを検索し、`checkedInAt`（ISO文字列）を短い日付形式に整形して返す。既存の日付フォーマットパターン（`${d.getMonth()+1}/${d.getDate()}`）を踏襲する。
+
+```js
+function _stampCheckinDateFor(spotId) {
+  const entry = (_stampProgress.checkinLog || []).find(e => e.spotId === spotId);
+  if (!entry || !entry.checkedInAt) return '';
+  const d = new Date(entry.checkedInAt);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+```
+
+- `checkinLog`に該当エントリが無い場合（旧チェックイン等でログが欠落しているケース、想定外だが防御的に）は空文字列を返し、呼び出し元は日時行自体を出さない設計にする
+- 同一`spotId`に複数エントリが存在する可能性は通常ないはずだが（`server.js`側は`checkedInSpotIds.includes(spotId)`で重複チェックイン自体を弾く設計、§3-1で確認済み）、念のため`find()`（最初の1件）で単純化する
+
+### 7-3. `_renderStampCollectionList()`の改修
+
+`checked`が真の場合のみ、日時・説明のHTMLブロックを`.stamp-stamp-cell`内、スポット名（`.stamp-stamp-cell-name`）の直後・「次はここ」タグ（`isNext`、ただし`checked`時は`isNext`は常に偽なので実質排他）の前に追加する。
+
+**HTML構造案**（クラス名は例、最終命名はbuilder判断）:
+
+```js
+const checkinMeta = checked ? `<div class="stamp-stamp-cell-meta">
+  <span class="stamp-stamp-cell-date">${_stampCheckinDateFor(spot.id)}</span>
+  ${spot.description ? `<span class="stamp-stamp-cell-desc">${spot.description}</span>` : ''}
+</div>` : '';
+```
+
+```
+<div class="stamp-stamp-cell">
+  <div class="${circleCls.join(' ')}" ...>...</div>
+  <div class="stamp-stamp-cell-name">${name}</div>
+  ${checkinMeta}
+  ${isNext ? `<span class="stamp-stamp-cell-next-tag">...</span>` : ''}
+</div>
+```
+
+- 日時が空文字列（`_stampCheckinDateFor()`が該当エントリなしで空を返すケース）の場合でも、`checkinMeta`ブロック自体は生成してよい（説明文だけ表示される状態を許容する）。両方とも空になるケース（`checkinLog`エントリなし＆`spot.description`未設定）のみ、ブロック自体を出さないかは実装時の見た目確認でbuilderが判断してよい
+- `spot.description`は既存データで全スポットに設定されている（§3-2確認済み）ため、通常は必ず表示される想定
+
+### 7-4. CSS設計方針
+
+`.stamp-stamp-cell`は固定幅74px（§3-3確認済み）のため、追加するテキストもこの幅に収まるよう省略表示を必須とする。
+
+```css
+.stamp-stamp-cell-meta {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 100%;
+}
+.stamp-stamp-cell-date {
+  font-size: 9px; font-weight: 700; color: var(--caramel);
+}
+.stamp-stamp-cell-desc {
+  font-size: 9px; color: var(--warm-gray); text-align: center;
+  line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+  overflow: hidden; text-overflow: ellipsis;
+  width: 100%;
+}
+```
+
+- 日時は`.stamp-circle--checked`の塗りつぶし色トーン（既存`var(--caramel)`系、`.stamp-stamp-cell-next-tag`の背景色と同系統）に寄せて視認性を持たせる案としたが、最終的な配色はbuilderがWeb版で目視確認しながら調整してよい
+- 説明文は1行省略（`-webkit-line-clamp:1`）を基本方針とする。スポット名（`.stamp-stamp-cell-name`）が既に2行分の高さを占めるため、これ以上グリッドセルの縦方向の高さが伸びすぎないようにする配慮（§4-5「グリッドレイアウトが破綻しないか確認」参照）
+- 具体的な行数・フォントサイズの微調整はbuilder判断に委ねる（本設計書は「制覇済みのみ・コンパクト表示」という方針の実現を優先し、ピクセル単位の最終調整は実装時のWeb版目視確認に委ねる）
+
+### 7-5. 表示条件
+
+- **制覇済み（`checked === true`）のセルのみ**日時・説明を表示する。未制覇（`unlocked`かつ`!checked`、点線円＋番号）・ロック中（`!unlocked`、点線円＋鍵）のセルは現状通り変更なし（`checkinMeta`は空文字列のまま生成されない）
+
+### 7-6. グリッドレイアウトへの影響確認
+
+- `.stamp-book-grid`は`display:flex;flex-wrap:wrap;`（グリッドではなくflex-wrap方式、§3-3確認済み）のため、各`.stamp-stamp-cell`の高さが不揃いになっても崩れるリスクは低い（flexboxのwrapは行ごとに独立した高さを取るため）。ただし、同じ行内で制覇済みセル（高さが伸びる）と未制覇セル（高さが伸びない）が混在した場合、行の高さは最も高いセルに揃うため、視覚的な余白の不揃いが発生する可能性がある。実機・Web版での目視確認が必要（未解決事項に記載）
+- `.stamp-stamp-cell`は`width:74px`固定のため、横方向の崩れは発生しない（縦方向の高さのみ可変）
+
+## 8. i18n変更点
+
+- **新規i18nキーは不要と想定される**。日時（`_stampCheckinDateFor()`は数値ベースの「M/D」表記のみで文言を含まない）・説明文（`spot.description`は既存の日本語専用フィールドをそのまま表示、i18n対象外として扱う）のいずれも、新規に翻訳が必要な固定文言を追加しない
+- ただし、実装の過程で「チェックイン日」等のラベル文言を追加する場合は、CLAUDE.md必須ルール通り`STRINGS.ja`/`STRINGS.en`に同時追加すること（本設計書は日時を数値のみで表示しラベルなしとする案を基本としているが、視認性の観点でラベルが必要と判断した場合はbuilderが追加してよい）
+
+## 9. 既知の未解決事項
+
+1. **`POST /api/stamp-progress/checkin`のレスポンスに`checkinLog`が含まれているかの実装時確認が必須**（§6参照）。含まれていない場合、チェックイン直後の一覧再描画（`doStampCheckin()`内`_renderStampCollectionList()`呼び出し、4149行目）で新しいチェックイン日時が即座に表示されない可能性がある。案A（クライアント側で自前push）で対応する場合、サーバーが実際に記録した`checkedInAt`と、クライアントが仮に生成した時刻がミリ秒単位でズレる可能性があるが、表示は「M/D」の日単位のため実害はないと考えられる
+2. **説明文の多言語対応**: `spot.description`は日本語のみのフィールドであり、英語モード（`getLang()==='en'`）で閲覧した場合も日本語の説明文がそのまま表示される。スコープ外として明記済みだが、次フェーズでの改善余地として残る
+3. **グリッドセルの縦方向の高さ不揃いが実機で気にならないか**: §7-6参照、Web版・iOS実機での目視確認が必要
+4. **長い説明文が1行省略でどこまで意味が伝わるか**: `spot.description`は現状1〜2文程度の長さで作成されている（データ確認済み、例:「シンガポールの象徴、巨大な人工樹「スーパーツリー」がそびえる庭園。夜のライトショーも必見。」）ため、1行省略だと文の途中で切れる可能性が高い。省略後も意味が伝わるかは実装時の見た目確認で判断が必要（2行に増やす選択肢も含めbuilder判断）
+5. **`checkinLog`のデータ量増加によるレスポンスサイズ・パフォーマンスへの影響**: 現状23スポット・小規模ユーザー数のため実害は低いと想定されるが、長期的にチェックイン件数が増えた場合のレスポンスサイズは考慮していない（スコープ外、必要になれば別タスク）
+
+## 10. リスク
+
+1. **`_stampProgress`代入箇所の修正漏れリスク**: 2箇所（`_loadStampSpotsAndProgress()`・`doStampCheckin()`）のうち片方だけ`checkinLog`を追加し忘れると、片方の経路（起動時ロード or チェックイン直後）でのみ日時が表示される不整合が起きる。実装後`grep`での確認が必須
+2. **既存のダークモード対応パターンからの逸脱リスク**: 新規CSSクラス（`.stamp-stamp-cell-date`/`.stamp-stamp-cell-desc`）は設計書78の教訓（`.stamp-collection-card`の`background:white`直書き問題）を踏まえ、既存CSS変数（`var(--caramel)`/`var(--warm-gray)`）ベースで実装する前提のため、リスクは低いと考えられる
+3. **グリッドの視覚的な不揃いリスク**: §7-6・未解決事項3参照。機能面のリスクではなく見た目の完成度に関わるリスク
+4. **既存デザイン変更に伴う回帰リスクの範囲は限定的**: データ取得・API呼び出し・状態管理（チェックイン判定・レベル解禁ロジック）には変更を加えない（`_stampProgress`へのフィールド追加のみ、既存フィールドの意味・型は変更しない）ため、機能面（チェックイン・レベル解禁・進捗計算）への回帰リスクは低い
+5. **iOS実機未検証**: 設計書69〜78自体がまだTestFlightビルド未実施のため、本追加もWeb版での検証が先行する
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**:
+   - フロントエンド変更（`public/app.js`・`public/app.css`）は既存APIレスポンス構造に依存する形の追加のみであり、旧バージョンのApp Store版アプリの動作には一切影響しない（旧バージョンはこの変更自体を知らないため、既存の見た目のまま動作を継続する）
+   - **§6の要確認事項で案B（サーバー側`POST /api/stamp-progress/checkin`レスポンスに`checkinLog`を追加）を採る場合**、既存レスポンス構造へのフィールド追加のみであり後方互換性は保たれる（旧バージョンAppは単に新フィールドを無視するのみ、既存フィールド〈`checkedInSpotIds`/`unlockedLevels`〉の意味・型は変更しない）。破壊的変更（既存フィールドの削除・型変更）は一切含まない
+   - 設計書69〜78自体がまだTestFlightビルド・App Store配信されていないため、実質的な後方互換リスクは低い（本番運用中の旧バージョンユーザーがこの機能に依存しているケースが存在しない）
+2. **影響範囲**: 本変更はWeb版・App Store版の両方に同時に反映される変更（`public/`配下の共通コードのため）。§6で案B（`server.js`変更）を採る場合は`pm2 restart`が必要になるが、案A（クライアント側のみ）を採る場合は`server.js`無変更のため静的ファイルのキャッシュバスティングのみで即座に反映可能
+3. **リリースタイミング**: 設計書69〜78と合わせて次回のTestFlightビルドで一括リリースする形が自然。Web版への先行デプロイ自体は（案Aを採る場合）いつでも可能だが、スタンプラリー機能自体がまだTestFlightビルド未実施のため、実質的にはWeb版のみでの先行確認となる
+4. **App Store Connect側の追加対応は不要**: 新規権限・新規トラッキングを一切伴わない、既存機能への表示追加のみ
+
+## 承認状況
+2026-07-20 planner設計。ユーザー要望「チェックインした時間や場所の簡単な説明も保存・表示したい」「コレクターを意識した作りにしたい」を受け、コレクション一覧ビューへのコンパクトな追加表示という方針で作成。**ユーザー承認済み**。

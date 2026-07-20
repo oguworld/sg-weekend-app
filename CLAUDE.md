@@ -233,6 +233,20 @@ sg-weekend-app/
 - `server.js`・`data/`配下は無変更（pm2 restart不要）。i18n新規キーなし（既存の`stampAreaBadgesTitle`/`stampCollectionLockedNote`/`stampNextTargetLabel`を再利用）
 - スコープ外（今回未実装）: スポット詳細モーダル自体・マップビュー（Leafletピン）自体・レベル解禁演出モーダルのデザイン変更、新規イラスト・画像アセット追加、コレクション一覧のエリア別再グルーピング、完全制覇時の特別演出
 - キャッシュバスティング: `index.html` app.css/app.js `?v=20260720i`、`sw.js` CACHE_NAME=`sg-weekend-v638`
+
+### コレクション一覧にチェックイン日時・説明文を追加（2026-07-20実装、設計書79）
+ユーザー要望「チェックインした時間や場所の簡単な説明も保存・表示したい」「コレクターを意識した作りにしたい」を受け、コレクション一覧ビュー（`_renderStampCollectionList()`）の各スタンプの下に、**制覇済みスポットのみ**チェックイン日時・説明文をコンパクト表示する機能を追加した。データモデル・API変更なし、既存の`checkinLog`（サーバー側で既に記録済み）と`spot.description`（既存フィールド）を利用するのみ。
+
+- **`_stampProgress`の状態拡張**（`public/app.js`）: `let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'] };`に`checkinLog: []`を追加。`_loadStampSpotsAndProgress()`（`GET /api/stamp-progress/me`のレスポンスを反映）・`doStampCheckin()`（`POST /api/stamp-progress/checkin`のレスポンスを反映）の代入箇所2箇所とも`checkinLog`を含めるよう修正
+- **`POST /api/stamp-progress/checkin`のレスポンスに`checkinLog`は含まれない**（`GET /api/stamp-progress/me`側は既に含まれている、`server.js`実ファイルで確認済み）。そのため`doStampCheckin()`ではクライアント側で自前のチェックインエントリ（`{spotId, checkedInAt: 現在時刻のISO文字列, lat, lng}`、重複防止の`some()`チェック付き）を`_stampProgress.checkinLog`にpushする方式を採用（**`server.js`は無変更**、pm2 restart不要）
+- **新規ヘルパー`_stampCheckinDateFor(spotId)`**（`_stampSpotIsChecked()`直後）: `_stampProgress.checkinLog`から該当`spotId`のエントリを検索し、`checkedInAt`（ISO文字列）を既存の日付フォーマットパターン踏襲の「M/D」形式（`${d.getMonth()+1}/${d.getDate()}`）に整形して返す。該当エントリなし・不正な日付は空文字列を返す
+- **`_renderStampCollectionList()`の改修**: `checked`（制覇済み、既存変数を再利用）が真の場合のみ、スポット名（`.stamp-stamp-cell-name`）の直後に`.stamp-stamp-cell-meta`ブロック（`.stamp-stamp-cell-date`＝チェックイン日時＋`.stamp-stamp-cell-desc`＝`spot.description`）を追加。未制覇・ロック中セルは変更なし（空文字列のまま、既存の`circleCls`/`isNext`/「次はここ」タグ判定ロジックには一切変更なし）
+- **CSS（`public/app.css`）**: `.stamp-stamp-cell-meta`（`display:flex;flex-direction:column;align-items:center;`）・`.stamp-stamp-cell-date`（9px、`var(--caramel)`）・`.stamp-stamp-cell-desc`（9px、`var(--warm-gray)`、`-webkit-line-clamp:2`で2行省略）を新規追加。`.stamp-stamp-cell`は`width:74px`固定のため、追加テキストもこの幅に収まる前提で実装
+- i18n新規キーなし（日時は数値のみのラベルなし表記、説明文は既存`spot.description`をそのまま表示。英語モードでも日本語のまま表示される、多言語対応はスコープ外）
+- スコープ外（今回未実装）: スポット詳細モーダル自体への日時表示、新規タブ・新規画面、チェックイン日時の編集・削除、`checkinLog`の`lat`/`lng`表示、データモデル・API変更、BKK/SYD対応
+- `server.js`・`data/`配下は無変更（pm2 restart不要）
+- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720j`、`sw.js` CACHE_NAME=`sg-weekend-v639`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのグリッドセル縦方向の高さ不揃い（制覇済み/未制覇混在時、`.stamp-book-grid`はflex-wrap方式のため崩れリスクは低いと想定）、長い説明文の2行省略後の可読性、日時ラベルの視認性は2026-07-20時点でWeb版目視確認のみ、実機未確認
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での円形スタンプグリッドの表示密度・スクロール量（23件）、長い英語スポット名での2行折り返しレイアウト崩れの有無、エリアバッジ（40px）の二重リング表現が潰れて見えないか、回転角のばらつきが実機で不自然に見えないか、ダークモード切り替え時の実機での見た目、`box-shadow`多重指定によるiOS WKWebView実機でのレンダリング負荷は、いずれも2026-07-20時点でWeb版目視確認のみ完了、実機未確認
 
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）

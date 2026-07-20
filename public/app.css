@@ -1991,6 +1991,21 @@
       font-size: 10px; font-weight: 700; color: white;
       background: var(--caramel); padding: 1px 7px; border-radius: 50px;
     }
+    /* ─── チェックイン日時・説明文（設計書79 §7-4） ─── */
+    .stamp-stamp-cell-meta {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      width: 100%;
+    }
+    .stamp-stamp-cell-date {
+      font-size: 9px; font-weight: 700; color: var(--caramel);
+    }
+    .stamp-stamp-cell-desc {
+      font-size: 9px; color: var(--warm-gray); text-align: center;
+      line-height: 1.25;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; text-overflow: ellipsis;
+      width: 100%;
+    }
 
     /* ─── スタンプ円（設計書78 §7-3） ─── */
     .stamp-circle {

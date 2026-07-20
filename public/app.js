@@ -3677,7 +3677,7 @@
     let _stampLeafletMap = null;
     let _stampMarkersLayer = null;
     let _stampSpots = [];
-    let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'] };
+    let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'], checkinLog: [] };
     let _stampCurrentPos = null; // { lat, lng } 直近の現在地取得結果
     let _stampSelectedSpot = null;
     let _stampMapInitialized = false;
@@ -3838,6 +3838,7 @@
           _stampProgress = {
             checkedInSpotIds: progressData.checkedInSpotIds || [],
             unlockedLevels: progressData.unlockedLevels || ['standard'],
+            checkinLog: progressData.checkinLog || [],
           };
         }
       } catch (_) {
@@ -3866,6 +3867,15 @@
 
     function _stampSpotIsChecked(spotId) {
       return _stampProgress.checkedInSpotIds.includes(spotId);
+    }
+
+    // チェックイン日時を「M/D」形式で返す（設計書79 §7-2）。該当エントリが無い場合は空文字列。
+    function _stampCheckinDateFor(spotId) {
+      const entry = (_stampProgress.checkinLog || []).find(e => e.spotId === spotId);
+      if (!entry || !entry.checkedInAt) return '';
+      const d = new Date(entry.checkedInAt);
+      if (isNaN(d.getTime())) return '';
+      return `${d.getMonth() + 1}/${d.getDate()}`;
     }
 
     function _renderStampMarkers() {
@@ -3990,11 +4000,18 @@
             : !unlocked
               ? `<span class="stamp-circle-lock">🔒</span>`
               : `<span class="stamp-circle-order">${typeof spot.order === 'number' ? spot.order : '?'}</span>`;
+          // 制覇済みのスポットのみ、チェックイン日時・説明文をコンパクト表示する（設計書79）
+          const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
+          const checkinMeta = checked ? `<div class="stamp-stamp-cell-meta">
+            ${checkinDate ? `<span class="stamp-stamp-cell-date">${checkinDate}</span>` : ''}
+            ${spot.description ? `<span class="stamp-stamp-cell-desc">${spot.description}</span>` : ''}
+          </div>` : '';
           return `<div class="stamp-stamp-cell">
             <div class="${circleCls.join(' ')}" style="${style}" ${unlocked ? `onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"` : ''}>
               ${markHtml}
             </div>
             <div class="stamp-stamp-cell-name">${name}</div>
+            ${checkinMeta}
             ${isNext ? `<span class="stamp-stamp-cell-next-tag">${t('stampNextTargetLabel')}</span>` : ''}
           </div>`;
         }).join('');
@@ -4132,9 +4149,22 @@
         if (!res.ok) throw new Error('checkin failed');
         const data = await res.json();
         const prevUnlockedCount = _stampProgress.unlockedLevels.length;
+        // POST /api/stamp-progress/checkin のレスポンスには checkinLog が含まれないため、
+        // クライアント側で自前のチェックインエントリを追加する（設計書79 §6 案A、server.js無変更）
+        const prevCheckinLog = _stampProgress.checkinLog || [];
+        const alreadyLogged = prevCheckinLog.some(e => e.spotId === spot.id);
+        const newCheckinLog = alreadyLogged
+          ? prevCheckinLog
+          : [...prevCheckinLog, {
+              spotId: spot.id,
+              checkedInAt: new Date().toISOString(),
+              lat: _stampCurrentPos.lat,
+              lng: _stampCurrentPos.lng,
+            }];
         _stampProgress = {
           checkedInSpotIds: data.checkedInSpotIds || [],
           unlockedLevels: data.unlockedLevels || _stampProgress.unlockedLevels,
+          checkinLog: newCheckinLog,
         };
         showToast(t('toastStampCheckinSuccess'));
         if (_stampProgress.unlockedLevels.length > prevUnlockedCount) {
