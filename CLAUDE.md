@@ -176,6 +176,16 @@ sg-weekend-app/
 - `server.js`・データファイル（`data/sg/stamp-spots.json`等）は無変更。キャッシュバスティング: `index.html` app.js?v=20260720e、`sw.js` CACHE_NAME=sg-weekend-v634
 - **未検証（次回TestFlightビルド後）**: スポット詳細モーダルの画像が安定して表示され続けるか（症状再発の有無）、固定高さ`200px`の実機レイアウトバランス、Web版ブラウザでの見た目回帰有無
 
+### ⚠️ スタンプスポット画像が引き続き読み込み失敗する不具合の恒久修正（Service Worker早期return＋innerHTML新規生成方式へ統一）（2026-07-20実装、設計書75。上記「aspect-ratio→固定高さ方式」修正は効果なく症状再発だったための追加対応）
+設計書74の修正後も実機で画像読み込み失敗（`stamp_image_load_error`）が継続したため、investigatorが読み取り専用で原因調査を実施。単一の確定原因は特定できなかったが、(1)Service Workerがクロスオリジン画像リクエストを意味なく中継しておりfetch実装の不安定性リスクを負っていたこと、(2)スタンプスポット詳細画像だけが既存3箇所（イベントカード・コース詳細・マイコースカード）と異なり「静的`<img>`要素への`src`後代入」方式で、同一URLを連続して開いた場合にload/errorイベントが発火しない既知のブラウザ挙動リスクを抱えていたこと、の2点を修正方針として実装した（ユーザー承認済み）。
+
+- **`public/sw.js`（Service Workerのクロスオリジン早期return）**: 最後のfetchハンドラ先頭に、クロスオリジンリクエスト（`url.origin !== self.location.origin`かつ`url.hostname !== 'fonts.googleapis.com'`）を一切インターセプトせずブラウザのネイティブfetchに完全に委ねる早期`return`を追加。旧実装は`caches.match`→`fetch`→（`response.ok && url.origin===self.location.origin`条件を満たさないため）そのまま返す、という**キャッシュ機構として何のメリットもない中継**になっており、SW fetch実装の不安定性リスク（WKWebView固有のno-cors+Range処理不安定性の可能性、一次情報未確認の推測）だけを負っていた。`/api/`・HTMLナビゲーション・同一オリジン静的アセットの既存3分岐は全て同一オリジンのため、この早期returnの影響を受けず無変更のまま機能する
+- **`public/app.js`の`openStampSpotDetail()`（画像生成方式の統一）**: 既存3箇所（イベントカード`public/app.js`1355行目付近・コース詳細`renderCourseDetail()`4411行目付近・マイコースカード`renderCourseResultHtml()`4861行目付近）と同じ「モーダル/カードを開く・生成するたびに`<img>`要素を新規生成する」パターンに統一。`spot.imageUrl`があれば`imgContainer.innerHTML`で新規`<img>`を都度生成し、生成した要素に対して`onload`/`onerror`ハンドラ（設計書74で追加済みの`stamp_image_load_success`/`stamp_image_load_error`診断ログ、引き続き維持）を設定する。`imageUrl`が空（ロック中スポット）の場合は`imgContainer.innerHTML = ''`で何も生成しない
+- **`public/index.html`（静的`<img>`要素→空コンテナへ変更）**: `#stamp-spot-detail-image`（静的`<img>`要素、初期`display:none`）を`<div id="stamp-spot-detail-image-container"></div>`（空コンテナ）に置き換え。旧要素へのHTML属性`onerror`フォールバックは、`<img>`自体が都度生成されなくなったため撤去（JS側の`onerror`ハンドラで代替）
+- **`server.js`は無変更**（画像URL生成・マスキングロジックとも今回のスコープ外、`GET /api/stamp-spots`のレスポンス構造は不変）。キャッシュバスティング: `index.html` app.js?v=20260720f、`sw.js` CACHE_NAME=sg-weekend-v635
+- **影響範囲の限定**: `openStampSpotDetail()`関数のみ変更、既存3箇所（イベントカード・コース詳細・マイコースカード）のUnsplash画像表示ロジックは無変更（回帰なし）。SWのクロスオリジン早期returnは`images.unsplash.com`だけでなく他の全クロスオリジンリクエスト（Instagram embed等）にも及ぶが、これらも元々SWでキャッシュされていなかったため機能的な後退はない
+- **未検証（次回TestFlightビルド後）**: iOS実機・Web版Safari両方でスタンプスポット詳細画像が安定して表示され続けること（一瞬表示されて消える、最初から表示されない、のいずれの症状も再発しないこと）、同一スポットを連続して複数回開いても毎回画像が表示されること（今回の不具合の核心）、`logs/debug-nav.log`で`stamp_image_load_error`が記録されなくなること（またはゼロに近い頻度になること）
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

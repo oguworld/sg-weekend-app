@@ -3964,22 +3964,24 @@
       document.getElementById('stamp-spot-detail-area').textContent = spot.area || '';
       document.getElementById('stamp-spot-detail-desc').textContent = spot.description || '';
 
-      const imgEl = document.getElementById('stamp-spot-detail-image');
-      if (imgEl) {
+      // 画像は他3箇所（イベントカード/コース詳細/マイコースカード）と同じ「モーダルを開くたびに
+      // <img>要素を新規生成する」方式に統一（設計書75 §4-2）。静的要素へのsrc再代入方式は
+      // 同一URLを連続して開いた際にload/errorイベントが発火しない既知のブラウザ挙動リスクがあった。
+      const imgContainer = document.getElementById('stamp-spot-detail-image-container');
+      if (imgContainer) {
         if (spot.imageUrl) {
-          imgEl.onload = () => _sendDebugLog('stamp_image_load_success', { spotId });
-          imgEl.onerror = () => {
-            imgEl.style.display = 'none';
-            _sendDebugLog('stamp_image_load_error', { spotId, url: spot.imageUrl });
-          };
-          imgEl.src = spot.imageUrl;
-          imgEl.alt = displayName;
-          imgEl.style.display = 'block';
+          imgContainer.innerHTML = `<img src="${spot.imageUrl}" alt="${escapeHtml(displayName)}"
+            style="width:100%;height:200px;object-fit:cover;border-radius:14px;margin-bottom:12px;display:block;">`;
+          const imgEl = imgContainer.querySelector('img');
+          if (imgEl) {
+            imgEl.onload = () => _sendDebugLog('stamp_image_load_success', { spotId });
+            imgEl.onerror = () => {
+              imgEl.style.display = 'none';
+              _sendDebugLog('stamp_image_load_error', { spotId, url: spot.imageUrl });
+            };
+          }
         } else {
-          imgEl.onload = null;
-          imgEl.onerror = null;
-          imgEl.removeAttribute('src');
-          imgEl.style.display = 'none';
+          imgContainer.innerHTML = '';
         }
       }
 

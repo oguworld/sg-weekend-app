@@ -1,5 +1,5 @@
 // ─── Service Worker for 今週末どこいく？SG ───
-const CACHE_NAME = 'sg-weekend-v634';
+const CACHE_NAME = 'sg-weekend-v635';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/app.css',
@@ -43,6 +43,15 @@ self.addEventListener('fetch', event => {
 
   // Skip non-GET requests
   if (request.method !== 'GET') return;
+
+  // クロスオリジンリクエスト（fonts.googleapis.comを除く）はSWが一切関与せず、
+  // ブラウザのネイティブfetchに完全に委ねる（設計書75 §4-1）。
+  // 現状の実装ではどのみちキャッシュされない（下記cache-first分岐のresponse.ok &&
+  // url.origin===self.location.origin 条件を満たさない）ため、意味のない中継をやめて
+  // SW fetch実装の不安定性リスクだけを構造的に排除する。
+  if (url.origin !== self.location.origin && url.hostname !== 'fonts.googleapis.com') {
+    return;
+  }
 
   // API calls: Network-only (real-time data needed)
   if (url.pathname.startsWith('/api/')) {
