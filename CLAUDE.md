@@ -167,6 +167,15 @@ sg-weekend-app/
 - **未検証（次回TestFlightビルド後）**: iOS実機でのスポット詳細モーダルの画像表示（アスペクト比・角丸・読み込み時のレイアウトシフト有無）、ロック中スポット詳細シートで画像が表示されないことの実機確認、見出し文言重複による見た目の違和感有無
 - **既知の未解決事項**: `tekka-market`・`labrador-secret-tunnel`の2件は画像取得失敗のまま空文字列（急ぎ対応不要、将来的な検索クエリ調整・手動URL設定の余地あり）。Unsplash URLの動的生成URLは将来失効・変更される可能性があり、既存`fill-images.js`によるイベント画像と同じ前提で運用（定期再取得の仕組みはスコープ外）
 
+### ⚠️ スタンプスポット画像が表示されない不具合修正（aspect-ratio→固定高さ方式へ変更）＋診断ログ追加（2026-07-20実装、設計書74。上記「スタンプスポット画像追加」節の`aspect-ratio:16/9`記述は本節により実態と乖離）
+設計書73実装後、実機で「スポット詳細モーダルの写真が一瞬表示されて消える（ずっと空白のまま）」不具合が報告された。状況証拠として、コードベース内で`#stamp-spot-detail-image`だけが`aspect-ratio:16/9`という書き方をしており、他の類似箇所（`public/app.js`のマイコースカード画像等）は`height:固定px + object-fit:cover`という既存の確立されたパターンで統一されていた。確実な原因究明はできていない（`aspect-ratio`が直接原因という確証はなく状況証拠からの推測）が、既存パターンへの統一を優先して修正した。
+
+- `public/index.html` 807行目: `#stamp-spot-detail-image`のインラインstyleから`aspect-ratio:16/9`を削除し`height:200px`に変更。`width:100%`・`object-fit:cover`・`border-radius:14px`・`margin-bottom:12px`・`display:none`（初期状態）・HTML属性`onerror="this.style.display='none';"`は維持
+- `public/app.js`の`openStampSpotDetail(spotId)`: 画像`src`セット時に`imgEl.onload`/`imgEl.onerror`をJSプロパティとして追加。`onload`時`_sendDebugLog('stamp_image_load_success', { spotId })`、`onerror`時は`imgEl.style.display='none'`実行後`_sendDebugLog('stamp_image_load_error', { spotId, url: spot.imageUrl })`を送信（JSプロパティ代入によりHTML属性の同名`onerror`は上書きされるため、非表示化処理をJS側ハンドラ内に統合する形で維持）。`spot.imageUrl`が空（ロック中スポット、`server.js`の`maskLockedStampSpot()`で担保・無変更）の場合は`imgEl.onload`/`imgEl.onerror`をともに`null`クリアし`src`もセットしないため、いずれのハンドラも発火しない
+- **診断ログは使い捨て**（CLAUDE.mdの実機デバッグ用ログ収集機能の既存運用ルール通り）: `stamp_image_load_success`/`stamp_image_load_error`は次回TestFlightビルド後、`logs/debug-nav.log`で症状再発の有無を確認したのち削除してよい
+- `server.js`・データファイル（`data/sg/stamp-spots.json`等）は無変更。キャッシュバスティング: `index.html` app.js?v=20260720e、`sw.js` CACHE_NAME=sg-weekend-v634
+- **未検証（次回TestFlightビルド後）**: スポット詳細モーダルの画像が安定して表示され続けるか（症状再発の有無）、固定高さ`200px`の実機レイアウトバランス、Web版ブラウザでの見た目回帰有無
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

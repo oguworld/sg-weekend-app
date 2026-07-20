@@ -3967,10 +3967,17 @@
       const imgEl = document.getElementById('stamp-spot-detail-image');
       if (imgEl) {
         if (spot.imageUrl) {
+          imgEl.onload = () => _sendDebugLog('stamp_image_load_success', { spotId });
+          imgEl.onerror = () => {
+            imgEl.style.display = 'none';
+            _sendDebugLog('stamp_image_load_error', { spotId, url: spot.imageUrl });
+          };
           imgEl.src = spot.imageUrl;
           imgEl.alt = displayName;
           imgEl.style.display = 'block';
         } else {
+          imgEl.onload = null;
+          imgEl.onerror = null;
           imgEl.removeAttribute('src');
           imgEl.style.display = 'none';
         }

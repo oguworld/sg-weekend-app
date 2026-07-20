@@ -804,7 +804,7 @@
       <button data-close onclick="closeStampSpotDetail()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
     </div>
     <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
-      <img id="stamp-spot-detail-image" style="display:none;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:14px;margin-bottom:12px;" onerror="this.style.display='none';" alt="">
+      <img id="stamp-spot-detail-image" style="display:none;width:100%;height:200px;object-fit:cover;border-radius:14px;margin-bottom:12px;" onerror="this.style.display='none';" alt="">
       <div id="stamp-spot-detail-name" style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;color:var(--midnight);margin-bottom:6px;"></div>
       <div id="stamp-spot-detail-area" style="font-size:12px;color:var(--warm-gray);margin-bottom:10px;"></div>
       <div id="stamp-spot-detail-desc" style="font-size:14px;line-height:1.7;color:var(--text);margin-bottom:16px;"></div>
@@ -1077,7 +1077,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260720d"></script>
+  <script src="/app.js?v=20260720e"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
