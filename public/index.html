@@ -145,7 +145,7 @@
       <span class="screen-title" data-i18n="courseScreenTitle">おでかけコース</span>
       <!-- ピルタブ -->
       <div class="course-tab-bar">
-        <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">スタンプマップ</button>
+        <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">スタンプラリー</button>
         <button class="course-tab" data-tab="everyone" onclick="switchCourseTab('everyone')" data-i18n="courseTabEveryone">みんなのコース</button>
         <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')" data-i18n="courseTabMylist">マイコース</button>
       </div>
@@ -508,7 +508,7 @@
     </button>
     <button class="nav-item" id="nav-course" onclick="if(!_touchCapableDetected) switchNav('course')">
       <span class="nav-icon">🧭</span>
-      <span class="nav-label" data-i18n="navCourse">コース</span>
+      <span class="nav-label" data-i18n="navCourse">制覇</span>
     </button>
     <button class="nav-item" id="nav-plan" onclick="if(!_touchCapableDetected) switchNav('plan')">
       <span class="nav-icon">📅</span>
@@ -1076,7 +1076,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260720b"></script>
+  <script src="/app.js?v=20260720c"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

@@ -7622,3 +7622,144 @@ bottom-nav（9999）未満の3000番台方針に準拠。一覧ビュー（`#sta
 
 - **未解決事項2（ロック中詳細シートの作り込み）**: マスクのみで十分。専用の「ロック中です」メッセージ・チェックインボタン非表示化は今回追加しない（§8のi18nキー案`stampSpotDetailLockedNote`は見送り）
 - **未解決事項3（初期表示タブ）**: **§4スコープ外の記述を上書きし、初期表示タブもスタンプマップに変更する**。`class="course-tab active"`を`data-tab="map"`のボタンに付け替え、`initCourseScreen()`が呼ぶ初期タブも`'map'`に変更する（`public/app.js` 3579行目付近）。「みんなのコース」「マイコース」は引き続きタブ切り替えでアクセス可能
+
+# 設計書72 — スタンプラリー名称変更（ボトムナビ「制覇」・タブ「スタンプラリー」）＋一覧表示リセットバグ修正
+
+（2026-07-20 planner作成。設計書69〜71で実装済みの「スポット制覇スタンプラリー」機能に対するユーザーからの追加フィードバック2件。コード実装は含まない）
+
+## 1. 背景
+
+設計書71までの実装で、コース画面の初期表示タブは「スタンプマップ」になり（`data-tab="map"`が先頭・`active`）、地図/一覧トグルのデフォルトは「一覧（リスト）」になっている。この状態を実機（Web版と推測）で確認したユーザーから、以下2件の追加フィードバックがあった。
+
+1. **一覧表示に戻らないバグ**: コース画面で「地図で見る」に切り替えた後、他の画面（イベント/予定表/設定）に移動し、ボトムナビ「コース」を再度タップしてコース画面に戻ると、地図表示のまま（本来は一覧表示に戻ってほしい）
+2. **名称変更**: ボトムナビの「コース」ラベルを「制覇」に、コース画面内タブの「スタンプマップ」ラベルを「スタンプラリー」に変更したい
+
+## 2. 既存コード調査結果（2026-07-20時点で実ファイルを確認）
+
+- `public/app.js` 3669行目: `let _stampViewMode = 'list'; // 'map' | 'list'（設計書71改善3、ユーザーフィードバックによりデフォルトをリスト表示に変更。地図はトグルボタンで切替）`— モジュールスコープ変数。**初期値は`'list'`だが、一度`'map'`に切り替わった後にリセットする仕組みは存在しない**
+- `public/app.js` `toggleStampViewMode()`（3749〜3755行目）: `_stampViewMode`を`'map'`⇄`'list'`にトグルするのみ。他のどの箇所からもこの変数へのリセット代入は行われていない（`grep`で`_stampViewMode = `の代入箇所は3669行目の初期化と3750行目のトグルの2箇所のみと確認済み）
+- `public/app.js` `_applyStampViewMode()`（3757〜3767行目）: **現在の`_stampViewMode`の値をそのまま参照して表示を切り替えるだけ**で、リセットのロジックは持たない
+- `public/app.js` `switchNav(screen)`（3493〜3561行目）
+  - 3549〜3553行目: `if (screen === 'course') { ... initCourseScreen(); }` — ボトムナビ「コース」タップ時（`onclick="if(!_touchCapableDetected) switchNav('course')"`、`public/index.html` 509行目）は必ずこの分岐を通り`initCourseScreen()`を呼ぶ。**画面がホーム/予定表/設定のいずれから遷移してきたかに関わらず同じ経路**
+- `public/app.js` `initCourseScreen()`（3578〜3600行目）
+  - 3579〜3580行目: `// 設計書71: スタンプラリーがメイン機能という位置づけのため、初期表示タブをスタンプマップに変更` → `await switchCourseTab('map');`
+  - **`_stampViewMode`への言及は一切ない**。`switchCourseTab('map')`経由で`initStampMapTab()`→`_applyStampViewMode()`が呼ばれるが、`_applyStampViewMode()`は前述の通り現在値を参照するのみ
+- `public/app.js` `switchCourseTab(tab)`（3603行目〜）: 3603〜3606行目で`currentCourseTab = tab;`とタブボタンの`active`クラス切り替えを行う**汎用関数**。`.course-tab`要素の`onclick="switchCourseTab('map')"`（`public/index.html` 148行目）から直接呼ばれるほか、`initCourseScreen()`内・マイコース関連の複数箇所（4864/4879/4951/5161行目、いずれも`switchCourseTab('mylist')`）からも呼ばれる**共有関数**。この関数自体に`_stampViewMode`をリセットする処理を入れると、タブ切り替え（例:「みんなのコース」→再度「スタンプラリー」に戻る操作）のたびにリセットされてしまい、確定仕様の「画面内タブ切り替えではユーザーの選択を尊重する」という要件に反する
+- 結論: **`initCourseScreen()`（`switchNav('course')`からのみ呼ばれる、コース画面への新規進入時の入口関数）が現状`_stampViewMode`を一切触っていないこと**が、改善1（バグ）の直接原因。`switchCourseTab()`本体にリセット処理を入れると改善1の要件（タブ切り替えではリセットしない）を満たせなくなるため、両者は区別して扱う必要がある
+
+- `public/index.html` 509〜511行目:
+  ```html
+  <button class="nav-item" id="nav-course" onclick="if(!_touchCapableDetected) switchNav('course')">
+    ...
+    <span class="nav-label" data-i18n="navCourse">コース</span>
+  ```
+  デフォルト直書きテキストも`data-i18n`属性の値も両方「コース」
+- `public/index.html` 148行目:
+  ```html
+  <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">スタンプマップ</button>
+  ```
+  デフォルト直書きテキストも`data-i18n`属性の値も両方「スタンプマップ」
+- `public/app.js` STRINGS.ja（416行目・420行目）:
+  ```js
+  navCourse: 'コース',
+  ...
+  courseTabStampMap: 'スタンプマップ',
+  ```
+- `public/app.js` STRINGS.en（678行目・682行目）:
+  ```js
+  navCourse: 'Courses',
+  ...
+  courseTabStampMap: 'Stamp Map',
+  ```
+- **`navCourse`/`courseTabStampMap`キーの参照箇所は、`public/index.html`の上記2箇所と`public/app.js`のSTRINGS定義（ja/en各1箇所）のみ**（`grep -rn "navCourse" public/`で`index.html`・`app.js`のみヒット、他ファイル・他画面での参照なしを確認済み）
+- **「コース」「スタンプマップ」というリテラル文言のハードコード（i18nキーを介さない直書き）は、上記2キーの対象箇所以外に発見されなかった**。ただし以下2件は今回のユーザー要望（ナビラベル・タブラベルの2箇所のみ）に含まれない別キーであり、変更対象外と判断する:
+  - `courseScreenTitle`（`public/app.js` 417行目 ja「おでかけコース」/679行目 en「Outing Courses」、`public/index.html` 145行目）— コース画面のヘッダータイトル。ボトムナビラベルともタブラベルとも別のi18nキー
+  - 5021行目 `subtitle: course.title || 'コース',`（コース詳細等のフォールバック文言、生成AIコースの`title`が空の場合の代替表示）— 「スタンプマップ/スタンプラリー」とは無関係な既存コース機能側のフォールバック文言
+
+## 3. 確定仕様
+
+### 改善1: ボトムナビ「コース」タップ時、一覧表示にリセットする
+
+- **リセットするタイミング**: ボトムナビ「コース」タップによる`switchNav('course')`経由の**新規進入時のみ**。具体的には`initCourseScreen()`が実行される際（`switchNav()`の3552行目`initCourseScreen();`呼び出し箇所）
+- **リセットしないタイミング**: コース画面内でのタブ切り替え（`switchCourseTab()`を直接呼ぶ操作、例:「スタンプラリー」タブ→「みんなのコース」タブ→再度「スタンプラリー」タブ、のように画面内を行き来する操作）では、ユーザーが明示的に選んだ表示モード（地図 or 一覧）を保持する。`switchCourseTab()`本体へのリセット処理の追加は行わない
+- **実装方針（一案、builder実装判断）**: `initCourseScreen()`内、`switchCourseTab('map')`を呼ぶ前に`_stampViewMode = 'list';`を代入する。この一行のみで、ボトムナビ経由の新規進入時は常に`_stampViewMode`が`'list'`にリセットされた状態で`_applyStampViewMode()`（`initStampMapTab()`内、3732行目）が呼ばれるため、一覧表示から始まる。画面内タブ切り替え（`switchCourseTab()`が`initCourseScreen()`を経由せず直接呼ばれるケース）はこの代入を通らないため、`_stampViewMode`の値は保持される
+- **既存動作への影響確認**: `switchCourseTab()`は`initCourseScreen()`以外からも4864/4879/4951/5161行目（いずれも`switchCourseTab('mylist')`、マイコース関連の保存・削除・公開操作後の画面遷移）から呼ばれるが、これらはいずれも`initCourseScreen()`を経由しない直接呼び出しのため、リセット処理を`initCourseScreen()`内に置く限り影響を受けない
+
+### 改善2: 名称変更（i18nラベル2箇所）
+
+1. **ボトムナビラベル**: `navCourse`キーの値を以下に変更する（キー名は変更しない）
+   - `public/app.js` STRINGS.ja（416行目）: `navCourse: 'コース',` → `navCourse: '制覇',`
+   - `public/app.js` STRINGS.en（678行目）: `navCourse: 'Courses',` → `navCourse: 'Conquer',`
+   - `public/index.html` 511行目のデフォルト直書きテキスト（`<span class="nav-label" data-i18n="navCourse">コース</span>`）も「制覇」に変更する（初回ロード時、JSによる`applyI18n()`実行前に一瞬旧文言が見える既存パターンを踏襲するため、デフォルトテキストとja側STRINGS値は常に一致させる、というCLAUDE.md i18nルールに準拠）
+   - アイコン（`public/index.html`のnav-item内、ラベルの前に配置されている画像/絵文字要素）自体は変更しない
+2. **コース画面内タブラベル**: `courseTabStampMap`キーの値を以下に変更する（キー名は変更しない）
+   - `public/app.js` STRINGS.ja（420行目）: `courseTabStampMap: 'スタンプマップ',` → `courseTabStampMap: 'スタンプラリー',`
+   - `public/app.js` STRINGS.en（682行目）: `courseTabStampMap: 'Stamp Map',` → `courseTabStampMap: 'Stamp Rally',`（現状の英語訳「Stamp Map」を「Stamp Rally」に変更。他の英語表現案は今回採用しない）
+   - `public/index.html` 148行目のデフォルト直書きテキスト（`data-i18n="courseTabStampMap"`の`<button>`内テキスト、現在「スタンプマップ」）も「スタンプラリー」に変更する
+3. **変更しないもの（確認済み）**: `courseScreenTitle`（コース画面ヘッダータイトル「おでかけコース」/「Outing Courses」）は今回のユーザー要望に含まれないため変更しない。5021行目のコース関連フォールバック文言`'コース'`も無関係のため変更しない
+
+## 4. スコープ外
+
+- ボトムナビ・コース画面タブのアイコン画像自体の変更（ラベル文言のみ変更）
+- 「みんなのコース」（`courseTabEveryone`）「マイコース」（`courseTabMylist`）タブのラベル変更
+- `courseScreenTitle`（コース画面ヘッダータイトル「おでかけコース」）の変更
+- スタンプラリー機能のロジック・データモデル（`data/sg/stamp-spots.json`・`server.js`のAPI）の変更。設計書69〜71から一切変更なし
+- 初期表示タブ自体の変更（設計書71で確定済みの「初期表示はスタンプマップタブ」は維持。今回変更するのは「スタンプマップタブを開いたときの表示モード（地図/一覧）のリセット」のみで、「どのタブが最初に開くか」ではない）
+- BKK/SYD対応
+- コース画面内タブ切り替え時の`_stampViewMode`リセット（改善1で明示的に「リセットしない」と確定）
+
+## 5. データモデルの変更
+
+なし。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも変更なし。
+
+## 6. APIの変更
+
+なし。`server.js`のいかなるエンドポイントも変更しない。改善1・改善2とも純粋にフロントエンド（`public/app.js`のモジュールスコープ変数操作・STRINGS値変更、`public/index.html`のデフォルトテキスト変更）のみで完結する。
+
+## 7. フロントエンドの変更
+
+### 7-1. `public/app.js`
+
+- `initCourseScreen()`（3578〜3600行目）: `await switchCourseTab('map');`の直前に`_stampViewMode = 'list';`を追加（改善1）
+- STRINGS.ja: `navCourse`（416行目）を`'制覇'`に、`courseTabStampMap`（420行目）を`'スタンプラリー'`に変更（改善2）
+- STRINGS.en: `navCourse`（678行目）を`'Conquer'`に、`courseTabStampMap`（682行目）を`'Stamp Rally'`に変更（改善2）
+
+### 7-2. `public/index.html`
+
+- 511行目: `<span class="nav-label" data-i18n="navCourse">コース</span>` → `<span class="nav-label" data-i18n="navCourse">制覇</span>`（改善2）
+- 148行目: `data-i18n="courseTabStampMap"`の`<button>`内テキスト「スタンプマップ」→「スタンプラリー」（改善2）。`data-tab`・`onclick`・`class`属性は変更しない
+
+## 8. i18n変更点
+
+CLAUDE.md「UI文字列を追加・変更するときは必ずjaとenの両方を同時に対応する」ルールに従い、以下2キーの**値のみ**をja/en同時に変更する（キー名の追加・削除・リネームは行わない）。
+
+| キー | 旧値（ja） | 新値（ja） | 旧値（en） | 新値（en） |
+|---|---|---|---|---|
+| `navCourse` | コース | 制覇 | Courses | Conquer |
+| `courseTabStampMap` | スタンプマップ | スタンプラリー | Stamp Map | Stamp Rally |
+
+変更後は英語モードに切り替えて目視確認し、キー名がそのまま表示されていないこと（追加漏れがないこと）を確認する（CLAUDE.md必須ルール）。新規i18nキーの追加はなし。
+
+## 9. 既知の未解決事項
+
+1. **英語訳「Stamp Rally」の適切性**: 「スタンプラリー」は日本語圏で一般的な言い回しだが、英語圏ユーザーにとって「Stamp Rally」がどの程度自然に伝わるか（「Stamp Collection」「Scavenger Hunt」等の代替案もあり得る）は未検証。今回はユーザー指定の「Stamp Rally」で確定するが、将来的にen版UIの実際の反応を見て再検討の余地がある
+2. **「制覇」という訳語の英訳「Conquer」の適切性**: 同様に、ボトムナビの短い1〜2語ラベルとして「Conquer」が英語話者にとって不自然でないか（動詞がそのままラベルになる点、他のナビラベルが名詞形〈Home/Courses/Plan/Settings等、推定〉である可能性との整合）は未検証。他のナビラベル（`navHome`/`navPlan`/`navSettings`等）の英語表現との統一感は今回のスコープでは確認していない
+3. **改善1の`_stampViewMode`リセットが「スタンプマップタブが表示されていない状態」でも安全に行われるか**: `initCourseScreen()`は`switchCourseTab('map')`を呼ぶため、リセット直後に必ずスタンプマップタブが表示される設計だが、仮に将来`initCourseScreen()`の初期タブが再度変更された場合（例: 設計書71以前の`'everyone'`に戻す等）、`_stampViewMode`のリセット処理自体は無害（スタンプマップタブを実際に開いたときにのみ意味を持つ変数のため）と考えられるが、念のためbuilder実装時に確認する
+
+## 10. リスク
+
+1. **改善1のリセット処理の設置箇所を誤ると、画面内タブ切り替えでもリセットされてしまう**: `switchCourseTab()`本体に誤ってリセット処理を入れてしまうと、「スタンプラリー」タブから「みんなのコース」タブへ移動し、再度「スタンプラリー」タブに手動で切り替えた場合にも地図/一覧選択がリセットされてしまい、確定仕様（画面内タブ切り替えでは尊重する）に反する退行を生む。実装後、(a)ボトムナビ経由の新規進入、(b)画面内タブ切り替え、の2パターンを分けて動作確認する必要がある
+2. **i18nキー値変更の反映漏れ**: `navCourse`/`courseTabStampMap`はいずれも`public/app.js`のSTRINGS.ja/en両方と`public/index.html`のデフォルトテキストの計4箇所（各キー2箇所×2キー）を変更する必要がある。1箇所でも変更漏れがあると、初回ロード時（`applyI18n()`実行前）に旧文言が一瞬表示される、または特定条件下で新旧文言が混在する見た目になる
+3. **既存の内部関数名・変数名（`_stampViewMode`・`courseTabStampMap`というキー名自体、`initStampMapTab()`等の関数名）は変更しない**ため、コード内コメント・ログ等に「スタンプマップ」という表記が残り続ける可能性がある（表示文言とコード内部識別子の乖離）。CLAUDE.mdの既存パターン（例: 設計書67で`secDangerZone`という表示済み文言と異なるキー名を使い続けている等）と同様、実害はないが将来の可読性のため触れておく
+4. **Web版・iOS版の同時反映**: 本改善は`public/`配下の共通コード変更のみで`server.js`は無変更のため、Web版は`pm2 restart`不要（`index.html`/`app.js`のキャッシュバスティング更新のみで反映）。iOS版は設計書69〜71と同様、次回TestFlightビルドまで反映されない。データ共有・API変更を伴わないため後方互換上のリスクはない（詳細は§11）
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 本改善は`server.js`・APIレスポンス構造・データファイル（`data/sg/stamp-spots.json`等）を一切変更しない、純粋なフロントエンド（`public/app.js`のモジュールスコープ変数操作・STRINGS文言値、`public/index.html`のマークアップ文言）のみの変更のため、旧バージョンのApp Store アプリ（まだ更新していないユーザー）に対する後方互換性の懸念は存在しない。なお設計書69〜71自体が2026-07-20時点でTestFlightビルド未実施・App Store配信前のステータスであるため、この機能に依存する旧バージョンユーザー自体が現状存在しない
+2. **影響範囲**: `public/`配下の共通コード変更のみのため、Web版・App Store版の両方に同一の変更が適用される。ただしWeb版は次回のデプロイ（キャッシュバスティング更新）で即座に反映されるのに対し、App Store版（iOS）は次回TestFlightビルドが行われるまで反映されない、という反映タイミングのズレが生じる。`server.js`の変更を伴わないため`pm2 restart`は不要
+3. **リリースタイミング**: 設計書69〜71自体がまだTestFlightビルド未実施のため、本改善（設計書72）も設計書69〜71と合わせて次回のTestFlightビルドで一括リリースする形が自然（`.claude/next.md`記載の既存方針を踏襲）。Web版への先行デプロイ自体は技術的に可能（データ・API変更を伴わないため安全）だが、Web版とiOS版でスタンプラリー機能自体の有無・ラベル文言が異なる期間が生じることになる点は考慮事項として留意する
+4. **App Store Connect側の追加対応は不要**: 本改善は表示文言・表示モードの初期化タイミングの変更のみであり、新規権限・新規トラッキング・データ構造変更は一切発生しないため、追加のApp Store Connect側申告は不要
+
+## 承認状況
+
+2026-07-20 planner設計。ユーザーからの追加フィードバック2件（一覧表示リセットバグ・名称変更）を踏まえて作成。**ユーザー承認済み**。

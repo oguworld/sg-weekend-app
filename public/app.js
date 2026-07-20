@@ -413,11 +413,11 @@
         toastPlanUpdated: '✅ 保存しました',
         scheduleNoPlans: '予定なし',
         customPlanTitlePlaceholder: 'タイトルを入力',
-        navCourse: 'コース',
+        navCourse: '制覇',
         courseScreenTitle: 'おでかけコース',
         courseTabEveryone: 'みんなのコース',
         courseTabMylist: 'マイコース',
-        courseTabStampMap: 'スタンプマップ',
+        courseTabStampMap: 'スタンプラリー',
         stampMapLoginRequired: 'スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。',
         stampLevelStandard: '定番',
         stampLevelLocal: 'ローカル',
@@ -675,11 +675,11 @@
         toastPlanUpdated: '✅ Saved',
         scheduleNoPlans: 'No plans',
         customPlanTitlePlaceholder: 'Enter title',
-        navCourse: 'Courses',
+        navCourse: 'Conquer',
         courseScreenTitle: 'Outing Courses',
         courseTabEveryone: 'Explore',
         courseTabMylist: 'My Courses',
-        courseTabStampMap: 'Stamp Map',
+        courseTabStampMap: 'Stamp Rally',
         stampMapLoginRequired: 'To save your stamp rally progress, please link your account from Settings.',
         stampLevelStandard: 'Standard',
         stampLevelLocal: 'Local',
@@ -3576,6 +3576,8 @@
     let _courseSwipeStartX = 0;
 
     async function initCourseScreen() {
+      // 設計書72: ボトムナビ「コース」タップ経由の新規進入時のみ一覧表示にリセットする（画面内タブ切り替えではリセットしない）
+      _stampViewMode = 'list';
       // 設計書71: スタンプラリーがメイン機能という位置づけのため、初期表示タブをスタンプマップに変更
       await switchCourseTab('map');
 
