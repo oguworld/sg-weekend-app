@@ -2019,6 +2019,19 @@ function computeUnlockedLevels(allSpots, checkedInSpotIds) {
   return unlocked;
 }
 
+// 未解禁の local/niche スポットについて、name/nameJa/description/imageUrl をプレースホルダーに置き換える
+// （設計書71改善1: ネタバレ防止のためサーバー側でレスポンス自体をマスクする。special は既存仕様〈スポット自体を除外〉を維持し対象外）
+// id/lat/lng/level/area/category/order/checkinRadiusM/active はチェックイン判定・マップ表示に必須のためそのまま返す
+function maskLockedStampSpot(spot) {
+  return {
+    ...spot,
+    name: '？？？',
+    nameJa: '？？？',
+    description: '',
+    imageUrl: '',
+  };
+}
+
 // GET /api/stamp-spots?city=sg — スポットマスター一覧（認証不要、ただしログイン時は任意認証でスペシャル解禁状況を反映）
 // special レベルのスポットは、そのユーザーが解禁条件を満たしていない場合レスポンス自体から除外する
 // （フロントのフィルタだけでなくAPIレスポンス自体で「ピン自体を非表示にする」要件を担保するため）
@@ -2033,11 +2046,17 @@ app.get('/api/stamp-spots', (req, res) => {
       const progress = loadStampProgress(authedUserId);
       unlockedLevels = computeUnlockedLevels(allSpots, progress.checkedInSpotIds);
     } else {
-      // 未ログイン時はフェイルセーフとして「未解禁」とみなす（specialは常に除外）
-      unlockedLevels = STAMP_LEVEL_ORDER.filter(l => l !== 'special');
+      // 未ログイン時はフェイルセーフとして「未解禁」とみなす（standard以外は未チェックイン状態として算出）。
+      // 設計書71実装時に判明: 従来は `STAMP_LEVEL_ORDER.filter(l => l !== 'special')` で
+      // local/niche まで「解禁済み」扱いになっており、コメントの意図（未解禁とみなす）と実装が乖離していた
+      // バグだった（ロック中スポットの名前が未ログイン時に平文で見えてしまう一因）。
+      // computeUnlockedLevels([]) は standard のみを返すため、これで意図通りの挙動になる。
+      unlockedLevels = computeUnlockedLevels(allSpots, []);
     }
 
-    const visibleSpots = allSpots.filter(s => s.level !== 'special' || unlockedLevels.includes('special'));
+    const visibleSpots = allSpots
+      .filter(s => s.level !== 'special' || unlockedLevels.includes('special'))
+      .map(s => (unlockedLevels.includes(s.level) ? s : maskLockedStampSpot(s)));
     res.json({ spots: visibleSpots, unlockedLevels });
   } catch (e) {
     res.status(500).json({ error: e.message });

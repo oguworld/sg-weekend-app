@@ -3576,7 +3576,8 @@
     let _courseSwipeStartX = 0;
 
     async function initCourseScreen() {
-      await switchCourseTab('everyone');
+      // 設計書71: スタンプラリーがメイン機能という位置づけのため、初期表示タブをスタンプマップに変更
+      await switchCourseTab('map');
 
       // スワイプでタブ切り替え（初回のみ登録）
       const sc = document.querySelector('#screen-course .screen-content');
@@ -3665,7 +3666,7 @@
     let _stampSelectedSpot = null;
     let _stampMapInitialized = false;
     let _stampLocationWatchStarted = false;
-    let _stampViewMode = 'map'; // 'map' | 'list'（設計書70改善1、地図が主役という設計書69の元コンセプトを尊重しデフォルトはマップ）
+    let _stampViewMode = 'list'; // 'map' | 'list'（設計書71改善3、ユーザーフィードバックによりデフォルトをリスト表示に変更。地図はトグルボタンで切替）
 
     // Capacitor Geolocationプラグイン取得（registerPlugin優先→Pluginsフォールバック、既存Keyboard/PushNotificationsと同じ防御的パターン）
     let _CapGeo = null;

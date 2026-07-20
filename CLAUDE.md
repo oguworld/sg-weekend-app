@@ -130,6 +130,19 @@ sg-weekend-app/
 - スコープ外（今回未実装）: 完全制覇時のフィナーレ演出、段階ゲート閾値変更、BKK/SYD対応、GPS偽装対策（設計書69から持ち越しの既存未解決事項）
 - **未検証（次回TestFlightビルド後）**: iOS実機でのLeaflet地図上の番号バッジタップ精度・「次はここ」脈動アニメーション・レベル解禁モーダルのスライドイン滑らかさ・一覧⇄マップ切替の挙動
 
+### スタンプラリーUI調整: ロック中スポットの情報秘匿・タブ順序変更・デフォルト表示変更（2026-07-20実装、設計書71）
+設計書70実装後のユーザーフィードバック（「ロック中のスポットが見えてしまうと面白くない」「タブは一番左に」「デフォルトはリストで」）を受けた3点の調整。
+
+- **改善1（ロック中スポットの情報秘匿）**: `server.js`に`maskLockedStampSpot(spot)`を新設。`GET /api/stamp-spots`のレスポンス構築時、未解禁の`local`/`niche`レベルスポットの`name`/`nameJa`を固定文言`'？？？'`、`description`/`imageUrl`を空文字列に置き換える。`id`/`lat`/`lng`/`level`/`area`/`category`/`order`/`checkinRadiusM`/`active`はそのまま返す（チェックイン判定・マップ描画・番号バッジ表示に必須のため）。`special`レベルは既存仕様（未解禁時はスポット自体をレスポンスから除外）を維持し対象外。レスポンスのトップレベル構造・各スポット要素のフィールド名一覧は無変更（値のみ条件付きで置換）
+- **ユーザー承認済み方針（詳細シート側の作り込みは見送り）**: マップ上のロック中ピンをタップして開く詳細シート（`openStampSpotDetail()`）は、サーバーが返すマスク済みデータ（「？？？」等）をそのまま既存ロジックで描画するのみ。専用の「ロック中です」メッセージ・チェックインボタンの非表示化などの追加作り込みは行っていない（`_updateStampCheckinButton()`が既存の`unlocked`判定で「未解禁」ボタン文言〈`stampCheckinBtnLocked`〉を表示する既存ロジックがそのまま機能する）
+- **⚠️ 実装時に発見・修正した既存バグ（未ログイン時の解禁レベル算出誤り）**: `GET /api/stamp-spots`の未ログイン時フェイルセーフが従来`unlockedLevels = STAMP_LEVEL_ORDER.filter(l => l !== 'special')`（`['standard','local','niche']`）となっており、コード上のコメント「未解禁とみなす」の意図に反して実際には`local`/`niche`まで解禁済み扱いになっていた。これによりログイン前ユーザーには`local`/`niche`スポットの名前が平文で見えており、今回のユーザー報告（ロック中なのに名前が見える）の直接原因だったと推測される。`unlockedLevels = computeUnlockedLevels(allSpots, [])`（`standard`のみ解禁扱いに算出し直す）に修正した。ログイン済みユーザーの`unlockedLevels`算出ロジック（`computeUnlockedLevels(allSpots, progress.checkedInSpotIds)`）自体は無変更
+- **改善2（タブ順序変更＋初期表示タブの変更）**: `public/index.html`の`.course-tab-bar`内3ボタンの記述順を「スタンプマップ／みんなのコース／マイコース」に変更（`data-tab="map"`を先頭へ）。**設計書71本文は「初期表示タブは`everyone`のまま現状維持」としていたが、ユーザー承認により上書きし、初期表示タブもスタンプマップに変更した**（`class="course-tab active"`を`data-tab="map"`のボタンへ付け替え、`public/app.js`の`initCourseScreen()`が呼ぶ初期タブも`switchCourseTab('everyone')`→`switchCourseTab('map')`に変更）。「みんなのコース」「マイコース」はタブ切り替えで引き続きアクセス可能
+- **改善3（デフォルト表示をリストに変更）**: `public/app.js`の`let _stampViewMode = 'map'`を`'list'`に変更（コメントも実態に合わせて更新）。`toggleStampViewMode()`/`_applyStampViewMode()`本体・`initStampMapTab()`内の初期化順序（`_applyStampViewMode()`の後に無条件で`_ensureStampLeafletMap()`を呼ぶ既存挙動）は無変更のため、デフォルトがリストになっても地図初期化のタイムラグは発生しない
+- i18n新規キーなし（既存の`courseTabEveryone`/`courseTabMylist`/`courseTabStampMap`・`stampViewToggleMap`/`stampViewToggleList`をそのまま使用）
+- キャッシュバスティング: `index.html` app.js?v=20260720b、`sw.js` CACHE_NAME=sg-weekend-v631（`app.css`は無変更のため据え置き）
+- スコープ外（今回未実装）: `area`フィールドのマスク（暫定で「マスクしない」方針を採用、実機確認後に再検討の余地あり明記済み）、プレースホルダー文言のレベル別出し分け（「？？？」で統一）、`COURSE_TABS`定数（`['everyone','mylist']`、`map`を含まない）の整理（実装時の調査でこの定数自体がコード内で未使用〈宣言のみ〉と判明したため実害なし、今回は対応不要と判断）
+- **未検証（次回TestFlightビルド後）**: iOS実機でのロック中カード「？？？」表示によるレイアウト崩れの有無、マップ上のロック中ピンタップ時の詳細シート表示の見え方、コース画面初期表示・スタンプマップタブ初期表示がそれぞれ意図通りになっていること
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている
