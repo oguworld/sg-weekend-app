@@ -3974,10 +3974,8 @@
             style="width:100%;height:200px;object-fit:cover;border-radius:14px;margin-bottom:12px;display:block;">`;
           const imgEl = imgContainer.querySelector('img');
           if (imgEl) {
-            imgEl.onload = () => _sendDebugLog('stamp_image_load_success', { spotId });
             imgEl.onerror = () => {
               imgEl.style.display = 'none';
-              _sendDebugLog('stamp_image_load_error', { spotId, url: spot.imageUrl });
             };
           }
         } else {
