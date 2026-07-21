@@ -457,6 +457,7 @@
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
         stampCardDoneMark: '済',
+        stampDetailMapLink: '📍 地図で見る',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '軸にするイベント',
         coursePinsHint: '軸にするイベントをタップして選んでください',
@@ -723,6 +724,7 @@
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
         stampCardDoneMark: '✓',
+        stampDetailMapLink: '📍 View on map',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: 'Base pinned event',
         coursePinsHint: 'Tap to select',
@@ -3499,6 +3501,8 @@
       closeCourseSheet();
       closeDatePickerSheet();
       closePlanModal();
+      closeStampSpotDetail();
+      closeStampLevelUnlockModal();
       const detail = document.getElementById('detail-screen');
       if (detail) detail.classList.remove('visible');
     }
@@ -3922,11 +3926,12 @@
         });
     }
 
-    // 一覧カード「地図で見る」ボタンから該当ピンへフォーカスする（設計書92）。
-    // マップビューに切り替え → flyTo() でパン&ズーム → 一度きりのパルス演出、の順で実行する。
+    // スポット詳細モーダル内「地図で見る」ボタンから該当ピンへフォーカスする（設計書92→設計書97でモーダルへ移動）。
+    // モーダルを閉じる → マップビューに切り替え → flyTo() でパン&ズーム → 一度きりのパルス演出、の順で実行する。
     function focusStampSpotOnMap(spotId) {
       const spot = _stampSpots.find(s => s.id === spotId);
       if (!spot) return;
+      closeStampSpotDetail(); // モーダル内から呼ばれた場合に備え、地図へ切り替える前に必ず閉じる
       _stampViewMode = 'map';
       _applyStampViewMode();
       setTimeout(() => {
@@ -4076,7 +4081,6 @@
             <div class="stamp-card-area">${spot.area || ''}</div>
             ${metaHtml}
           </div>
-          <div class="spot-map-link" onclick="event.stopPropagation(); focusStampSpotOnMap('${spot.id}')">📍</div>
         </div>`;
       }).join('');
 

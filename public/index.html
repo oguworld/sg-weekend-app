@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260721f">
+  <link rel="stylesheet" href="/app.css?v=20260721g">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -810,6 +810,11 @@
       <div id="stamp-spot-detail-image-container"></div>
       <div id="stamp-spot-detail-name" style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;color:var(--midnight);margin-bottom:6px;"></div>
       <div id="stamp-spot-detail-area" style="font-size:12px;color:var(--warm-gray);margin-bottom:10px;"></div>
+      <div style="margin-bottom:10px;">
+        <span class="card-detail-link" style="cursor:pointer;"
+          onclick="if(!_touchCapableDetected) focusStampSpotOnMap(_stampSelectedSpot && _stampSelectedSpot.id)"
+          data-i18n="stampDetailMapLink">📍 地図で見る</span>
+      </div>
       <div id="stamp-spot-detail-desc" style="font-size:14px;line-height:1.7;color:var(--text);margin-bottom:16px;"></div>
       <div id="stamp-spot-detail-checked" style="display:none;text-align:center;padding:14px;background:var(--caramel-pale);border-radius:12px;font-size:14px;font-weight:700;color:var(--caramel);margin-bottom:8px;" data-i18n="stampCheckedInBadge">✓ 制覇済み</div>
       <div id="stamp-spot-detail-distance" style="font-size:13px;color:var(--warm-gray);text-align:center;margin-bottom:10px;"></div>
@@ -1080,7 +1085,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260721j"></script>
+  <script src="/app.js?v=20260721l"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
