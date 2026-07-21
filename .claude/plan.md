@@ -12459,3 +12459,150 @@ if (ticketLinkEl) {
 
 ## 承認状況
 2026-07-22 ユーザーが「探訪スタンプ帳かな」→英語案"Discovery Stamp Book"の提示に「はい、英語もそれで大丈夫です。」と明示。**ユーザー承認済み**。
+
+# 設計書116 — 「探訪」「予定表」画面をアカウント連携必須にする（ぼかし＋設定誘導オーバーレイ）
+
+（2026-07-22 ユーザーとの会話で確定。AskUserQuestionで2点の範囲確認済み。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーから「探訪と予定表の機能を使うにはまるっとアカウント連携が必要、という作りにしようかな。画面をぼかして、設定のアカウント連携に誘導する、みたいな。」との提案があった。
+
+現状、両画面ともアカウント連携なしで一部/全部利用可能な設計だった:
+- 「探訪」画面（`courseScreenTitle`＝シンガポール探訪、現在2タブ: 探訪スタンプ帳／モデルコース。マイコースは設計書94で非表示中）: 探訪スタンプ帳タブのみ`#stamp-map-login-required`のテキストメッセージでログイン必須（設計書69）。モデルコースタブは未ログインでも閲覧可能
+- 「予定表」画面: カスタムプラン・イベント予定はlocalStorageのみで動作するログイン不要が前提の機能（バックアップ機能はオプトイン、設計書54）
+
+AskUserQuestionでユーザーに範囲を確認した結果:
+1. 「探訪」画面は2タブとも全ブロック（モデルコース閲覧も含む）
+2. 「予定表」画面も全ブロック。既にローカルに予定を作っている未ログインユーザーが自分のデータを見れなくなることも想定内・許容
+
+## 2. 確定済み仕様
+
+### 2-1. 実装方式: 画面全体への半透明ブラーオーバーレイ
+
+コンテンツ側（`#course-screen-content`等）に直接blurフィルターを掛けるのではなく、`.screen`内に新規オーバーレイ要素（`position:absolute;inset:0`）を1枚重ね、そのオーバーレイ自体に`backdrop-filter:blur(8px)`＋半透明背景（`rgba(255,253,249,0.55)`程度）を適用する。ヘッダー・タブバー・コンテンツを問わず画面全体が一括でぼける（個々のコンテンツ要素に触れないため、Leaflet地図等の内部状態に影響を与えない低リスクな実装）。
+
+オーバーレイ中央には:
+- アイコン（🔒）
+- メッセージ（新規i18nキー`authGateMessage`）
+- ボタン（新規i18nキー`authGateBtn`）: タップで`switchNav('settings')`を呼び、続けて`document.getElementById('login-section-logged-out')?.scrollIntoView({behavior:'smooth', block:'center'})`でアカウントセクションまでスクロールする
+
+対象2画面（`#course-auth-gate`/`#plan-auth-gate`）で見た目・構造は共通、要素IDのみ異なる。
+
+### 2-2. HTML変更
+
+`public/index.html`:
+- `#screen-course`内、`.screen-content`の直後（`#course-fab`ボタンの手前）に`<div id="course-auth-gate" class="screen-auth-gate" style="display:none;">...</div>`を追加
+- `#screen-plan`内、`.screen-scroll-content`の直後に`<div id="plan-auth-gate" class="screen-auth-gate" style="display:none;">...</div>`を追加
+- 両オーバーレイの中身は共通構造（アイコン・メッセージ・ボタン）
+
+```html
+<div id="course-auth-gate" class="screen-auth-gate" style="display:none;">
+  <div class="screen-auth-gate-card">
+    <div class="screen-auth-gate-icon">🔒</div>
+    <div class="screen-auth-gate-msg" data-i18n="authGateMessage">この機能を使うにはアカウント連携が必要です</div>
+    <button class="screen-auth-gate-btn" onclick="goToAccountLinking()" data-i18n="authGateBtn">設定で連携する</button>
+  </div>
+</div>
+```
+
+`#screen-course`/`#screen-plan`自体に`position:relative`が無いため、`public/app.css`側でこの2画面に限定して`position:relative`を追加する（`#screen-home`/`#screen-settings`には影響させない）。
+
+### 2-3. CSS新規クラス（`public/app.css`）
+
+```css
+.screen-auth-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 250; /* FAB(200)より上、bottom-nav(9999)・各種モーダル(3000番台)より下 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 253, 249, 0.55);
+}
+.screen-auth-gate-card {
+  text-align: center;
+  padding: 28px 24px;
+  max-width: 280px;
+}
+.screen-auth-gate-icon { font-size: 36px; margin-bottom: 12px; }
+.screen-auth-gate-msg { font-size: 14px; line-height: 1.7; color: var(--midnight); margin-bottom: 18px; }
+.screen-auth-gate-btn {
+  padding: 12px 24px; background: var(--caramel); border: none; border-radius: 50px;
+  font-size: 14px; font-weight: 700; font-family: inherit; color: white; cursor: pointer;
+}
+#screen-course, #screen-plan { position: relative; }
+```
+
+ダークモード（`html[data-theme="dark"]`）は既存の`--midnight`/`--caramel`等のCSS変数が自動追従するため追加対応不要（背景の`rgba(255,253,249,...)`のみダーク用に別途調整が必要か要確認、既存の他オーバーレイのダーク対応パターンに倣う）。
+
+### 2-4. JS変更（`public/app.js`）
+
+新規関数`_applyScreenAuthGate(screenKey)`（`switchNav()`の直前あたりに配置）:
+
+```js
+function _applyScreenAuthGate(screenKey) {
+  const gateEl = document.getElementById(`${screenKey}-auth-gate`);
+  if (!gateEl) return;
+  const gated = !getAuthToken();
+  gateEl.style.display = gated ? 'flex' : 'none';
+  return gated;
+}
+
+function goToAccountLinking() {
+  switchNav('settings');
+  setTimeout(() => {
+    document.getElementById('login-section-logged-out')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+```
+
+`switchNav()`内、`screen === 'course'`・`screen === 'plan'`それぞれの分岐に`_applyScreenAuthGate()`呼び出しを追加し、戻り値（gated真偽）でFABの表示を上書きする:
+
+```js
+if (screen === 'plan') {
+  renderScheduleTab();
+  if (getSharedGroupId()) fetchFromServer().then(ok => { if (ok) renderScheduleTab(); });
+  const gated = _applyScreenAuthGate('plan');
+  if (gated && fabPlanGroup) fabPlanGroup.classList.remove('visible');
+}
+if (screen === 'course') {
+  const csc = document.querySelector('#screen-course .screen-content');
+  if (csc) csc.scrollTop = 0;
+  initCourseScreen();
+  const gated = _applyScreenAuthGate('course');
+  const courseFab = document.getElementById('course-fab');
+  if (courseFab) courseFab.style.display = gated ? 'none' : '';
+}
+```
+
+**既存のロジック（`initCourseScreen()`・`renderScheduleTab()`・`#stamp-map-login-required`の個別メッセージ等）には一切手を加えない**。ゲート判定はあくまで画面全体に後乗せするオーバーレイであり、既存のデータ読み込み・タブ切り替えロジックはそのまま裏側で動き続ける（無駄なAPI呼び出しは残るが、機能的な害はない。既存コードの複雑な内部状態〈Leaflet地図初期化タイミング等〉に触れない安全側の実装判断）。
+
+### 2-5. i18n新規キー（ja/en同時）
+
+- `authGateMessage`: ja「この機能を使うにはアカウント連携が必要です」/ en「Please link your account to use this feature」
+- `authGateBtn`: ja「設定で連携する」/ en「Link Account in Settings」
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 3520-3588行目: `switchNav()`（course/plan分岐に追記）
+- `public/app.js` 3605行目〜: `initCourseScreen()`（無変更のまま維持）
+- `public/index.html` 143-202行目: `#screen-course`・`#screen-plan`のマークアップ
+- `public/index.html` 330-353行目: `secAccount`セクション、`#login-section-logged-out`（スクロール先ターゲット）
+- `FAB_HIDDEN_SCREENS`（3516行目）・`fab-plan-group`のvisible制御（3542-3546行目）は無変更、追加の上書きのみ
+
+## 4. スコープ外
+
+- ホーム画面・設定画面は対象外（無変更）
+- 予定表画面の共有カレンダー機能（パスフレーズ方式、既存独立の仕組み）も今回まとめてブロック対象に含む（「予定表全体」という指示のため個別除外はしない）
+- 既存の`#stamp-map-login-required`（探訪スタンプ帳タブ単体の従来ログイン誘導）は削除しない（無害なまま残置、新オーバーレイの背後に隠れて実質到達不能になるだけ）
+- ログイン状態のリアルタイム反映（同一画面に留まったまま裏で連携完了した場合の即時解除）は対象外。画面遷移（`switchNav`）のたびに再評価される設計のため、設定画面から連携後にナビで戻れば解除される
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ（`public/app.js`/`public/app.css`/`public/index.html`）。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-22 ユーザーがAskUserQuestionで「探訪2タブとも全ブロック」「予定表も全ブロック（既存匿名データ非表示も想定内）」と明示回答。**ユーザー承認済み**。

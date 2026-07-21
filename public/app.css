@@ -3313,3 +3313,28 @@
     html[data-theme="dark"] .oauth-btn--apple {
       border: 1px solid rgba(255, 255, 255, 0.28);
     }
+
+    /* アカウント連携必須ゲート（設計書116） */
+    .screen-auth-gate {
+      position: absolute;
+      inset: 0;
+      z-index: 250; /* FAB(200)より上、bottom-nav(9999)・各種モーダル(3000番台)より下 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(255, 253, 249, 0.55);
+    }
+    .screen-auth-gate-card {
+      text-align: center;
+      padding: 28px 24px;
+      max-width: 280px;
+    }
+    .screen-auth-gate-icon { font-size: 36px; margin-bottom: 12px; }
+    .screen-auth-gate-msg { font-size: 14px; line-height: 1.7; color: var(--midnight); margin-bottom: 18px; }
+    .screen-auth-gate-btn {
+      padding: 12px 24px; background: var(--caramel); border: none; border-radius: 50px;
+      font-size: 14px; font-weight: 700; font-family: inherit; color: white; cursor: pointer;
+    }
+    #screen-course, #screen-plan { position: relative; }

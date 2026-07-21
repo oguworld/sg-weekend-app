@@ -432,6 +432,8 @@
         courseTabMylist: 'マイコース',
         courseTabStampMap: '探訪スタンプ帳',
         stampMapLoginRequired: '探訪スタンプ帳の進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。',
+        authGateMessage: 'この機能を使うにはアカウント連携が必要です',
+        authGateBtn: '設定で連携する',
         stampLevelStandard: '見習い',
         stampLevelLocal: '定住レベル',
         stampLevelNiche: 'シンガポール通',
@@ -702,6 +704,8 @@
         courseTabMylist: 'My Courses',
         courseTabStampMap: 'Discovery Stamp Book',
         stampMapLoginRequired: 'To save your progress in the Discovery Stamp Book, please link your account from Settings.',
+        authGateMessage: 'Please link your account to use this feature',
+        authGateBtn: 'Link Account in Settings',
         stampLevelStandard: 'Apprentice',
         stampLevelLocal: 'Settled',
         stampLevelNiche: 'Singapore Expert',
@@ -3517,6 +3521,22 @@
 
     let _loadedCity = getCity();
 
+    // アカウント連携必須ゲート（設計書116）
+    function _applyScreenAuthGate(screenKey) {
+      const gateEl = document.getElementById(`${screenKey}-auth-gate`);
+      if (!gateEl) return;
+      const gated = !getAuthToken();
+      gateEl.style.display = gated ? 'flex' : 'none';
+      return gated;
+    }
+
+    function goToAccountLinking() {
+      switchNav('settings');
+      setTimeout(() => {
+        document.getElementById('login-section-logged-out')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+
     function switchNav(screen) {
       // 画面遷移直前にフォーカスが残っていれば無条件で外す（モーダル閉じ忘れ等でinput/textareaに
       // フォーカスが残ったまま遷移すると、iOS WKWebViewでボトムナビのタップが効かなくなる不具合の対策。2026-07-11）
@@ -3572,11 +3592,16 @@
         if (screen === 'plan') {
           renderScheduleTab();
           if (getSharedGroupId()) fetchFromServer().then(ok => { if (ok) renderScheduleTab(); });
+          const gated = _applyScreenAuthGate('plan');
+          if (gated && fabPlanGroup) fabPlanGroup.classList.remove('visible');
         }
         if (screen === 'course') {
           const csc = document.querySelector('#screen-course .screen-content');
           if (csc) csc.scrollTop = 0;
           initCourseScreen();
+          const gated = _applyScreenAuthGate('course');
+          const courseFab = document.getElementById('course-fab');
+          if (courseFab) courseFab.style.display = gated ? 'none' : '';
         }
         if (screen === 'settings') {
           initSettingsProfile();
