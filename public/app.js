@@ -6410,10 +6410,6 @@
                        onclick="event.stopPropagation();openCustomPlanModal('${dateKey}')">
                        <span class="card-action-icon">📅</span><span>予定を追加</span>
                      </button>
-                     <button class="card-action-btn" style="flex:none;width:calc(33% - 4px);"
-                       onclick="event.stopPropagation();_openCourseFromSchedule('${dateKey}')">
-                       <span class="card-action-icon">🗺</span><span>${t('courseCreateBtnShort')}</span>
-                     </button>
                    </div>
                  </div>`;
 

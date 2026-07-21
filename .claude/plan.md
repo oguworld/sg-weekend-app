@@ -11713,3 +11713,42 @@ CSSのみの変更。`server.js`・データファイル無変更のため`pm2 r
 
 ## 承認状況
 2026-07-21 ユーザーが「あとイベントカードのピン留め、予定表に追加は中央寄せして。今は←によってます。」と明示。**ユーザー承認済み**。
+
+# 設計書102 — 予定表「空き日タップ→コースを作る」ボタンを非表示化
+
+（2026-07-21 ユーザー要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+マイコースタブが非表示化（設計書94）・イベントカードのコース作成ボタンが削除済み（設計書95）の流れで、ユーザーから「予定表のコース作成ボタンも非表示にしてください。消した後は同じく中央寄せで」との要望があった。
+
+調査したところ、予定表画面の「空き週末日タップ→予定を追加/コースを作る」の2ボタン行（`schedule-plan-actions-${dateKey}`、`public/app.js`）が該当する。
+
+## 2. 確定済み仕様
+
+`schedule-plan-actions-${dateKey}`ブロック内の「🗺 コースを作る」ボタン（`onclick="event.stopPropagation();_openCourseFromSchedule('${dateKey}')"`）を削除する。
+
+**重要な確認事項**: このブロックのコンテナ（`<div id="schedule-plan-actions-${dateKey}" style="display:none;padding:4px 12px 10px;justify-content:center;gap:6px;">`）は**既に`justify-content:center`が設定済み**のため、ボタンを1つ削除するだけで、残る「📅 予定を追加」ボタンは自動的に中央寄せの見た目になる。設計書101（イベントカード）のように新たに`justify-content:center`を追加するCSS変更は不要。
+
+`_openCourseFromSchedule(dateKey)`関数自体は削除しない（このボタン削除によりこの関数の唯一の呼び出し元が無くなり事実上呼ばれなくなるが、既存の「機能は残しつつ表示だけ止める」パターンを踏襲し、関数定義は残置する）。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` `schedule-plan-actions-${dateKey}`ブロック（現在6407〜6417行目付近）: 「📅 予定を追加」（`openCustomPlanModal`）・「🗺 コースを作る」（`_openCourseFromSchedule`）の2ボタン、コンテナは`justify-content:center`設定済み
+- `_openCourseFromSchedule(dateKey)`（6092〜6097行目付近）: `window._coursePresetDate`をセットして`openCourseSheet()`を呼ぶ。他に呼び出し元はこの1箇所のみ（`grep`で確認済み）
+
+## 4. スコープ外（別途確認が必要な残課題）
+
+- **ピン留めイベント一覧の「コース作成」ボタン**（`.plan-to-plan-btn`、`onclick="openCourseSheetFromEvent('${p.id}')"`、`public/app.js` 6064〜6068行目付近の`.plan-card-actions`内）は、縦並びレイアウト（`flex-direction:column`）のため「中央寄せ」という今回のユーザー要望と構造的に対応しない別の箇所であり、今回のスコープには含めない。マイコース非表示化に伴う同種の「作っても見れない」問題は依然として残っているため、ユーザーが気になる場合は別途対応する
+- `#schedule-plan-action-sheet`/`#schedule-plan-action-course-btn`（`public/index.html` 1147〜1164行目付近）は、調査の結果**現在どこからも開かれない不使用（デッド）マークアップ**と判明した。今回の「予定表のコース作成ボタン」とは無関係のため一切変更しない
+
+## 5〜6. データモデル・API・i18n変更点
+
+**変更なし**。
+
+## 7. データ共有影響（Web版/iOS App Store版）の確認
+
+フロントエンドのみの変更。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「あぁ予定表のコース作成ボタンも非常時にしてください。消した後は同じく中央寄せで。」と明示（「非常時」は「非表示」の誤字と解釈）。**ユーザー承認済み**。
