@@ -2076,7 +2076,7 @@
     {
       let _fabTx = 0, _fabTy = 0;
       [
-        { id: 'course-fab', fn: () => openCourseSheet() },
+        { id: 'course-fab', fn: () => toggleStampViewMode() },
         { id: 'fab-plan',   fn: () => openCustomPlanModal() },
         { id: 'fab-top',    fn: () => fabScrollTop() },
       ].forEach(({ id, fn }) => {
@@ -3637,13 +3637,13 @@
       if (tab === 'map') {
         if (courseListEl) courseListEl.style.display = 'none';
         if (stampMapViewEl) stampMapViewEl.style.display = 'block';
-        if (courseFabEl) courseFabEl.style.display = 'none';
+        if (courseFabEl) courseFabEl.style.display = '';
         await initStampMapTab();
         return;
       } else {
         if (courseListEl) courseListEl.style.display = 'flex';
         if (stampMapViewEl) stampMapViewEl.style.display = 'none';
-        if (courseFabEl) courseFabEl.style.display = '';
+        if (courseFabEl) courseFabEl.style.display = 'none';
       }
 
       if (tab === 'mylist') {
@@ -3797,10 +3797,12 @@
       const mapEl = document.getElementById('stamp-map-view-inner');
       const listEl = document.getElementById('stamp-collection-list');
       const toggleBtn = document.getElementById('stamp-view-toggle-btn');
+      const fabEl = document.getElementById('course-fab');
       const isMap = _stampViewMode === 'map';
       if (mapEl) mapEl.style.display = isMap ? 'block' : 'none';
       if (listEl) listEl.style.display = isMap ? 'none' : 'block';
       if (toggleBtn) toggleBtn.textContent = t(isMap ? 'stampViewToggleList' : 'stampViewToggleMap');
+      if (fabEl) fabEl.textContent = isMap ? '📖' : '🗺️';
     }
 
     // ─── 「次はここ」判定（設計書70改善2） ───
