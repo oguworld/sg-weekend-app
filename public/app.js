@@ -1390,17 +1390,13 @@
             </div>
             ${tipsContent}
             <div class="card-action-row">
-              <button class="card-action-btn${pinned ? ' pinned' : ''}" id="pin-${e.id}" onclick="togglePinById('${e.id}')">
+              <button class="card-action-btn${pinned ? ' pinned' : ''}" style="flex:none;width:calc(33% - 4px);" id="pin-${e.id}" onclick="togglePinById('${e.id}')">
                 <span class="card-action-icon">📌</span>
                 <span id="pin-label-${e.id}">${pinned ? t('pinnedBtn') : t('pinBtn')}</span>
               </button>
-              <button class="card-action-btn" onclick="openEventPlanModal('${e.id}')">
+              <button class="card-action-btn" style="flex:none;width:calc(33% - 4px);" onclick="openEventPlanModal('${e.id}')">
                 <span class="card-action-icon">📅</span>
                 <span>${t('addToPlanBtnShort')}</span>
-              </button>
-              <button class="card-action-btn" onclick="openCourseSheetFromEvent('${e.id}')">
-                <span class="card-action-icon">🗺</span>
-                <span>${t('courseCreateBtnShort')}</span>
               </button>
             </div>
           </div>
