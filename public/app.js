@@ -3693,8 +3693,9 @@
     };
 
     // 設計書110: STAMP_LEVEL_META.yearRange/yearRangeEnを現在の言語に応じて取得する共通ヘルパー
+    // 設計書112: 厳密な必須条件に読めないよう「目安」/「approx.」を接頭辞として追加
     function _stampLevelYearRange(meta) {
-      return getLang() === 'ja' ? meta.yearRange : meta.yearRangeEn;
+      return getLang() === 'ja' ? `目安${meta.yearRange}` : `approx. ${meta.yearRangeEn}`;
     }
 
     // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。

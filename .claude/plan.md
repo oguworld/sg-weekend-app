@@ -12221,3 +12221,44 @@ const STAMP_LEVEL_META = {
 
 ## 承認状況
 2026-07-21 ユーザーが「あと進捗バーはもう少し目立たせて」と明示。**ユーザー承認済み**。
+
+# 設計書112 — 年数ラベルに「目安」の接頭辞を追加
+
+（2026-07-21 ユーザー要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書110で追加したレベルラベルの年数表示（例:「新参者（1〜2年）」）が、厳密な必須条件のように読めてしまう懸念があった。ユーザーから「目安っていうラベルをつけてほしい」との要望。
+
+## 2. 確定済み仕様
+
+`_stampLevelYearRange(meta)`ヘルパー関数（`public/app.js` 3696〜3698行目付近）の戻り値に「目安」（英語は"approx."）を接頭辞として追加する。
+
+```js
+// 変更前
+function _stampLevelYearRange(meta) {
+  return getLang() === 'ja' ? meta.yearRange : meta.yearRangeEn;
+}
+
+// 変更後
+function _stampLevelYearRange(meta) {
+  return getLang() === 'ja' ? `目安${meta.yearRange}` : `approx. ${meta.yearRangeEn}`;
+}
+```
+
+この関数は4箇所（`_renderStampLevelRowLocked()`・`_renderStampLevelRowInProgress()`・`_renderStampLevelRowComplete()`・`openStampLevelUnlockModal()`）から呼ばれており、**この関数1つを直すだけで全箇所に反映される**（個別の呼び出し元は変更不要）。表示は「新参者（目安1〜2年）」のようになる。
+
+## 3. 既存コードの調査結果
+
+`public/app.js` 3696〜3698行目付近の`_stampLevelYearRange()`関数本体のみ。呼び出し元4箇所（4070・4119・4152・4405行目付近）は無変更。
+
+## 4. スコープ外
+
+`yearRange`/`yearRangeEn`の値自体（1〜2年等）は変更しない。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「年数ラベルのところ一応目安っていうラベルつけてもらっていい」と明示。**ユーザー承認済み**。
