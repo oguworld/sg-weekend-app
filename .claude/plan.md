@@ -12316,3 +12316,97 @@ function _stampLevelYearRange(meta) {
 
 ## 承認状況
 2026-07-22 ユーザーが「定住レベルはそのままだね見習いだけ変えて。あとは（)の中は目安 : 在住1〜2年の形できる？」と明示。**ユーザー承認済み**。
+
+# 設計書114 — スタンプスポット詳細モーダルにKlookチケットリンクを追加
+
+（2026-07-22 ユーザーとの会話で確定。モック案Bで承認済み。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーから「スポットのモーダルにチケットへのリンクを載せれる？広告は出さなくていいです。リンクだけで。」との要望があり、モック2案（案A: 「地図で見る」の隣に併記／案B: 説明文の後に単独行、既存コース機能の「チケット情報」リンクと同じ見た目）を提示した。ユーザーは案Bを選択（「そうですね。Bで実装して」）。
+
+既存のKlookアフィリエイトリンク基盤（設計書23フェーズ1、`data/sg/affiliate-links.json`・`loadAffiliateLinks()`・`openAffiliateLink()`）はコース機能向けに実装済みだが、設計書32で**コース機能への埋め込み呼び出しのみ**一時停止中（関数・データは残置）。今回はこの基盤をスタンプスポット向けに新規に活用する（コース側の停止状態には触れない、独立した新規呼び出し）。
+
+## 2. 確定済み仕様
+
+### 2-1. 見た目・配置（案B）
+
+`#stamp-spot-detail-sheet`内、`#stamp-spot-detail-desc`（説明文）の直後・`#stamp-spot-detail-checked`（制覇済みバッジ）の手前に、既存のコース機能「チケット情報」リンク（`course-timeline-meta`内の`<a>`要素）と全く同じスタイル（`color:var(--caramel);text-decoration:underline;cursor:pointer;font-size:12px`程度、ボタン・バッジ・アイコン装飾なし）でリンクを1行追加する。i18nキーは既存の`affiliateInfoLink`（ja「チケット情報」/en「Ticket info」）をそのまま再利用し、新規キーは追加しない。
+
+### 2-2. データソース
+
+コース機能と同じ`data/sg/affiliate-links.json`（スポット名英語表記をキーにしたマッピング）をそのまま再利用する。新規ファイルは作らない。既存3件（Gardens by the Bay – Supertree Grove / National Orchid Garden / Bedok Reservoir Park）のうち**Bedok Reservoir Parkは今回追加済みの定住レベルスタンプスポットと同名**のため、コード実装だけで即座に有効になる。
+
+### 2-3. サーバー側の埋め込み
+
+`GET /api/stamp-spots`のレスポンス構築時、`loadAffiliateLinks(city)`（既存関数、無変更で再利用）を1回読み込み、**解禁済み（マスクされていない）スポットのみ**に対して`spot.name`をキーに検索し、ヒットすれば`affiliateLink`フィールド（URLのみ）を追加する。ロック中（`maskLockedStampSpot()`でマスクされた）スポットは`name`が「？？？」になっており検索してもヒットしないため、実装上は追加の分岐なしで自然に除外される（念のため明示的にコメントで意図を残す）。`special`未解禁時に除外されるスポットは元々レスポンスに含まれないため対象外。
+
+```js
+// server.js: GET /api/stamp-spots 内、visibleSpots計算部分
+const affiliateLinks = loadAffiliateLinks(city);
+const visibleSpots = allSpots
+  .filter(s => s.level !== 'special' || unlockedLevels.includes('special'))
+  .map(s => {
+    if (!unlockedLevels.includes(s.level)) return maskLockedStampSpot(s);
+    const link = affiliateLinks[s.name];
+    return link ? { ...s, affiliateLink: link.url } : s;
+  });
+```
+
+コース機能向けの`embedAffiliateLinks()`（配列ネスト構造・course.spots向け）は今回のスタンプスポット（フラットな配列）には構造が合わないため使い回さず、上記のシンプルな`map`内分岐で個別実装する（`embedAffiliateLinks()`自体は無変更のまま残置）。
+
+### 2-4. フロントエンド
+
+`public/index.html`の`#stamp-spot-detail-sheet`、`#stamp-spot-detail-desc`の直後に新規行を追加:
+
+```html
+<div id="stamp-spot-detail-ticket-link" style="display:none;margin-bottom:16px;">
+  <span style="font-size:12px;color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">チケット情報</span>
+</div>
+```
+
+`public/app.js`の`openStampSpotDetail(spotId)`内、`imgContainer`処理の直後あたりに以下を追加。`onclick`はJSで動的にセットする（URLに含まれる可能性のある特殊文字のエスケープ問題を避けるため、コース機能のようなHTML文字列内`onclick`属性埋め込みではなく`.onclick`プロパティ代入方式にする）:
+
+```js
+const ticketLinkEl = document.getElementById('stamp-spot-detail-ticket-link');
+if (ticketLinkEl) {
+  if (spot.affiliateLink) {
+    ticketLinkEl.style.display = '';
+    ticketLinkEl.onclick = () => openAffiliateLink(spot.affiliateLink, 'klook', spot.name);
+  } else {
+    ticketLinkEl.style.display = 'none';
+    ticketLinkEl.onclick = null;
+  }
+}
+```
+
+`openAffiliateLink(url, provider, spotName)`は既存関数（無変更で再利用、Capacitor/Web分岐・`POST /api/affiliate-click`計測込み）。**`_touchCapableDetected`ガードは付与しない**（このセッションで2回発生した「ガードのみ付与しtouchendハンドラを追加し忘れてタップ不能になる」既知アンチパターン〈設計書84・99〉を踏まえ、コース機能の既存パターンに倣いガードなしのシンプルなonclickのままにする）。
+
+## 3. 既存コードの調査結果
+
+- `server.js` 2167-2175行目: `loadAffiliateLinks(city)`（無変更で再利用可能、course向けの停止コメントはそのまま）
+- `server.js` 2051-2077行目: `GET /api/stamp-spots`（`visibleSpots`のmap内に分岐追加）
+- `public/index.html` 800-826行目: `#stamp-spot-detail-sheet`（`#stamp-spot-detail-desc`の直後に新規div追加）
+- `public/app.js` 4175-4227行目: `openStampSpotDetail()`（imgContainer処理の直後にticketLink処理を追加）
+- `public/app.js` 4806-4820行目: `openAffiliateLink()`（無変更で再利用）
+- `public/app.js` 488行目・758行目: `affiliateInfoLink`（既存i18nキー、無変更で再利用）
+
+## 4. データ拡充（コード実装後、orchestratorとは別に直接作業）
+
+`scripts/match-affiliate-links.js`は現状`model-courses.json`/`community-courses.json`のスポット名のみを対象にしている。`data/sg/stamp-spots.json`（55件）の`name`もマッチング対象に加えるよう同スクリプトを拡張し（`STAMP_SPOTS_PATH`定数追加・名前収集ループに1箇所追加のみ、既存ロジック・対話フロー・書き込み形式は無変更）、実行して`data/klook-catalog-sg.csv`（238件）との半自動マッチングを行い、`data/sg/affiliate-links.json`にヒットした分を追記する。この部分はデータ収集作業（`data/*.json`直接更新）のためorchestratorの範囲外とし、コード実装完了後に私が直接対話形式で実行する。スクリプト自体の変更（`STAMP_SPOTS_PATH`追加）はコード変更のためorchestrator側のタスクに含める。
+
+## 5. スコープ外
+
+- コース機能側の`embedAffiliateLinks()`呼び出し停止状態（設計書32）の解除は行わない
+- ロック中スポットへのチケットリンク表示は行わない（サーバー側で自然に除外される設計、フロント側の追加判定は不要）
+- クリック計測（`POST /api/affiliate-click`）は既存エンドポイントをそのまま再利用、変更なし
+
+## 6〜8. データモデル・API・データ共有影響
+
+- `data/sg/affiliate-links.json`のスキーマ変更なし（既存キー・値構造のまま、キーの種類がコーススポット名からスタンプスポット名にも広がるのみ）
+- `GET /api/stamp-spots`のレスポンスに`affiliateLink`フィールドが**条件付きで**追加される（既存フィールドの型・意味は無変更、後方互換）。旧バージョンのApp/Web側もこのフィールドを無視するだけで実害なし
+- `server.js`の変更を伴うため`pm2 restart`が必要
+- Web版・iOS版両方に反映。iOS版は次回TestFlightビルドで反映
+
+## 承認状況
+2026-07-22 ユーザーがモック案Bを選択し「そうですね。Bで実装して」と明示。**ユーザー承認済み**。

@@ -4209,6 +4209,19 @@
         }
       }
 
+      // 設計書114: Klookチケットリンク（ロック中スポットはサーバー側でaffiliateLinkが付与されないため
+      // 追加のロック判定は不要、affiliateLink有無だけを見れば自然に除外される）
+      const ticketLinkEl = document.getElementById('stamp-spot-detail-ticket-link');
+      if (ticketLinkEl) {
+        if (spot.affiliateLink) {
+          ticketLinkEl.style.display = '';
+          ticketLinkEl.onclick = () => openAffiliateLink(spot.affiliateLink, 'klook', spot.name);
+        } else {
+          ticketLinkEl.style.display = 'none';
+          ticketLinkEl.onclick = null;
+        }
+      }
+
       const checked = _stampSpotIsChecked(spot.id);
       const checkedEl = document.getElementById('stamp-spot-detail-checked');
       if (checkedEl) checkedEl.style.display = checked ? 'block' : 'none';

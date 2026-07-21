@@ -23,6 +23,7 @@ const CSV_PATH = path.join(__dirname, '..', 'data', 'klook-catalog-sg.csv');
 const LINKS_PATH = path.join(__dirname, '..', 'data', 'sg', 'affiliate-links.json');
 const MODEL_COURSES_PATH = path.join(__dirname, '..', 'data', 'sg', 'model-courses.json');
 const COMMUNITY_COURSES_PATH = path.join(__dirname, '..', 'data', 'sg', 'community-courses.json');
+const STAMP_SPOTS_PATH = path.join(__dirname, '..', 'data', 'sg', 'stamp-spots.json');
 
 const DRY_RUN = process.argv.includes('--dry-run');
 // マッチスコアがこれ未満の候補は提示しない（無関係な候補で確認作業を煩雑にしないため）
@@ -164,6 +165,16 @@ function loadUniqueSpotNames() {
       for (const s of c.spots || []) {
         if (s.name) names.add(s.name);
       }
+    }
+  }
+  if (fs.existsSync(STAMP_SPOTS_PATH)) {
+    try {
+      const stampSpots = JSON.parse(fs.readFileSync(STAMP_SPOTS_PATH, 'utf8'));
+      for (const s of stampSpots || []) {
+        if (s.name) names.add(s.name);
+      }
+    } catch {
+      // 読み込み失敗時はスタンプスポット分をスキップ（既存のコース側処理は継続）
     }
   }
   return [...names].sort();

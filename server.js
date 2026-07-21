@@ -2067,9 +2067,17 @@ app.get('/api/stamp-spots', (req, res) => {
       unlockedLevels = computeUnlockedLevels(allSpots, []);
     }
 
+    // 設計書114: スタンプスポット詳細向けKlookチケットリンク埋め込み。
+    // ロック中（maskLockedStampSpot()でnameが「？？？」に置換された）スポットは検索してもヒットしないため、
+    // 追加の分岐なしで自然に除外される。
+    const affiliateLinks = loadAffiliateLinks(city);
     const visibleSpots = allSpots
       .filter(s => s.level !== 'special' || unlockedLevels.includes('special'))
-      .map(s => (unlockedLevels.includes(s.level) ? s : maskLockedStampSpot(s)));
+      .map(s => {
+        if (!unlockedLevels.includes(s.level)) return maskLockedStampSpot(s);
+        const link = affiliateLinks[s.name];
+        return link ? { ...s, affiliateLink: link.url } : s;
+      });
     res.json({ spots: visibleSpots, unlockedLevels });
   } catch (e) {
     res.status(500).json({ error: e.message });
