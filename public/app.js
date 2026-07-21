@@ -3678,9 +3678,9 @@
     // Nano Banana生成イラストバッジ（img）に置き換える。凡例チップ・スポット詳細バッジは
     // 絵文字のまま維持（emojiフィールドは全箇所で引き続き参照される、削除しない）。
     const STAMP_LEVEL_META = {
-      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '📍', img: '/images/stamp-badges/badge-level-standard.png' },
-      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏘', img: '/images/stamp-badges/badge-level-local.png' },
-      niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🔎', img: '/images/stamp-badges/badge-level-niche.png' },
+      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '🔰', img: '/images/stamp-badges/badge-level-standard.png' },
+      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏠', img: '/images/stamp-badges/badge-level-local.png' },
+      niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🦁', img: '/images/stamp-badges/badge-level-niche.png' },
       special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png' },
     };
 

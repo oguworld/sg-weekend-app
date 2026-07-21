@@ -11863,3 +11863,47 @@ return _renderStampLevelRowLocked(STAMP_LEVEL_META[level], null, null, true);
 
 ## 承認状況
 2026-07-21 ユーザーが「あっ最後は極めし者という文言自体もロック中は？？？としてほしいです」と明示。**ユーザー承認済み**。
+
+# 設計書106 — レベル絵文字の変更（🔰/🏠/🦁/👑）
+
+（2026-07-21 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書98・103・104でレベルラベルを「新参者→定住レベル→シンガポール通→極めし者」に変更した流れで、ユーザーから各レベルの絵文字（`STAMP_LEVEL_META`の`emoji`フィールド）も変更したいとの要望があった。会話を経て以下の組み合わせで確定した。
+
+- 新参者: 🔰（初心者マーク、ユーザー発案。Unicode上も「Japanese Symbol for Beginner」という名称で完全に一致）
+- 定住レベル: 🏠（家。シンガポールの住宅事情〈コンド/HDB中心で戸建てはほぼ無い〉を踏まえ、庭付きの🏡ではなくシンプルな🏠を採用。🏢〈ビル〉・🔑〈鍵〉・🪴〈観葉植物〉も検討したが、「家」の温かみを優先し🏠に確定）
+- シンガポール通: 🦁（ライオン。既存のイベントプロフィールバッジ`styleLabels.local: '🦁 地元民'`と絵文字が一致し、意味的にも統一感がある）
+- 極めし者: 👑（王冠。最上位の称号らしい格を表現）
+
+## 2. 確定済み仕様
+
+`public/app.js`の`STAMP_LEVEL_META`定数（3680〜3685行目付近）の`emoji`フィールドのみ変更する:
+
+```js
+const STAMP_LEVEL_META = {
+  standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '🔰', img: '/images/stamp-badges/badge-level-standard.png' },
+  local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏠', img: '/images/stamp-badges/badge-level-local.png' },
+  niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🦁', img: '/images/stamp-badges/badge-level-niche.png' },
+  special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png' },
+};
+```
+
+`special`（極めし者）の絵文字は今回のユーザー発言では言及されていないため`✨`のまま変更しない。`color`・`img`（設計書81のイラストバッジ画像）はいずれも変更しない。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 3680〜3685行目: `STAMP_LEVEL_META`定数本体
+- この`emoji`フィールドは複数箇所から参照されている（マップピン`_renderStampMarkers()`、スポット詳細モーダルのレベルバッジ`openStampSpotDetail()`、レベル解禁演出モーダル`openStampLevelUnlockModal()`、コレクション一覧の状態Bレベル見出し`_renderStampLevelRowInProgress()`）。**値の変更のみでこれら全ての参照箇所に自動的に反映される**ため、個別の呼び出し元コードは変更不要
+
+## 4. スコープ外
+
+`special`（極めし者）の絵文字（✨のまま）・`color`・`img`（バッジイラスト画像）は変更しない。
+
+## 5〜7. データモデル・API・i18n・データ共有影響
+
+**変更なし**（表示用の絵文字定数の値変更のみ）。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「了解。家はコンド、ＨＤＢなんだけど...」を経て「なやむな。やっぱり家で。」「実装してください。」と明示。**ユーザー承認済み**。
