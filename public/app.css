@@ -2043,6 +2043,24 @@
       font-size: 14px; font-weight: 700; color: var(--midnight);
       margin-bottom: 10px;
     }
+    .stamp-level-progress-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 10px;
+    }
+    .stamp-level-progress-track {
+      flex: 1; height: 6px; border-radius: 50px;
+      background: var(--sand);
+      overflow: hidden;
+    }
+    .stamp-level-progress-fill {
+      height: 100%; border-radius: 50px;
+      background: linear-gradient(90deg, var(--caramel-light), var(--caramel));
+      transition: width 0.3s ease;
+    }
+    .stamp-level-progress-label {
+      font-size: 11px; font-weight: 700; color: var(--warm-gray);
+      flex-shrink: 0;
+    }
     .stamp-card-list {
       display: flex; flex-direction: column; gap: 8px;
     }
@@ -2057,16 +2075,29 @@
     .stamp-card--checked {
       background: var(--warm-white);
     }
-    .stamp-card-circle {
+    .stamp-card-thumb {
+      position: relative;
       flex-shrink: 0;
-      width: 36px; height: 36px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 700;
-      border: 2px dashed var(--sand-dark);
-      color: var(--warm-gray);
+      width: 56px; height: 56px;
     }
-    .stamp-card-circle--checked {
-      border: none; color: white;
+    .stamp-card-thumb-img {
+      width: 56px; height: 56px; border-radius: 12px;
+      object-fit: cover; display: block;
+    }
+    .stamp-card-thumb-placeholder {
+      width: 56px; height: 56px; border-radius: 12px;
+      background: var(--sand);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .stamp-card-done-mark {
+      position: absolute; bottom: -6px; right: -6px;
+      width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: white;
+      border: 2px solid var(--cream);
+      transform: rotate(-12deg);
+      box-shadow: 0 2px 4px rgba(44,36,32,0.25);
     }
     .stamp-card-body { flex: 1; min-width: 0; }
     .stamp-card-name {

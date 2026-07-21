@@ -426,8 +426,8 @@
         toastPlanUpdated: '✅ 保存しました',
         scheduleNoPlans: '予定なし',
         customPlanTitlePlaceholder: 'タイトルを入力',
-        navCourse: '制覇',
-        courseScreenTitle: 'スタンプラリー',
+        navCourse: '探検',
+        courseScreenTitle: 'シンガポール探訪',
         courseTabEveryone: 'みんなのコース',
         courseTabMylist: 'マイコース',
         courseTabStampMap: 'スタンプラリー',
@@ -456,6 +456,7 @@
         stampLevelUnlockModalTitle: '新しいレベルが解禁されました！',
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
+        stampCardDoneMark: '済',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '軸にするイベント',
         coursePinsHint: '軸にするイベントをタップして選んでください',
@@ -691,8 +692,8 @@
         toastPlanUpdated: '✅ Saved',
         scheduleNoPlans: 'No plans',
         customPlanTitlePlaceholder: 'Enter title',
-        navCourse: 'Conquer',
-        courseScreenTitle: 'Stamp Rally',
+        navCourse: 'Explore',
+        courseScreenTitle: 'Explore Singapore',
         courseTabEveryone: 'Explore',
         courseTabMylist: 'My Courses',
         courseTabStampMap: 'Stamp Rally',
@@ -721,6 +722,7 @@
         stampLevelUnlockModalTitle: 'New level unlocked!',
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
+        stampCardDoneMark: '✓',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: 'Base pinned event',
         coursePinsHint: 'Tap to select',
@@ -4003,7 +4005,7 @@
         if (state === 'locked') {
           return _renderStampLevelRowLocked(meta, checkedCount, totalCount);
         } else if (state === 'inProgress') {
-          return _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang);
+          return _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount);
         } else {
           return _renderStampLevelRowComplete(meta, totalCount);
         }
@@ -4020,16 +4022,20 @@
     }
 
     // 状態B: 解禁中・未全制覇 — レベル見出し＋横長カード一覧（order昇順）
-    function _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang) {
+    function _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount) {
       const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const cardsHtml = sorted.map(spot => {
         const checked = _stampSpotIsChecked(spot.id);
         const isNext = !!nextTarget && nextTarget.id === spot.id;
         const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
 
-        const circleHtml = checked
-          ? `<div class="stamp-card-circle stamp-card-circle--checked" style="background:${meta.color};">✓</div>`
-          : `<div class="stamp-card-circle">${typeof spot.order === 'number' ? spot.order : '?'}</div>`;
+        const thumbInner = spot.imageUrl
+          ? `<img src="${spot.imageUrl}" alt="${name}" class="stamp-card-thumb-img">`
+          : `<div class="stamp-card-thumb-placeholder">📍</div>`;
+        const doneStampHtml = checked
+          ? `<div class="stamp-card-done-mark" style="background:${meta.color};">${t('stampCardDoneMark')}</div>`
+          : '';
+        const thumbHtml = `<div class="stamp-card-thumb">${thumbInner}${doneStampHtml}</div>`;
 
         const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
         const metaHtml = checked
@@ -4040,7 +4046,7 @@
           : '';
 
         return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
-          ${circleHtml}
+          ${thumbHtml}
           <div class="stamp-card-body">
             <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
             <div class="stamp-card-area">${spot.area || ''}</div>
@@ -4049,10 +4055,18 @@
         </div>`;
       }).join('');
 
+      const total = typeof totalCount === 'number' ? totalCount : spotsInLevel.length;
+      const checkedN = typeof checkedCount === 'number' ? checkedCount : spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+      const pct = total > 0 ? Math.round((checkedN / total) * 100) : 0;
+
       return `<div class="stamp-level-section">
         <div class="stamp-level-section-title">
           ${meta.emoji}
           ${t(meta.labelKey)}
+        </div>
+        <div class="stamp-level-progress-row">
+          <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
+          <span class="stamp-level-progress-label">${checkedN}/${total}</span>
         </div>
         <div class="stamp-card-list">${cardsHtml}</div>
       </div>`;
