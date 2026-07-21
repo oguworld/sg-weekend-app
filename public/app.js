@@ -438,6 +438,8 @@
         stampViewToggleList: '📖 一覧で見る',
         stampCollectionLockedNote: 'このレベルはまだロック中です',
         stampNextTargetLabel: '次はここ！',
+        stampLevelCompleteLabel: '制覇！',
+        stampLevelCompleteSpotsLabel: 'スポット達成',
         stampLevelUnlockModalTitle: '新しいレベルが解禁されました！',
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
@@ -701,6 +703,8 @@
         stampViewToggleList: '📖 List view',
         stampCollectionLockedNote: 'This level is still locked',
         stampNextTargetLabel: 'Next up!',
+        stampLevelCompleteLabel: 'Complete!',
+        stampLevelCompleteSpotsLabel: 'spots collected',
         stampLevelUnlockModalTitle: 'New level unlocked!',
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
@@ -3753,8 +3757,6 @@
       _ensureStampLeafletMap();
       _renderStampMarkers();
       _renderStampFog();
-      _renderStampLevelLegend();
-      _renderStampProgressSummary();
       _renderStampCollectionList();
       _renderStampAreaBadges();
 
@@ -3777,12 +3779,10 @@
 
     function _applyStampViewMode() {
       const mapEl = document.getElementById('stamp-map-view-inner');
-      const legendEl = document.getElementById('stamp-level-legend');
       const listEl = document.getElementById('stamp-collection-list');
       const toggleBtn = document.getElementById('stamp-view-toggle-btn');
       const isMap = _stampViewMode === 'map';
       if (mapEl) mapEl.style.display = isMap ? 'block' : 'none';
-      if (legendEl) legendEl.style.display = isMap ? 'flex' : 'none';
       if (listEl) listEl.style.display = isMap ? 'none' : 'block';
       if (toggleBtn) toggleBtn.textContent = t(isMap ? 'stampViewToggleList' : 'stampViewToggleMap');
     }
@@ -3886,22 +3886,24 @@
       if (!_stampMarkersLayer) return;
       _stampMarkersLayer.clearLayers();
       const nextTarget = _computeStampNextTarget();
-      _stampSpots.forEach(spot => {
-        const checked = _stampSpotIsChecked(spot.id);
-        const isNext = !!nextTarget && nextTarget.id === spot.id;
-        const meta = STAMP_LEVEL_META[spot.level] || STAMP_LEVEL_META.standard;
-        const badgeHtml = (typeof spot.order === 'number')
-          ? `<div class="stamp-marker-badge">${spot.order}</div>`
-          : '';
-        const icon = L.divIcon({
-          className: '',
-          html: `<div class="stamp-marker-icon ${checked ? 'stamp-marker-icon--checked' : 'stamp-marker-icon--unchecked'} ${isNext ? 'stamp-marker-icon--next' : ''}" style="position:relative;"><span>${meta.emoji}</span>${badgeHtml}</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 30],
+      _stampSpots
+        .filter(spot => _stampProgress.unlockedLevels.includes(spot.level)) // 設計書83 §7-2-1: ロック中レベルのスポットはピン自体を生成しない
+        .forEach(spot => {
+          const checked = _stampSpotIsChecked(spot.id);
+          const isNext = !!nextTarget && nextTarget.id === spot.id;
+          const meta = STAMP_LEVEL_META[spot.level] || STAMP_LEVEL_META.standard;
+          const badgeHtml = (typeof spot.order === 'number')
+            ? `<div class="stamp-marker-badge">${spot.order}</div>`
+            : '';
+          const icon = L.divIcon({
+            className: '',
+            html: `<div class="stamp-marker-icon ${checked ? 'stamp-marker-icon--checked' : 'stamp-marker-icon--unchecked'} ${isNext ? 'stamp-marker-icon--next' : ''}" style="position:relative;"><span>${meta.emoji}</span>${badgeHtml}</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 30],
+          });
+          const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(_stampMarkersLayer);
+          marker.on('click', () => openStampSpotDetail(spot.id));
         });
-        const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(_stampMarkersLayer);
-        marker.on('click', () => openStampSpotDetail(spot.id));
-      });
     }
 
     // フォグ・オブ・ウォー: チェックイン済みスポット周辺だけ霧を透明にする穴を開ける。
@@ -3926,18 +3928,6 @@
       fogEl.style.background = `${holes.join(', ')}, rgba(${FOG_COLOR},0.55)`;
     }
 
-    function _renderStampLevelLegend() {
-      const el = document.getElementById('stamp-level-legend');
-      if (!el) return;
-      el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
-        const meta = STAMP_LEVEL_META[level];
-        const unlocked = _stampProgress.unlockedLevels.includes(level);
-        return `<div class="stamp-level-chip ${unlocked ? '' : 'stamp-level-chip--locked'}">
-          <span class="stamp-level-chip-dot" style="background:${meta.color};"></span>
-          ${meta.emoji} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒'}
-        </div>`;
-      }).join('');
-    }
     const STAMP_LEVEL_ORDER_CLIENT = ['standard', 'local', 'niche', 'special'];
 
     // ─── エリア制覇バッジのレンダリング（設計書77） ───
@@ -3969,71 +3959,99 @@
       }).join('');
     }
 
-    function _renderStampProgressSummary() {
-      const el = document.getElementById('stamp-progress-summary');
-      if (!el) return;
-      const checked = _stampProgress.checkedInSpotIds.length;
-      const total = _stampSpots.length;
-      const unlockedCount = _stampProgress.unlockedLevels.length;
-      el.textContent = t('stampProgressSummary')
-        .replace('{unlocked}', String(unlockedCount))
-        .replace('{checked}', String(checked))
-        .replace('{total}', String(total));
-    }
-
-    // ─── コレクション一覧ビュー（設計書70改善1・2） ───
-    // レベルごとにグルーピングし、各グループ内は order 昇順で表示。番号バッジ・「次はここ」ハイライトを併記する。
+    // ─── コレクション一覧ビュー（設計書70改善1・2 → 設計書83で横長カード一覧＋レベル別3状態表示に全面リデザイン） ───
+    // レベルごとに「ロック中」「解禁中・未全制覇」「解禁中・全制覇済み」の3状態いずれかに分類して描画する。
     // special レベルは既存サーバー仕様（未解禁時は GET /api/stamp-spots のレスポンス自体から除外）をそのまま踏襲するため、
-    // フロント側で追加のフィルタ処理は不要（_stampSpots に含まれているものだけを描画すれば良い）
+    // spotsInLevel.length === 0 のガードにより行自体が描画されない（既存仕様と整合、設計書83 §7-3-1）。
     function _renderStampCollectionList() {
       const el = document.getElementById('stamp-collection-list');
       if (!el) return;
       const nextTarget = _computeStampNextTarget();
       const lang = getLang();
 
-      const groups = STAMP_LEVEL_ORDER_CLIENT
-        .map(level => ({ level, spots: _stampSpots.filter(s => s.level === level) }))
-        .filter(g => g.spots.length > 0);
+      el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
+        const spotsInLevel = _stampSpots.filter(s => s.level === level);
+        if (spotsInLevel.length === 0) return ''; // special未解禁時等、該当レベルのスポットが1件もない場合は行自体を描画しない（設計書83 §10リスク3のガード）
 
-      el.innerHTML = groups.map(({ level, spots }) => {
         const meta = STAMP_LEVEL_META[level];
         const unlocked = _stampProgress.unlockedLevels.includes(level);
-        const sorted = [...spots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        const cellsHtml = sorted.map(spot => {
-          const checked = _stampSpotIsChecked(spot.id);
-          const isNext = unlocked && !!nextTarget && nextTarget.id === spot.id;
-          const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
-          const circleCls = ['stamp-circle'];
-          if (checked) circleCls.push('stamp-circle--checked');
-          if (!unlocked) circleCls.push('stamp-circle--locked');
-          if (isNext) circleCls.push('stamp-circle--next');
-          const style = checked ? `--stamp-color:${meta.color};--stamp-rotate:${_stampRotateDeg(spot.id)}deg;` : '';
-          const markHtml = checked
-            ? `<span class="stamp-circle-mark">${meta.emoji}</span>`
-            : !unlocked
-              ? `<span class="stamp-circle-lock">🔒</span>`
-              : `<span class="stamp-circle-order">${typeof spot.order === 'number' ? spot.order : '?'}</span>`;
-          // 制覇済みのスポットのみ、チェックイン日時・説明文をコンパクト表示する（設計書79）
-          const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
-          const checkinMeta = checked ? `<div class="stamp-stamp-cell-meta">
-            ${checkinDate ? `<span class="stamp-stamp-cell-date">${checkinDate}</span>` : ''}
-            ${spot.description ? `<span class="stamp-stamp-cell-desc">${spot.description}</span>` : ''}
-          </div>` : '';
-          return `<div class="stamp-stamp-cell">
-            <div class="${circleCls.join(' ')}" style="${style}" ${unlocked ? `onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"` : ''}>
-              ${markHtml}
-            </div>
-            <div class="stamp-stamp-cell-name">${name}</div>
-            ${checkinMeta}
-            ${isNext ? `<span class="stamp-stamp-cell-next-tag">${t('stampNextTargetLabel')}</span>` : ''}
-          </div>`;
-        }).join('');
-        const levelTitleImgHtml = `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">`;
-        return `<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}">
-          <div class="stamp-book-page-title">${levelTitleImgHtml} ${t(meta.labelKey)}${unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}</div>
-          <div class="stamp-book-grid">${cellsHtml}</div>
+        const totalCount = spotsInLevel.length;
+        const checkedCount = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+
+        let state;
+        if (!unlocked) {
+          state = 'locked';
+        } else if (checkedCount < totalCount) {
+          state = 'inProgress';
+        } else {
+          state = 'complete';
+        }
+
+        if (state === 'locked') {
+          return _renderStampLevelRowLocked(meta, checkedCount, totalCount);
+        } else if (state === 'inProgress') {
+          return _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang);
+        } else {
+          return _renderStampLevelRowComplete(meta, totalCount);
+        }
+      }).join('');
+    }
+
+    // 状態A: ロック中 — 個別スポットは表示せず「レベル名＋🔒＋件数」の1行のみ
+    function _renderStampLevelRowLocked(meta, checkedCount, totalCount) {
+      return `<div class="stamp-level-row stamp-level-row--locked">
+        <span class="stamp-level-row-icon">🔒</span>
+        <span class="stamp-level-row-label">${t(meta.labelKey)}</span>
+        <span class="stamp-level-row-count">${checkedCount}/${totalCount}</span>
+      </div>`;
+    }
+
+    // 状態B: 解禁中・未全制覇 — レベル見出し＋横長カード一覧（order昇順）
+    function _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang) {
+      const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const cardsHtml = sorted.map(spot => {
+        const checked = _stampSpotIsChecked(spot.id);
+        const isNext = !!nextTarget && nextTarget.id === spot.id;
+        const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+
+        const circleHtml = checked
+          ? `<div class="stamp-card-circle stamp-card-circle--checked" style="background:${meta.color};">✓</div>`
+          : `<div class="stamp-card-circle">${typeof spot.order === 'number' ? spot.order : '?'}</div>`;
+
+        const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
+        const metaHtml = checked
+          ? `<div class="stamp-card-meta">
+              ${checkinDate ? `<span class="stamp-card-date">${checkinDate}</span>` : ''}
+              ${spot.description ? `<span class="stamp-card-desc">${spot.description}</span>` : ''}
+            </div>`
+          : '';
+
+        return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')">
+          ${circleHtml}
+          <div class="stamp-card-body">
+            <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
+            <div class="stamp-card-area">${spot.area || ''}</div>
+            ${metaHtml}
+          </div>
         </div>`;
       }).join('');
+
+      return `<div class="stamp-level-section">
+        <div class="stamp-level-section-title">
+          <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">
+          ${t(meta.labelKey)}
+        </div>
+        <div class="stamp-card-list">${cardsHtml}</div>
+      </div>`;
+    }
+
+    // 状態C: 解禁中・全制覇済み — 個別カードは表示せず、大きな全制覇バッジのみ表示（タップ不可）
+    function _renderStampLevelRowComplete(meta, totalCount) {
+      return `<div class="stamp-level-complete-badge">
+        <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-complete-badge-img">
+        <div class="stamp-level-complete-badge-title">${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}</div>
+        <div class="stamp-level-complete-badge-count">${totalCount}/${totalCount} ${t('stampLevelCompleteSpotsLabel')}</div>
+      </div>`;
     }
 
     // ─── スポット詳細シート ───
@@ -4188,8 +4206,6 @@
         }
         _renderStampMarkers();
         _renderStampFog();
-        _renderStampLevelLegend();
-        _renderStampProgressSummary();
         _renderStampCollectionList();
         _renderStampAreaBadges();
         const checkedEl = document.getElementById('stamp-spot-detail-checked');

@@ -288,6 +288,21 @@ sg-weekend-app/
 - キャッシュバスティング: `index.html` app.css `?v=20260720l`→`20260720m`、`sw.js` CACHE_NAME=`sg-weekend-v641`→`v642`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での拡大後の表示密度・スクロール量増加、エリアバッジ拡大に伴う`.stamp-area-badges-page`の折り返しレイアウト変化、ダークモード時の見た目は2026-07-20時点でWeb版目視確認のみ、実機未確認
 
+### スタンプラリー画面の大幅リデザイン（2026-07-21実装、設計書83）
+円形スタンプグリッド（設計書78）のコレクション一覧を実機で確認したユーザーから見直し要望があり、(1)エリア制覇バッジの一時停止、(2)マップ表示の簡素化、(3)コレクション一覧の全面リデザイン、の3点をまとめて実施した。データモデル・API変更なし、`public/`配下（index.html/app.js/app.css）のみの変更。
+
+- **エリア制覇バッジの一時停止**: `public/index.html`のエリアバッジ見出し行＋`#stamp-area-badges`を新規`<div style="display:none;">`ラッパーで包んで非表示化。**CLAUDE.mdの既存「稼働停止中」パターン（Klookアフィリエイトリンク等）を踏襲**、`_renderStampAreaBadges()`関数・`STAMP_BADGE_AREAS`定数・`initStampMapTab()`/`doStampCheckin()`からの呼び出し・関連CSS（`.stamp-area-badges-page`/`.stamp-circle--area`/`.stamp-circle--area-img`/`.stamp-area-badge-img`等）は一切削除せず残置。復活時はHTML側の`display:none`を解除するのみ
+- **マップ表示の簡素化**: `_renderStampMarkers()`に`.filter(spot => _stampProgress.unlockedLevels.includes(spot.level))`を追加し、ロック中（未解禁）の`local`/`niche`スポットのピンをマップ生成ループから除外（`standard`は`STAMP_LEVEL_GATES.standard===null`により常に解禁済みのため全件表示のまま、`special`は既存仕様でAPIレスポンス自体から除外済みのため無関係）。**進捗サマリー（`#stamp-progress-summary`）・レベル凡例チップ（`#stamp-level-legend`）はHTML要素ごと削除し、`_renderStampLevelLegend()`/`_renderStampProgressSummary()`関数定義も削除**（復活を前提としない恒久的な削除として扱う、エリアバッジとは異なる方針）。`initStampMapTab()`・`doStampCheckin()`双方の呼び出し列から該当2関数の呼び出しを削除（計4行）。`_applyStampViewMode()`内の`legendEl`関連コードも削除
+- **コレクション一覧の全面リデザイン（`_renderStampCollectionList()`書き換え）**: 円形スタンプグリッド（`.stamp-book-page`＋`.stamp-book-grid`）を廃止し、`STAMP_LEVEL_ORDER_CLIENT`の順でレベルごとに以下3状態のいずれかで描画する構成に変更（**`spotsInLevel.length === 0`のガードが`totalCount===0`の誤判定〈`special`未解禁時に`0/0`の全制覇バッジが出るバグ〉を防ぐ必須の防御線**、totalCount算出より前に配置）
+  - **状態A（ロック中）**: `_renderStampLevelRowLocked()`。「🔒＋レベル名＋`checkedCount`/`totalCount`」のコンパクトな1行のみ、個別スポットのカードは一切表示しない（新規`.stamp-level-row`系CSS）
+  - **状態B（解禁中・未全制覇）**: `_renderStampLevelRowInProgress()`。レベル見出し（`meta.img`＋ラベル、既存`.stamp-level-title-img`クラスを継続利用）の下に`order`昇順の横長カード一覧。制覇済みは塗りつぶし✓円（`meta.color`背景）＋チェックイン日時（`_stampCheckinDateFor()`）・説明文（`spot.description`、既存設計書79ロジックを流用）をカード内に配置、未制覇は番号円のみ。現在の次ターゲット（`_computeStampNextTarget()`）には「次はここ！」タグを表示（新規`.stamp-level-section`/`.stamp-card`系CSS）。このレベル内の全カードは無条件で`onclick="if(!_touchCapableDetected) openStampSpotDetail(...)"` を付与（状態Bは定義上`unlocked===true`のみのため旧実装の三項分岐は不要）
+  - **状態C（解禁中・全制覇済み）**: `_renderStampLevelRowComplete()`。個別カード一覧は表示せず、`meta.img`（96px、設計書81で導入済みのレベルイラスト画像を再利用）＋「{レベル名} 制覇！」＋「{件数}/{件数} スポット達成」の大きなバッジを常時表示（新規`.stamp-level-complete-badge`系CSS）。タップ不可の純粋な表示要素（`onclick`なし）。既存のレベル解禁演出モーダル`openStampLevelUnlockModal()`（一度きりの祝いポップアップ）とは別物として無変更のまま共存
+- **旧CSSクラスの削除**: `.stamp-level-chip`系（凡例チップ）・`.stamp-book-page`系・`.stamp-stamp-cell`系（旧コレクション一覧グリッド）・`.stamp-circle-order`/`.stamp-circle-lock`/`.stamp-circle--locked`/`.stamp-circle--next`＋`@keyframes stampNextPulseRing`（旧コレクション一覧専用の円修飾子）を削除。**`.stamp-circle`本体・`.stamp-circle--checked`・`.stamp-circle--area`・`.stamp-circle--area-img`・`.stamp-area-badge-img`はエリアバッジ側（`_renderStampAreaBadges()`）が引き続き共有使用するため削除せず維持**（同名クラスがコレクション一覧側とエリアバッジ側の両方から参照されていたための必須の注意点、設計書83 §10リスク1）
+- **i18n**: 新規2キー（ja/en同時追加）: `stampLevelCompleteLabel`（制覇！/Complete!）・`stampLevelCompleteSpotsLabel`（スポット達成/spots collected）。死にキー化した既存`stampProgressSummary`/`stampCollectionLockedNote`は実害がないため削除せず残置
+- キャッシュバスティング: `index.html` app.js/app.css `?v=20260721a`、`sw.js` CACHE_NAME=`sg-weekend-v643`
+- `server.js`・`data/`配下は無変更（pm2 restart不要）。設計書69〜82自体もまだTestFlightビルド未実施のステータスのため、本リデザインも含めて次回一括リリースの想定
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での横長カード一覧（23件想定）のスクロール量・タップ精度、状態B/C切り替わり時の見た目のジャンプ、状態A/B/Cの視覚的統一感（制覇済み/未制覇混在時のカード高さ不揃い）、ダークモード時の見た目は2026-07-21時点でWeb版目視確認のみ、実機未確認
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

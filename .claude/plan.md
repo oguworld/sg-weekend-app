@@ -9801,3 +9801,459 @@ return `<div class="stamp-book-page ${unlocked ? '' : 'stamp-book-page--locked'}
 
 ## 承認状況
 2026-07-20 planner設計。ユーザーが実機スクリーンショットを確認し「レベル見出しアイコンが小さすぎて変わっていないと誤解した」とのフィードバックを受け、レベル見出しアイコン（20px→32px）・エリアバッジ（40px→56px）・個別スポット円（56px→72px）の3種類のスタンプサイズを拡大する方針で合意。**ユーザー承認済み**。
+
+# 設計書83 — スタンプラリー画面の大幅リデザイン（横長カード一覧・レベル別3状態表示・マップ簡素化・エリアバッジ一時停止）
+
+（2026-07-21 planner作成。設計書69〜82で実装済みの「スポット制覇スタンプラリー」機能のうち、コレクション一覧ビュー（設計書78で実装した円形スタンプグリッド）とマップ表示・エリアバッジ表示を、実機確認したユーザーとメインエージェントの相談・モックアップ確認を経て大幅にリデザインする設計。コード実装は含まない）
+
+## 1. 背景
+
+設計書78で「スタンプ帳（パスポート風）」のメタファーに刷新したコレクション一覧ビュー（`.stamp-book-page`＋`.stamp-book-grid`の円形スタンプグリッド、設計書79・80・81・82で段階的に改善）を実機で確認したユーザーから、デザインを見直したいという要望があった。メインエージェントとの相談・モックアップ確認を経て、以下の新デザイン方針で合意した。
+
+1. エリア制覇バッジ（設計書77/78/80で実装）を一時的に非表示にする
+2. マップ表示を簡素化する（ロック中ピンの非表示化、進捗サマリー・レベル凡例の削除）
+3. コレクション一覧ビューを、円形スタンプグリッドから「レベルごとの3状態表示（ロック中/解禁中未全制覇/解禁中全制覇済み）」＋「横長カード一覧」に全面リデザインする
+
+## 2. 確定済み仕様（ユーザー承認済み、モックアップで確認済み）
+
+### 2-1. エリア制覇バッジの非表示化（一時停止）
+
+`#stamp-area-badges`セクション（見出し「エリア制覇バッジ」＋バッジ本体、設計書77/78/80で実装）を画面から非表示にする。CLAUDE.mdに記録されている既存の「稼働停止中」パターン（Klookアフィリエイトリンク機能・PRカード機能等）を踏襲し、**コード自体（`_renderStampAreaBadges()`・`_computeStampAreaProgress()`・`STAMP_BADGE_AREAS`定数・関連CSS）は削除せず残置**する。復活時は最小限のコメントアウト解除のみで再開できる状態にする。
+
+### 2-2. マップ表示の簡素化
+
+- ロック中（現在解禁されていないレベル）のスポットのピンをマップ上から非表示にする。現状`local`/`niche`スポットは未解禁時サーバー側で名前等をマスクされる（`maskLockedStampSpot()`）が、ピン自体はマップ上に表示され続けている。今回は**ピン自体を表示しない**ように変更する（`special`は既存仕様で既にAPIレスポンスから除外されているため、ピン非表示は自然に実現されている。変更が必要なのは`local`/`niche`のロック中ピンのみ）
+- マップの上下にある付随情報（`#stamp-progress-summary`の進捗サマリーテキスト、`#stamp-level-legend`のレベル凡例チップ行）を削除する
+
+### 2-3. コレクション一覧の全面リデザイン（本設計書のメイン）
+
+現状のレベル別「ページ」（`.stamp-book-page`）＋円形スタンプグリッド（`.stamp-book-grid`／`.stamp-stamp-cell`／`.stamp-circle`、いずれも設計書78で実装）を廃止し、各レベルの状態に応じて以下3パターンの表示に出し分ける新デザインに刷新する。
+
+レベルは常に「定番→ローカル→ニッチ→スペシャル」の順で上から並べる。各レベルは以下3状態のいずれかを取る。
+
+- **状態A: ロック中**（そのレベルがまだ解禁されていない） — 個別スポットのカードは一切表示しない。「レベル名＋🔒アイコン＋件数（例:「ローカル 🔒 0/6」）」のみのコンパクトな1行表示にする
+- **状態B: 解禁中・未全制覇**（そのレベルは解禁されているが、まだ全スポットを制覇していない） — レベル見出し（アイコン＋レベル名）の下に、横長カードの一覧を表示する。各カードは番号付き円（制覇済みは塗りつぶし✓、未制覇は番号）＋スポット名＋エリア名を横並びで表示し、`order`昇順（＝順番）で並べる。現在の「次に狙うべきスポット」（既存の`_computeStampNextTarget()`ロジックを流用）には「次はここ！」タグを表示する。制覇済みスポットには、既存の設計書79で実装したチェックイン日時・説明文もカード内にコンパクト表示する（従来は円形スタンプの下に表示していたものを、横長カードのレイアウトに合わせて配置し直す）
+- **状態C: 解禁中・全制覇済み**（そのレベルの全スポットをチェックイン済み） — 個別スポットのカード一覧は表示せず、代わりに新規の大きなバッジ表示（常時表示、既存のレベル解禁演出モーダル`openStampLevelUnlockModal()`とは別物）を表示する。設計書81で導入済みの`STAMP_LEVEL_META[level].img`（レベルごとのイラスト画像、例: 定番=ヴィンテージカメラ）を大きく（96px程度）使い、「{レベル名} 制覇！」＋「{件数}/{件数} スポット達成」のようなテキストを添える
+
+## 3. 既存コードの調査結果（2026-07-21時点で実ファイルを確認、設計の前提事実）
+
+### 3-1. `public/index.html`
+
+- `#stamp-map-content`（167〜181行目）内の構造:
+  - `#stamp-progress-summary`（169行目、`<div style="font-size:13px;color:var(--warm-gray);flex:1;"></div>`）＋`#stamp-view-toggle-btn`（170行目、マップ⇄一覧トグルボタン）の行
+  - エリアバッジ見出し（173行目、`data-i18n="stampAreaBadgesTitle"`）＋`#stamp-area-badges`（174行目、`class="stamp-area-badges-page"`）
+  - `#stamp-map-view-inner`（175〜178行目、Leafletマップ`#stamp-leaflet-map`＋フォグ`#stamp-fog-overlay`）
+  - `#stamp-level-legend`（179行目、`<div style="display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px 4px;"></div>`）
+  - `#stamp-collection-list`（180行目、`<div style="display:none;padding:2px 16px 4px;"></div>`、`_renderStampCollectionList()`が`innerHTML`をセットする空コンテナ）
+- `#stamp-view-toggle-btn`は`toggleStampViewMode()`を呼ぶ既存トグルボタン（マップ⇄一覧の切り替え自体は本設計書のスコープ外、そのまま維持）
+
+### 3-2. `public/app.js`
+
+- **`STAMP_LEVEL_META`**（3661〜3666行目）: `{ standard: {labelKey, color, emoji, img}, local, niche, special }`。設計書81で`img`フィールド追加済み。**本設計書の状態C（全制覇バッジ）でそのまま再利用可能**
+- **`STAMP_LEVEL_ORDER_CLIENT`**（3941行目）: `['standard', 'local', 'niche', 'special']`。**そのまま再利用可能**（レベル表示順を制御する既存定数）
+- **`_stampSpots`**（3683行目）・**`_stampProgress`**（3684行目、`{checkedInSpotIds, unlockedLevels, checkinLog}`）: モジュールスコープ変数。**状態判定・集計にそのまま再利用可能**
+- **`_computeStampNextTarget()`**（3794〜3804行目）: 解禁済みレベルを順に見て`order`最小の未チェックスポットを返す。**そのまま再利用可能**（状態Bの「次はここ」タグ判定に使う）
+- **`_stampSpotIsChecked(spotId)`**（3872〜3874行目）: `_stampProgress.checkedInSpotIds.includes(spotId)`。**そのまま再利用可能**
+- **`_stampCheckinDateFor(spotId)`**（3877〜3883行目）: `checkinLog`から「M/D」形式の日付を返す。**そのまま再利用可能**（状態Bの横長カード内チェックイン日時表示に使う）
+- **`_stampRotateDeg(str)`**（3822〜3829行目、設計書78）: 文字列ハッシュから-5°〜+5°の回転角を決定的に算出。**本設計書では新規デザインが円形スタンプの回転演出を廃止するカードベースに変わるため、コレクション一覧側での利用は不要になる見込み**（エリアバッジ側の利用は§4-3参照）
+- **`_renderStampMarkers()`**（3885〜3905行目）: `_stampSpots`を`forEach`し、チェック状態に関わらず全スポットのピンを`L.divIcon`で生成、`_stampMarkersLayer`に`addTo`する。**本設計書の改修対象**（ロック中`local`/`niche`スポットのピンを非表示にするフィルタを追加）
+  ```js
+  function _renderStampMarkers() {
+    if (!_stampMarkersLayer) return;
+    _stampMarkersLayer.clearLayers();
+    const nextTarget = _computeStampNextTarget();
+    _stampSpots.forEach(spot => {
+      const checked = _stampSpotIsChecked(spot.id);
+      ...
+      const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(_stampMarkersLayer);
+      marker.on('click', () => openStampSpotDetail(spot.id));
+    });
+  }
+  ```
+  現状ロック中/解禁中を判定する分岐が一切ない。`_stampProgress.unlockedLevels.includes(spot.level)`で判定を追加する必要がある
+- **`_renderStampLevelLegend()`**（3929〜3940行目）: `#stamp-level-legend`にレベル凡例チップを`innerHTML`セットする関数本体。呼び出し元は`initStampMapTab()`（3756行目）・`doStampCheckin()`（4191行目）の2箇所。**本設計書では呼び出し自体を削除**（§2-2「レベル凡例チップ行を削除」に対応）
+- **`_renderStampProgressSummary()`**（3972〜3982行目）: `#stamp-progress-summary`に進捗テキストをセットする関数本体。呼び出し元は`initStampMapTab()`（3757行目）・`doStampCheckin()`（4192行目）の2箇所。**本設計書では呼び出し自体を削除**（§2-2「進捗サマリーテキストを削除」に対応）
+- **`_renderStampAreaBadges()`**（3949〜3970行目）: `#stamp-area-badges`にエリアバッジHTMLをセットする関数本体。呼び出し元は`initStampMapTab()`（3759行目）・`doStampCheckin()`（4194行目）の2箇所。**本設計書ではCLAUDE.mdの「稼働停止中」パターンに倣い、関数定義自体は残置し、呼び出しをスキップまたはHTML側で非表示にする**（§7-1参照）
+- **`_renderStampCollectionList()`**（3988〜4037行目、設計書78・79・81で拡張済み）: レベルごとに`.stamp-book-page`を生成し、内部に`.stamp-book-grid`＋`.stamp-stamp-cell`（円形スタンプ＋番号/絵文字/🔒＋スポット名＋チェックイン日時・説明文＋「次はここ」タグ）の縦積みグリッドを描画する現行実装。**本設計書で全面書き換えの対象**（状態A/B/Cの3分岐に置き換える）
+- **`openStampSpotDetail(spotId)`**（4040行目〜）: スポット詳細モーダルを開く関数。**変更不要**、状態Bの横長カードタップ時の遷移先としてそのまま使う
+- **`openStampLevelUnlockModal(level)`**（4205〜4223行目）・**`closeStampLevelUnlockModal()`**（4225〜4229行目）: レベル解禁の一度きりの演出モーダル。**変更不要**。状態C（常時表示の大きなバッジ）とは別物として共存させる（詳細は§4「両立設計」参照）
+- **`doStampCheckin()`**（4145〜4202行目）: チェックイン成功後の再描画呼び出し列（4189〜4194行目）:
+  ```js
+  _renderStampMarkers();
+  _renderStampFog();
+  _renderStampLevelLegend();      // ← 本設計書で削除
+  _renderStampProgressSummary();  // ← 本設計書で削除
+  _renderStampCollectionList();
+  _renderStampAreaBadges();       // ← 本設計書で呼び出しスキップ（§7-1参照）
+  ```
+- **`initStampMapTab()`**（3740〜3764行目）: 初回描画呼び出し列（3754〜3759行目）も上記と同一の5関数を呼ぶ構造。**同様の変更が必要**
+
+### 3-3. `public/app.css`
+
+- `.stamp-level-chip`系（1908〜1914行目）: レベル凡例チップのスタイル。**呼び出し元を削除するのみでCSS自体は残置可**（他箇所からの参照がないか要確認、§9参照）
+- `.stamp-area-badges-page`／`.stamp-area-stamp`系（1917〜1935行目）: エリアバッジのスタイル。**削除せず残置**（§2-1の方針通り）
+- `.stamp-marker-icon`系（1937〜1958行目）: マップピンのスタイル。**本設計書のスコープ外**（ピン自体のデザインは変更しない、表示/非表示のフィルタのみ追加）
+- `.stamp-book-page`系（1961〜2008行目）・`.stamp-circle`系（2011〜2076行目）: 現行コレクション一覧のスタイル一式。**本設計書で新規クラス一式に置き換え対象**（既存クラス名を流用するか新規命名にするかはbuilder判断、詳細は§7-3）
+- `.stamp-unlock-emoji`／`.stamp-unlock-img`（2079〜2088行目）: レベル解禁演出モーダル用。**本設計書のスコープ外**（変更しない）
+
+### 3-4. `server.js`
+
+- `STAMP_LEVEL_GATES`（1994〜1999行目）・`STAMP_LEVEL_ORDER`（2000行目）・`computeUnlockedLevels()`（2003〜2020行目）: レベル制の段階ゲートロジック。**本設計書は変更不要**
+- `maskLockedStampSpot()`（2025〜2033行目）: 未解禁`local`/`niche`スポットの`name`/`nameJa`/`description`/`imageUrl`をマスクする既存関数。**本設計書は変更不要**（`lat`/`lng`はマスク対象外のまま、ピン自体をクライアント側で非表示にする設計のため、サーバー側のマスク範囲を広げる必要はない）
+- `GET /api/stamp-spots`（2038〜2064行目）: レスポンス構造は`{ spots, unlockedLevels }`。各スポット要素は`unlockedLevels`を見てロック中かどうかクライアント側で判定できる情報を既に持っている（`spot.level`＋レスポンス直下の`unlockedLevels`配列）。**本設計書は変更不要**
+
+## 4. スコープ外（今回作らないもの）
+
+- スポット詳細モーダル自体（`#stamp-spot-detail-sheet`／`openStampSpotDetail()`）のデザイン変更
+- エリアバッジ機能自体の削除（コードは残置、表示のみ停止。§2-1）
+- レベル解禁演出モーダル（`openStampLevelUnlockModal()`、一度きりのポップアップ演出）自体の変更。状態Cの「常時表示される大きなバッジ」とは別物として共存させる（両方が同時にトリガーされても矛盾なく動作させる、詳細は§6-4）
+- データモデル・API変更（本設計書は表示ロジックの変更のみ、`server.js`・`data/`は無変更）
+- BKK/SYD対応
+- マップ⇄一覧トグル自体（`toggleStampViewMode()`／`#stamp-view-toggle-btn`）の廃止・変更（引き続き両ビューの切替機能として残す）
+- マップ上のピンデザイン自体（`.stamp-marker-icon`の形状・色）の変更（今回はロック中ピンの表示/非表示フィルタ追加のみ）
+- 状態Cの「全制覇バッジ」タップ時の追加インタラクション（詳細シートへの遷移等）。タップ不可の純粋な表示要素として扱う（未解決事項§9-4参照）
+- 状態Bの横長カードの画像表示（`spot.imageUrl`）。既存の円形グリッド版でも画像は使っていなかった（`imageUrl`は多くのスポットで空文字列、設計書73参照）ため、本設計書でも画像なしのテキストベースカードとする
+
+## 5. データモデルの変更点
+
+**変更なし**。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも無変更。既存フィールド（`id/name/nameJa/lat/lng/level/area/category/description/imageUrl/checkinRadiusM/active/order`、進捗側は`checkedInSpotIds/checkinLog/unlockedLevels`）をそのまま利用する。
+
+## 6. APIの変更点
+
+**変更なし**。`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`のいずれもレスポンス構造の変更は不要。`server.js`は無変更。本設計書は純粋にフロントエンドの表示ロジック・HTML構造・CSSの変更のみで完結する。
+
+### 6-1. 参考: サーバーがマスクしないフィールドの再確認
+
+`maskLockedStampSpot()`は`lat`/`lng`をマスク対象外のまま返す（設計書71 §3で確認済みの既存仕様）。本設計書の「ロック中ピンをマップから非表示にする」対応は、**クライアント側で`_stampProgress.unlockedLevels.includes(spot.level)`が偽のスポットをマーカー生成ループから除外するだけで実現できる**（サーバー側が`lat`/`lng`を返さないように変更する必要はない。理由: `special`レベルの既存非表示化がAPIレスポンス自体からの除外〈スポット要素ごと除外〉なのに対し、`local`/`niche`は「マスクはするがスポット要素自体は返す」既存設計〈設計書71で確定済み〉のため、この既存方針との整合性を保つには、ピンの表示/非表示制御もクライアント側フィルタで行うのが自然）
+
+## 7. フロントエンド設計
+
+### 7-1. エリアバッジの非表示化（呼び出しスキップ方式）
+
+**方針**: `_renderStampAreaBadges()`関数定義自体は無変更のまま残置し、以下いずれかの方法で呼び出しを止める（builder判断でどちらでもよいが、**両方同時に行う必要はない**、単一の対策で十分）。
+
+- **案A（推奨）: HTML側で`#stamp-area-badges`セクション全体を`display:none`にする**。`public/index.html`のエリアバッジ見出し行（173行目）と`#stamp-area-badges`（174行目）を包む新規`<div style="display:none;">`ラッパーを追加する、または既存2要素それぞれに`style="display:none;"`を追記する。`_renderStampAreaBadges()`の呼び出し自体（`initStampMapTab()`・`doStampCheckin()`）は**そのまま残してよい**（非表示要素への`innerHTML`書き込みは実害がなく、CLAUDE.mdの既存「稼働停止中」パターン〈PRカードの`_pickSponsoredCardForToday([])`が空配列で自然に非表示になる設計〉と同様に、無害な形で処理を残しておける）
+- **案B: JS側で呼び出し自体をコメントアウト**（`initStampMapTab()`・`doStampCheckin()`の`_renderStampAreaBadges();`の行をコメントアウトする）。この場合`#stamp-area-badges`のHTML自体は変更不要（呼び出されないため空のまま）だが、見出しテキスト（173行目）はHTML側で個別に非表示にする必要がある
+
+**推奨は案A**。理由: JS側の呼び出し列（`initStampMapTab()`・`doStampCheckin()`）に手を加えないため、変更差分が小さく、CLAUDE.mdの他の「稼働停止中」パターン（例: Klookアフィリエイトリンクの`embedAffiliateLinks()`コメントアウト方式）とは異なる、より変更範囲の小さい停止方法になる。復活時はHTML側の`display:none`を消すだけで即座に再開できる。
+
+### 7-2. マップ表示の簡素化
+
+**7-2-1. ロック中ピンの非表示化（`_renderStampMarkers()`改修）**
+
+```js
+function _renderStampMarkers() {
+  if (!_stampMarkersLayer) return;
+  _stampMarkersLayer.clearLayers();
+  const nextTarget = _computeStampNextTarget();
+  _stampSpots
+    .filter(spot => _stampProgress.unlockedLevels.includes(spot.level))  // ← 追加: ロック中レベルのスポットはピン自体を生成しない
+    .forEach(spot => {
+      const checked = _stampSpotIsChecked(spot.id);
+      const isNext = !!nextTarget && nextTarget.id === spot.id;
+      const meta = STAMP_LEVEL_META[spot.level] || STAMP_LEVEL_META.standard;
+      const badgeHtml = (typeof spot.order === 'number')
+        ? `<div class="stamp-marker-badge">${spot.order}</div>`
+        : '';
+      const icon = L.divIcon({ ... });  // 既存のまま無変更
+      const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(_stampMarkersLayer);
+      marker.on('click', () => openStampSpotDetail(spot.id));
+    });
+}
+```
+
+- `filter()`を`forEach`の直前に追加するだけの最小変更。既存のマーカー生成ロジック（`L.divIcon`のHTML文字列生成、`marker.on('click', ...)`）は一切変更しない
+- **`standard`レベルは`STAMP_LEVEL_GATES.standard === null`により常に解禁済み**（設計書71 §2で確認済みの既存仕様）のため、`standard`スポットのピンは従来通り全件表示され続ける。実質的に影響を受けるのは未解禁時の`local`/`niche`スポットのみ（`special`は既にAPIレスポンス自体から除外されているため、この`filter()`が実行される時点でそもそも`_stampSpots`に含まれていない）
+- `_computeStampNextTarget()`は解禁済みレベルのみを見て次ターゲットを算出する既存ロジック（3796行目`if (!_stampProgress.unlockedLevels.includes(level)) continue;`）のため、この`filter()`追加によって整合性が崩れることはない（ロック中スポットが`nextTarget`になることは元々ない）
+
+**7-2-2. 進捗サマリー・レベル凡例チップの削除**
+
+- `initStampMapTab()`（3754〜3759行目）・`doStampCheckin()`（4189〜4194行目）の呼び出し列から`_renderStampLevelLegend();`と`_renderStampProgressSummary();`の2行を削除する（各箇所で2行ずつ、計4行の削除）
+- `public/index.html`の`#stamp-progress-summary`（169行目）を含む行、`#stamp-level-legend`（179行目）の行は、**HTML要素自体を削除してよい**（§7-1のエリアバッジとは扱いを分ける理由: エリアバッジは「一時停止」で将来の復活を想定した設計〈CLAUDE.mdの確立パターンに揃える〉のに対し、進捗サマリー・レベル凡例チップは本設計書のマップ簡素化方針そのものであり、復活を前提としない恒久的な削除として扱ってよい。ただし関数定義自体（`_renderStampLevelLegend()`・`_renderStampProgressSummary()`）を削除するかHTML要素だけ削除して関数は死んだコードとして残すかはbuilder判断でよい。**呼び出し元を削除すれば実害はどちらでも同じ**なので、削除範囲の広さはbuilderの裁量とする）
+- `#stamp-view-toggle-btn`（170行目、トグルボタン）を含む行は残す（§4スコープ外の通り、マップ⇄一覧トグル自体は維持するため）。ただし進捗サマリーが同じ行にあった場合、トグルボタンのみの行としてレイアウトを整える必要がある（現状169〜171行目は`display:flex;align-items:center;justify-content:space-between;`の1行にサマリーテキストとボタンが同居しているため、サマリーテキスト側の`<div>`を削除した後、ボタンだけが右寄せのまま残る、または左右中央寄せに変える等のレイアウト微調整はbuilder判断）
+
+### 7-3. コレクション一覧の全面リデザイン（`_renderStampCollectionList()`の書き換え）
+
+**7-3-1. 状態判定ロジック（builderが迷わず実装できる具体的アルゴリズム）**
+
+各レベル（`STAMP_LEVEL_ORDER_CLIENT`の4値を順に処理）について、以下の手順で状態A/B/Cを判定する。
+
+```js
+function _renderStampCollectionList() {
+  const el = document.getElementById('stamp-collection-list');
+  if (!el) return;
+  const nextTarget = _computeStampNextTarget();
+  const lang = getLang();
+
+  el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
+    const spotsInLevel = _stampSpots.filter(s => s.level === level);
+    if (spotsInLevel.length === 0) return '';  // 該当レベルのスポットが1件もない場合（現状ありえないが防御的に）は何も描画しない
+
+    const meta = STAMP_LEVEL_META[level];
+    const unlocked = _stampProgress.unlockedLevels.includes(level);
+    const totalCount = spotsInLevel.length;
+    const checkedCount = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+
+    // ─── 状態判定（3値のいずれか1つに必ず分類される） ───
+    // 状態A: ロック中（unlocked === false）
+    // 状態B: 解禁中・未全制覇（unlocked === true かつ checkedCount < totalCount）
+    // 状態C: 解禁中・全制覇済み（unlocked === true かつ checkedCount === totalCount）
+    let state;
+    if (!unlocked) {
+      state = 'locked';
+    } else if (checkedCount < totalCount) {
+      state = 'inProgress';
+    } else {
+      state = 'complete';
+    }
+
+    if (state === 'locked') {
+      return _renderStampLevelRowLocked(level, meta, totalCount);
+    } else if (state === 'inProgress') {
+      return _renderStampLevelRowInProgress(level, meta, spotsInLevel, nextTarget, lang);
+    } else {
+      return _renderStampLevelRowComplete(level, meta, totalCount);
+    }
+  }).join('');
+}
+```
+
+- **状態判定の根拠となる値は既存データのみで完結する**（`_stampProgress.unlockedLevels`・`_stampProgress.checkedInSpotIds`・`_stampSpots`の3つ、いずれも既存の`_loadStampSpotsAndProgress()`・`doStampCheckin()`で更新済みのモジュールスコープ変数）。新規APIコール・新規データ構造は不要
+- **`totalCount`は`_stampSpots`に含まれる件数**（＝APIレスポンスに実際に含まれているスポット数）である点に注意。`special`レベルが未解禁の場合、そもそも`_stampSpots`に`special`スポットが1件も含まれない（サーバー側で除外済み）ため、`spotsInLevel.length === 0`となり`STAMP_LEVEL_ORDER_CLIENT.map()`のこのイテレーションは空文字列を返す（**「スペシャルレベルの行自体が丸ごと表示されない」という結果になり、これは既存仕様〈スペシャルはピン自体も一覧要素も非表示〉と完全に整合する**。状態Aの「ロック中を1行だけ表示する」という要件は、`special`が未解禁の場合には適用されない＝スペシャルは行自体が存在しないことになる点をbuilderは認識しておくこと。この扱いは既存の`_renderStampMarkers()`・旧`_renderStampCollectionList()`双方が既に踏襲している`special`除外の一貫した延長であり、本設計書で新たに導入する挙動ではない）
+- 上記コード例では3つの状態を個別のヘルパー関数（`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`、命名はbuilder判断）に分離する構成を提示しているが、1つの巨大な関数内で`if/else if/else`により文字列を分岐生成する方式でも構わない（**関数分割はbuilderの実装しやすさを優先して判断してよい、本設計書が要求するのはロジックの結果〈3状態のいずれかに必ず分類され、対応するHTML構造が生成されること〉であり、コードの構造自体ではない**）
+
+**7-3-2. 状態A（ロック中）のHTML構造案**
+
+```js
+function _renderStampLevelRowLocked(level, meta, totalCount) {
+  return `<div class="stamp-level-row stamp-level-row--locked">
+    <span class="stamp-level-row-icon">🔒</span>
+    <span class="stamp-level-row-label">${t(meta.labelKey)}</span>
+    <span class="stamp-level-row-count">0/${totalCount}</span>
+  </div>`;
+}
+```
+
+- コンパクトな1行表示（既存`.stamp-level-chip`と似た情報量だが、レベル別に縦積みで並ぶ点が異なる）
+- `0/${totalCount}`と決め打ちしてよい理由: ロック中レベルはそのレベル自体が未解禁＝そのレベル内のスポットは1件もチェックインできない状態にある（`STAMP_LEVEL_GATES`の段階ゲート設計上、あるレベルが解禁されるにはその前段のレベルを規定数チェックインする必要があり、そのレベル自体をチェックインすることは物理的に不可能）。ただし念のため`checkedCount`（実測値、通常は常に0のはず）を使う実装でも構わない（`0`固定 vs `checkedCount`変数使用、どちらでも結果は同じになる想定だが、**将来の仕様変更への耐性を考えるなら`checkedCount`変数を使う方が安全**、builder判断とする）
+- 見出しテキストの絵文字は🔒固定（`meta.emoji`は使わない、ロック状態を明示するため）。レベル名の右に件数（`0/{totalCount}`）を添える
+
+**7-3-3. 状態B（解禁中・未全制覇）のHTML構造案（横長カード一覧）**
+
+```js
+function _renderStampLevelRowInProgress(level, meta, spotsInLevel, nextTarget, lang) {
+  const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const cardsHtml = sorted.map(spot => {
+    const checked = _stampSpotIsChecked(spot.id);
+    const isNext = !!nextTarget && nextTarget.id === spot.id;
+    const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+
+    const circleHtml = checked
+      ? `<div class="stamp-card-circle stamp-card-circle--checked" style="background:${meta.color};">✓</div>`
+      : `<div class="stamp-card-circle">${typeof spot.order === 'number' ? spot.order : '?'}</div>`;
+
+    const metaHtml = checked
+      ? `<div class="stamp-card-meta">
+          ${_stampCheckinDateFor(spot.id) ? `<span class="stamp-card-date">${_stampCheckinDateFor(spot.id)}</span>` : ''}
+          ${spot.description ? `<span class="stamp-card-desc">${spot.description}</span>` : ''}
+        </div>`
+      : '';
+
+    return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')">
+      ${circleHtml}
+      <div class="stamp-card-body">
+        <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
+        <div class="stamp-card-area">${spot.area || ''}</div>
+        ${metaHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="stamp-level-section">
+    <div class="stamp-level-section-title">
+      <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">
+      ${t(meta.labelKey)}
+    </div>
+    <div class="stamp-card-list">${cardsHtml}</div>
+  </div>`;
+}
+```
+
+- **既存の再利用ロジック**: `order`昇順ソート・`_stampCheckinDateFor()`・`spot.description`（設計書79）・「次はここ」タグ（`_computeStampNextTarget()`の結果を親関数から引数で受け取る）は、旧`_renderStampCollectionList()`のロジックをそのまま流用する（`_stampRotateDeg()`・円の回転演出は今回のカードデザインでは使わないため参照しない）
+- **各カードのタップハンドラ**: 旧実装は`unlocked`時のみ`onclick`を付与していたが、状態Bは定義上「解禁中」のレベルのみが到達するため、**このレベル内の全カードは無条件で`onclick`を付与してよい**（ロック中カード自体がそもそも存在しない設計のため、旧実装にあった`unlocked ? onclick... : ''`の三項分岐は不要になる。既存の`if(!_touchCapableDetected)`ガードパターン〈CLAUDE.md必須ルール〉は維持する）
+- **見出しレベルタイトル**: 設計書81で導入済みの`meta.img`（`STAMP_LEVEL_META[level].img`）をそのまま流用し、既存`.stamp-level-title-img`クラス（32px、設計書82でサイズ拡大済み）を継続利用する。旧実装の`.stamp-book-page-title`にあった「ロック時は🔒＋注意文を追加する」分岐（`unlocked ? '' : ' 🔒 ' + t('stampCollectionLockedNote')}`）は不要になる（状態Bは定義上`unlocked === true`のため）
+
+**7-3-4. 状態C（解禁中・全制覇済み）のHTML構造案（全制覇バッジ）**
+
+```js
+function _renderStampLevelRowComplete(level, meta, totalCount) {
+  return `<div class="stamp-level-complete-badge">
+    <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-complete-badge-img">
+    <div class="stamp-level-complete-badge-title">${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}</div>
+    <div class="stamp-level-complete-badge-count">${totalCount}/${totalCount} ${t('stampLevelCompleteSpotsLabel')}</div>
+  </div>`;
+}
+```
+
+- **「{レベル名} 制覇！」の「制覇！」部分・「{件数}/{件数} スポット達成」の「スポット達成」部分は新規i18nキーとして切り出す**（プレースホルダー埋め込み方式にせず、`t(meta.labelKey)`＋`t('stampLevelCompleteLabel')`のように文言を分割して連結する方式を推奨。理由: 日本語「定番 制覇！」・英語「Standard: Complete!」のように語順・記号が言語間で異なりうるため、単純な文字列連結よりも、必要であれば`.replace('{level}', ...)`のプレースホルダー方式も選択肢としてbuilder判断で構わない。詳細は§8参照）
+- **画像サイズは96px程度**（§2-3確定仕様の通り）。既存`.stamp-unlock-img`（レベル解禁演出モーダル用、96px、設計書81で導入済み）と全く同じサイズ・`object-fit:contain`パターンを流用できるが、**クラス自体は新規に用意すること**（`.stamp-unlock-img`をそのまま使い回すと、モーダル用のクラスとコレクション一覧用のクラスが同じセレクタになり、将来どちらかのサイズだけ変更したい場合に共倒れするリスクがあるため、新規`.stamp-level-complete-badge-img`として分離する）
+- タップ不可の純粋な表示要素として扱う（§4スコープ外の通り、`onclick`は付与しない）
+
+**7-3-5. 既存クラス名との関係**
+
+- 本設計書の新規HTML構造（`.stamp-level-row`／`.stamp-level-section`／`.stamp-card`／`.stamp-level-complete-badge`、いずれも命名例）は、設計書78で導入した`.stamp-book-page`／`.stamp-book-grid`／`.stamp-stamp-cell`／`.stamp-circle`（コレクション一覧用途の部分のみ。**エリアバッジ用途〈`.stamp-circle--area`〉は本設計書のスコープ外〈エリアバッジ自体が非表示化されるため〉なので触れる必要はない**）を置き換える。**旧クラスを削除するか、使われなくなったコードとして残すかはbuilder判断**（CLAUDE.mdには「CSSクラスの二重定義禁止」ルールはあるが、「使われなくなったクラスを都度削除する」ことまでは必須ルール化されていない。ただし本設計書は「置き換え」を目的とするため、削除するのが望ましいとplannerは考える。**推奨: 旧`.stamp-book-page`／`.stamp-book-grid`／`.stamp-stamp-cell`／`.stamp-circle`／`.stamp-circle-order`／`.stamp-circle-lock`／`.stamp-circle--locked`／`.stamp-circle--checked`／`.stamp-circle--next`／`.stamp-circle-mark`／`.stamp-stamp-cell-name`／`.stamp-stamp-cell-next-tag`／`.stamp-stamp-cell-meta`／`.stamp-stamp-cell-date`／`.stamp-stamp-cell-desc`は削除する。ただし`.stamp-circle--area`／`.stamp-circle--area-img`（エリアバッジ用）・`.stamp-area-badge-img`はエリアバッジ機能自体を残置する方針〈§2-1〉のため削除しないこと**（`.stamp-circle`という同名の基本クラスをエリアバッジ側〈`.stamp-circle--area`と併記して使う〉とコレクション一覧側の両方が共有していたため、**コレクション一覧側の書き換えで`.stamp-circle`本体のスタイル定義を削除・変更すると、エリアバッジ側の見た目も連動して壊れる**点に強く注意すること。詳細はリスク§10-1参照）
+
+### 7-4. CSS設計方針（新規クラス、具体的な数値案）
+
+builderの実装しやすさのため、既存の確立されたトーン（`.stamp-book-page`の紙質感背景、`var(--cream)`/`var(--sand)`/`var(--sand-dark)`/`var(--warm-gray)`/`var(--caramel)`）を踏襲した具体案を示す。最終的な数値微調整はbuilder判断でよい。
+
+**状態A（ロック中）の1行表示**:
+```css
+.stamp-level-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px;
+  background: var(--sand);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  opacity: 0.6;
+}
+.stamp-level-row-icon { font-size: 16px; }
+.stamp-level-row-label { font-size: 13px; font-weight: 700; color: var(--warm-gray); flex: 1; }
+.stamp-level-row-count { font-size: 12px; color: var(--warm-gray); }
+```
+
+**状態B（解禁中・未全制覇）のセクション＋横長カード一覧**:
+```css
+.stamp-level-section {
+  margin-bottom: 20px;
+}
+.stamp-level-section-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 700; color: var(--midnight);
+  margin-bottom: 10px;
+}
+.stamp-card-list {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.stamp-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--cream);
+  border: 1px solid var(--sand-dark);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.stamp-card--checked {
+  background: var(--warm-white, var(--cream));  /* 制覇済みカードは背景をわずかに区別できる余地を残す。既存var(--warm-white)が無ければvar(--cream)にフォールバック */
+}
+.stamp-card-circle {
+  flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700;
+  border: 2px dashed var(--sand-dark);
+  color: var(--warm-gray);
+}
+.stamp-card-circle--checked {
+  border: none; color: white;
+}
+.stamp-card-body { flex: 1; min-width: 0; }
+.stamp-card-name {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 14px; font-weight: 700; color: var(--midnight);
+}
+.stamp-card-area { font-size: 11px; color: var(--warm-gray); margin-top: 2px; }
+.stamp-card-next-tag {
+  font-size: 10px; font-weight: 700; color: white;
+  background: var(--caramel); padding: 1px 7px; border-radius: 50px;
+}
+.stamp-card-meta {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 6px;
+}
+.stamp-card-date { font-size: 10px; font-weight: 700; color: var(--caramel); }
+.stamp-card-desc {
+  font-size: 11px; color: var(--warm-gray); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+```
+
+**状態C（解禁中・全制覇済み）の大きなバッジ**:
+```css
+.stamp-level-complete-badge {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--sand);
+  border: 1px solid var(--sand-dark);
+  border-radius: 16px;
+  padding: 24px 16px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.stamp-level-complete-badge-img {
+  width: 96px; height: 96px; object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(44,36,32,0.25));
+  margin-bottom: 10px;
+}
+.stamp-level-complete-badge-title {
+  font-size: 15px; font-weight: 700; color: var(--midnight);
+  margin-bottom: 4px;
+}
+.stamp-level-complete-badge-count {
+  font-size: 12px; color: var(--warm-gray);
+}
+```
+
+- いずれも既存CSS変数（`var(--cream)`/`var(--sand)`/`var(--sand-dark)`/`var(--midnight)`/`var(--warm-gray)`/`var(--caramel)`）ベースのため、設計書78で確立されたダークモード自動追従（`html[data-theme="dark"]`ブロックでの変数再定義）の恩恵をそのまま受ける。**新規に`background: white`等の直書きをしないこと**（設計書78で修正済みの「ダークモード非対応の見落とし」を再発させないための必須確認事項）
+- `.stamp-card--checked`の`var(--warm-white, var(--cream))`は、`--warm-white`というCSS変数が既存に定義されているか未確認のため、フォールバック記法にしている。**builder実装時に`grep -n "\-\-warm-white"`等で既存定義の有無を確認し、無ければ単純に`var(--cream)`のみ使う（フォールバック構文ごと削除してよい）**
+
+### 7-5. マップ/一覧トグルとの関係（既存ロジックへの影響確認）
+
+- `toggleStampViewMode()`・`_applyStampViewMode()`（3771〜3788行目）は本設計書のスコープ外、無変更で維持する
+- `_applyStampViewMode()`が制御する3要素（`#stamp-map-view-inner`／`#stamp-level-legend`／`#stamp-collection-list`）のうち、`#stamp-level-legend`は§7-2-2でHTML要素ごと削除する対象のため、**`_applyStampViewMode()`内の`legendEl`関連コード（`document.getElementById('stamp-level-legend')`の取得・`legendEl.style.display = ...`の代入）も合わせて削除する必要がある**（要素が存在しないままアクセスしても`legendEl`が`null`になり`if (legendEl) ...`のガードがあるため実害はないが、死んだコードを残さないためbuilderは削除することを推奨）
+- `#stamp-area-badges`は`_applyStampViewMode()`の表示切替対象に**含まれていない**（設計書77で確定済みの既存仕様、マップ/一覧どちらでも常時表示するため）。本設計書§7-1で`display:none`にする対応も、この`_applyStampViewMode()`とは独立した変更のため、相互に影響しない
+
+## 8. i18n変更点
+
+以下2キーを新規追加する（ja/en同時追加、CLAUDE.md必須ルール）。
+
+| キー | ja（案） | en（案） |
+|---|---|---|
+| `stampLevelCompleteLabel`（新規） | 制覇！ | Complete! |
+| `stampLevelCompleteSpotsLabel`（新規） | スポット達成 | spots collected |
+
+- 状態Cのバッジテキスト生成例: `${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}`（例: 「定番 制覇！」/「Standard Complete!」）、`${totalCount}/${totalCount} ${t('stampLevelCompleteSpotsLabel')}`（例: 「7/7 スポット達成」/「7/7 spots collected」）
+- **既存キーの流用**: `stampNextTargetLabel`（次はここ！）はそのまま流用。`stampCollectionLockedNote`（このレベルはまだロック中です）は、旧実装ではページ見出し内に注釈として使われていたが、本設計書の状態A（1行表示）はコンパクトな表現（🔒＋件数のみ）を採用しているため、**このキーは新デザインでは使用しない可能性が高い**。他に参照箇所がないか`grep`で確認し、無参照になった場合はCLAUDE.mdの「死にキー削除」慣習に従い削除するかどうかはbuilder判断とする（削除しなくても実害はない、死にキーとして残しても動作に影響しない）
+- **既存キーで英語訳の見直しが必要な可能性**: `stampAreaBadgesTitle`（エリア制覇バッジ）は§7-1でHTML側`display:none`にする対応のため、キー自体は死にキーにはならない（`data-i18n`属性は残るため`applyI18n()`は引き続き参照する。ただし表示されないので実害はない）。**削除不要**
+- 英語モードでの目視確認（CLAUDE.md必須ルール）を実装完了の確認基準に含めること
+
+## 9. 既知の未解決事項
+
+1. **状態C（全制覇済み）バッジのタップ動作**: §4スコープ外の通りタップ不可の表示要素とする方針だが、将来的に「制覇済みスポット一覧を再度見たい」というニーズが出た場合、タップで簡易的な一覧をポップアップ表示する等の拡張余地はある（今回は実装しない）
+2. **状態Aの1行表示に、そのレベル内の「代表スポット名」等のヒントを含めるか**: 現状案は「レベル名＋🔒＋0/N」のみで、どんなスポットがあるかの情報は一切出さない（ネタバレ防止という設計書71の既存方針を踏襲した保守的な設計）。より強いフックが欲しい場合は将来的な改善候補
+3. **状態Bのカードの高さが、制覇済み（チェックイン日時・説明文あり）と未制覇（番号のみ）で不揃いになる**: `.stamp-card-list`は`display:flex;flex-direction:column;`のため、各カードの高さがコンテンツ量に応じて変わること自体はレイアウト崩れを起こさないが、視覚的な統一感（リズム）が損なわれる可能性がある。実装後のWeb版目視確認で許容範囲かを判断する
+4. **エリアバッジ非表示化の方式（案A vs 案B）の最終選択**: §7-1で案A（HTML側`display:none`）を推奨したが、最終的な採用可否はbuilder実装時の判断に委ねる
+5. **旧CSSクラス（`.stamp-book-page`等）の削除範囲**: §7-3-5で「削除を推奨」としたクラス一覧を提示したが、`.stamp-circle`本体・`.stamp-circle--checked`等、**エリアバッジ側（`.stamp-circle--area`と併記使用）とコレクション一覧側で共有されているクラスの扱いには特に注意が必要**（詳細はリスク§10-1）。builderは実装前に該当クラスの全参照箇所を`grep`で洗い出し、削除してよい範囲を確定させること
+6. **`.stamp-marker-badge`（マップピン上の番号バッジ）の扱い**: 本設計書はマップピンのデザイン自体（§4スコープ外）には触れないため、番号バッジ表示は現状維持。ただし状態A/B/Cの新デザインで「順番の示唆」の主要な導線がコレクション一覧側の横長カード（`order`昇順表示）に一本化される形になるため、マップ側の番号バッジの相対的な役割は小さくなる（削除は今回のスコープ外だが、将来的な整理候補として記録）
+7. **状態Bのカード一覧のスクロール量**: 23件のスポット（設計書77で拡張済み）が横長カードになると、円形グリッドより1件あたりの縦方向の専有面積が大きくなり、コレクション一覧全体のスクロール量が増える可能性が高い。実装後のWeb版・実機での確認が必要
+
+## 10. リスク
+
+1. **`.stamp-circle`本体クラスの共有関係を見落として削除すると、エリアバッジ（非表示化されるが将来復活する想定）のCSSも壊れるリスク**: `.stamp-circle`はコレクション一覧の個別スポット円（本設計書で廃止対象）と、エリアバッジの円形スタンプ（`.stamp-circle--area`と併記、§2-1の方針により機能自体は残置）の**両方から参照される共通基本クラス**である。本設計書の実装時に`.stamp-circle`本体（`width:72px;height:72px;border-radius:50%;...`等の基本スタイル）を安易に削除・変更すると、`#stamp-area-badges`を再度表示状態に戻した際（復活時）にエリアバッジの見た目が壊れる。**対応**: `.stamp-circle`本体・`.stamp-circle--checked`・`.stamp-circle--area`・`.stamp-circle--area-img`・`.stamp-area-badge-img`は削除せず維持し、コレクション一覧側で使わなくなった付随クラス（`.stamp-circle-order`／`.stamp-circle-lock`／`.stamp-circle--locked`／`.stamp-circle--next`／`.stamp-circle-mark`のうち、エリアバッジ側で参照されていないもの）のみ削除対象とする。実装時に`grep -n "stamp-circle"`で全参照箇所を洗い出し、エリアバッジ側（`_renderStampAreaBadges()`関数内）で使われているクラス名を除外リストとして確定させてから削除を行うこと
+2. **`_renderStampMarkers()`のフィルタ追加漏れによる回帰リスク**: `filter()`の追加位置を誤ると（例: `forEach`の中で条件分岐する方式に変えた場合、`return`し忘れてピンが生成され続ける等）、意図通りロック中ピンが非表示にならない可能性がある。実装後、未解禁状態のテストユーザーで`GET /api/stamp-spots`のレスポンス件数とマップ上の実際のピン数を突き合わせて確認することを推奨
+3. **状態判定ロジックの境界条件ミス**: `totalCount === 0`（該当レベルのスポットが0件、通常は起こらないが`special`未解禁時に相当）のケースで、`checkedCount < totalCount`が`0 < 0`となり偽になるため`state = 'complete'`に誤判定される可能性がある（`0/0`の全制覇バッジが表示されてしまうバグ）。**対応**: §7-3-1のコード例冒頭`if (spotsInLevel.length === 0) return '';`のガードが必須であることをbuilderは見落とさないこと（`special`未解禁時に空の全制覇バッジが出る事故を防ぐための唯一の防御線）
+4. **`initStampMapTab()`／`doStampCheckin()`双方の呼び出し列の修正漏れ**: `_renderStampLevelLegend()`・`_renderStampProgressSummary()`の呼び出し削除は2箇所（初回描画・チェックイン後再描画）双方で行う必要がある。片方だけ削除すると「初回は消えているがチェックイン後に復活する」ような不整合バグになる。実装後`grep -n "_renderStampLevelLegend\|_renderStampProgressSummary"`で参照が完全に無くなった（または呼び出し元がない状態になった）ことを確認すること
+5. **状態B・状態Cが同一レベル内で切り替わる瞬間（チェックインでレベルが全制覇になった瞬間）の見た目のジャンプ**: `doStampCheckin()`実行後、`_renderStampCollectionList()`が再呼び出しされ、あるレベルの表示が「横長カード一覧」から「全制覇バッジ」へ瞬時に切り替わる。アニメーション遷移は本設計書のスコープに含まれておらず（§4に明記なしだが、既存の`_renderStampAreaBadges()`同様`innerHTML`一括再代入方式を踏襲するため自然と即時切り替えになる）、この切り替わりが不自然に見えないかは実装後の目視確認が必要
+6. **レベル解禁演出モーダル（一度きり）と状態C全制覇バッジ（常時表示）が同時にトリガーされるケースの整合性**: 「ローカルレベルを全制覇した瞬間に、たまたまその制覇が同時にニッチレベルの解禁条件も満たしていた」ような場合（設計書69の段階ゲートは「前レベルのカウント」に基づくため、理論上は同一チェックインで複数の状態変化が同時に起こり得る）、`openStampLevelUnlockModal()`（新しく解禁されたレベルを祝う一度きりの演出）と、コレクション一覧の状態C表示（全制覇したレベルを常時表示するバッジ）が、画面内で同時に存在する状態になる。これは**矛盾ではない**（前者は「新しく解禁されたレベル」を祝い、後者は「全制覇し終えたレベル」を示す、対象レベルが異なる場合が通常であり、そもそも設計対象が異なる別概念）が、UIとして両方が目に入るタイミングの体験は実装後に確認が必要
+7. **iOS実機未検証**: 設計書69〜82自体がTestFlightビルド未実施のため、本リデザインもWeb版での検証が先行する。特に横長カードの23件表示によるスクロール量・タップ精度は実機確認が必要
+8. **ダークモード時の見た目未検証**: 新規CSSクラスはCSS変数ベースで設計しているため理論上は自動追従するはずだが、実装後のWeb版ダークモード切り替え目視確認が必須（設計書78の教訓を踏まえた確認事項）
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 本設計書はAPIレスポンス構造・データモデルに一切変更を加えない、フロントエンド（`public/app.js`・`public/app.css`・`public/index.html`）のみの変更のため、旧バージョンのApp Store版アプリへの影響はゼロ。設計書69〜82自体が2026-07-21時点でまだTestFlightビルド・App Store配信されていない（ローカル`main`ブランチへのコミットのみ）ため、現時点でこの機能に依存している旧バージョンのApp Store版ユーザーは存在しない。実質的な後方互換リスクはない
+2. **影響範囲**: 本リデザインはWeb版・App Store版の両方に同時に反映される変更（`public/`配下の共通コードのため）。`server.js`・`data/`配下のデータファイルには一切触れないため、Web版への反映は静的ファイルのキャッシュバスティングのみで即座に反映可能（`pm2 restart`不要）。iOS版はCapacitorのローカルバンドル方式のため、変更の反映には次回TestFlightビルドが必要
+3. **リリースタイミング**: 設計書69〜82と合わせて次回のTestFlightビルドで一括リリースする形が自然（スタンプラリー機能自体がまだ本番未リリースのため、段階的リリースを検討する必要性は低い）
+4. **App Store Connect側の追加対応は不要**: 新規権限・新規トラッキング等を一切伴わない、既存機能の見た目・表示ロジック変更のみ
+
+## 承認状況
+2026-07-21 planner設計。実機で確認したユーザーから、コレクション一覧ビュー（設計書78の円形スタンプグリッド）のデザインを見直したいという要望を受け、メインエージェントとの相談・モックアップ確認を経て、エリアバッジの一時停止・マップ表示の簡素化・コレクション一覧のレベル別3状態表示（横長カード一覧）への刷新という新デザイン方針で合意した。**ユーザー承認済み**。

@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260720m">
+  <link rel="stylesheet" href="/app.css?v=20260721a">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -165,18 +165,18 @@
           <div style="font-size:14px;line-height:1.7;margin-bottom:18px;" data-i18n="stampMapLoginRequired">スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。</div>
         </div>
         <div id="stamp-map-content" style="display:none;">
-          <div style="padding:14px 16px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            <div id="stamp-progress-summary" style="font-size:13px;color:var(--warm-gray);flex:1;"></div>
+          <div style="padding:14px 16px 6px;display:flex;align-items:center;justify-content:flex-end;gap:8px;">
             <button id="stamp-view-toggle-btn" class="sort-btn" onclick="if(!_touchCapableDetected) toggleStampViewMode()" style="flex-shrink:0;"></button>
           </div>
-          <!-- エリア制覇バッジ（設計書77）。マップ/一覧どちらの表示モードでも常時表示（_applyStampViewModeの切替対象外） -->
-          <div style="padding:0 16px 4px;font-size:11px;font-weight:700;color:var(--warm-gray);" data-i18n="stampAreaBadgesTitle">エリア制覇バッジ</div>
-          <div id="stamp-area-badges" class="stamp-area-badges-page"></div>
+          <!-- エリア制覇バッジ（設計書77）は設計書83で一時停止（display:none）。コード（_renderStampAreaBadges()/STAMP_BADGE_AREAS/関連CSS）は残置、復活時はこのdisplay:noneを解除するのみ -->
+          <div style="display:none;">
+            <div style="padding:0 16px 4px;font-size:11px;font-weight:700;color:var(--warm-gray);" data-i18n="stampAreaBadgesTitle">エリア制覇バッジ</div>
+            <div id="stamp-area-badges" class="stamp-area-badges-page"></div>
+          </div>
           <div id="stamp-map-view-inner" style="position:relative;width:100%;height:min(60vh,480px);border-radius:16px;overflow:hidden;margin:0 16px;width:calc(100% - 32px);box-shadow:0 2px 8px rgba(0,0,0,0.08);">
             <div id="stamp-leaflet-map" style="position:absolute;inset:0;"></div>
             <div id="stamp-fog-overlay" style="position:absolute;inset:0;pointer-events:none;"></div>
           </div>
-          <div id="stamp-level-legend" style="display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px 4px;"></div>
           <div id="stamp-collection-list" style="display:none;padding:2px 16px 4px;"></div>
         </div>
       </div>
@@ -1080,7 +1080,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260720l"></script>
+  <script src="/app.js?v=20260721a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
