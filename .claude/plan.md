@@ -10747,3 +10747,132 @@ document.querySelectorAll('.chat-overlay').forEach(el => {
 
 ## 承認状況
 2026-07-21 メインエージェントが実機スクリーンショット2枚の比較・Playwrightでの状態検証・色の一致計算により原因を特定し、ユーザーに調査結果を報告済み。ユーザーからのスクリーンショット提供・原因説明への反応（追加の異論なし）を踏まえ、修正方針を確定。**会話内合意により承認**（ユーザーは「会話で合意でいいです」と既に表明済み、本設計書もその運用に従う）。
+
+# 設計書87 — スタンプチェックインのサーバー側GPS距離検証（不正対策）
+
+（2026-07-21 メインエージェントが直接調査・設計。ユーザーとの会話で「位置情報以外の入力による不正対策」を検討→「まずサーバー側のGPS距離検証を先に入れるべき」という提案に「それはいるね」と合意。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+スタンプラリー機能（設計書69〜86）のチェックインAPI（`POST /api/stamp-progress/checkin`）は、CLAUDE.mdに既存の既知の残課題として明記されている通り、**v1時点でサーバー側のGPS距離検証を行わず、クライアント申告の`lat`/`lng`をそのまま信用する**設計だった（`server.js` 2084行目のコメント「v1はサーバー側の距離検証を行わない（クライアントの手動確認ボタン+GPS近接判定を信用する暫定方針、設計書69）」）。
+
+クライアント側（`public/app.js`）は`_haversineDistanceM()`で距離を計算し、`checkinRadiusM`圏内でなければチェックインボタンをdisabledにする2段階チェックイン（GPS近接判定+手動確認ボタン）を実装済みだが、これはあくまで**UIの制御**でしかなく、`POST /api/stamp-progress/checkin`を直接叩けば（アプリを介さずAPIを直接呼び出せば）、任意の`lat`/`lng`を送って現地にいなくてもチェックイン実績を記録できてしまう状態だった。
+
+ユーザーへの「位置情報以外の追加入力で不正対策をしたい」という相談に対し、メインエージェントから「まずサーバー側で距離検証すら行っていない既存の穴を塞ぐのが最優先で、追加入力（写真・クイズ等）は共有・使い回しされれば同程度に突破されうるため費用対効果が低い」と提案し、ユーザーが同意した。
+
+## 2. 確定済み仕様
+
+### 2-1. サーバー側距離検証の追加
+
+`POST /api/stamp-progress/checkin`（`server.js` 2086〜2135行目）に、クライアント側と同じ計算式（Haversine、メートル単位）による距離検証を追加する。
+
+- クライアント側`_haversineDistanceM()`（`public/app.js` 3746〜3754行目）と**同一の計算式**を`server.js`に移植する（地球半径6371000m、標準的なHaversine公式）
+- 判定基準はクライアントと同じ「`spot.checkinRadiusM || 200`（メートル）」。クライアントが既にこの半径内でなければボタンをdisabledにしているため、正規のフローを通る限り新しいサーバー検証で弾かれることは想定されない
+- `lat`/`lng`が数値でない場合（未送信・不正な型）は、距離計算不能として**検証失敗（拒否）**として扱う。現状は`typeof lat === 'number' ? lat : null`として無条件に記録される実装だったが、これも合わせて「位置情報なしでのチェックインを許可しない」方向に閉じる
+- **距離検証は「新規チェックイン」の場合のみ行う**。既にチェックイン済みスポットへの再リクエスト（冪等リプレイ、既存の`alreadyCheckedIn`分岐）は、状態が変化しないため距離検証の対象外とし、現状の冪等動作（200 OKをそのまま返す）を維持する
+- 検証に失敗した場合、ファイルへの書き込みは一切行わず（`checkedInSpotIds`・`checkinLog`・`updatedAt`いずれも変更しない）、HTTP 403 `{ error: 'too far from spot' }`相当のレスポンスを返す
+
+### 2-2. クライアント側の変更は不要
+
+`public/app.js`の`doStampCheckin()`（4196〜4251行目）は既に`if (!res.ok) throw new Error('checkin failed')`で非2xxレスポンスを捕捉し、`catch`節で`showToast(t('toastStampCheckinError'))`を表示する実装になっている。正規のフロー（クライアントが既に距離チェック済みでボタンを押した場合）では基本的にサーバー側検証で弾かれることはなく、この汎用エラートーストは「APIを直接叩く等の異常系」でのみ表示される想定のため、**新規i18nキーの追加・エラーメッセージの出し分けは行わない**（既存の`toastStampCheckinError`をそのまま流用）。
+
+## 3. 既存コードの調査結果
+
+### 3-1. `server.js`
+
+- `POST /api/stamp-progress/checkin`（2086〜2135行目）: 現状の実装は`spotId`の存在確認・スポット実在確認（`allSpots.find(...)`）・`withFileLock`内での冪等チェック（`data.checkedInSpotIds.includes(spotId)`）のみ。距離検証は一切なし
+- `withFileLock(filePath, fn)`（278〜283行目）: `fn`を`await`して結果を返すシンプルな排他ロック。`fn`内で早期`return`しても`finally`でロック解放される安全な構造のため、距離検証失敗時に書き込みをスキップして早期returnする実装が可能
+- Haversine距離計算のサーバー側実装は現状**存在しない**（`grep`で確認済み、`public/app.js`のクライアント側実装のみ）
+
+### 3-2. `public/app.js`
+
+- `_haversineDistanceM(lat1, lng1, lat2, lng2)`（3745〜3754行目）: 地球半径6371000m、標準的なHaversine公式。この式をそのままサーバー側に移植する
+- `doStampCheckin()`（4196〜4251行目）: 4203〜4204行目で`_haversineDistanceM`＋`checkinRadiusM || 200`によりボタン押下前に距離チェック済み。4207〜4250行目の`try/catch`で非2xxレスポンスは既に汎用エラーとして処理される（§2-2参照）
+
+## 4. スコープ外（今回作らないもの）
+
+- 位置情報以外の追加入力（写真、クイズ、QRコード等）による不正対策。ユーザーとの会話で「まずGPS距離検証を先に」という結論になったため、今回は含めない
+- クライアント側のエラーメッセージの出し分け（「距離検証失敗」と「その他のエラー」を区別した専用トースト文言）。既存の汎用エラートーストで十分と判断
+- GPS偽装対策の完全な解決（端末側でのモック位置情報アプリ使用等、クライアントが送信するlat/lng自体が偽装されているケースへの対策は別レイヤーの課題であり、今回はスコープ外。今回の対応は「サーバーがスポットの実座標との距離を検証する」ことで、少なくとも「API直叩きで任意の座標を送って無条件にチェックインが通る」という最も容易な抜け道を塞ぐことが目的）
+- レート制限・異常な連続チェックイン試行の検知等、距離検証以外の不正対策
+
+## 5. データモデルの変更点
+
+**変更なし**。`data/stamp-progress/{userId}.json`のスキーマ（`checkedInSpotIds`/`checkinLog`/`updatedAt`）は無変更。`data/sg/stamp-spots.json`の`lat`/`lng`/`checkinRadiusM`フィールドは既存のまま参照するのみ。
+
+## 6. APIの変更点
+
+`POST /api/stamp-progress/checkin`のリクエスト形式（`{spotId, lat, lng}`）は無変更。成功時レスポンス（`{ok:true, alreadyCheckedIn, checkedInSpotIds, unlockedLevels}`）も無変更。**新規追加**: 距離検証に失敗した場合、HTTP 403で`{ error: 'too far from spot' }`相当のエラーレスポンスを返す（既存の404「spot not found」・400「spotId is required」と同様のエラーレスポンス方式を踏襲）。
+
+## 7. 実装詳細（builderへの引き継ぎ事項）
+
+```js
+// server.js に新規追加するヘルパー関数（public/app.jsの_haversineDistanceMと同一の計算式）
+function haversineDistanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+```
+
+`POST /api/stamp-progress/checkin`ハンドラの修正方針（既存構造を維持しつつ、`else`分岐＝新規チェックインの場合のみ距離検証を追加）:
+
+```js
+let alreadyCheckedIn = false;
+let tooFar = false;
+await withFileLock(fp, () => {
+  let data = { ... }; // 既存のまま
+  if (data.checkedInSpotIds.includes(spotId)) {
+    alreadyCheckedIn = true;
+  } else {
+    const distanceM = (typeof lat === 'number' && typeof lng === 'number')
+      ? haversineDistanceM(lat, lng, spot.lat, spot.lng)
+      : Infinity;
+    if (distanceM > (spot.checkinRadiusM || 200)) {
+      tooFar = true;
+      return; // 書き込みを行わずロック内処理を終了
+    }
+    data.checkedInSpotIds.push(spotId);
+    data.checkinLog.push({ spotId, checkedInAt: new Date().toISOString(), lat, lng });
+    data.updatedAt = new Date().toISOString();
+    fs.writeFileSync(fp, JSON.stringify(data, null, 2));
+  }
+});
+
+if (tooFar) {
+  return res.status(403).json({ error: 'too far from spot' });
+}
+
+// 以降の progress/unlockedLevels 計算・レスポンス組み立ては既存のまま
+```
+
+**注意**: 既存コードは`alreadyCheckedIn`分岐の場合も`data.updatedAt = new Date().toISOString(); fs.writeFileSync(...)`を通っていた（`if/else`の外、共通処理として実行）。修正後もこの**冪等リプレイ時の`updatedAt`更新・再書き込み動作は変更しない**（`tooFar`のときだけ書き込みをスキップし、`alreadyCheckedIn`のときは従来通り書き込む）。既存コードの正確な構造をよく確認してから最小差分で修正すること。
+
+## 8. i18n変更点
+
+**新規キーなし**（§2-2参照、既存`toastStampCheckinError`を流用）。
+
+## 9. 既知の未解決事項
+
+1. **クライアント側GPS値自体の偽装（モック位置情報アプリ等）への対策は依然として残る**。今回はサーバーがスポット実座標との距離を検証するのみで、送信されたlat/lng自体が本物かどうかまでは検証しない（§4参照、既知のスコープ外として明記）
+2. **GPS精度のばらつきによる誤検知リスク**: クライアント側で使っている閾値と全く同じ計算・同じ半径をサーバー側にも適用するため、理論上は「クライアントでボタンが押せた＝サーバーでも通る」はずだが、ボタン押下からAPI送信までの間に位置情報が更新されズレるケース（信号ロスト等）では稀に弾かれる可能性がある。この場合は既存の汎用エラートースト（「もう一度お試しください」的な文言）が表示され、ユーザーは再度位置情報を取得し直せば通常は解決する
+3. **拒否時のログ・監視は今回追加しない**: 何度も距離検証に失敗するアカウントを検知・記録する仕組み（不正チェックインの試行ログ等）は今回のスコープに含めない。将来的に悪質な試行が疑われる場合は別途検討する
+
+## 10. リスク
+
+1. **既存の正規ユーザーへの影響**: クライアント・サーバー双方で同じ計算式・同じ半径を使うため、正規のチェックインフローに影響が出るリスクは低いと考えられるが、実装後に少なくとも1スポットで実際にチェックイン成功のエンドツーエンド確認を行うこと（Web版でモック位置情報を使うか、既存のテストパターンで確認）
+2. **`checkinRadiusM`未設定スポットのデフォルト値の一致**: クライアント（`spot.checkinRadiusM || 200`）とサーバーで同じフォールバック値（200）を使うことを実装時に必ず確認する
+3. **`withFileLock`内の早期return**: `tooFar`時に`return;`でロック内処理を終了する実装が、`finally`でのロック解放を正しく経由することを実装後に確認する（§3-1で安全性は確認済みだが、実装ミスで書き込み処理の一部だけスキップされる等がないよう注意）
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: リクエスト・成功時レスポンスの形式は無変更。新規追加されるのは「距離検証失敗時の403エラー」のみで、これは新しいエラーケースの追加であり既存の正常系レスポンスには影響しない。旧バージョンのApp Store版アプリも、正規のフロー（GPS近接判定を経てボタンを押す）を通る限り影響を受けない
+2. **影響範囲**: `server.js`のみの変更のため、Web版・iOS版の両方に即座に反映される（`pm2 restart`が必要）。クライアント側（`public/app.js`/`public/index.html`）の変更は不要なため、iOS版もTestFlightビルドを待たずに次回`pm2 restart`時点でサーバー側の防御が有効になる
+3. **App Store Connect側の追加対応は不要**
+
+## 承認状況
+2026-07-21 メインエージェントが提案し、ユーザーが「なるほど。それはいるね。」と会話内で合意。**ユーザー承認済み**。

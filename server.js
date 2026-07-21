@@ -1953,10 +1953,23 @@ app.put('/api/user-plans/me', requireAppAuth, async (req, res) => {
 // STAMP RALLY（スポット制覇スタンプラリー、設計書69）
 // スポットマスターは data/{city}/stamp-spots.json（人力キュレーション、gitignore対象・VPS直接編集）。
 // 進捗は data/stamp-progress/{userId}.json（既存 data/user-plans と同じディレクトリ分割パターン、requireAppAuth必須）。
-// v1ではGPS偽装対策（サーバー側距離検証）は行わず、クライアント申告のlat/lngをそのまま信用する（設計書69 承認済み暫定方針）。
+// v1ではGPS偽装対策（サーバー側距離検証）は行わず、クライアント申告のlat/lngをそのまま信用する暫定方針だったが、
+// 設計書87でサーバー側のHaversine距離検証を追加し「API直叩きで任意の座標を送って無条件にチェックインが通る」抜け道を塞いだ
+// （クライアント側GPS値自体の偽装〈モック位置情報アプリ等〉への対策は依然スコープ外）。
 // ─────────────────────────────────────────────
 const STAMP_PROGRESS_DIR = path.join(__dirname, 'data', 'stamp-progress');
 if (!fs.existsSync(STAMP_PROGRESS_DIR)) fs.mkdirSync(STAMP_PROGRESS_DIR, { recursive: true });
+
+// public/app.js の _haversineDistanceM() と同一の計算式（地球半径6371000m、標準的なHaversine公式）
+function haversineDistanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 function getStampProgressFilePath(userId) {
   // userId は upsertUser() が 'usr_' + hex24 で発行する既知フォーマットのみ許可（パストラバーサル対策）
@@ -2081,8 +2094,8 @@ app.get('/api/stamp-progress/me', requireAppAuth, (req, res) => {
 });
 
 // POST /api/stamp-progress/checkin — { spotId, lat, lng } を受け取りチェックインを記録する
-// v1はサーバー側の距離検証を行わない（クライアントの手動確認ボタン+GPS近接判定を信用する暫定方針、設計書69）
-// 冪等: 既にチェックイン済みのスポットへの再リクエストもエラーにせず200を返す
+// 設計書87: 新規チェックイン時のみサーバー側でHaversine距離検証を行う（クライアントと同じ計算式・同じ半径）。
+// 冪等: 既にチェックイン済みのスポットへの再リクエストは距離検証の対象外、エラーにせず200を返す
 app.post('/api/stamp-progress/checkin', requireAppAuth, async (req, res) => {
   try {
     const city = resolveCity(req);
@@ -2097,6 +2110,7 @@ app.post('/api/stamp-progress/checkin', requireAppAuth, async (req, res) => {
     if (!fp) return res.status(400).json({ error: 'invalid user' });
 
     let alreadyCheckedIn = false;
+    let tooFar = false;
     await withFileLock(fp, () => {
       let data = { userId: req.authUserId, city, checkedInSpotIds: [], checkinLog: [], updatedAt: null };
       if (fs.existsSync(fp)) {
@@ -2114,6 +2128,13 @@ app.post('/api/stamp-progress/checkin', requireAppAuth, async (req, res) => {
       if (data.checkedInSpotIds.includes(spotId)) {
         alreadyCheckedIn = true;
       } else {
+        const distanceM = (typeof lat === 'number' && typeof lng === 'number')
+          ? haversineDistanceM(lat, lng, spot.lat, spot.lng)
+          : Infinity;
+        if (distanceM > (spot.checkinRadiusM || 200)) {
+          tooFar = true;
+          return; // 書き込みを行わずロック内処理を終了（finallyでロックは解放される）
+        }
         data.checkedInSpotIds.push(spotId);
         data.checkinLog.push({
           spotId,
@@ -2125,6 +2146,8 @@ app.post('/api/stamp-progress/checkin', requireAppAuth, async (req, res) => {
       data.updatedAt = new Date().toISOString();
       fs.writeFileSync(fp, JSON.stringify(data, null, 2));
     });
+
+    if (tooFar) return res.status(403).json({ error: 'too far from spot' });
 
     const progress = loadStampProgress(req.authUserId);
     const unlockedLevels = computeUnlockedLevels(allSpots.filter(s => s.active !== false), progress.checkedInSpotIds);
