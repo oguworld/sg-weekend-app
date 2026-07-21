@@ -10257,3 +10257,213 @@ builderの実装しやすさのため、既存の確立されたトーン（`.st
 
 ## 承認状況
 2026-07-21 planner設計。実機で確認したユーザーから、コレクション一覧ビュー（設計書78の円形スタンプグリッド）のデザインを見直したいという要望を受け、メインエージェントとの相談・モックアップ確認を経て、エリアバッジの一時停止・マップ表示の簡素化・コレクション一覧のレベル別3状態表示（横長カード一覧）への刷新という新デザイン方針で合意した。**ユーザー承認済み**。
+
+# 設計書84 — スタンプ一覧の不具合修正（タップ不発）＋見た目調整（見出しアイコンを絵文字に・全制覇バッジ拡大）
+
+（2026-07-21 investigator/planner作成。設計書83で実装した横長カード一覧に見つかった不具合修正1件と、見た目調整2点をまとめた設計。コード実装は含まない）
+
+## 1. 背景
+
+設計書83で「スタンプラリー」コレクション一覧のレベル別3状態表示（ロック中1行／解禁中未全制覇=横長カード一覧／解禁中全制覇済み=大きなバッジ）を実装した。実装直後にユーザーが確認したところ、以下1件の不具合と2件の見た目調整要望が見つかった。
+
+1. **【最優先・不具合】一覧のスポットカードをタップしても詳細が開かない**
+2. レベルセクション見出し（状態Bのみ）のアイコンを、設計書81/82で導入したイラスト画像から通常の絵文字表示に戻したい
+3. 全制覇バッジ（状態C）をもっと大きく目立たせたい
+
+## 2. 確定済み仕様（ユーザー承認済み）
+
+### 2-1. 不具合修正: `.stamp-card`のタップ不発（最優先）
+
+**原因判明済み**: `_renderStampLevelRowInProgress()`（`public/app.js` 4029行目付近）が生成する`.stamp-card`要素のonclick属性が以下のようになっている。
+
+```js
+onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"
+```
+
+これはCLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知の落とし穴に該当する。`_touchCapableDetected`ガードは、**対応する`touchend`専用ハンドラが別途登録されている要素にのみ**付けるべきパターンであり、`.stamp-card`にはそのような`touchend`ハンドラが一切登録されていない（`grep -n "addEventListener('touchend'"` で`public/app.js`内の全11箇所を確認したが、`.stamp-card`・`.stamp-stamp-cell`を対象にしたものは存在しないことを確認済み）。
+
+その結果、実機（タッチ操作）では一度でも画面をタッチすると`_touchCapableDetected`が`true`になり、以降`.stamp-card`のonclickガードが常に偽と評価されて`openStampSpotDetail()`が呼ばれなくなる（PCのマウス操作では`_touchCapableDetected`が`false`のままなので問題なく動作していたため、タッチデバイスでのみ再現する不具合）。
+
+**確定修正方針**: `.stamp-card`のonclick属性から`if(!_touchCapableDetected)`ガードを外し、単純な`onclick="openStampSpotDetail('${spot.id}')"`に変更する。CLAUDE.mdの既存ルール「ガード対象外の全てのボタン（onclick属性のみに依存する多数のボタン）は一切影響を受けず、通常のclickイベントで正常動作する」に従った標準的な対応であり、新たに`touchend`ハンドラを追加する必要はない（ゴーストクリックが実証されていない要素にガードを付けるべきではないという既存方針に従う）。
+
+- 変更対象: `public/app.js` `_renderStampLevelRowInProgress()`内、`cardsHtml`生成部の`return`文（現状4029行目付近）1箇所のみ
+- 他の`.stamp-card`関連コード（`stamp-card-circle`・`stamp-card-body`等の内部構造、`checked`判定、`isNext`判定）は無変更
+
+### 2-2. レベルセクション見出しのアイコンを絵文字に戻す（状態Bのみ）
+
+設計書83の状態B（解禁中・未全制覇）のセクション見出し（`_renderStampLevelRowInProgress()`内、レベル名「定番」等の左に表示されるアイコン、現状`.stamp-level-section-title`）は、設計書81で導入した`meta.img`（イラスト画像、`.stamp-level-title-img`、32px）を使っている。ユーザーから「これは普通の絵文字でいい」とのフィードバックがあり、**`meta.img`のイラスト表示から`meta.emoji`（絵文字、例: 📍）のテキスト表示に戻す**。
+
+- 変更対象: `public/app.js` `_renderStampLevelRowInProgress()`内、`return`する`.stamp-level-section-title`のHTML（現状4040〜4043行目付近）
+  - 変更前: `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">`
+  - 変更後: `${meta.emoji}`（プレーンテキスト、`<span>`等でラップするかはbuilder判断）
+- **この変更は状態B（`_renderStampLevelRowInProgress()`）のセクション見出しのみが対象**。以下は明示的にスコープ外・無変更:
+  - 状態C（全制覇バッジ、`_renderStampLevelRowComplete()`）の`<img src="${meta.img}" ... class="stamp-level-complete-badge-img">`（4051行目）
+  - レベル解禁演出モーダル（`openStampLevelUnlockModal()`、4229行目付近）の`<img ... class="stamp-unlock-img">`（設計書81実装、`.stamp-level-title-img`とは別クラスであることを確認済み）
+  - エリアバッジ側の`.stamp-circle--area-img`／`.stamp-area-badge-img`（設計書80実装、非表示中だがコード残置）
+- `.stamp-level-title-img`というCSSクラス自体（`public/app.css` 2017〜2019行目）は、他に参照箇所がないか確認した上で、死んだクラスとして残すか削除するかはbuilder判断でよい（`grep -n "stamp-level-title-img"`で`public/app.js`内の参照が今回の1箇所のみだったことを確認済み。削除しても実害はないが、CLAUDE.mdに「使われなくなったクラスを都度削除する」ことまでは必須ルール化されていないため、残置も許容する）
+
+### 2-3. 全制覇バッジ（状態C）をもっと大きく目立たせる
+
+設計書83で実装した状態C（解禁中・全制覇済み）の「全制覇バッジ」（`_renderStampLevelRowComplete()`、`.stamp-level-complete-badge`、現状画像96px）について、ユーザーから「どかんと大きく表示したい」との要望があった。**現状の96pxからさらに拡大し、より視覚的インパクトのある大きなバッジ表示にする**。
+
+- 画像サイズの目安: 96px→**140〜160px程度**（builder判断で微調整可）
+- バッジ全体のコンテナ（`.stamp-level-complete-badge`、現状`padding:24px 16px`）・テキスト（`.stamp-level-complete-badge-title`現状15px・`.stamp-level-complete-badge-count`現状12px）も、画像拡大に合わせて全体的にスケールアップすることを推奨する（画像だけ大きくしてテキストが相対的に小さいままだとバランスが崩れるため）
+- 目安: タイトルテキスト15px→18〜20px程度、件数テキスト12px→14px程度、paddingも`32px 20px`程度に拡大
+- 変更対象CSS（`public/app.css`）: `.stamp-level-complete-badge`（2092〜2100行目）・`.stamp-level-complete-badge-img`（2101〜2105行目）・`.stamp-level-complete-badge-title`（2106〜2109行目）・`.stamp-level-complete-badge-count`（2110〜2112行目）
+- `drop-shadow`フィルタ（現状`0 3px 6px rgba(44,36,32,0.25)`）も画像拡大に合わせて微調整するかはbuilder判断（必須ではない）
+
+## 3. 既存コードの調査結果（2026-07-21時点、実ファイル確認済み）
+
+### 3-1. `public/app.js`
+
+- `_renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang)`（4010〜4046行目）
+  - `.stamp-card`のonclick属性（4029行目）: `onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"` — **§2-1の修正対象**
+  - `.stamp-level-section-title`内の見出し（4040〜4043行目）: `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">` — **§2-2の修正対象**
+- `_renderStampLevelRowComplete(meta, totalCount)`（4049〜4055行目）
+  - `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-complete-badge-img">`（4051行目） — サイズ拡大対象は**CSS側のみ**、この行自体（`img`タグのクラス指定）は無変更
+- `STAMP_LEVEL_META`定数（3665〜3670行目）: 4レベル分の`labelKey`/`color`/`emoji`/`img`を保持。`emoji`フィールドは設計書83実装時も削除されず維持済みのため、§2-2は`meta.emoji`を参照するだけで新規データ追加は不要
+  ```js
+  const STAMP_LEVEL_META = {
+    standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '📍', img: '/images/stamp-badges/badge-level-standard.png' },
+    local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏘', img: '/images/stamp-badges/badge-level-local.png' },
+    niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🔎', img: '/images/stamp-badges/badge-level-niche.png' },
+    special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png' },
+  };
+  ```
+- `.stamp-level-title-img`の参照箇所は`public/app.js`内に1箇所のみ（4041行目）。レベル解禁演出モーダル側は別クラス`.stamp-unlock-img`（4229行目）を使用しており、混同・共有はしていないことを確認済み
+- `addEventListener('touchend', ...)`は`public/app.js`内に11箇所あるが、いずれも`.stamp-card`・`.stamp-stamp-cell`・`#stamp-collection-list`を対象にしたものは存在しない（grep確認済み）。設定画面のtouchendデリゲーション一覧（`#settings-screen`配下）等、他画面向けのみ
+
+### 3-2. `public/app.css`
+
+- `.stamp-card`（2048〜2055行目）・`.stamp-card-circle`系（2059〜2069行目）・`.stamp-card-body`系（2070〜2089行目）: 状態Bのカードスタイル一式。**§2-1の不具合修正はJS側onclick属性の変更のみで完結し、CSS変更は不要**
+- `.stamp-level-title-img`（2017〜2019行目、設計書81新規・設計書82でサイズ拡大32px）: **§2-2でJS側の使用箇所を絵文字に置き換えた結果、このCSSクラス自体は死にクラスになる**（削除するかはbuilder判断、上記2-2参照）
+- `.stamp-level-complete-badge`／`.stamp-level-complete-badge-img`／`.stamp-level-complete-badge-title`／`.stamp-level-complete-badge-count`（2092〜2112行目、設計書83新規）: **§2-3の拡大対象**
+
+### 3-3. `public/index.html`
+
+- `.stamp-card`・`.stamp-stamp-cell`を対象にした静的HTML記述は存在しない（`_renderStampCollectionList()`が`innerHTML`で動的生成する空コンテナ`#stamp-collection-list`のみ、grep確認済み）。本設計書の変更はいずれも`public/app.js`（ロジック）・`public/app.css`（スタイル）のみで完結し、`public/index.html`の変更は不要
+
+### 3-4. `server.js`
+
+- 本設計書は表示ロジック・スタイルの変更のみのため、無変更（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`いずれもレスポンス構造・ロジックとも変更不要）
+
+## 4. スコープ外（今回作らないもの）
+
+- スポット詳細モーダル自体（`#stamp-spot-detail-sheet`／`openStampSpotDetail()`）の変更
+- 状態A（ロック中の1行表示）・エリアバッジ（非表示中）・マップ表示の変更
+- レベル解禁演出モーダル（`openStampLevelUnlockModal()`）自体の変更（`.stamp-unlock-img`のサイズ・演出とも無変更）
+- データモデル・API変更
+- BKK/SYD対応
+- `.stamp-card`以外のonclickガード監査（CLAUDE.mdに記録されている「未対応の類似要素あり（8箇所）」等、本件と無関係な既存の技術的負債への対応は含まない）
+
+## 5. データモデルの変更点
+
+**変更なし**。`data/sg/stamp-spots.json`・`data/stamp-progress/{userId}.json`とも無変更。
+
+## 6. APIの変更点
+
+**変更なし**。`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`のいずれもレスポンス構造・ロジックの変更は不要。`server.js`は無変更。本設計書は純粋にフロントエンド（`public/app.js`のonclick属性・HTML生成ロジック、`public/app.css`のサイズ指定）の変更のみで完結する。
+
+## 7. フロントエンド設計
+
+### 7-1. `.stamp-card`のonclick修正（§2-1）
+
+```js
+// 変更前
+return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')">
+
+// 変更後
+return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
+```
+
+- 他の属性・内部構造は一切変更しない
+- `openStampSpotDetail(spotId)`本体は無変更（引数・処理内容とも変更不要）
+
+### 7-2. 見出しアイコンの絵文字化（§2-2）
+
+```js
+// 変更前
+return `<div class="stamp-level-section">
+  <div class="stamp-level-section-title">
+    <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">
+    ${t(meta.labelKey)}
+  </div>
+  <div class="stamp-card-list">${cardsHtml}</div>
+</div>`;
+
+// 変更後
+return `<div class="stamp-level-section">
+  <div class="stamp-level-section-title">
+    ${meta.emoji}
+    ${t(meta.labelKey)}
+  </div>
+  <div class="stamp-card-list">${cardsHtml}</div>
+</div>`;
+```
+
+- `.stamp-level-section-title`のCSS（`display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--midnight);margin-bottom:10px;`、2040〜2044行目）は無変更のまま流用可能（絵文字テキストでも`flex`＋`gap`のレイアウトはそのまま機能する）。絵文字の`font-size`を見出しテキストと揃えるか大きくするかは、既存の他画面（設定画面ジャンルチップ等）の絵文字表示パターンを参考にbuilder判断でよい（本設計書は数値を指定しない）
+
+### 7-3. 全制覇バッジの拡大（§2-3）
+
+```css
+/* 変更前 */
+.stamp-level-complete-badge {
+  padding: 24px 16px;
+  margin-bottom: 20px;
+}
+.stamp-level-complete-badge-img {
+  width: 96px; height: 96px;
+}
+.stamp-level-complete-badge-title {
+  font-size: 15px;
+}
+.stamp-level-complete-badge-count {
+  font-size: 12px;
+}
+
+/* 変更後（目安、builder判断で微調整可） */
+.stamp-level-complete-badge {
+  padding: 32px 20px;
+  margin-bottom: 20px;
+}
+.stamp-level-complete-badge-img {
+  width: 150px; height: 150px;
+}
+.stamp-level-complete-badge-title {
+  font-size: 19px;
+}
+.stamp-level-complete-badge-count {
+  font-size: 14px;
+}
+```
+
+- `border-radius`（16px）・`background`（`var(--sand)`）・`border`（`1px solid var(--sand-dark)`）・`text-align:center`・`flex`レイアウトは無変更のまま流用
+- ダークモード自動追従（`var(--sand)`等のCSS変数ベース）は既存のまま維持されるため、本変更で新たな直書き色を追加しないこと（設計書78以来の確立ルール）
+
+## 8. i18n変更点
+
+**新規キーなし**。既存キー（`stampLevelCompleteLabel`／`stampLevelCompleteSpotsLabel`、いずれも設計書83で追加済み）をそのまま使用する。文言・キー自体の変更は行わない。
+
+## 9. 既知の未解決事項
+
+1. **§2-1修正後の実機タップ精度**: onclickガードを外すこと自体はCLAUDE.mdの確立パターンに沿った標準対応だが、実際にタッチ操作でタップが安定して反応するかは次回TestFlightビルド後の実機確認が必要（Web版でのタッチシミュレーション・目視確認は可能）
+2. **§2-2の絵文字サイズ**: 具体的な`font-size`指定を本設計書では確定していない（builder判断）。既存の見出しテキスト（14px）と並んだときに小さすぎ・大きすぎに見えないか、実装後のWeb版目視確認で調整が必要
+3. **§2-3の画像拡大後のレイアウト崩れ**: 150px程度への拡大により、`.stamp-level-complete-badge`コンテナの縦方向専有面積が増える。複数レベルが同時に全制覇済み状態になった場合（例: standard・localとも全制覇済み）、コレクション一覧全体のスクロール量がさらに増える可能性がある（設計書83 §9-7で既に指摘済みの一般論の延長）
+4. **`.stamp-level-title-img`クラスの削除要否**: builder実装時の判断に委ねる（§2-2参照）。削除しなくても実害はない
+
+## 10. リスク
+
+1. **onclick修正が他の`.stamp-card`関連ロジックに影響しないことの確認**: `_renderStampLevelRowInProgress()`内の`checked`・`isNext`・`circleHtml`・`metaHtml`の生成ロジックには一切触れない、`return`文のonclick属性1箇所のみのピンポイント修正であることを実装後に`git diff`で確認すること
+2. **絵文字化によりセクション見出しの見た目バランスが変わるリスク**: イラスト画像（32px、Nano Banana生成の統一感あるビジュアル）から絵文字（フォント依存、デバイスごとに見た目が変わりうる）に戻すことで、状態B（横長カード一覧の見出し）と状態C（全制覇バッジ、画像のまま維持）の間でビジュアルトーンの一貫性がやや失われる可能性がある。ただしこれはユーザー自身の明示的な要望（「これは普通の絵文字でいい」）に基づく意図的な選択であり、設計上の問題ではない
+3. **全制覇バッジ拡大によるファーストビューの占有面積増加**: 複数レベルが同時に全制覇済みの場合、大きなバッジが連続して表示され、コレクション一覧全体のスクロール量が増える（設計書83から持ち越しの一般論、本設計書の拡大でさらに顕著になる可能性がある点を追記）
+4. **iOS実機未検証**: 設計書69〜83自体がTestFlightビルド未実施のため、本修正・調整もWeb版での検証が先行する。特に§2-1のタップ不発修正はタッチデバイス固有の不具合だったため、実機での動作確認が特に重要
+
+## 11. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: 本設計書はAPIレスポンス構造・データモデルに一切変更を加えない、フロントエンド（`public/app.js`・`public/app.css`）のみの変更のため、旧バージョンのApp Store版アプリへの影響はゼロ。設計書69〜83自体が2026-07-21時点でまだTestFlightビルド・App Store配信されていない（ローカル`main`ブランチへのコミットのみ）ため、現時点でこの機能に依存している旧バージョンのApp Store版ユーザーは存在しない。実質的な後方互換リスクはない
+2. **影響範囲**: 本修正・調整はWeb版・App Store版の両方に同時に反映される変更（`public/`配下の共通コードのため）。`server.js`・`data/`配下のデータファイルには一切触れないため、Web版への反映は静的ファイルのキャッシュバスティングのみで即座に反映可能（`pm2 restart`不要）。iOS版はCapacitorのローカルバンドル方式のため、変更の反映には次回TestFlightビルドが必要
+3. **リリースタイミング**: 設計書69〜83と合わせて次回のTestFlightビルドで一括リリースする形が自然（スタンプラリー機能自体がまだ本番未リリースのため、段階的リリースを検討する必要性は低い）
+4. **App Store Connect側の追加対応は不要**: 新規権限・新規トラッキング等を一切伴わない、既存機能の不具合修正・見た目調整のみ
+
+## 承認状況
+2026-07-21 investigator/planner設計。設計書83実装直後にユーザーが実機/Web版で確認したところ見つかった不具合1件（`.stamp-card`のタップ不発、原因判明済み）と見た目調整2点（見出しアイコンの絵文字化・全制覇バッジの拡大）についてユーザーから要望・確定仕様の提示を受け作成。**ユーザー承認済み**。

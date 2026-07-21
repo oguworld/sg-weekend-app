@@ -303,6 +303,15 @@ sg-weekend-app/
 - `server.js`・`data/`配下は無変更（pm2 restart不要）。設計書69〜82自体もまだTestFlightビルド未実施のステータスのため、本リデザインも含めて次回一括リリースの想定
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での横長カード一覧（23件想定）のスクロール量・タップ精度、状態B/C切り替わり時の見た目のジャンプ、状態A/B/Cの視覚的統一感（制覇済み/未制覇混在時のカード高さ不揃い）、ダークモード時の見た目は2026-07-21時点でWeb版目視確認のみ、実機未確認
 
+### スタンプ一覧の不具合修正（タップ不発）＋見た目調整（2026-07-21実装、設計書84）
+設計書83実装直後のユーザー確認で見つかった不具合1件・見た目調整2点を修正した。データモデル・API変更なし、`public/app.js`・`public/app.css`のみの変更（`public/index.html`はキャッシュバスティングのみ）。
+
+- **【最優先・不具合修正】`.stamp-card`タップ不発**: `_renderStampLevelRowInProgress()`（状態B、`public/app.js`）が生成する`.stamp-card`のonclick属性が`onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"`となっていたが、対応する`touchend`ハンドラが一切登録されていなかった（CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知アンチパターンに該当）。実機タッチ操作では一度でも画面に触れると`_touchCapableDetected`が`true`になり、以降ガードが常に偽と評価されて`openStampSpotDetail()`が呼ばれずタップ不発になっていた（PCマウス操作では`_touchCapableDetected`が`false`のままのため問題なく動いていた）。`onclick="openStampSpotDetail('${spot.id}')"`に単純化し、新規`touchend`ハンドラは追加していない（ゴーストクリックが実証されていない要素にガードを付けるべきではないという既存方針通り）
+- **見出しアイコンを絵文字に戻す（状態Bのみ）**: `_renderStampLevelRowInProgress()`内`.stamp-level-section-title`の中身を、設計書81で導入した`<img src="${meta.img}" ... class="stamp-level-title-img">`（イラスト画像）から`${meta.emoji}`（絵文字）に戻した。**状態C（`_renderStampLevelRowComplete()`の`.stamp-level-complete-badge-img`）・レベル解禁演出モーダル（`openStampLevelUnlockModal()`の`.stamp-unlock-img`）・エリアバッジ画像（`.stamp-circle--area-img`/`.stamp-area-badge-img`、非表示中だがコード残置）はいずれも変更していない**（別クラス・別関数、`grep`で無変更を確認済み）。`.stamp-level-title-img`というCSSクラス自体は参照元がなくなり死にクラス化したが、実害がないため削除せず残置
+- **全制覇バッジ（状態C）の拡大**: `public/app.css`の`.stamp-level-complete-badge`（padding `24px 16px`→`32px 20px`）・`.stamp-level-complete-badge-img`（`96px`→`150px`、drop-shadowオフセットも`0 3px 6px`→`0 4px 8px`に微調整）・`.stamp-level-complete-badge-title`（`15px`→`19px`）・`.stamp-level-complete-badge-count`（`12px`→`14px`）を拡大。border-radius・background（`var(--sand)`）・border・text-align・flexレイアウトは無変更のまま流用、新規の直書き色は追加していない（ダークモード自動追従を維持）
+- `server.js`・データファイルは無変更（pm2 restart不要だが今回は実施済み）。キャッシュバスティング: `index.html` app.js/app.css `?v=20260721a`→`20260721b`、`sw.js` CACHE_NAME=`sg-weekend-v643`→`v644`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのタップ精度（onclickガード除去後の安定性）、絵文字見出しの見た目バランス（イラスト画像との統一感がやや失われる可能性、ユーザー明示要望に基づく意図的選択）、全制覇バッジ拡大後のコレクション一覧全体のスクロール量増加は2026-07-21時点でWeb版目視確認のみ、実機未確認
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている

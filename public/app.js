@@ -4026,7 +4026,7 @@
             </div>`
           : '';
 
-        return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')">
+        return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
           ${circleHtml}
           <div class="stamp-card-body">
             <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
@@ -4038,7 +4038,7 @@
 
       return `<div class="stamp-level-section">
         <div class="stamp-level-section-title">
-          <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-title-img">
+          ${meta.emoji}
           ${t(meta.labelKey)}
         </div>
         <div class="stamp-card-list">${cardsHtml}</div>
