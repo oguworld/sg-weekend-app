@@ -2153,10 +2153,6 @@
       background: var(--sand);
       cursor: pointer;
     }
-    .spot-map-link--next {
-      background: var(--caramel);
-      color: white;
-    }
 
     /* 状態C: 解禁中・全制覇済み — 大きなバッジ */
     .stamp-level-complete-badge {

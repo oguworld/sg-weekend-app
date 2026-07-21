@@ -4078,7 +4078,7 @@
             <div class="stamp-card-area">${spot.area || ''}</div>
             ${metaHtml}
           </div>
-          <div class="spot-map-link ${isNext ? 'spot-map-link--next' : ''}" onclick="event.stopPropagation(); focusStampSpotOnMap('${spot.id}')">📍</div>
+          <div class="spot-map-link" onclick="event.stopPropagation(); focusStampSpotOnMap('${spot.id}')">📍</div>
         </div>`;
       }).join('');
 
