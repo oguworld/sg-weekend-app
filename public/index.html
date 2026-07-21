@@ -145,7 +145,7 @@
       <span class="screen-title" data-i18n="courseScreenTitle">シンガポール探訪</span>
       <!-- ピルタブ -->
       <div class="course-tab-bar">
-        <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">スタンプラリー</button>
+        <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">探訪スタンプ帳</button>
         <button class="course-tab" data-tab="everyone" onclick="switchCourseTab('everyone')" data-i18n="courseTabEveryone">モデルコース</button>
         <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')" data-i18n="courseTabMylist" style="display:none;">マイコース</button>
       </div>
@@ -162,7 +162,7 @@
       <div id="stamp-map-view" style="display:none;padding:0 0 100px;">
         <div id="stamp-map-login-required" style="display:none;text-align:center;padding:60px 24px;color:var(--warm-gray);">
           <div style="font-size:36px;margin-bottom:12px;">🗺️</div>
-          <div style="font-size:14px;line-height:1.7;margin-bottom:18px;" data-i18n="stampMapLoginRequired">スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。</div>
+          <div style="font-size:14px;line-height:1.7;margin-bottom:18px;" data-i18n="stampMapLoginRequired">探訪スタンプ帳の進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。</div>
         </div>
         <div id="stamp-map-content" style="display:none;">
           <div style="display:none;padding:14px 16px 6px;align-items:center;justify-content:flex-end;gap:8px;">
@@ -1089,7 +1089,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260722b"></script>
+  <script src="/app.js?v=20260722c"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

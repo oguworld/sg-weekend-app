@@ -12410,3 +12410,52 @@ if (ticketLinkEl) {
 
 ## 承認状況
 2026-07-22 ユーザーがモック案Bを選択し「そうですね。Bで実装して」と明示。**ユーザー承認済み**。
+
+# 設計書115 — タブラベル「スタンプラリー」を「探訪スタンプ帳」に変更
+
+（2026-07-22 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーとのネーミングブレストで、「スタンプラリーであると同時にシンガポールを探訪してた記録・証」という機能の本質を踏まえ、「探訪ノート／探訪帳」→「探訪ラリー」（ラリー感を残す案）→最終的に両方の要素（探訪＝証、スタンプ＝集める行為、帳＝冊子）を全部乗せした「探訪スタンプ帳」に確定した。英語は"Discovery Stamp Book"とする（ユーザー承認済み）。
+
+既存のナビラベル「探訪」（`navCourse`、設計書89・91）・画面共通見出し「シンガポール探訪」（`courseScreenTitle`、設計書89）とはトーンを合わせつつ、タブ単体としての「スタンプ」の具体性も残す狙い。
+
+## 2. 確定済み仕様
+
+`public/app.js`で「スタンプラリー」という文字列が実際に出現する箇所は2キーのみ（`grep`で確認済み、他はコード内コメントのみで対象外）:
+
+### 2-1. `courseTabStampMap`の値変更
+
+- ja: 「スタンプラリー」→「探訪スタンプ帳」
+- en: 「Stamp Rally」→「Discovery Stamp Book」
+
+### 2-2. `stampMapLoginRequired`の値変更（文中の呼称を置換）
+
+- ja: 「スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。」→「探訪スタンプ帳の進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。」
+- en: 「To save your stamp rally progress, please link your account from Settings.」→「To save your progress in the Discovery Stamp Book, please link your account from Settings.」
+
+### 2-3. `public/index.html`のデフォルト直書きテキスト
+
+- 148行目: `data-i18n="courseTabStampMap"`のデフォルトテキスト「スタンプラリー」→「探訪スタンプ帳」
+- 165行目: `data-i18n="stampMapLoginRequired"`のデフォルトテキスト内「スタンプラリー」→「探訪スタンプ帳」（文全体を2-2のja新文言に合わせる）
+
+いずれもキー名（`courseTabStampMap`/`stampMapLoginRequired`）自体は不変、値のみの変更。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 433-434行目（ja）・703-704行目（en）: `STRINGS.ja`/`STRINGS.en`内の該当2キー
+- `public/index.html` 148行目・165行目: 上記2キーに対応するデフォルト直書きテキスト
+- `courseScreenTitle`（「シンガポール探訪」、3タブ共通ヘッダー）・`navCourse`（「探訪」、ボトムナビ）・`courseTabEveryone`（「モデルコース」）・`courseTabMylist`（非表示中、無変更）は対象外、変更しない
+
+## 4. スコープ外
+
+- コード内コメント（`public/app.js`/`public/index.html`内の「スタンプラリー機能」等の開発者向け注記）は変更しない（ユーザー影響なし、対象外と明示）
+- 変数名・関数名・CSSクラス名（`stamp*`プレフィックス等）・データファイル（`data/sg/stamp-spots.json`等）は無変更
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドi18n文言のみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティング（`index.html`のapp.js `?v=`、`sw.js`のCACHE_NAME）を更新する。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-22 ユーザーが「探訪スタンプ帳かな」→英語案"Discovery Stamp Book"の提示に「はい、英語もそれで大丈夫です。」と明示。**ユーザー承認済み**。
