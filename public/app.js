@@ -3706,6 +3706,7 @@
     let _stampMapInitialized = false;
     let _stampLocationWatchStarted = false;
     let _stampViewMode = 'list'; // 'map' | 'list'（設計書71改善3、ユーザーフィードバックによりデフォルトをリスト表示に変更。地図はトグルボタンで切替）
+    let _stampMarkerRefs = {}; // spotId → Leafletマーカー参照（設計書92、一覧カードから地図ピンへのフォーカス導線用）
 
     // Capacitor Geolocationプラグイン取得（registerPlugin優先→Pluginsフォールバック、既存Keyboard/PushNotificationsと同じ防御的パターン）
     let _CapGeo = null;
@@ -3900,6 +3901,7 @@
     function _renderStampMarkers() {
       if (!_stampMarkersLayer) return;
       _stampMarkersLayer.clearLayers();
+      _stampMarkerRefs = {};
       const nextTarget = _computeStampNextTarget();
       _stampSpots
         .filter(spot => _stampProgress.unlockedLevels.includes(spot.level)) // 設計書83 §7-2-1: ロック中レベルのスポットはピン自体を生成しない
@@ -3918,7 +3920,31 @@
           });
           const marker = L.marker([spot.lat, spot.lng], { icon }).addTo(_stampMarkersLayer);
           marker.on('click', () => openStampSpotDetail(spot.id));
+          _stampMarkerRefs[spot.id] = marker;
         });
+    }
+
+    // 一覧カード「地図で見る」ボタンから該当ピンへフォーカスする（設計書92）。
+    // マップビューに切り替え → flyTo() でパン&ズーム → 一度きりのパルス演出、の順で実行する。
+    function focusStampSpotOnMap(spotId) {
+      const spot = _stampSpots.find(s => s.id === spotId);
+      if (!spot) return;
+      _stampViewMode = 'map';
+      _applyStampViewMode();
+      setTimeout(() => {
+        if (!_stampLeafletMap) return;
+        _stampLeafletMap.invalidateSize();
+        _stampLeafletMap.flyTo([spot.lat, spot.lng], 16, { animate: true, duration: 0.8 });
+        const marker = _stampMarkerRefs[spotId];
+        if (marker) {
+          setTimeout(() => {
+            const el = marker.getElement();
+            if (!el) return;
+            el.classList.add('stamp-marker-icon--focus-pulse');
+            setTimeout(() => el.classList.remove('stamp-marker-icon--focus-pulse'), 1800);
+          }, 850);
+        }
+      }, 60);
     }
 
     // フォグ・オブ・ウォー: チェックイン済みスポット周辺だけ霧を透明にする穴を開ける。
@@ -4052,6 +4078,7 @@
             <div class="stamp-card-area">${spot.area || ''}</div>
             ${metaHtml}
           </div>
+          <div class="spot-map-link ${isNext ? 'spot-map-link--next' : ''}" onclick="event.stopPropagation(); focusStampSpotOnMap('${spot.id}')">📍</div>
         </div>`;
       }).join('');
 
