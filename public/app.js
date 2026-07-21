@@ -72,6 +72,19 @@
     let _touchCapableDetected = false;
     document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
 
+    // ─── .chat-overlay フェードアウト完了後にdisplay:noneで実質除去（設計書86）───
+    // iOS Safariでopacity:0のposition:fixed要素がステータスバー付近に古いペイントとして焼き付く不具合の対策。
+    // 再表示時はCSS側の .chat-overlay.visible { display:block !important; } が確実に上書きするため、
+    // 各要素の「開く」処理コード側は変更不要。
+    document.querySelectorAll('.chat-overlay').forEach(el => {
+      el.addEventListener('transitionend', (e) => {
+        if (e.target !== el || e.propertyName !== 'opacity') return;
+        if (!el.classList.contains('visible')) {
+          el.style.display = 'none';
+        }
+      });
+    });
+
     // ─── パスフレーズ入力シート（バックアップ/共有カレンダー）フォーカス中はbottom-navを一時的に隠す（設計書60）───
     // Web版Safari・iOS版共通（Capacitor限定にしない）。モバイルSafariのキーボード表示時、独立したposition:fixed;bottom:0
     // 要素同士（.bottom-nav と #backup-passphrase-sheet/#cal-passphrase-sheet）の可視領域追従がズレ、
@@ -4112,9 +4125,29 @@
     function closeStampSpotDetail() {
       _blurIfFocusInside('stamp-spot-detail-sheet');
       unlockScroll();
-      document.getElementById('stamp-spot-detail-overlay').classList.remove('visible');
+      const overlayEl = document.getElementById('stamp-spot-detail-overlay');
+      overlayEl.classList.remove('visible');
       document.getElementById('stamp-spot-detail-sheet').classList.remove('visible');
       _stampSelectedSpot = null;
+      // ─── 診断ログ（使い捨て、設計書86）: グレーアウト残留不具合の調査用 ───
+      try {
+        const s1 = getComputedStyle(overlayEl);
+        _sendDebugLog('stamp_detail_close_state', {
+          phase: 'immediate',
+          opacity: s1.opacity,
+          display: s1.display,
+          pointerEvents: s1.pointerEvents
+        });
+        setTimeout(() => {
+          const s2 = getComputedStyle(overlayEl);
+          _sendDebugLog('stamp_detail_close_state', {
+            phase: 'after_400ms',
+            opacity: s2.opacity,
+            display: s2.display,
+            pointerEvents: s2.pointerEvents
+          });
+        }, 400);
+      } catch (_) {}
     }
 
     function _updateStampCheckinButton() {

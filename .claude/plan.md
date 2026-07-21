@@ -10601,3 +10601,149 @@ async function makeTransparent(inputPath, outputPath, { diffTol = 30, minBrightn
 
 ## 承認状況
 2026-07-21 メインエージェントが調査・プロトタイプ検証（`sharp`によるアルファチャンネル確認、フラッドフィル+連結成分クリーンアップアルゴリズムの視覚的検証、`badge-central.png`の誤配置発見）を実施。ユーザーに透明化の3方針を提示し「チェッカーボード部分を自動で透明化」を選択、正しいマーライオン画像の送付を受け確定。**ユーザー承認済み**（会話内で提示・選択・画像送付という形で実質的な承認プロセスを完了）。
+
+# 設計書86 — スタンプ詳細モーダルを閉じた後、画面上部（ステータスバー付近）がグレーアウトされたまま残る不具合の調査・修正
+
+（2026-07-21 メインエージェントが直接調査。実機スクリーンショット2枚（不具合再現時・正常時）の比較、Playwrightでの状態検証を経て原因を特定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザー（Web版、iPhone Safari）から、スタンプラリーのスポット詳細モーダル（`#stamp-spot-detail-sheet`）を開いて閉じると、画面最上部（iOSステータスバー付近の領域）がグレーアウトされたまま残る不具合の報告があった。
+
+ユーザーから2枚のスクリーンショットが提供され、比較の結果、以下が視覚的に確認できた。
+- **正常時**（モーダルを開く前）: ステータスバー領域（時刻・電波・バッテリー表示の背景）は他の画面領域と同じクリーム色（`--cream` `#FFF9F2`）
+- **不具合再現時**（モーダルを閉じた直後）: 同じ領域だけが灰色〜灰褐色にグレーアウトされている。それ以外の画面（ヘッダー・カード一覧・ボトムナビ）は正常なクリーム色で表示されている
+
+## 2. 調査内容・原因特定
+
+### 2-1. Playwrightによる状態検証（Chromiumエンジン、dosuru.app本番に対して実施）
+
+`.stamp-card`をタップしてスポット詳細を開き、✕ボタンで閉じた直後の`#stamp-spot-detail-overlay`の`getComputedStyle()`を取得したところ、以下の通り**JS/CSSの論理的な状態は正しく更新されていた**。
+
+```
+open:   { classes: "chat-overlay visible", opacity: "1", display: "block", pointerEvents: "auto", zIndex: "3700" }
+closed: { classes: "chat-overlay",         opacity: "0", display: "block", pointerEvents: "none", zIndex: "3700" }
+```
+
+`opacity:0`・`pointer-events:none`とも正しく、ヘッドレスChromiumでの画面キャプチャでもグレーアウトは再現しなかった。`lockScroll()`/`unlockScroll()`（`public/app.js` 5403〜5415行目、背景スクロール防止用の`touchmove`リスナー着脱のみ）もCSSに影響を与えない実装であることを確認し、原因から除外した。
+
+### 2-2. 色の一致による原因特定
+
+`#stamp-spot-detail-overlay`が使う共有クラス`.chat-overlay`（`public/app.css` 1839〜1851行目）の背景色は`rgba(44,36,32,0.45)`。これをクリーム色（`#FFF9F2` = rgb(255,249,242)）に重ねてアルファブレンド計算すると、
+
+```
+R: 0.45×44 + 0.55×255 ≈ 160
+G: 0.45×36 + 0.55×249 ≈ 153
+B: 0.45×32 + 0.55×242 ≈ 148
+→ rgb(160,153,148) 相当の灰褐色
+```
+
+となり、ユーザーのスクリーンショットで確認されたグレーの帯の色味とほぼ一致した。
+
+### 2-3. 原因の結論
+
+`.chat-overlay`は`opacity`のみで表示/非表示を切り替えており（`display`プロパティは指定なし＝常に`block`のままDOM上に存在し続ける）、**要素自体はopacity:0になった後も引き続きレイアウト・コンポジットツリーに残り続ける**。これは、フェードアニメーション（`transition: opacity 0.3s ease`）を成立させるために意図的にそうなっている（CLAUDE.md既存ルールにも「`.要素名.visible{display:block;opacity:1}`」とあるのみで、非表示側の`display:none`化は明記されていない）。
+
+iOS Safari（WKWebViewではなくSafari本体、Web版）では、`position:fixed`かつ半透明の要素が、opacityがゼロになった後もDOM/コンポジットツリーに残存し続ける場合、**ステータスバー背後の安全域（safe-area-inset-top）付近で、フェードアウト中の中間フレームの描画がそのまま「古いペイントとして」残ってしまうレンダリング不具合**（WebKitの`position:fixed`要素とダイナミックツールバー/ステータスバー領域の再描画にまつわる既知の挙動）が起きていると考えられる。JS側の状態（`opacity:0`）は正しいにもかかわらず、実際の画面には古い半透明フレームが焼き付いたように残る、という状態と整合する。
+
+### 2-4. 影響範囲: 同じ構造を持つ他7つのオーバーレイも同様のリスクを抱えている
+
+`.chat-overlay`クラスは`#stamp-spot-detail-overlay`以外に7箇所で共有されている（`public/index.html`）。
+
+```
+#title-edit-overlay         z-index:3101
+#backup-passphrase-overlay  z-index:3601
+#cal-passphrase-overlay     z-index:3603
+#stamp-level-unlock-overlay z-index:3702
+#pin-picker-overlay         (z-index未指定=CSS既定)
+#emoji-picker-overlay       z-index:2099
+#schedule-action-overlay    z-index:2199, background:transparent
+```
+
+いずれも「`opacity`のみのトグル、`display`は常に`block`のまま」という同一構造のため、同種の不具合を潜在的に抱えている可能性が高い（ユーザーからの報告はスタンプ詳細モーダルの1件のみだが、他のモーダルは使用頻度・開閉タイミングが異なるため単に未報告なだけの可能性がある）。CLAUDE.mdの既存ルール「z-index是正時は『companion要素』だけでなく『子シート』も辿って確認する」の精神に倣い、**この8箇所全てに横展開して修正する**方針とする。
+
+## 3. 確定済み修正方針
+
+### 3-1. フェードアウト完了後にDOMツリーから実質的に除去する（`display:none`化）
+
+`.chat-overlay`要素が非表示状態（`.visible`クラスなし）で`opacity:0`に到達した後、`transitionend`イベントを検知して`display:none`を設定し、コンポジットツリーから完全に外す。再度開く際（`.visible`クラス付与時）は、CSS側で`display:block !important`を指定し、JSが以前付けた可能性のあるインラインスタイル`display:none`を確実に上書きする（CSSカスケードで解決するため、8箇所それぞれの「開く」処理コード側を個別に触る必要がない）。
+
+```css
+/* 変更前 */
+.chat-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 変更後 */
+.chat-overlay.visible {
+  display: block !important;
+  opacity: 1;
+  pointer-events: auto;
+}
+```
+
+```js
+// 新規、ページ初期化時に一度だけ実行（8つの.chat-overlay要素全てに一括適用）
+document.querySelectorAll('.chat-overlay').forEach(el => {
+  el.addEventListener('transitionend', (e) => {
+    if (e.target !== el || e.propertyName !== 'opacity') return;
+    if (!el.classList.contains('visible')) {
+      el.style.display = 'none';
+    }
+  });
+});
+```
+
+`!important`はこのプロジェクトで既に他8箇所（`public/app.css`）で使用実績があるパターンのため、新規導入として違和感はない。
+
+### 3-2. 診断ログの追加（原因仮説が外れていた場合の保険）
+
+`closeStampSpotDetail()`に、閉じた直後と`transitionend`発火後（またはタイムアウト後）の2時点で`_sendDebugLog()`を仕込み、`#stamp-spot-detail-overlay`の`getComputedStyle()`（`opacity`/`display`/`pointerEvents`）を記録する。**この計装は使い捨て**（CLAUDE.md既存運用ルール通り、原因確定後に削除してよい）。上記3-1の修正で症状が再発しなかった場合はログ確認不要のまま削除、再発した場合はログを元に追加調査する。
+
+## 4. 既存コードの調査結果
+
+- `public/app.css` 1839〜1851行目: `.chat-overlay`／`.chat-overlay.visible`の定義（§3-1参照）
+- `public/index.html`: `.chat-overlay`クラスを持つ要素8個（§2-4参照）、いずれも`onclick="if(!_touchCapableDetected) close〜()"`または`onclick="close〜()"`で背景タップ時に閉じる
+- `public/app.js`:
+  - `closeStampSpotDetail()`（4112〜4118行目）: `classList.remove('visible')`のみ、`display`操作なし
+  - `openStampSpotDetail()`（4058〜4110行目）: `classList.add('visible')`のみ
+  - 他7箇所の開閉関数（`closeTitleEdit`/`closeBackupPassphraseSheet`/`closeCalPassphraseSheet`/`closeStampLevelUnlockModal`/`closePinPicker`/`closeEmojiPicker`/`closeScheduleActionSheet`等）も同一パターンで実装されている
+  - `transitionend`リスナーは現状コードベースに一切存在しない（新規追加であり、既存リスナーとの競合リスクはない）
+- `lockScroll()`/`unlockScroll()`（5403〜5415行目）: `touchmove`リスナーの着脱のみ、CSS状態には無関係と確認済み（§2-1参照）
+
+## 5. スコープ外（今回作らないもの）
+
+- `.chat-overlay`以外の別カテゴリのオーバーレイ（`.plan-modal-overlay`・`.cal-popup-overlay`・`.pin-detail-overlay`等、CLAUDE.md z-index表に記載の別クラス群）への同種修正の横展開。今回はまず`.chat-overlay`共有クラス8箇所に限定し、他カテゴリで同様の報告が出た場合は別途対応する
+- WebKitの根本原因の完全な特定（一次情報による確証は得られていない。あくまで色の一致・JS状態の正常性・症状の再現条件から導いた最有力仮説に基づく対症療法）
+- iOS App Store版（Capacitor）での検証（今回はWeb版での報告に基づく修正。ただし`public/`配下の共通コードのため、iOS版にも同時に適用される）
+
+## 6. データモデル・APIの変更点
+
+**変更なし**。`server.js`・`data/`配下とも無関係、`public/app.css`・`public/app.js`のみの変更。
+
+## 7. i18n変更点
+
+**新規キーなし**。
+
+## 8. 既知の未解決事項
+
+1. **仮説の未確証**: WebKitの`position:fixed`＋半透明要素のステータスバー付近レンダリング不具合という原因は、一次情報（WebKit側のバグトラッカー等）による確証を得たものではなく、症状・色の一致・JS状態の正常性から導いた最有力仮説である。§3-2の診断ログはこの仮説が外れていた場合の保険措置
+2. **`transitionend`の発火信頼性**: ごく稀に`transitionend`が発火しないブラウザ挙動（要素が非表示祖先内にある、transition自体が中断される等）があることが知られている。今回の8要素はいずれも`body`直下のfixed要素で中断されるケースは考えにくいが、万一発火しなかった場合は`display:none`化がされないまま（＝修正前の状態に戻るだけで、新たな不具合が生じるわけではない）
+3. **他7箇所での同様の不具合報告の有無**: 現時点でユーザーからの報告はスタンプ詳細モーダルの1件のみ。他7箇所は今回の横展開修正の効果を积极的に検証する機会がないため、次回何らかの形で同様の症状が報告されないか注視する
+
+## 9. リスク
+
+1. **`!important`によるカスケード上書きの影響範囲**: `.chat-overlay.visible`に`display:block !important`を追加することで、将来的にこのクラスに対して`display`を変更する別のインラインスタイル/CSSルールが追加された場合、意図せず上書きしてしまうリスクがある。現状8箇所の使用箇所いずれも`display`をJS/HTMLから直接操作していないことを確認済みのため、現時点でのリスクは低い
+2. **フェードイン時のちらつきリスク**: `display:none`から`.visible`付与で`display:block`に戻る際、`opacity:0→1`のトランジションが正しく発火するためには、`display:block`が先に適用されてから次のフレームで`opacity:1`にならないと、ブラウザがトランジションをスキップしてしまう可能性がある（`display:none`要素はトランジション対象にならないため）。ただし`classList.add('visible')`は`display`と`opacity`を同時にCSS上変更するのみで、両者は同一のクラス切り替えタイミングで適用されるため、ブラウザの通常のスタイル再計算タイミングにより意図通りフェードインすることを実装後に目視確認する
+3. **診断ログの一時性**: §3-2のログは使い捨てのため、修正効果が確認でき次第削除すること（CLAUDE.md運用ルール通り）
+
+## 10. データ共有影響（Web版/iOS App Store版）の確認 ※CLAUDE.md必須項目
+
+1. **後方互換性**: CSS/JSのみの変更、API・データモデルへの影響なし。旧バージョンApp Store版への影響もなし
+2. **影響範囲**: `public/`配下の共通コードのため、Web版・iOS版の両方に同時に反映される。`server.js`・データファイルは無変更のため`pm2 restart`不要。Web版は`app.css`/`app.js`のキャッシュバスティング（`?v=`更新）が必要
+3. **iOS版**: Capacitorのローカルバンドル方式のため、次回TestFlightビルドでの反映が必要。iOS版でも同じ`.chat-overlay`共有クラスを使っているため、もし同種の不具合がiOS版（WKWebView）でも起きていた場合はあわせて改善される可能性がある
+4. **App Store Connect側の追加対応は不要**
+
+## 承認状況
+2026-07-21 メインエージェントが実機スクリーンショット2枚の比較・Playwrightでの状態検証・色の一致計算により原因を特定し、ユーザーに調査結果を報告済み。ユーザーからのスクリーンショット提供・原因説明への反応（追加の異論なし）を踏まえ、修正方針を確定。**会話内合意により承認**（ユーザーは「会話で合意でいいです」と既に表明済み、本設計書もその運用に従う）。

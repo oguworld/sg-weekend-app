@@ -323,6 +323,20 @@ sg-weekend-app/
 - `server.js`・データファイル・APIレスポンス構造は無変更（`pm2 restart`不要）。iOS版はCapacitorのローカルバンドル方式のため次回TestFlightビルドでの反映が必要
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのバッジ表示（設計書69〜84自体がまだTestFlightビルド未実施のため、本修正も次回一括リリース時に確認）
 
+### スタンプ詳細モーダルを閉じた後、画面上部（ステータスバー付近）がグレーアウトされたまま残る不具合の修正（2026-07-21実装、設計書86）
+Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダル（`#stamp-spot-detail-sheet`）を開いて閉じると、画面最上部（iOSステータスバー付近）がグレーアウトされたまま残る不具合が報告された。メインエージェントが実機スクリーンショット2枚（不具合再現時・正常時）の比較とPlaywrightでの状態検証を実施し原因を特定した。
+
+- **原因**: `#stamp-spot-detail-overlay`が使う共有クラス`.chat-overlay`は`opacity`のみで表示/非表示を切り替えており（`display`は常に`block`のまま）、`opacity:0`になった後も要素はレイアウト・コンポジットツリーに残り続ける実装だった。`.chat-overlay`の背景色`rgba(44,36,32,0.45)`をクリーム色（`#FFF9F2`）にアルファブレンド計算すると`rgb(160,153,148)`相当となり、ユーザーのスクリーンショットで確認されたグレーの帯の色味とほぼ一致した。Playwrightでの検証では`opacity:0`・`pointer-events:none`ともJS/CSSの論理的な状態は正しく更新されていることを確認済みで、iOS Safariが`position:fixed`かつ半透明の要素をopacityがゼロになった後もステータスバー付近（safe-area-inset-top付近）の再描画で「古いペイントとして」焼き付かせる既知のWebKit挙動が最有力仮説（一次情報による確証はなく、色の一致・症状の再現条件から導いた推測）
+- **影響範囲**: `.chat-overlay`クラスは`#stamp-spot-detail-overlay`以外に7箇所で共有されている（`#title-edit-overlay`/`#backup-passphrase-overlay`/`#cal-passphrase-overlay`/`#stamp-level-unlock-overlay`/`#pin-picker-overlay`/`#emoji-picker-overlay`/`#schedule-action-overlay`）。いずれも同一構造（`opacity`のみのトグル、`display`は常に`block`のまま）のため同種の不具合を潜在的に抱えている可能性が高く、8箇所全てに横展開して修正した
+- **修正1（CSS）**: `public/app.css`の`.chat-overlay.visible`ルールに`display: block !important;`を追加
+- **修正2（JS）**: `public/app.js`（`_touchCapableDetected`検出リスナー直後、ページ初期化時に一度だけ実行）に、`.chat-overlay`要素全てへ一括で`transitionend`リスナーを登録。`opacity`のトランジション完了時に`.visible`クラスが無ければ`el.style.display = 'none'`を設定し、フェードアウト完了後にDOM上から実質的に除去する。再度開く際はCSS側の`display:block !important`がJSの残留インラインスタイルを確実に上書きするため、開く側の8箇所の`open〜()`関数は一切変更不要（CSSカスケードで解決）
+- **`#schedule-action-overlay`との相互作用確認済み**: この要素のみ他7箇所と異なり`classList.add/remove('visible')`ではなく`overlay.style.display='block'/'none'`を直接操作する独自実装（`background:transparent`のインタラクションブロック専用オーバーレイ、`opacity`は常に`.chat-overlay`既定の`0`のまま変化しない）。新規`transitionend`リスナーは`opacity`の値が変化しないため発火せず、既存の`closeScheduleActionSheet()`内`display='none'`設定と衝突しないことを確認済み
+- **診断ログ（使い捨て、原因仮説が外れていた場合の保険）**: `closeStampSpotDetail()`に、閉じた直後と400ms後（`transitionend`発火想定後）の2時点で`_sendDebugLog('stamp_detail_close_state', {...})`を追加し、`#stamp-spot-detail-overlay`の`getComputedStyle()`（`opacity`/`display`/`pointerEvents`）を記録する。**実装直後の実機検証で`immediate`時点`{opacity:"1",display:"block"}`→`after_400ms`時点`{opacity:"0",display:"none"}`という想定通りの遷移を`logs/debug-nav.log`で確認済み**。CLAUDE.md既存運用ルール上は原因確定後に削除してよい使い捨てログだが、**今回は削除せず残置した**（次回症状再発の有無を継続確認するため）
+- スコープ外（今回未実装）: `.chat-overlay`以外の別カテゴリのオーバーレイ（`.plan-modal-overlay`・`.cal-popup-overlay`・`.pin-detail-overlay`等）への同種修正の横展開、WebKit側の根本原因の完全な特定
+- `server.js`・`data/`配下・`public/index.html`のマークアップは無変更（`?v=`キャッシュバスティングのみ）。`pm2 restart`不要
+- キャッシュバスティング: `index.html` app.css/app.js `?v=20260721c`、`sw.js` CACHE_NAME=`sg-weekend-v645`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS App Store版（Capacitor/WKWebView）での同種のグレーアウト残留有無（今回はWeb版報告に基づく修正）。フェードイン（開く動作）が引き続き正常にアニメーションすること・8箇所全ての開閉が壊れていないことはWeb版で確認済みだが、iOS実機は未確認
+
 ## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
 - コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
 - ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている
