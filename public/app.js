@@ -3808,7 +3808,7 @@
       if (mapEl) mapEl.style.display = isMap ? 'block' : 'none';
       if (listEl) listEl.style.display = isMap ? 'none' : 'block';
       if (toggleBtn) toggleBtn.textContent = t(isMap ? 'stampViewToggleList' : 'stampViewToggleMap');
-      if (fabEl) fabEl.textContent = isMap ? '📖' : '🗺️';
+      if (fabEl) fabEl.textContent = '⇄';
     }
 
     // ─── 「次はここ」判定（設計書70改善2） ───
@@ -4140,10 +4140,12 @@
 
       return `<div class="stamp-level-complete-badge">
         <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-complete-badge-img">
-        <div class="stamp-level-complete-badge-title">${meta.emoji} ${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}</div>
-        <div class="stamp-level-complete-badge-count">${totalCount}/${totalCount} ${t('stampLevelCompleteSpotsLabel')}</div>
-        <button type="button" class="stamp-complete-toggle-btn" data-list-id="${listId}"
-          onclick="if(!_touchCapableDetected) _toggleStampCompleteList('${listId}')">${t('stampCompleteListShow')}</button>
+        <div class="stamp-level-complete-badge-body">
+          <div class="stamp-level-complete-badge-title">${meta.emoji} ${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}</div>
+          <div class="stamp-level-complete-badge-count">${totalCount}/${totalCount} ${t('stampLevelCompleteSpotsLabel')}</div>
+          <button type="button" class="stamp-complete-toggle-btn" data-list-id="${listId}"
+            onclick="if(!_touchCapableDetected) _toggleStampCompleteList('${listId}')">${t('stampCompleteListShow')}</button>
+        </div>
         <div id="${listId}" class="stamp-complete-card-list" style="display:none;">${cardsHtml}</div>
       </div>`;
     }

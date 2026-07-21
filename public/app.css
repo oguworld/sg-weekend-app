@@ -2158,20 +2158,23 @@
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    /* 状態C: 解禁中・全制覇済み — 大きなバッジ */
+    /* 状態C: 解禁中・全制覇済み — 大きなバッジ（設計書109で横並びレイアウトに変更） */
     .stamp-level-complete-badge {
-      display: flex; flex-direction: column; align-items: center;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
       background: var(--sand);
       border: 1px solid var(--sand-dark);
       border-radius: 16px;
-      padding: 32px 20px;
+      padding: 16px 18px;
       margin-bottom: 20px;
-      text-align: center;
+      text-align: left;
     }
     .stamp-level-complete-badge-img {
       width: 150px; height: 150px; object-fit: contain;
       filter: drop-shadow(0 4px 8px rgba(44,36,32,0.25));
-      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+    .stamp-level-complete-badge-body {
+      flex: 1; min-width: 0;
     }
     .stamp-level-complete-badge-title {
       font-size: 19px; font-weight: 700; color: var(--midnight);
@@ -2194,7 +2197,7 @@
     .stamp-complete-card-list {
       width: 100%;
       flex-direction: column; gap: 6px;
-      margin-top: 14px;
+      margin-top: 0;
       text-align: left;
     }
     .stamp-complete-card {
