@@ -453,11 +453,14 @@
         stampNextTargetLabel: '次はここ！',
         stampLevelCompleteLabel: '制覇！',
         stampLevelCompleteSpotsLabel: 'スポット達成',
-        stampLevelUnlockModalTitle: '新しいレベルが解禁されました！',
+        stampLevelUnlockModalTitle: 'スタンプ獲得！',
+        stampLevelUnlockSubtext: '🔓 {level}のロックが解除されました',
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
         stampCardDoneMark: '済',
         stampDetailMapLink: '📍 地図で見る',
+        stampCompleteListShow: 'スポット一覧を見る ▾',
+        stampCompleteListHide: '閉じる ▴',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '軸にするイベント',
         coursePinsHint: '軸にするイベントをタップして選んでください',
@@ -720,11 +723,14 @@
         stampNextTargetLabel: 'Next up!',
         stampLevelCompleteLabel: 'Complete!',
         stampLevelCompleteSpotsLabel: 'spots collected',
-        stampLevelUnlockModalTitle: 'New level unlocked!',
+        stampLevelUnlockModalTitle: 'Stamp acquired!',
+        stampLevelUnlockSubtext: '🔓 {level} unlocked!',
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
         stampCardDoneMark: '✓',
         stampDetailMapLink: '📍 View on map',
+        stampCompleteListShow: 'Show spots ▾',
+        stampCompleteListHide: 'Hide ▴',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: 'Base pinned event',
         coursePinsHint: 'Tap to select',
@@ -4044,7 +4050,7 @@
         } else if (state === 'inProgress') {
           return _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount);
         } else {
-          return _renderStampLevelRowComplete(meta, totalCount);
+          return _renderStampLevelRowComplete(meta, spotsInLevel, totalCount, level, lang);
         }
       }).join('');
     }
@@ -4112,13 +4118,45 @@
       </div>`;
     }
 
-    // 状態C: 解禁中・全制覇済み — 個別カードは表示せず、大きな全制覇バッジのみ表示（タップ不可）
-    function _renderStampLevelRowComplete(meta, totalCount) {
+    // 状態C: 解禁中・全制覇済み — 大きな全制覇バッジ＋開閉トグルでスポット一覧を展開表示（設計書108）
+    function _renderStampLevelRowComplete(meta, spotsInLevel, totalCount, level, lang) {
+      const listId = `stamp-complete-list-${level}`;
+      const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const cardsHtml = sorted.map(spot => {
+        const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+        const thumbInner = spot.imageUrl
+          ? `<img src="${spot.imageUrl}" alt="${name}" class="stamp-complete-card-thumb-img">`
+          : `<div class="stamp-complete-card-thumb-placeholder">📍</div>`;
+        const checkinDate = _stampCheckinDateFor(spot.id);
+        return `<div class="stamp-complete-card">
+          <div class="stamp-complete-card-thumb">${thumbInner}</div>
+          <div class="stamp-complete-card-body">
+            <div class="stamp-complete-card-name">${name}</div>
+            <div class="stamp-complete-card-area">${spot.area || ''}</div>
+            ${checkinDate ? `<div class="stamp-complete-card-date">${checkinDate}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
       return `<div class="stamp-level-complete-badge">
         <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-complete-badge-img">
-        <div class="stamp-level-complete-badge-title">${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}</div>
+        <div class="stamp-level-complete-badge-title">${meta.emoji} ${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}</div>
         <div class="stamp-level-complete-badge-count">${totalCount}/${totalCount} ${t('stampLevelCompleteSpotsLabel')}</div>
+        <button type="button" class="stamp-complete-toggle-btn" data-list-id="${listId}"
+          onclick="if(!_touchCapableDetected) _toggleStampCompleteList('${listId}')">${t('stampCompleteListShow')}</button>
+        <div id="${listId}" class="stamp-complete-card-list" style="display:none;">${cardsHtml}</div>
       </div>`;
+    }
+
+    // 全制覇バッジの「スポット一覧を見る」開閉トグル（設計書108）。複数レベルが同時に全制覇済みでも
+    // レベルごとに一意な listId のため独立して開閉できる。
+    function _toggleStampCompleteList(listId) {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+      const btn = document.querySelector(`.stamp-complete-toggle-btn[data-list-id="${listId}"]`);
+      const isOpen = listEl.style.display !== 'none';
+      listEl.style.display = isOpen ? 'none' : 'flex';
+      if (btn) btn.textContent = isOpen ? t('stampCompleteListShow') : t('stampCompleteListHide');
     }
 
     // ─── スポット詳細シート ───
@@ -4289,7 +4327,7 @@
         if (_stampProgress.unlockedLevels.length > prevUnlockedCount) {
           // 新しく解禁されたレベル（複数レベルが一度に解禁されるケースは想定しないが、念のため配列末尾＝最新を採用）
           const newlyUnlockedLevel = _stampProgress.unlockedLevels[_stampProgress.unlockedLevels.length - 1];
-          setTimeout(() => openStampLevelUnlockModal(newlyUnlockedLevel), 1600);
+          setTimeout(() => openStampLevelUnlockModal(spot.level, newlyUnlockedLevel), 1600);
         }
         _renderStampMarkers();
         _renderStampFog();
@@ -4304,11 +4342,44 @@
       }
     }
 
-    // ─── レベル解禁演出モーダル（設計書70改善3 → 設計書81でイラスト画像化） ───
-    function openStampLevelUnlockModal(level) {
-      const meta = STAMP_LEVEL_META[level] || STAMP_LEVEL_META.standard;
+    // 紙吹雪バースト演出（設計書107）。外部ライブラリ不使用、CSS @keyframes + JS動的生成の軽量実装。
+    function _burstStampConfetti(originEl) {
+      if (!originEl) return;
+      const colors = ['#C8804A', '#7A9B6E', '#9370B0', '#C4705A', '#E2B854', '#5AA0C4'];
+      document.querySelectorAll('.stamp-confetti').forEach(el => el.remove()); // 前回分の残骸を掃除
+      const rect = originEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      for (let i = 0; i < 50; i++) {
+        const el = document.createElement('div');
+        el.className = 'stamp-confetti';
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 180;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist - 30;
+        const rot = Math.random() * 720 - 360;
+        el.style.background = colors[Math.floor(Math.random() * colors.length)];
+        el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+        el.style.left = cx + 'px';
+        el.style.top = cy + 'px';
+        el.style.setProperty('--dx', dx + 'px');
+        el.style.setProperty('--dy', dy + 'px');
+        el.style.setProperty('--rot', rot + 'deg');
+        el.style.animationDelay = (Math.random() * 0.15) + 's';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1400); // アニメーション終了後にDOMから除去（蓄積防止）
+      }
+    }
+
+    // ─── レベル解禁演出モーダル（設計書70改善3 → 設計書81でイラスト画像化 → 設計書107で刷新: 獲得スタンプ表示＋紙吹雪） ───
+    // completedLevel: チェックインしたスポットのレベル（メインで表示するスタンプ）
+    // unlockedLevel: 新しく解禁されたレベル（下部の補足ボックスで表示）
+    function openStampLevelUnlockModal(completedLevel, unlockedLevel) {
+      const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
+      const unlockedMeta = STAMP_LEVEL_META[unlockedLevel] || STAMP_LEVEL_META.standard;
       const emojiEl = document.getElementById('stamp-level-unlock-emoji');
       const nameEl = document.getElementById('stamp-level-unlock-name');
+      const subtextEl = document.getElementById('stamp-level-unlock-subtext');
       if (emojiEl) {
         // 設計書81: 絵文字textContentからイラスト<img>表示に変更。モーダルを開くたびに
         // <img>要素を新規生成する方式（設計書75で確立、同一URL連続表示時のload/errorイベント
@@ -4318,8 +4389,13 @@
         emojiEl.style.animation = 'none';
         void emojiEl.offsetWidth;
         emojiEl.style.animation = '';
+        const imgEl = emojiEl.querySelector('.stamp-unlock-img');
+        _burstStampConfetti(imgEl || emojiEl);
       }
-      if (nameEl) nameEl.textContent = t(meta.labelKey);
+      if (nameEl) nameEl.textContent = `${meta.emoji} ${t(meta.labelKey)}`;
+      if (subtextEl) {
+        subtextEl.textContent = t('stampLevelUnlockSubtext').replace('{level}', `${unlockedMeta.emoji} ${t(unlockedMeta.labelKey)}`);
+      }
       lockScroll();
       document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
       document.getElementById('stamp-level-unlock-modal').classList.add('visible');

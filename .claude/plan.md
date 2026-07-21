@@ -11907,3 +11907,169 @@ const STAMP_LEVEL_META = {
 
 ## 承認状況
 2026-07-21 ユーザーが「了解。家はコンド、ＨＤＢなんだけど...」を経て「なやむな。やっぱり家で。」「実装してください。」と明示。**ユーザー承認済み**。
+
+# 設計書107 — レベル解禁演出モーダルの刷新（獲得スタンプ表示＋紙吹雪演出）
+
+（2026-07-21 ユーザーとの会話・モックアップ確認を経て確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+既存のレベル解禁演出モーダル（`openStampLevelUnlockModal(level)`、設計書70・81）は、チェックインによって新しいレベルが解禁された際、**新しく解禁されたレベル**のバッジ画像と「新しいレベルが解禁されました！」という文言を表示していた。
+
+ユーザーから「このモーダルだけど、スタンプは新参者の方がいいんじゃない？スタンプ獲得！みたいな。そのうえで下にロックが解除されました、と出す感じ」との提案があり、**チェックインした（＝スタンプを獲得した）レベル自身のバッジ**をメインに表示し、新しく解禁されたレベルの情報はその下に補足として表示する構成に変更することで合意した。あわせて「よくあるくす玉がパッカーンみたいな演出」（紙吹雪バースト）の追加も承認された。メインエージェントがPlaywrightでモックアップ（紙吹雪付き）を提示し、ユーザーが承認済み。
+
+## 2. 確定済み仕様
+
+### 2-1. モーダルの表示内容変更
+
+`openStampLevelUnlockModal(level)`の引数を、**チェックインしたスポットのレベル**（`completedLevel`）と**新しく解禁されたレベル**（`unlockedLevel`）の2つに変更する。
+
+- メインバッジ画像: `completedLevel`の`meta.img`（例: 新参者ならカメラ画像）
+- タイトル: 新規i18nキー`stampLevelUnlockModalTitle`の値を「新しいレベルが解禁されました！」→「スタンプ獲得！」に変更（既存キーの値変更、キー名は不変）
+- レベル名表示: `${meta.emoji} ${t(meta.labelKey)}`（絵文字つき、例: 「🔰 新参者」）、既存の`#stamp-level-unlock-name`要素を流用
+- 新規の「ロック解除」補足ボックス: `unlockedLevel`の情報を表示する新規要素。「🔓 {レベル名}のロックが解除されました」（新規i18nキー`stampLevelUnlockSubtext`、`{level}`プレースホルダーを`.replace('{level}', ...)`で置換する既存パターン踏襲、例: `bannerDaysLeft: '⏰ あと{d}日'`と同じ方式）
+
+### 2-2. 紙吹雪バースト演出
+
+モーダルが開いた瞬間（バッジ画像表示と同時）に、バッジ画像を中心として50個前後の色つき紙片（円形/四角形ランダム、6色程度）が四方に飛び散り1〜1.2秒でフェードアウトする演出を追加する。外部ライブラリは使わず、CSS `@keyframes`+JS動的生成の軽量実装（モックアップで検証済みの実装方式をそのまま採用）。
+
+```js
+function _burstStampConfetti(originEl) {
+  const colors = ['#C8804A', '#7A9B6E', '#9370B0', '#C4705A', '#E2B854', '#5AA0C4'];
+  document.querySelectorAll('.stamp-confetti').forEach(el => el.remove()); // 前回分の残骸を掃除
+  const rect = originEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (let i = 0; i < 50; i++) {
+    const el = document.createElement('div');
+    el.className = 'stamp-confetti';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 80 + Math.random() * 180;
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist - 30;
+    const rot = Math.random() * 720 - 360;
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    el.style.left = cx + 'px';
+    el.style.top = cy + 'px';
+    el.style.setProperty('--dx', dx + 'px');
+    el.style.setProperty('--dy', dy + 'px');
+    el.style.setProperty('--rot', rot + 'deg');
+    el.style.animationDelay = (Math.random() * 0.15) + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1400); // アニメーション終了後にDOMから除去（蓄積防止）
+  }
+}
+```
+
+```css
+.stamp-confetti {
+  position: fixed;
+  width: 8px; height: 8px;
+  z-index: 3710; /* モーダル(3703)より上、既存z-index体系の枠内 */
+  pointer-events: none;
+  animation: stampConfettiFly 1.1s ease-out forwards;
+}
+@keyframes stampConfettiFly {
+  0% { transform: translate(0,0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+}
+```
+
+`openStampLevelUnlockModal()`内、バッジ画像`<img>`生成直後に`_burstStampConfetti(バッジ画像要素)`を呼ぶ。
+
+### 2-3. `doStampCheckin()`の呼び出し変更
+
+```js
+// 変更前
+const newlyUnlockedLevel = _stampProgress.unlockedLevels[_stampProgress.unlockedLevels.length - 1];
+setTimeout(() => openStampLevelUnlockModal(newlyUnlockedLevel), 1600);
+
+// 変更後
+const newlyUnlockedLevel = _stampProgress.unlockedLevels[_stampProgress.unlockedLevels.length - 1];
+setTimeout(() => openStampLevelUnlockModal(spot.level, newlyUnlockedLevel), 1600);
+```
+
+`spot`は`doStampCheckin()`冒頭で既に`const spot = _stampSelectedSpot;`として取得済みのため追加取得不要。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` `doStampCheckin()`（4250〜4305行目）: 4291〜4292行目が変更対象
+- `public/app.js` `openStampLevelUnlockModal(level)`（4308〜4326行目）: 全面書き換え対象
+- `public/index.html` 828〜838行目付近: `#stamp-level-unlock-modal`のマークアップ。新規の「ロック解除」補足ボックス用要素を追加する
+- `public/app.js` `STRINGS.ja`/`STRINGS.en`: `stampLevelUnlockModalTitle`（既存キー、値変更）
+
+## 4. スコープ外
+
+- レベル解禁の判定ロジック（`STAMP_LEVEL_GATES`、サーバー側`computeUnlockedLevels()`）は変更しない
+- 状態C（全制覇バッジ）自体の変更は設計書108で扱う（別設計書）
+
+## 5〜6. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 7. i18n変更点
+
+- `stampLevelUnlockModalTitle`: 既存キーの値変更（ja「新しいレベルが解禁されました！」→「スタンプ獲得！」、en「New level unlocked!」→「Stamp acquired!」）
+- `stampLevelUnlockSubtext`: 新規キー（ja「🔓 {level}のロックが解除されました」、en「🔓 {level} unlocked!」）、ja/en同時追加
+
+## 承認状況
+2026-07-21 ユーザーが「そちらもみたいです！」（モーダル確認）を経て「よくあるくす玉がパッカーンみたいな演出ってできる？」「お願いします。モックつくってみて」と依頼、モックアップ提示後「いいね。」と承認。**ユーザー承認済み**。
+
+---
+
+# 設計書108 — 全制覇バッジに「スポット一覧を見る」展開機能を追加
+
+（2026-07-21 ユーザーとの会話・モックアップ確認を経て確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書83の状態C（解禁中・全制覇済み）は、個別スポットカードを一切表示せず大きなバッジのみを表示する設計だった。ユーザーから「制覇した後も完了したスポットは見れるようにしてほしい」との要望があり、メインエージェントが「バッジはそのまま残しつつ、下に開閉トグルで詳細カード一覧を表示する」仕様を提案、モックアップを経て承認された。
+
+あわせて以下の追加フィードバックがあった:
+1. バッジタイトルに絵文字も表示する（例: 「🔰 新参者 制覇！」）
+2. 地図上のピン表示は変更しない（`_renderStampMarkers()`は無変更のまま、完全制覇後もスポットのピンは引き続き表示され続ける既存挙動を維持）
+3. 展開時のカード一覧は、状態Bの横長カード（56pxサムネイル）よりもコンパクトなデザインにする（「スタンプは左、文字は右」の配置を維持しつつ、サイズを縮小）
+
+## 2. 確定済み仕様
+
+### 2-1. バッジタイトルに絵文字を追加
+
+`_renderStampLevelRowComplete()`のタイトル行を`${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}`から`${meta.emoji} ${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}`に変更する。
+
+### 2-2. 「スポット一覧を見る」開閉トグル＋コンパクトカード一覧
+
+バッジ下に開閉トグルボタンを追加し、タップすると当該レベルの全スポット（すべて制覇済み）をコンパクトなカード形式で一覧表示する。デフォルトは閉じた状態（既存の「バッジのみ」の見た目を維持）。
+
+- トグルボタン文言: 開いている時「スポット一覧を見る ▾」・閉じている時「閉じる ▴」（新規i18nキー2つ、または1キー+条件分岐、実装はbuilder判断）
+- コンパクトカード: 状態Bの`.stamp-card`（56pxサムネイル）より小さいサムネイル（目安40px）、説明文（`spot.description`）は表示せず、名前・エリア・チェックイン日時のみとし、全体的にコンパクトな新規CSSクラス（`.stamp-complete-card`等、`.stamp-card`とは別クラス）で実装する
+- レイアウトは既存の状態Bカードと同じ「サムネイル（左）＋テキスト（右）」を踏襲する
+- 複数レベルが同時に全制覇済みになるケース（例: 新参者と定住レベルが同時に制覇済み）を考慮し、開閉状態の管理・コンテナIDはレベルごとに一意にする（例: `id="stamp-complete-list-${level}"`）
+
+### 2-3. 地図表示への影響なし（明示的スコープ外）
+
+`_renderStampMarkers()`は無変更。状態Cになったスポットも含め、解禁済みレベルのスポットは引き続き全て地図上にピン表示され続ける既存挙動（設計書83で確立済み）をそのまま維持する。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` `_renderStampLevelRowComplete(meta, totalCount)`（4116〜4122行目）: 呼び出し元（4047行目 `return _renderStampLevelRowComplete(meta, totalCount);`）を含めて、**`spotsInLevel`を渡すようシグネチャ変更が必要**（現状`totalCount`のみでは個別スポット情報にアクセスできないため）
+- `public/app.js` `_renderStampLevelRowInProgress()`（4065〜4113行目）: カード生成ロジック（サムネイル・「済」マーク・チェックイン日時）の参考実装。ただし状態Cのコンパクトカードは別クラスで実装するため、このロジックをそのまま流用はせずサイズを縮小した独自マークアップにする
+- `public/app.js` `_stampCheckinDateFor(spotId)`（既存ヘルパー、設計書79）: チェックイン日時取得にそのまま再利用できる
+- `public/app.css` `.stamp-level-complete-badge`系（2149〜2169行目）: 既存スタイル、無変更のまま基盤として使う
+- `public/app.js` `_renderStampMarkers()`: 変更対象外（§2-3参照）
+
+## 4. スコープ外
+
+- 状態B（未全制覇時）のカードサイズ・デザインは変更しない
+- 複数レベル同時展開時のアニメーション演出等の作り込みは行わない（単純なdisplay切り替えで十分とする）
+
+## 5〜6. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 7. i18n変更点
+
+新規キー2個（ja/en同時、開閉トグルのラベル用）。具体的なキー名・文言はbuilder判断でよいが、CLAUDE.mdのi18n必須ルール（ja/en同時追加）を厳守すること。
+
+## 承認状況
+2026-07-21 ユーザーが「いいね。あとは制覇した後も完了したスポットはみれるようにしてほしいです。仕様を考えて。」から始まる一連の会話・モックアップ確認を経て、「新参者 制覇、のところは絵文字も表示してね。あと地図上は表示を残しておいてね。スタンプはひだり、文字は右とかでもいいと思う？少しカードが大きいなと。」で最終承認。**ユーザー承認済み**。
