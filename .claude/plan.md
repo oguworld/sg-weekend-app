@@ -11534,3 +11534,182 @@ function focusStampSpotOnMap(spotId) {
 
 ## 承認状況
 2026-07-21 ユーザーが「あとやっぱり地図へのピンボタンは一覧のカードじゃなくて、スポットを表示したときのモーダルの中にしようかな。」と明示。**ユーザー承認済み**。
+
+# 設計書98 — レベルラベル・コースタブ名の文言変更（在住歴ベースの命名へ）
+
+（2026-07-21 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーとの会話で、スタンプラリーのレベル名（定番／ローカル／ニッチ）を、探訪／シンガポール探訪というアプリ全体のテーマ（限られた在住期間でどれだけ深くシンガポールを知れるか）に合わせて在住歴ベースの言葉に変更したいという要望があった。複数パターンを提示し、既存のイベントプロフィールバッジ語彙（`styleLabels = { beginner:'✈️ 移住したて', resident:'🏠 定住', local:'🦁 地元民' }`）と統一感のあるパターンA、ただし最上位（ニッチ相当）は「地元民」ではなく別案として提示した「シンガポール通」を採用することで確定した。
+
+あわせて、「みんなのコース」タブの呼称も「モデルコース」に変更することが確定した（アプリ内部の既存データファイル名`model-courses.json`とも意味的に一致する、旅行ガイドで馴染みのある言葉のため）。
+
+## 2. 確定済み仕様
+
+以下、既存キーの**値のみ変更**（キー名は不変、設計書89・91と同じパターン）。
+
+| キー | 現在の値（ja） | 新しい値（ja） | 現在の値（en） | 新しい値（en） |
+|---|---|---|---|---|
+| `stampLevelStandard` | 定番 | 移住したて | Standard | Newcomer |
+| `stampLevelLocal` | ローカル | 定住 | Local | Settled |
+| `stampLevelNiche` | ニッチ | シンガポール通 | Niche | Singapore Expert |
+| `courseTabEveryone` | みんなのコース | モデルコース | Explore | Model Courses |
+
+`stampLevelSpecial`（スペシャル/Special）は変更しない。`courseTabStampMap`（スタンプラリー/Stamp Rally）・`courseTabMylist`（マイコース、現在非表示中）も変更しない。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 431行目・435〜438行目（`STRINGS.ja`）
+- `public/app.js` 698行目・702〜705行目（`STRINGS.en`）
+- `public/index.html`にこれらキーのデフォルト直書きテキストが存在する場合は同様に変更する（`grep -n 'data-i18n="stampLevelStandard"\|data-i18n="stampLevelLocal"\|data-i18n="stampLevelNiche"\|data-i18n="courseTabEveryone"'`で確認の上、対応するデフォルトテキストも変更すること）
+
+## 4. スコープ外
+
+- レベルの解禁条件・ゲートロジック（`STAMP_LEVEL_GATES`）・データモデルの変更は一切なし
+- `stampLevelSpecial`・`courseTabStampMap`・`courseTabMylist`の変更はなし
+
+## 5〜6. データモデル・API・i18n変更点
+
+**データモデル・API変更なし**。i18nは既存4キーの値変更のみ（新規キーなし）。
+
+## 7. データ共有影響（Web版/iOS App Store版）の確認
+
+表示文言のみの変更。`public/`配下の共通コードのためWeb版・iOS版両方に反映。`server.js`・データファイル無変更のため`pm2 restart`不要。iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「シンガポール通でいきましょうか」「③はモデルコースにしましょう」と明示。**ユーザー承認済み**。
+
+---
+
+# 設計書99 — スポット詳細モーダルの「地図で見る」不具合修正＋ピルボタン化
+
+（2026-07-21 ユーザー報告・要望を経て確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書97でスポット詳細モーダルに追加した「地図で見る」リンクについて、ユーザーから「押せない」との報告があった。調査したところ、`onclick="if(!_touchCapableDetected) focusStampSpotOnMap(...)"`という実装になっているが、対応する`touchend`ハンドラが登録されておらず、CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知アンチパターン（設計書84の`.stamp-card`と全く同じ構造の不具合）が再発していた。
+
+あわせてユーザーから「もう少し目立たせてもいい」との要望があり、地味なテキストリンク（`.card-detail-link`）から、旧`#stamp-view-toggle-btn`で使っていたピル型ボタンスタイル（`.sort-btn`）への変更で合意した。
+
+## 2. 確定済み仕様
+
+### 2-1. 不具合修正
+
+`public/index.html`の「地図で見る」`<span>`（現在814〜816行目付近）のonclick属性から`if(!_touchCapableDetected)`ガードを除去し、単純な`onclick="focusStampSpotOnMap(_stampSelectedSpot && _stampSelectedSpot.id)"`に変更する。対応する`touchend`ハンドラの新規追加は不要（CLAUDE.md既存ルールに従い、ゴーストクリックが実証されていない要素への個別ガードは付けない）。
+
+### 2-2. ピルボタン化
+
+`class="card-detail-link"`を`class="sort-btn"`に変更する（`public/app.css` 280〜294行目の既存スタイル、`inline-flex`・`border-radius:20px`・`background:var(--caramel-pale)`・`border:1px solid var(--caramel-light)`のピル型）。旧`#stamp-view-toggle-btn`が使っていたのと同じクラスのため、見た目の統一感もある。
+
+## 3. 既存コードの調査結果
+
+- `public/index.html` 813〜817行目: 現在の「地図で見る」`<span class="card-detail-link">`
+- `public/app.css` 280〜294行目: `.sort-btn`定義
+- `.card-detail-link`は他の箇所（イベントカードの「🔗 元記事を見る」）でも使われているため、そちらは変更しない（この1箇所のみクラス変更）
+
+## 4. スコープ外
+
+`focusStampSpotOnMap()`本体・地図セピアフィルター・パルス演出は変更しない。
+
+## 5〜6. データモデル・API・i18n変更点
+
+**変更なし**。
+
+## 7. データ共有影響（Web版/iOS App Store版）の確認
+
+フロントエンドのみの変更。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「あとイベントカードの...」の直前に「あと押せないのでチェックして」「もうちょっと目立ぐらいでもいいかな」と明示、その後の会話で継続の意思を確認。**ユーザー承認済み**。
+
+---
+
+# 設計書100 — スペシャルレベルの存在を「？？？」表示でグレーアウト表示する
+
+（2026-07-21 ユーザー要望を経て確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+`special`レベルのスポットは、未解禁ユーザーには`GET /api/stamp-spots`のレスポンス自体から除外される既存サーバー仕様（設計書69）のため、コレクション一覧側では該当スポットが0件となり、`_renderStampCollectionList()`の`if (spotsInLevel.length === 0) return '';`ガード（設計書83 §10リスク3）により、「スペシャル」の行自体が全く描画されない状態だった。ユーザーから「スペシャルというカテゴリの存在自体を、ローカル/ニッチの『？？？』表示と同じようにグレーアウトで示しておいてほしい」との要望があった。
+
+## 2. 確定済み仕様
+
+`special`レベルが未解禁（`_stampProgress.unlockedLevels`に含まれない）かつ`spotsInLevel.length === 0`の場合、行自体を非表示にする代わりに、既存の「ロック中」表示（状態A、`_renderStampLevelRowLocked()`）と同じ見た目で「🔒 スペシャル ？？？」を表示する。**実際の件数（2件）は表示しない**（サーバーが意図的に件数も含めて存在を隠す設計のため、フロント側でも件数だけは伏せ字のままにする）。
+
+## 3. 実装方針
+
+`_renderStampCollectionList()`（`public/app.js` 4010〜4018行目付近）の`if (spotsInLevel.length === 0) return '';`分岐に、`special`レベル専用の特別処理を追加する:
+
+```js
+if (spotsInLevel.length === 0) {
+  if (level === 'special' && !_stampProgress.unlockedLevels.includes('special')) {
+    return _renderStampLevelRowLocked(STAMP_LEVEL_META[level], null, null);
+  }
+  return '';
+}
+```
+
+`_renderStampLevelRowLocked(meta, checkedCount, totalCount)`（4014〜4020行目付近）を、`checkedCount`/`totalCount`が`null`の場合は件数表示を「？？？」にするよう修正する:
+
+```js
+function _renderStampLevelRowLocked(meta, checkedCount, totalCount) {
+  const countHtml = (checkedCount === null || totalCount === null) ? '？？？' : `${checkedCount}/${totalCount}`;
+  return `<div class="stamp-level-row stamp-level-row--locked">
+    <span class="stamp-level-row-icon">🔒</span>
+    <span class="stamp-level-row-label">${t(meta.labelKey)}</span>
+    <span class="stamp-level-row-count">${countHtml}</span>
+  </div>`;
+}
+```
+
+既存の呼び出し元（local/niche、実件数あり）はそのまま`${checkedCount}/${totalCount}`が表示され、影響を受けない。
+
+## 4. スコープ外
+
+- サーバー側（`GET /api/stamp-spots`）の変更は一切なし。あくまでフロント側の表示ロジックのみで完結させる
+- `special`が解禁された後の見た目（既存の状態B/C分岐）は変更しない
+
+## 5〜6. データモデル・API・i18n変更点
+
+**変更なし**。「？？？」は既存サーバー側マスキング文言（`maskLockedStampSpot()`、設計書71）と同じ文字列をハードコードで流用するため新規i18nキーは不要（既存の他の「？？？」表示箇所も非i18n対応のため整合的）。
+
+## 7. データ共有影響（Web版/iOS App Store版）の確認
+
+フロントエンドのみの変更。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「あとスペシャルのカテゴリの存在も？？？のような感じで出しておいてほしいです。同じようにグレーアウトで。」と明示し、メインエージェントの実装方針提案（件数は伏せ字にする）にも「①はオッケーです」と承認済み。**ユーザー承認済み**。
+
+---
+
+# 設計書101 — イベントカードのアクションボタン行を中央寄せに変更
+
+（2026-07-21 設計書95でコース作成ボタンを削除した結果生じた左寄せの見た目について、ユーザーから中央寄せの要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書95でイベントカードの「コース作成」ボタンを削除し、残る2ボタン（ピン留め・予定に追加）に`flex:none;width:calc(33% - 4px);`を指定して元のサイズを維持したが、`.card-action-row`自体が`display:flex`のみで`justify-content`を指定していなかったため、既定値（`flex-start`）により2ボタンが左寄せになっていた。ユーザーから「中央寄せにしてほしい」との要望があった。
+
+## 2. 確定済み仕様
+
+`.card-action-row`（`public/app.css` 513〜519行目）に`justify-content: center;`を追加する。
+
+## 3. 既存コードの調査結果
+
+`.card-action-row`クラスは`public/app.js`内で1箇所（1394行目、イベントカードの当該箇所）のみで使用されていることを`grep`で確認済み（他画面との共有クラスではない）。そのため`justify-content: center`の追加による他画面への影響はゼロ。
+
+## 4. スコープ外
+
+`.card-action-btn`（ボタン自体のスタイル、他画面と共有）は変更しない。
+
+## 5〜6. データモデル・API・i18n変更点
+
+**変更なし**。
+
+## 7. データ共有影響（Web版/iOS App Store版）の確認
+
+CSSのみの変更。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「あとイベントカードのピン留め、予定表に追加は中央寄せして。今は←によってます。」と明示。**ユーザー承認済み**。

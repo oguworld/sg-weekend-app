@@ -512,6 +512,7 @@
     }
     .card-action-row {
       display: flex;
+      justify-content: center;
       gap: 6px;
       margin-top: 12px;
       padding-top: 12px;

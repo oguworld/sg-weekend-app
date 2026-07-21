@@ -428,13 +428,13 @@
         customPlanTitlePlaceholder: 'タイトルを入力',
         navCourse: '探訪',
         courseScreenTitle: 'シンガポール探訪',
-        courseTabEveryone: 'みんなのコース',
+        courseTabEveryone: 'モデルコース',
         courseTabMylist: 'マイコース',
         courseTabStampMap: 'スタンプラリー',
         stampMapLoginRequired: 'スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。',
-        stampLevelStandard: '定番',
-        stampLevelLocal: 'ローカル',
-        stampLevelNiche: 'ニッチ',
+        stampLevelStandard: '移住したて',
+        stampLevelLocal: '定住',
+        stampLevelNiche: 'シンガポール通',
         stampLevelSpecial: 'スペシャル',
         stampProgressSummary: '{unlocked}レベル解禁中・{checked}/{total}スポット制覇',
         stampCheckedInBadge: '✓ 制覇済み',
@@ -695,13 +695,13 @@
         customPlanTitlePlaceholder: 'Enter title',
         navCourse: 'Explore',
         courseScreenTitle: 'Explore Singapore',
-        courseTabEveryone: 'Explore',
+        courseTabEveryone: 'Model Courses',
         courseTabMylist: 'My Courses',
         courseTabStampMap: 'Stamp Rally',
         stampMapLoginRequired: 'To save your stamp rally progress, please link your account from Settings.',
-        stampLevelStandard: 'Standard',
-        stampLevelLocal: 'Local',
-        stampLevelNiche: 'Niche',
+        stampLevelStandard: 'Newcomer',
+        stampLevelLocal: 'Settled',
+        stampLevelNiche: 'Singapore Expert',
         stampLevelSpecial: 'Special',
         stampProgressSummary: '{unlocked} level(s) unlocked · {checked}/{total} spots collected',
         stampCheckedInBadge: '✓ Collected',
@@ -4015,7 +4015,15 @@
 
       el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
         const spotsInLevel = _stampSpots.filter(s => s.level === level);
-        if (spotsInLevel.length === 0) return ''; // special未解禁時等、該当レベルのスポットが1件もない場合は行自体を描画しない（設計書83 §10リスク3のガード）
+        if (spotsInLevel.length === 0) {
+          // special未解禁時等、該当レベルのスポットが1件もない場合。
+          // special はサーバーが件数・存在自体を意図的に隠す設計（設計書69）のため、
+          // 未解禁の special のみ「？？？」の伏せ字ロック行を表示し、それ以外は行自体を描画しない（設計書100）。
+          if (level === 'special' && !_stampProgress.unlockedLevels.includes('special')) {
+            return _renderStampLevelRowLocked(STAMP_LEVEL_META[level], null, null);
+          }
+          return '';
+        }
 
         const meta = STAMP_LEVEL_META[level];
         const unlocked = _stampProgress.unlockedLevels.includes(level);
@@ -4042,11 +4050,13 @@
     }
 
     // 状態A: ロック中 — 個別スポットは表示せず「レベル名＋🔒＋件数」の1行のみ
+    // checkedCount/totalCount が null の場合（special未解禁時等、サーバーが件数自体を隠している場合）は「？？？」を表示する（設計書100）
     function _renderStampLevelRowLocked(meta, checkedCount, totalCount) {
+      const countHtml = (checkedCount === null || totalCount === null) ? '？？？' : `${checkedCount}/${totalCount}`;
       return `<div class="stamp-level-row stamp-level-row--locked">
         <span class="stamp-level-row-icon">🔒</span>
         <span class="stamp-level-row-label">${t(meta.labelKey)}</span>
-        <span class="stamp-level-row-count">${checkedCount}/${totalCount}</span>
+        <span class="stamp-level-row-count">${countHtml}</span>
       </div>`;
     }
 
