@@ -432,7 +432,7 @@
         courseTabMylist: 'マイコース',
         courseTabStampMap: 'スタンプラリー',
         stampMapLoginRequired: 'スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。',
-        stampLevelStandard: '新参者',
+        stampLevelStandard: '見習い',
         stampLevelLocal: '定住レベル',
         stampLevelNiche: 'シンガポール通',
         stampLevelSpecial: '極めし者',
@@ -702,7 +702,7 @@
         courseTabMylist: 'My Courses',
         courseTabStampMap: 'Stamp Rally',
         stampMapLoginRequired: 'To save your stamp rally progress, please link your account from Settings.',
-        stampLevelStandard: 'Newcomer',
+        stampLevelStandard: 'Apprentice',
         stampLevelLocal: 'Settled',
         stampLevelNiche: 'Singapore Expert',
         stampLevelSpecial: 'Grandmaster',
@@ -3694,8 +3694,9 @@
 
     // 設計書110: STAMP_LEVEL_META.yearRange/yearRangeEnを現在の言語に応じて取得する共通ヘルパー
     // 設計書112: 厳密な必須条件に読めないよう「目安」/「approx.」を接頭辞として追加
+    // 設計書113: 年数表記に「在住」を追加
     function _stampLevelYearRange(meta) {
-      return getLang() === 'ja' ? `目安${meta.yearRange}` : `approx. ${meta.yearRangeEn}`;
+      return getLang() === 'ja' ? `目安：在住${meta.yearRange}` : `approx. ${meta.yearRangeEn} in Singapore`;
     }
 
     // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。

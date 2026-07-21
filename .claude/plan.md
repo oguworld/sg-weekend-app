@@ -12262,3 +12262,57 @@ function _stampLevelYearRange(meta) {
 
 ## 承認状況
 2026-07-21 ユーザーが「年数ラベルのところ一応目安っていうラベルつけてもらっていい」と明示。**ユーザー承認済み**。
+
+# 設計書113 — 「新参者」を「見習い」に変更＋年数表記に「在住」を追加
+
+（2026-07-22 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーから「新参者」がバカにしている感じに聞こえるとの指摘があり、代替案（新米／ビギナー／はじめの一歩等）を検討した結果、「冒険家・探訪者」路線の「見習い」（職人の世界の「見習い→一人前」という伝統的な対の言葉）に確定した。「一人前」への変更案（定住レベルの置き換え）も提示したが、ユーザーは「定住レベルはそのまま」を選択し、新参者（tier1）のみの変更となった。
+
+あわせて、年数目安の表記を「（目安1〜2年）」から「（目安：在住1〜2年）」の形式に変更したいとの要望があった。
+
+## 2. 確定済み仕様
+
+### 2-1. `stampLevelStandard`の値変更
+
+- ja: 「新参者」→「見習い」
+- en: 「Newcomer」→「Apprentice」
+
+`stampLevelLocal`（定住レベル）・`stampLevelNiche`（シンガポール通）・`stampLevelSpecial`（極めし者）は変更しない。
+
+### 2-2. 年数表記フォーマットの変更
+
+`_stampLevelYearRange(meta)`関数の戻り値を「目安{年数}」から「目安：在住{年数}」に変更する:
+
+```js
+// 変更前
+function _stampLevelYearRange(meta) {
+  return getLang() === 'ja' ? `目安${meta.yearRange}` : `approx. ${meta.yearRangeEn}`;
+}
+
+// 変更後
+function _stampLevelYearRange(meta) {
+  return getLang() === 'ja' ? `目安：在住${meta.yearRange}` : `approx. ${meta.yearRangeEn} in Singapore`;
+}
+```
+
+表示は「見習い（目安：在住1〜2年）」のようになる。この関数1つの変更で既存4箇所の呼び出し元全てに反映される（設計書110・112と同じ構造）。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js`の`STRINGS.ja`/`STRINGS.en`内`stampLevelStandard`（設計書98・103で既に値変更済みの箇所）
+- `public/app.js`の`_stampLevelYearRange()`関数（設計書112で追加済みの「目安」接頭辞をさらに拡張）
+- `public/index.html`にデフォルト直書きテキストがあれば同様に確認・変更する
+
+## 4. スコープ外
+
+`stampLevelLocal`・`stampLevelNiche`・`stampLevelSpecial`は変更しない。`yearRange`/`yearRangeEn`の値自体（1〜2年等）も変更しない。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-22 ユーザーが「定住レベルはそのままだね見習いだけ変えて。あとは（)の中は目安 : 在住1〜2年の形できる？」と明示。**ユーザー承認済み**。
