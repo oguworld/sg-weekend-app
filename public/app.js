@@ -3683,12 +3683,19 @@
     // 設計書81: レベル解禁演出モーダル・コレクション一覧「ページ」見出しの2箇所のみ、
     // Nano Banana生成イラストバッジ（img）に置き換える。凡例チップ・スポット詳細バッジは
     // 絵文字のまま維持（emojiフィールドは全箇所で引き続き参照される、削除しない）。
+    // 設計書110: レベル名に併記する在住年数の目安（ja/en）。年数表記自体は数値＋単位のみだが、
+    // 既存のi18n必須ルールに配慮し英語表記も用意する（yearRange=ja、yearRangeEn=en）。
     const STAMP_LEVEL_META = {
-      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '🔰', img: '/images/stamp-badges/badge-level-standard.png' },
-      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏠', img: '/images/stamp-badges/badge-level-local.png' },
-      niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🦁', img: '/images/stamp-badges/badge-level-niche.png' },
-      special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png' },
+      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '🔰', img: '/images/stamp-badges/badge-level-standard.png', yearRange: '1〜2年', yearRangeEn: '1-2 years' },
+      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏠', img: '/images/stamp-badges/badge-level-local.png', yearRange: '3〜4年', yearRangeEn: '3-4 years' },
+      niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🦁', img: '/images/stamp-badges/badge-level-niche.png', yearRange: '5年以上', yearRangeEn: '5+ years' },
+      special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png', yearRange: '10年以上', yearRangeEn: '10+ years' },
     };
+
+    // 設計書110: STAMP_LEVEL_META.yearRange/yearRangeEnを現在の言語に応じて取得する共通ヘルパー
+    function _stampLevelYearRange(meta) {
+      return getLang() === 'ja' ? meta.yearRange : meta.yearRangeEn;
+    }
 
     // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。
     // 既存コース機能の CITY_COURSE_AREAS には依存しない独立定数（スタンプラリー機能は既存コース機能と完全独立という設計方針を踏襲）。
@@ -4059,7 +4066,8 @@
     // checkedCount/totalCount が null の場合（special未解禁時等、サーバーが件数自体を隠している場合）は「？？？」を表示する（設計書100）
     function _renderStampLevelRowLocked(meta, checkedCount, totalCount, hideLabel) {
       const countHtml = (checkedCount === null || totalCount === null) ? '？？？' : `${checkedCount}/${totalCount}`;
-      const labelHtml = hideLabel ? '？？？' : t(meta.labelKey);
+      // 設計書110: hideLabel時（極めし者ロック中）はレベル名同様、年数目安も一切表示しない（設計書105のマスキング方針を踏襲）
+      const labelHtml = hideLabel ? '？？？' : `${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）`;
       return `<div class="stamp-level-row stamp-level-row--locked">
         <span class="stamp-level-row-icon">🔒</span>
         <span class="stamp-level-row-label">${labelHtml}</span>
@@ -4108,7 +4116,7 @@
       return `<div class="stamp-level-section">
         <div class="stamp-level-section-title">
           ${meta.emoji}
-          ${t(meta.labelKey)}
+          ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）
         </div>
         <div class="stamp-level-progress-row">
           <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
@@ -4141,7 +4149,7 @@
       return `<div class="stamp-level-complete-badge">
         <img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-level-complete-badge-img">
         <div class="stamp-level-complete-badge-body">
-          <div class="stamp-level-complete-badge-title">${meta.emoji} ${t(meta.labelKey)} ${t('stampLevelCompleteLabel')}</div>
+          <div class="stamp-level-complete-badge-title">${meta.emoji} ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}） ${t('stampLevelCompleteLabel')}</div>
           <div class="stamp-level-complete-badge-count">${totalCount}/${totalCount} ${t('stampLevelCompleteSpotsLabel')}</div>
           <button type="button" class="stamp-complete-toggle-btn" data-list-id="${listId}"
             onclick="if(!_touchCapableDetected) _toggleStampCompleteList('${listId}')">${t('stampCompleteListShow')}</button>
@@ -4394,7 +4402,7 @@
         const imgEl = emojiEl.querySelector('.stamp-unlock-img');
         _burstStampConfetti(imgEl || emojiEl);
       }
-      if (nameEl) nameEl.textContent = `${meta.emoji} ${t(meta.labelKey)}`;
+      if (nameEl) nameEl.textContent = `${meta.emoji} ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）`;
       if (subtextEl) {
         subtextEl.textContent = t('stampLevelUnlockSubtext').replace('{level}', `${unlockedMeta.emoji} ${t(unlockedMeta.labelKey)}`);
       }

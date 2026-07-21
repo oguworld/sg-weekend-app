@@ -12127,3 +12127,97 @@ if (fabEl) fabEl.textContent = '⇄';
 
 ## 承認状況
 2026-07-21 ユーザーが横並びレイアウトのモックアップに「だいじょうぶです！お願いします。」、FABアイコン変更案（⇄）に「いいね。お願いします。実装とビルドまでお願いします。」と明示。**ユーザー承認済み**（実装後、ユーザー指示によりreleaseブランチへのpush・TestFlightビルドまで実施する）。
+
+# 設計書110 — レベルラベルに在住年数の目安を追記（極めし者はロック中マスク維持）
+
+（2026-07-21 ユーザー要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーから、各レベルラベル（新参者／定住レベル／シンガポール通／極めし者）に在住年数の目安を併記したいとの要望があった。目安は「新参者=1〜2年、定住レベル=3〜4年、シンガポール通=5年以上、極めし者=10年以上」。あわせて「極めし者はロック中はマスクで」と、設計書105で確立した未解禁時のマスキング（レベル名自体を「？？？」にする）を年数表示にも一貫して適用するよう明示された。
+
+## 2. 確定済み仕様
+
+### 2-1. `STAMP_LEVEL_META`に`yearRange`フィールドを追加
+
+```js
+const STAMP_LEVEL_META = {
+  standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '🔰', img: '...', yearRange: '1〜2年' },
+  local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏠', img: '...', yearRange: '3〜4年' },
+  niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🦁', img: '...', yearRange: '5年以上' },
+  special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '👑', img: '...', yearRange: '10年以上' },
+};
+```
+
+（英語版は`yearRangeEn`等、別フィールドで用意するかi18nキー化するかはbuilder判断。年数表記自体は数字＋単位のみのため多言語対応の必要性は低いが、既存のi18n必須ルールに配慮し、"1-2 years" 等の英語表記も用意すること）
+
+### 2-2. 表示箇所
+
+以下3箇所に「レベル名（年数目安）」の形式で追記する:
+- `_renderStampLevelRowLocked()`（状態A、ロック中1行表示）: `hideLabel`が`false`のとき（ローカル/ニッチ）のみ年数を併記。`hideLabel`が`true`のとき（**極めし者のロック中**）は、レベル名だけでなく年数目安も一切表示しない（`？？？`のみ、設計書105のマスキング方針を年数にも一貫適用）
+- `_renderStampLevelRowInProgress()`（状態B、レベル見出し）: 年数を併記
+- `_renderStampLevelRowComplete()`（状態C、全制覇バッジタイトル）: 年数を併記
+- `openStampLevelUnlockModal()`（レベル解禁演出モーダル、レベル名表示）: 年数を併記
+
+以下は据え置き（変更しない、UIスペースの制約上追記しない）:
+- スポット詳細モーダルのレベルバッジ（`openStampSpotDetail()`、小さなピル型バッジのため年数を追加すると窮屈になる）
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 3680〜3685行目付近: `STAMP_LEVEL_META`定数
+- `public/app.js` 4062行目: `_renderStampLevelRowLocked()`の`labelHtml`生成部（`hideLabel`分岐、設計書105で追加済み）
+- `public/app.js` 4111行目: `_renderStampLevelRowInProgress()`のレベル見出し
+- `public/app.js` 4144行目: `_renderStampLevelRowComplete()`のバッジタイトル
+- `public/app.js` 4397行目: `openStampLevelUnlockModal()`のレベル名表示
+
+## 4. スコープ外
+
+スポット詳細モーダルのレベルバッジへの追記は行わない。年数目安の値自体（1〜2年等）の妥当性検証（実際のユーザー行動データに基づく調整等）は今回のスコープ外。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「最後にラベルに年数の目安を追記したいです。目安：1〜2年みたいな。新参者 1〜2年、定住：3〜4年、シンガポール通 5年以上、極めし者 10年以上です」「極めし者はロック中はマスクで」と明示。**ユーザー承認済み**。
+
+# 設計書111 — レベル進捗バーをもっと目立たせる
+
+（2026-07-21 ユーザー要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+状態B（解禁中・未全制覇）のレベル見出し下に表示される進捗バー（`.stamp-level-progress-row`系）が地味という指摘があった。もう少し目立たせたい。
+
+## 2. 確定済み仕様
+
+`public/app.css`の`.stamp-level-progress-track`・`.stamp-level-progress-fill`・`.stamp-level-progress-label`を以下のように変更する:
+
+```css
+/* 変更前 */
+.stamp-level-progress-track { flex: 1; height: 6px; border-radius: 50px; background: var(--sand); overflow: hidden; }
+.stamp-level-progress-fill { height: 100%; border-radius: 50px; background: linear-gradient(90deg, var(--caramel-light), var(--caramel)); transition: width 0.3s ease; }
+.stamp-level-progress-label { font-size: 11px; font-weight: 700; color: var(--warm-gray); flex-shrink: 0; }
+
+/* 変更後（目安、builder微調整可） */
+.stamp-level-progress-track { flex: 1; height: 12px; border-radius: 50px; background: var(--sand); border: 1px solid var(--sand-dark); overflow: hidden; }
+.stamp-level-progress-fill { height: 100%; border-radius: 50px; background: linear-gradient(90deg, var(--caramel-light), var(--caramel-dark)); transition: width 0.3s ease; box-shadow: inset 0 1px 2px rgba(255,255,255,0.3); }
+.stamp-level-progress-label { font-size: 13px; font-weight: 900; color: var(--caramel-dark); flex-shrink: 0; }
+```
+
+高さを6px→12pxに倍増、外枠線を追加、ラベルを11px→13px・色をグレーからキャラメル濃色に変更してコントラストを強める。
+
+## 3. 既存コードの調査結果
+
+`public/app.css` 2085〜2102行目付近、`.stamp-level-progress-row`系4クラス。
+
+## 4. スコープ外
+
+進捗バーの構造（HTML生成ロジック、`public/app.js`側）は変更しない。CSSのみの変更。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「あと進捗バーはもう少し目立たせて」と明示。**ユーザー承認済み**。
