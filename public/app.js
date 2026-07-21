@@ -426,7 +426,7 @@
         toastPlanUpdated: '✅ 保存しました',
         scheduleNoPlans: '予定なし',
         customPlanTitlePlaceholder: 'タイトルを入力',
-        navCourse: '探検',
+        navCourse: '探訪',
         courseScreenTitle: 'シンガポール探訪',
         courseTabEveryone: 'みんなのコース',
         courseTabMylist: 'マイコース',
