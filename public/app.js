@@ -702,7 +702,7 @@
         stampLevelStandard: 'Newcomer',
         stampLevelLocal: 'Settled',
         stampLevelNiche: 'Singapore Expert',
-        stampLevelSpecial: 'Special',
+        stampLevelSpecial: 'Grandmaster',
         stampProgressSummary: '{unlocked} level(s) unlocked · {checked}/{total} spots collected',
         stampCheckedInBadge: '✓ Collected',
         stampCheckinBtn: 'Checking your location…',
@@ -4020,7 +4020,7 @@
           // special はサーバーが件数・存在自体を意図的に隠す設計（設計書69）のため、
           // 未解禁の special のみ「？？？」の伏せ字ロック行を表示し、それ以外は行自体を描画しない（設計書100）。
           if (level === 'special' && !_stampProgress.unlockedLevels.includes('special')) {
-            return _renderStampLevelRowLocked(STAMP_LEVEL_META[level], null, null);
+            return _renderStampLevelRowLocked(STAMP_LEVEL_META[level], null, null, true);
           }
           return '';
         }
@@ -4051,11 +4051,12 @@
 
     // 状態A: ロック中 — 個別スポットは表示せず「レベル名＋🔒＋件数」の1行のみ
     // checkedCount/totalCount が null の場合（special未解禁時等、サーバーが件数自体を隠している場合）は「？？？」を表示する（設計書100）
-    function _renderStampLevelRowLocked(meta, checkedCount, totalCount) {
+    function _renderStampLevelRowLocked(meta, checkedCount, totalCount, hideLabel) {
       const countHtml = (checkedCount === null || totalCount === null) ? '？？？' : `${checkedCount}/${totalCount}`;
+      const labelHtml = hideLabel ? '？？？' : t(meta.labelKey);
       return `<div class="stamp-level-row stamp-level-row--locked">
         <span class="stamp-level-row-icon">🔒</span>
-        <span class="stamp-level-row-label">${t(meta.labelKey)}</span>
+        <span class="stamp-level-row-label">${labelHtml}</span>
         <span class="stamp-level-row-count">${countHtml}</span>
       </div>`;
     }

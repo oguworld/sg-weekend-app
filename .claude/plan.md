@@ -11815,3 +11815,51 @@ CSSのみの変更。`server.js`・データファイル無変更のため`pm2 r
 
 ## 承認状況
 2026-07-21 ユーザーが「いきましょう」と明示。**ユーザー承認済み**。
+
+# 設計書105 — スペシャルレベル未解禁時、ラベル名自体も「？？？」でマスクする
+
+（2026-07-21 設計書100の追加要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書100で「🔒 極めし者 ？？？」（レベル名は表示・件数のみ伏せ字）という実装を行ったが、ユーザーから「レベル名自体（『極めし者』の文言）もロック中は？？？にしてほしい」との追加要望があった。ローカル・ニッチの既存ロック中表示（レベル名は表示、個別スポット名のみ`？？？`）とは異なり、`special`レベルはその**存在自体を隠す**という設計書69以来の一貫した方針（サーバー側でAPIレスポンスからスポット自体を除外）に合わせ、レベル名も含めて完全に伏せる。
+
+## 2. 確定済み仕様
+
+`_renderStampLevelRowLocked(meta, checkedCount, totalCount)`に第4引数`hideLabel`（boolean、デフォルトfalse）を追加し、`true`の場合はレベル名表示も`t(meta.labelKey)`の代わりに「？？？」にする。
+
+```js
+function _renderStampLevelRowLocked(meta, checkedCount, totalCount, hideLabel) {
+  const countHtml = (checkedCount === null || totalCount === null) ? '？？？' : `${checkedCount}/${totalCount}`;
+  const labelHtml = hideLabel ? '？？？' : t(meta.labelKey);
+  return `<div class="stamp-level-row stamp-level-row--locked">
+    <span class="stamp-level-row-icon">🔒</span>
+    <span class="stamp-level-row-label">${labelHtml}</span>
+    <span class="stamp-level-row-count">${countHtml}</span>
+  </div>`;
+}
+```
+
+`special`用の呼び出し箇所（`public/app.js` 4023行目付近）のみ第4引数に`true`を渡す:
+```js
+return _renderStampLevelRowLocked(STAMP_LEVEL_META[level], null, null, true);
+```
+
+既存のローカル/ニッチ用の呼び出し箇所（4043行目付近）は第4引数を渡さない（`undefined`→falsy、レベル名は従来通り表示）ため無変更のまま動作する。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 4054〜4061行目: `_renderStampLevelRowLocked()`本体（設計書100で件数マスク機能を追加済み）
+- `public/app.js` 4023行目付近: `special`用の呼び出し（`null, null`で件数マスク済み、今回`true`を追加）
+- `public/app.js` 4043行目付近: ローカル/ニッチ用の呼び出し（実件数あり、変更しない）
+
+## 4. スコープ外
+
+ローカル/ニッチのロック中表示（レベル名は表示のまま）は変更しない。個別スポット名のマスキング（サーバー側`maskLockedStampSpot()`）も変更しない。
+
+## 5〜7. データモデル・API・i18n・データ共有影響
+
+**変更なし**。「？？？」は既存の同一文字列をそのまま流用（新規i18nキーなし）。`server.js`・データファイル無変更のため`pm2 restart`不要。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-21 ユーザーが「あっ最後は極めし者という文言自体もロック中は？？？としてほしいです」と明示。**ユーザー承認済み**。
