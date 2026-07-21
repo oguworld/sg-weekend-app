@@ -5430,6 +5430,16 @@
     }
 
     function handleImgError(el, cls, emoji) {
+      if (!el.dataset.retried) {
+        el.dataset.retried = '1';
+        const src = el.src;
+        setTimeout(() => {
+          if (!el.isConnected) return; // 待機中にDOMから除去されていたら何もしない
+          el.removeAttribute('src');
+          el.src = src; // 同一URLへのsrc再代入だけではブラウザが再読み込みしないことがあるため、一度removeAttributeで明示的にクリアしてから再設定する
+        }, 1200);
+        return;
+      }
       el.parentElement.innerHTML = '<div class="card-image-bg ' + cls + '">' + emoji + '</div>';
     }
 
