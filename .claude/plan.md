@@ -12637,3 +12637,143 @@ html[data-theme="dark"] .screen-auth-gate {
 
 ## 承認状況
 2026-07-22 メインエージェントが設計書116実装直後に自己発見・ユーザーに一言断ったうえで修正。軽微なCSS1行修正のため詳細確認は省略。
+
+# 設計書118 — アカウント連携時にバックアップパスフレーズ入力を必須化
+
+（2026-07-22 ユーザーとの会話で確定。AskUserQuestionで「忘却時のリセット導線」を確認済み。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+現状、データバックアップ（設計書54・58）は「アカウント連携」とは独立したオプトイン機能で、連携後に設定画面から別途パスフレーズを設定しないとバックアップは有効にならなかった。ユーザーから「アカウント連携する時に必ずパスフレーズの入力をしてもらって、基本バックアップはそれでオンになる。ただしアカウント連携した後もパスフレーズを変えられる作りにしてほしい」との要望があり、「アカウント連携している以上バックアップをしない状態はない」という不変条件を持たせたいとの意図も確認した。
+
+あわせて、今回追加した探訪（スタンプラリー）のチェックイン進捗（`data/stamp-progress/{userId}.json`）がアカウントに正しく紐付いてバックアップされているか確認を求められたが、これは調査の結果**対応不要**と判明した: スタンプ進捗はlocalStorageを経由せず`POST /api/stamp-progress/checkin`でサーバー側に直接保存される設計（設計書69）であり、かつ探訪画面自体が設計書116でログイン必須になったため、匿名状態で進捗が失われる隙間商品もない。既存のバックアップ機構（`_collectBackupPayload()`）に含める必要はない。
+
+## 2. 確定済み仕様
+
+### 2-1. 全体フロー
+
+Google/Apple連携の完了経路は4パターン（Web Google=`renderButton`+`_submitGoogleIdToken`、iOS Google=`_handleGoogleLoginIOS`+`_submitGoogleIdToken`、iOS Apple=`_handleAppleLoginIOS`+`_submitAppleIdentityToken`、Web Apple=`_consumeAppleAuthTokenFromHash`のリダイレクト受信）あるが、**いずれも最終的に`refreshLoginUI()`が呼ばれる**（Web Appleのみ`_initAuthToken`起動時IIFE経由で間接的に）。この収束点1箇所にフックを追加することで全経路をカバーする。
+
+`refreshLoginUI()`のトークン検証成功パス（`res.ok`、2838-2847行目）の直後に、新規関数`_checkMandatoryBackupSetup()`の呼び出しを追加する（awaitしないfire-and-forget）:
+
+```js
+// refreshLoginUI() 内、success分岐の末尾（catch の直前）
+_checkMandatoryBackupSetup();
+```
+
+```js
+// バックアップが未設定（この端末にローカル鍵materialがない）なら、サーバーの既存バックアップ有無を見て
+// setup/restoreいずれかのモードで必須パスフレーズシートを開く。ログイン確認できた経路すべてから収束的に呼ばれる。
+async function _checkMandatoryBackupSetup() {
+  if (!getAuthToken()) return;
+  if (isBackupEnabled()) return; // 既にこの端末で鍵material保持済みなら何もしない
+  const sheetEl = document.getElementById('backup-passphrase-sheet');
+  if (sheetEl && sheetEl.classList.contains('visible')) return; // 既に開いている（二重表示防止）
+  try {
+    const res = await authedFetch(API_BASE + '/api/user-plans/me');
+    if (!res.ok) return;
+    const d = await res.json();
+    const mode = (d.salt && d.encryptedData) ? 'restore' : 'setup';
+    openBackupPassphraseSheet(mode, true); // 第2引数 mandatory=true
+  } catch (e) {}
+}
+```
+
+この設計により、新規連携（サーバーに未設定→setup）・別端末での再連携（サーバーに設定済み→restore）・フロー中断からの再試行（次回`refreshLoginUI()`実行時に鍵materialが無ければ再度開く）が同じロジックで自然にカバーされる。
+
+### 2-2. 必須モードのシート（閉じられない・「リセット」逃げ道）
+
+`openBackupPassphraseSheet(mode, mandatory = false)`に第2引数`mandatory`を追加する。既存の3呼び出し元（`_runBackupAction`内の'setup'/'change'/'restore'、および`checkExistingBackupOnOpen()`が生成するボタンからの'restore'/'setup'）は全て第2引数を渡さず`mandatory=false`のまま（既存の任意フローは無変更）。
+
+```js
+let _backupSheetMandatory = false;
+
+async function openBackupPassphraseSheet(mode, mandatory = false) {
+  if (!getAuthToken()) { showToast(t('backupLoginRequired')); return; }
+  _backupSheetMode = mode;
+  _backupSheetMandatory = mandatory;
+  // ...既存のtitle/warn/confirmRow設定はそのまま...
+  const closeBtn = document.getElementById('backup-passphrase-close-btn');
+  const cancelBtn = document.getElementById('backup-passphrase-cancel-btn');
+  const resetLink = document.getElementById('backup-passphrase-reset-link');
+  if (closeBtn) closeBtn.style.display = mandatory ? 'none' : '';
+  if (cancelBtn) cancelBtn.style.display = mandatory ? 'none' : '';
+  if (resetLink) resetLink.style.display = (mandatory && mode === 'restore') ? '' : 'none';
+  // ...既存のlockScroll()・visible付与はそのまま...
+}
+
+function closeBackupPassphraseSheet() {
+  if (_backupSheetMandatory) return; // 必須モードは閉じさせない（オーバーレイタップ・✕・キャンセル全経路がこの1関数を通るため一括で防げる）
+  // ...既存の処理...
+}
+```
+
+`public/index.html`の`#backup-passphrase-sheet`内、✕ボタン（749行目）に`id="backup-passphrase-close-btn"`、キャンセルボタン（768行目）に`id="backup-passphrase-cancel-btn"`を追加する（挙動は無変更、JSからのdisplay制御のためのid付与のみ）。
+
+### 2-3. 「パスフレーズを忘れた場合」のリセット導線
+
+restoreモードかつmandatory時のみ表示する、新規リンク要素を送信ボタンの下に追加する:
+
+```html
+<div id="backup-passphrase-reset-link" style="display:none;text-align:center;margin-bottom:12px;">
+  <span style="font-size:12px;color:var(--warm-gray);text-decoration:underline;cursor:pointer;"
+    onclick="if(!_touchCapableDetected) _resetBackupAndSetupFresh()"
+    data-i18n="backupForgotPassphraseLink">パスフレーズを忘れた場合はこちら</span>
+</div>
+```
+
+タップ時、`confirm()`で「既存のバックアップは復元できなくなり新しいパスフレーズで作り直される」旨を警告した上で同意なら、シートを閉じずに'setup'モードへその場で切り替える（サーバー上の暗号化データは`_doBackupSetup`が新しいsalt+暗号文で無条件PUT上書きするため、この関数自体はUI切り替えのみ行えばよい）:
+
+```js
+function _resetBackupAndSetupFresh() {
+  if (!confirm(t('confirmBackupReset'))) return;
+  _backupSheetMode = 'setup';
+  document.getElementById('backup-passphrase-title').textContent = t('backupSetupTitle');
+  document.getElementById('backup-passphrase-confirm-row').style.display = '';
+  document.getElementById('backup-passphrase-input').value = '';
+  document.getElementById('backup-passphrase-reset-link').style.display = 'none';
+}
+```
+
+### 2-4. 設定画面「無効にする」ボタンの削除
+
+`renderBackupSection()`のログイン済み・バックアップ有効時の分岐から、「🚫 無効にする」ボタン（`data-backup-action="disable"`）を削除する（「連携している以上バックアップをしない状態はない」という不変条件のため、ユーザーが自発的に無効化する導線を無くす）。「🔑 パスフレーズを変更」ボタンのみ残す。
+
+```js
+// 変更後（disable ボタンを削除、change のみ残す）
+el.innerHTML = `
+  <p ...>${t('backupEnabledDesc')}</p>
+  <button class="cal-sync-action secondary" data-backup-action="change">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>`;
+```
+
+`disableBackup()`関数自体・`_runBackupAction()`内の`'disable'`ディスパッチは削除しない（既存の「使わなくなった導線は残置」方針を踏襲、ボタンが無くなるため実質到達不能になるだけ）。バックアップ未有効時の分岐（`backupDisabledDesc`＋`data-backup-action="setup"`ボタン）は、`_checkMandatoryBackupSetup()`が先回りして必須シートを開くため通常は一瞬しか表示されない想定だが、フォールバック表示として無変更のまま残す。
+
+### 2-5. i18n新規キー（ja/en同時）
+
+- `backupForgotPassphraseLink`: ja「パスフレーズを忘れた場合はこちら」/ en「Forgot your passphrase?」
+- `confirmBackupReset`: ja「既存のバックアップデータは復元できなくなり、新しいパスフレーズで作り直されます。よろしいですか？」/ en「Your existing backup can no longer be restored and will be recreated with a new passphrase. Continue?」
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 2756-2791行目: `_submitGoogleIdToken`/`_submitAppleIdentityToken`（無変更、既存の`await refreshLoginUI()`がそのままフックの入口になる）
+- `public/app.js` 2808-2853行目: `refreshLoginUI()`（success分岐末尾に1行追加）
+- `public/app.js` 3020-3027行目: `_consumeAppleAuthTokenFromHash`（無変更、`_initAuthToken`経由で間接的にrefreshLoginUIに合流する既存の仕組みをそのまま利用）
+- `public/app.js` 7147-7152行目: `isBackupEnabled()`（無変更、再利用）
+- `public/app.js` 7244-7263行目: `renderBackupSection()`（disable ボタンの削除のみ）
+- `public/app.js` 7268-7291行目: `openBackupPassphraseSheet()`（第2引数追加）
+- `public/app.js` 7293-7298行目: `closeBackupPassphraseSheet()`（先頭に必須ガード追加）
+- `public/app.js` 7445-7462行目: `checkExistingBackupOnOpen()`（無変更、フォールバックとして残置）
+- `public/index.html` 743-778行目: `#backup-passphrase-sheet`（id付与2箇所・新規div1箇所）
+
+## 4. スコープ外
+
+- ログアウト時の鍵material・端末ローカルデータのクリア可否（設計書54 §8-5で既に「クリアしない」を採用、未解決事項として明示済み。今回変更しない）
+- 複数アカウントの切り替え（同一端末で別のGoogle/Appleアカウントに連携し直すケースの鍵material整合性）は既存の未検討事項のままとし、今回新たに対応しない（既存コードも同様の前提のため今回の変更が新たに悪化させるものではない）
+- スタンプ進捗（`data/stamp-progress/{userId}.json`）のバックアップ対応は上記の通り調査の結果対応不要と判明したため、コード変更なし
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ（`public/app.js`/`public/index.html`）。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-22 ユーザーが「アカウント連携する時に必ずパスフレーズの入力をしてもらって...アカウント連携している以上バックアップをしない状態はない」と明示。AskUserQuestionで「別端末再連携時にパスフレーズを忘れた場合の逃げ道」について「リセット」選択肢を採用することを確認済み。**ユーザー承認済み**。

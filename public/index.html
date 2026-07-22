@@ -746,7 +746,7 @@
     box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
       <div id="backup-passphrase-title" style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="backupSetupTitle">バックアップ用パスフレーズを設定</div>
-      <button data-close onclick="closeBackupPassphraseSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
+      <button id="backup-passphrase-close-btn" data-close onclick="closeBackupPassphraseSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
     </div>
     <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
       <div id="backup-passphrase-warn" style="font-size:12px;color:var(--terracotta);line-height:1.6;background:var(--caramel-pale);border-radius:10px;padding:8px 10px;margin-bottom:12px;" data-i18n="backupPassphraseWarning">⚠️ パスフレーズを忘れるとバックアップは復元できません。安全な場所に控えてください。</div>
@@ -765,7 +765,7 @@
           onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
       </div>
       <div style="display:flex;gap:10px;margin-top:12px;margin-bottom:8px;">
-        <button onclick="closeBackupPassphraseSheet()"
+        <button id="backup-passphrase-cancel-btn" onclick="closeBackupPassphraseSheet()"
           style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
                  font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
           data-i18n="titleEditCancel">キャンセル</button>
@@ -773,6 +773,11 @@
           style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
                  font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
           data-i18n="backupPassphraseSubmit">確定</button>
+      </div>
+      <div id="backup-passphrase-reset-link" style="display:none;text-align:center;margin-bottom:12px;">
+        <span style="font-size:12px;color:var(--warm-gray);text-decoration:underline;cursor:pointer;"
+          onclick="if(!_touchCapableDetected) _resetBackupAndSetupFresh()"
+          data-i18n="backupForgotPassphraseLink">パスフレーズを忘れた場合はこちら</span>
       </div>
     </div>
   </div>
@@ -1107,7 +1112,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260722d"></script>
+  <script src="/app.js?v=20260722e"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

@@ -572,6 +572,8 @@
         backupPassphraseEmpty: 'パスフレーズを入力してください',
         backupPassphraseMismatch: 'パスフレーズが一致しません',
         confirmBackupDisable: 'バックアップを無効にしますか？サーバー上のデータはこの端末からは同期されなくなります。',
+        backupForgotPassphraseLink: 'パスフレーズを忘れた場合はこちら',
+        confirmBackupReset: '既存のバックアップデータは復元できなくなり、新しいパスフレーズで作り直されます。よろしいですか？',
         toastBackupEnabled: '🔒 バックアップを有効にしました',
         toastBackupDisabled: 'バックアップを無効にしました',
         toastBackupRestored: '✅ バックアップから復元しました',
@@ -844,6 +846,8 @@
         backupPassphraseEmpty: 'Please enter a passphrase',
         backupPassphraseMismatch: 'Passphrases do not match',
         confirmBackupDisable: 'Disable backup? This device will stop syncing with the server.',
+        backupForgotPassphraseLink: 'Forgot your passphrase?',
+        confirmBackupReset: 'Your existing backup can no longer be restored and will be recreated with a new passphrase. Continue?',
         toastBackupEnabled: '🔒 Backup enabled',
         toastBackupDisabled: 'Backup disabled',
         toastBackupRestored: '✅ Restored from backup',
@@ -2845,6 +2849,7 @@
         loggedOutEl.style.display = 'none';
         loggedInEl.style.display = '';
         if (deleteSectionEl) deleteSectionEl.style.display = '';
+        _checkMandatoryBackupSetup(); // fire-and-forget（設計書118）
       } catch (e) {
         // 通信エラー・fetch自体の失敗ではトークンを消さず、楽観的に「連携中」を維持する（設計書48・課題2）
         _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
@@ -7252,8 +7257,7 @@
       if (isBackupEnabled()) {
         el.innerHTML = `
           <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupEnabledDesc">${t('backupEnabledDesc')}</p>
-          <button class="cal-sync-action secondary" data-backup-action="change">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>
-          <button class="cal-sync-action danger" data-backup-action="disable">🚫 <span data-i18n="backupDisable">${t('backupDisable')}</span></button>`;
+          <button class="cal-sync-action secondary" data-backup-action="change">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>`;
       } else {
         el.innerHTML = `
           <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 6px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
@@ -7264,10 +7268,29 @@
 
     // ─── バックアップ用パスフレーズ入力シート ───
     let _backupSheetMode = null; // 'setup' | 'restore' | 'change'
+    let _backupSheetMandatory = false; // true時はオーバーレイタップ・✕・キャンセルで閉じられない（設計書118）
 
-    async function openBackupPassphraseSheet(mode) {
+    // アカウント連携が確認できた（refreshLoginUI success分岐）たびに呼ばれる。この端末にまだ
+    // バックアップ鍵materialが無ければ、サーバーの既存バックアップ有無を見てsetup/restoreいずれかの
+    // モードで必須パスフレーズシートを開く（設計書118）。
+    async function _checkMandatoryBackupSetup() {
+      if (!getAuthToken()) return;
+      if (isBackupEnabled()) return; // 既にこの端末で鍵material保持済みなら何もしない
+      const sheetEl = document.getElementById('backup-passphrase-sheet');
+      if (sheetEl && sheetEl.classList.contains('visible')) return; // 既に開いている（二重表示防止）
+      try {
+        const res = await authedFetch(API_BASE + '/api/user-plans/me');
+        if (!res.ok) return;
+        const d = await res.json();
+        const mode = (d.salt && d.encryptedData) ? 'restore' : 'setup';
+        openBackupPassphraseSheet(mode, true); // 第2引数 mandatory=true
+      } catch (e) {}
+    }
+
+    async function openBackupPassphraseSheet(mode, mandatory = false) {
       if (!getAuthToken()) { showToast(t('backupLoginRequired')); return; }
       _backupSheetMode = mode;
+      _backupSheetMandatory = mandatory;
       const titleEl = document.getElementById('backup-passphrase-title');
       const warnEl = document.getElementById('backup-passphrase-warn');
       const confirmRow = document.getElementById('backup-passphrase-confirm-row');
@@ -7285,12 +7308,19 @@
         if (titleEl) titleEl.textContent = t('backupRestoreTitle');
         if (confirmRow) confirmRow.style.display = 'none';
       }
+      const closeBtn = document.getElementById('backup-passphrase-close-btn');
+      const cancelBtn = document.getElementById('backup-passphrase-cancel-btn');
+      const resetLink = document.getElementById('backup-passphrase-reset-link');
+      if (closeBtn) closeBtn.style.display = mandatory ? 'none' : '';
+      if (cancelBtn) cancelBtn.style.display = mandatory ? 'none' : '';
+      if (resetLink) resetLink.style.display = (mandatory && mode === 'restore') ? '' : 'none';
       lockScroll();
       document.getElementById('backup-passphrase-overlay').classList.add('visible');
       document.getElementById('backup-passphrase-sheet').classList.add('visible');
     }
 
     function closeBackupPassphraseSheet() {
+      if (_backupSheetMandatory) return; // 必須モードは閉じさせない（オーバーレイタップ・✕・キャンセル全経路がこの1関数を通るため一括で防げる）
       _blurIfFocusInside('backup-passphrase-sheet');
       unlockScroll();
       document.getElementById('backup-passphrase-overlay').classList.remove('visible');
@@ -7320,6 +7350,18 @@
       }
     }
 
+    // 必須restoreモードで「パスフレーズを忘れた場合」リンクをタップした際、シートを閉じずに
+    // その場でsetupモードへ切り替える（設計書118）。サーバー上の暗号化データは_doBackupSetupが
+    // 新しいsalt+暗号文で無条件PUT上書きするため、この関数自体はUI切り替えのみでよい。
+    function _resetBackupAndSetupFresh() {
+      if (!confirm(t('confirmBackupReset'))) return;
+      _backupSheetMode = 'setup';
+      document.getElementById('backup-passphrase-title').textContent = t('backupSetupTitle');
+      document.getElementById('backup-passphrase-confirm-row').style.display = '';
+      document.getElementById('backup-passphrase-input').value = '';
+      document.getElementById('backup-passphrase-reset-link').style.display = 'none';
+    }
+
     async function _doBackupSetup(passphrase) {
       _sendDebugLog('backup_start', { mode: 'setup', hasAuthToken: !!getAuthToken() });
       try {
@@ -7337,6 +7379,7 @@
         const material = await _exportKeyMaterial(key);
         _setBackupKeyMaterial(material);
         localStorage.setItem('app_backup_salt', salt);
+        _backupSheetMandatory = false; // 成功時は必須モードでも閉じられるようにする（設計書118）
         closeBackupPassphraseSheet();
         renderBackupSection();
         showToast(t('toastBackupEnabled'));
@@ -7377,6 +7420,7 @@
         const material = await _exportKeyMaterial(newKey);
         _setBackupKeyMaterial(material);
         localStorage.setItem('app_backup_salt', newSalt);
+        _backupSheetMandatory = false; // 成功時は必須モードでも閉じられるようにする（設計書118）
         closeBackupPassphraseSheet();
         renderBackupSection();
         showToast(t('toastBackupEnabled'));
@@ -7417,6 +7461,7 @@
         _setBackupKeyMaterial(material);
         localStorage.setItem('app_backup_salt', d.salt);
         await _applyRestoredBackup(dec);
+        _backupSheetMandatory = false; // 成功時は必須モードでも閉じられるようにする（設計書118）
         closeBackupPassphraseSheet();
         renderBackupSection();
         renderScheduleTab();
