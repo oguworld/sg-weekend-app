@@ -12845,3 +12845,97 @@ async function openBackupPassphraseSheet(mode, mandatory = false) {
 
 ## 承認状況
 2026-07-22 ユーザーが実機不具合を報告し「原因調査して」「度々起こるのでデバッグ前提でちゃんと調査してね」と明示。診断ログ追加は軽微かつCLAUDE.md既定の標準デバッグ手法のため、詳細確認は省略し実装に進める。
+
+# 設計書120 — 探訪マップに現在地マーカーを表示
+
+（2026-07-22 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーから探訪スタンプ帳のマップ画面（Leaflet地図）に「現在地も出せる？」との要望。既存のチェックイン距離判定用に`_getCurrentPositionOnce()`で取得済みの`_stampCurrentPos`（`initStampMapTab()`・`openStampSpotDetail()`から呼ばれる）をそのまま再利用でき、追加の位置情報許可プロンプトは発生しない。
+
+## 2. 確定済み仕様
+
+### 2-1. 新規モジュールスコープ変数
+
+`_stampLeafletMap`等の宣言（3745-3752行目）と同じ並びに追加:
+
+```js
+let _stampUserLocationMarker = null;
+```
+
+### 2-2. 新規関数`_renderStampUserLocation()`
+
+現在地マーカーを描画・更新する。マーカーが既に存在すれば`setLatLng()`で位置更新のみ（スポットピン層のような`clearLayers()`による再生成はしない、ちらつき防止）。スポットピンのタップ判定に影響しないよう`interactive:false`を指定する。
+
+```js
+function _renderStampUserLocation() {
+  if (!_stampLeafletMap || !_stampCurrentPos) return;
+  const latlng = [_stampCurrentPos.lat, _stampCurrentPos.lng];
+  if (_stampUserLocationMarker) {
+    _stampUserLocationMarker.setLatLng(latlng);
+    return;
+  }
+  const icon = L.divIcon({
+    className: '',
+    html: '<div class="stamp-user-location-dot"></div>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+  _stampUserLocationMarker = L.marker(latlng, { icon, zIndexOffset: 1000, interactive: false }).addTo(_stampLeafletMap);
+}
+```
+
+### 2-3. CSS新規クラス（`public/app.css`）
+
+Googleマップ等でおなじみの「青い点」を踏襲（既存のアプリのブランドカラー〈caramel系〉は使わず、地図アプリの共通言語として認識されやすい青系を採用）:
+
+```css
+.stamp-user-location-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #4285F4; border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(66,133,244,0.35), 0 1px 4px rgba(0,0,0,0.3);
+  animation: stampUserLocationPulse 2.2s ease-out infinite;
+}
+@keyframes stampUserLocationPulse {
+  0%   { box-shadow: 0 0 0 2px rgba(66,133,244,0.35), 0 1px 4px rgba(0,0,0,0.3), 0 0 0 0 rgba(66,133,244,0.4); }
+  70%  { box-shadow: 0 0 0 2px rgba(66,133,244,0.35), 0 1px 4px rgba(0,0,0,0.3), 0 0 0 14px rgba(66,133,244,0); }
+  100% { box-shadow: 0 0 0 2px rgba(66,133,244,0.35), 0 1px 4px rgba(0,0,0,0.3), 0 0 0 0 rgba(66,133,244,0); }
+}
+```
+
+### 2-4. 呼び出し箇所への追加
+
+1. `initStampMapTab()`（3805行目付近）の`_getCurrentPositionOnce().then(pos => { _stampCurrentPos = pos; });`に`_renderStampUserLocation();`を追加。あわせて、既に`_stampCurrentPos`がセット済みの場合（スポット詳細を先に開いていた等）に即座に反映されるよう、`_ensureStampLeafletMap()`/`_renderStampMarkers()`の直後にも`_renderStampUserLocation();`を1回呼ぶ
+
+```js
+_ensureStampLeafletMap();
+_renderStampMarkers();
+_renderStampUserLocation(); // 既に位置情報があれば即反映
+// ...(既存のフォグ・凡例等の呼び出し)...
+_getCurrentPositionOnce().then(pos => {
+  _stampCurrentPos = pos;
+  _renderStampUserLocation();
+});
+```
+
+2. `openStampSpotDetail()`（4266行目付近）の位置情報再取得コールバックにも追加:
+
+```js
+_getCurrentPositionOnce().then(pos => {
+  _stampCurrentPos = pos;
+  _renderStampUserLocation();
+  if (_stampSelectedSpot && _stampSelectedSpot.id === spot.id) _updateStampCheckinButton();
+});
+```
+
+## 3. スコープ外
+
+「現在地に戻る」ボタン等のマップ操作UIは今回追加しない（表示のみ）。位置情報の継続監視（`watchPosition`）は導入しない（既存の一回取得方式`_getCurrentPositionOnce()`をそのまま踏襲、既存の未使用変数`_stampLocationWatchStarted`にも触れない）。
+
+## 4〜6. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ（`public/app.js`/`public/app.css`）。位置情報は既存のフローで取得済みのものを再利用するため、新規の許可プロンプトは発生しない。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-22 ユーザーが「よろしくお願いします」と明示。**ユーザー承認済み**。

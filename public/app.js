@@ -3752,6 +3752,7 @@
     let _stampLocationWatchStarted = false;
     let _stampViewMode = 'list'; // 'map' | 'list'（設計書71改善3、ユーザーフィードバックによりデフォルトをリスト表示に変更。地図はトグルボタンで切替）
     let _stampMarkerRefs = {}; // spotId → Leafletマーカー参照（設計書92、一覧カードから地図ピンへのフォーカス導線用）
+    let _stampUserLocationMarker = null; // 現在地マーカー（設計書120）
 
     // Capacitor Geolocationプラグイン取得（registerPlugin優先→Pluginsフォールバック、既存Keyboard/PushNotificationsと同じ防御的パターン）
     let _CapGeo = null;
@@ -3801,6 +3802,24 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
+    // 現在地マーカーの描画・更新（設計書120）。既存マーカーがあれば位置更新のみ（ちらつき防止）。
+    // interactive:false でスポットピンのタップ判定に影響しないようにする。
+    function _renderStampUserLocation() {
+      if (!_stampLeafletMap || !_stampCurrentPos) return;
+      const latlng = [_stampCurrentPos.lat, _stampCurrentPos.lng];
+      if (_stampUserLocationMarker) {
+        _stampUserLocationMarker.setLatLng(latlng);
+        return;
+      }
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="stamp-user-location-dot"></div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      });
+      _stampUserLocationMarker = L.marker(latlng, { icon, zIndexOffset: 1000, interactive: false }).addTo(_stampLeafletMap);
+    }
+
     // コースタブ「スタンプマップ」表示時のエントリポイント
     async function initStampMapTab() {
       const loginEl = document.getElementById('stamp-map-login-required');
@@ -3817,13 +3836,17 @@
       _applyStampViewMode();
       _ensureStampLeafletMap();
       _renderStampMarkers();
+      _renderStampUserLocation(); // 既に位置情報があれば即反映（設計書120）
       _renderStampFog();
       _renderStampCollectionList();
       _renderStampAreaBadges();
 
       // 現在地を取得しておく（詳細シートを開いた際のチェックインボタン活性判定に使う）。
       // 権限リクエストのタイミングはマップタブオープン時に一括で行う設計（実装判断、設計書69未解決事項8）
-      _getCurrentPositionOnce().then(pos => { _stampCurrentPos = pos; });
+      _getCurrentPositionOnce().then(pos => {
+        _stampCurrentPos = pos;
+        _renderStampUserLocation();
+      });
     }
 
     // ─── マップ⇄一覧 表示切り替え（設計書70改善1） ───
@@ -4265,6 +4288,7 @@
       // シートを開いたタイミングで現在地を再取得し、距離判定を最新化する
       _getCurrentPositionOnce().then(pos => {
         _stampCurrentPos = pos;
+        _renderStampUserLocation();
         if (_stampSelectedSpot && _stampSelectedSpot.id === spot.id) _updateStampCheckinButton();
       });
     }
