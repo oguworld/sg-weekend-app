@@ -316,6 +316,8 @@
       ja: {
         headerSubtitle: 'シンガポール在住者の週末おでかけガイド', // city-specific: overridden by updateCityUI()
         labelCity: '都市',
+        labelArrivalDate: '来星日',
+        residencyCounterLabel: '在住 {ym}（{days}日）',
         shareLabel: 'シェア',
         tabsLabel: 'いつ行く？',
         tabWeekend: '今週',
@@ -600,6 +602,8 @@
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
         labelCity: 'City',
+        labelArrivalDate: 'Arrival Date',
+        residencyCounterLabel: '{ym} in Singapore ({days} days)',
         shareLabel: 'Share',
         tabsLabel: 'When?',
         tabWeekend: 'This Week',
@@ -3135,6 +3139,15 @@
         }
         labelEl.textContent = parts.length ? parts.join(isEn ? ', ' : '・') : t('genreStatusUnset');
       }
+
+      // 設計書122: 来星日入力欄の初期値セット＋未来日付選択防止のmax属性
+      const arrivalInput = document.getElementById('arrival-date-input');
+      if (arrivalInput) {
+        arrivalInput.value = localStorage.getItem('app_arrival_date') || '';
+        const today = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        arrivalInput.max = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+      }
     }
 
     function getProfile() {
@@ -3669,6 +3682,7 @@
       _stampViewMode = 'list';
       // 設計書71: スタンプラリーがメイン機能という位置づけのため、初期表示タブをスタンプマップに変更
       await switchCourseTab('map');
+      _renderResidencyCounter(); // 設計書122: 画面に入るたびに最新の在住日数へ再計算
 
       // スワイプでタブ切り替え（初回のみ登録）
       const sc = document.querySelector('#screen-course .screen-content');
@@ -3943,6 +3957,41 @@
       const memos = _getStampMemos();
       memos[spotId] = { text, updatedAt: new Date().toISOString() };
       try { localStorage.setItem('sg_stamp_memos', JSON.stringify(memos)); } catch (_) {}
+    }
+
+    // ─── 来星日登録＋在住日数カウンター（設計書122） ───
+    function _saveArrivalDate(value) {
+      if (value) localStorage.setItem('app_arrival_date', value);
+      else localStorage.removeItem('app_arrival_date');
+      _renderResidencyCounter();
+      _syncBackupToServer();
+    }
+
+    function _formatResidencyYM(years, months, lang) {
+      if (lang === 'ja') return years > 0 ? `${years}年${months}か月` : `${months}か月`;
+      const mStr = `${months}mo`;
+      return years > 0 ? `${years}yr${years > 1 ? 's' : ''} ${mStr}` : mStr;
+    }
+
+    function _renderResidencyCounter() {
+      const el = document.getElementById('stamp-residency-counter');
+      if (!el) return;
+      const arrivalStr = localStorage.getItem('app_arrival_date');
+      if (!arrivalStr) { el.style.display = 'none'; return; }
+      const arrival = new Date(arrivalStr + 'T00:00:00');
+      if (isNaN(arrival.getTime())) { el.style.display = 'none'; return; }
+      const today = new Date();
+      const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+      const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const days = Math.round((todayMid - arrivalMid) / 86400000);
+      if (days < 0) { el.style.display = 'none'; return; } // 未来日付は無視（フェイルセーフ、UIバリデーションはinput type=dateのmax属性でも別途行う）
+      let years = todayMid.getFullYear() - arrivalMid.getFullYear();
+      let months = todayMid.getMonth() - arrivalMid.getMonth();
+      if (todayMid.getDate() < arrivalMid.getDate()) months--;
+      if (months < 0) { years--; months += 12; }
+      const ym = _formatResidencyYM(years, months, getLang());
+      el.textContent = t('residencyCounterLabel').replace('{ym}', ym).replace('{days}', days);
+      el.style.display = '';
     }
 
     // 写真取得（iOS: @capacitor/camera、Web: <input type=file>フォールバック）。
@@ -7509,6 +7558,7 @@
         likedCourses,
         avatar: localStorage.getItem('user_avatar') || '',
         stampMemos: _getStampMemos(), // 設計書121: テキストのみ既存バックアップに統合（写真は一切含めない）
+        arrivalDate: localStorage.getItem('app_arrival_date') || '', // 設計書122
       };
     }
 
@@ -7558,6 +7608,10 @@
         }
         if (dec.avatar && !localStorage.getItem('user_avatar')) {
           localStorage.setItem('user_avatar', dec.avatar);
+        }
+        // 設計書122: 来星日（単一スカラー値）。who/avatarと同じ「ローカル未設定時のみ採用」パターン
+        if (dec.arrivalDate && !localStorage.getItem('app_arrival_date')) {
+          localStorage.setItem('app_arrival_date', dec.arrivalDate);
         }
         // 設計書121: 思い出メモ（テキストのみ）のマージ。ローカルに同じspotIdが無い、
         // またはリモート側のupdatedAtがローカルより新しい場合のみ採用する（updatedAt比較によるマージ）

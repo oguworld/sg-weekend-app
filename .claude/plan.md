@@ -13202,3 +13202,135 @@ _getAllStampMemoryPhotoBlobs().then(blobs => {
 
 ### 承認状況
 2026-07-22 ユーザーが提示した3案（フレームなし/ポラロイド風まっすぐ/ポラロイド風斜め＋キャプション）から「Cで！」と明示選択。**承認済み**。
+
+# 設計書122 — 来星日登録＋探訪画面での在住日数カウンター表示
+
+（2026-07-23 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ゲーミフィケーション拡張のブレスト（「デイリーストリーク」議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装する。ユーザーから「来星日を登録して、今日で何日！という表示をどこかにしたい」との要望があり、置き場所・表示形式を相談の上、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定した。
+
+## 2. 確定済み仕様
+
+### 2-1. データモデル
+
+新規`localStorage`キー`app_arrival_date`（ISO日付文字列 `"YYYY-MM-DD"`）。既存のバックアップ機構に統合する:
+
+`_collectBackupPayload()`（7490行目付近）に1フィールド追加:
+```js
+arrivalDate: localStorage.getItem('app_arrival_date') || '',
+```
+
+`_applyRestoredBackup()`（既存の`avatar`マージ処理、7559-7561行目の直後）に追加。`who`/`avatar`と同じ「ローカル未設定時のみ採用」パターン（単一スカラー値のプロフィール項目のため、思い出メモのような`updatedAt`比較マージは不要）:
+```js
+if (dec.arrivalDate && !localStorage.getItem('app_arrival_date')) {
+  localStorage.setItem('app_arrival_date', dec.arrivalDate);
+}
+```
+
+### 2-2. 設定画面での入力
+
+日付選択は既存の`openDatePickerSheet()`（週末プランニング用の近未来週チップ、`getScheduleWeeks()`ベース）は過去の任意日付選択に不向きなため**再利用しない**。代わりにネイティブ`<input type="date">`を使う（Web・iOS Capacitor（WKWebView）とも標準サポート、追加実装コストが低い）。
+
+`public/index.html`のプロフィールセクション、「都市」選択行（277行目付近）の直後に新規行を追加:
+```html
+<div class="settings-item" style="padding:12px 18px;">
+  <span class="settings-item-label" data-i18n="labelArrivalDate">来星日</span>
+  <input id="arrival-date-input" type="date"
+    style="border:none;background:transparent;font-size:15px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;text-align:right;"
+    onchange="_saveArrivalDate(this.value)">
+</div>
+```
+
+`initSettingsProfile()`（3097行目付近）に、既存のwho/age初期化処理と同様、入力欄の初期値セットを追加:
+```js
+const arrivalInput = document.getElementById('arrival-date-input');
+if (arrivalInput) arrivalInput.value = localStorage.getItem('app_arrival_date') || '';
+```
+
+新規関数`_saveArrivalDate(value)`:
+```js
+function _saveArrivalDate(value) {
+  if (value) localStorage.setItem('app_arrival_date', value);
+  else localStorage.removeItem('app_arrival_date');
+  _renderResidencyCounter();
+  _syncBackupToServer();
+}
+```
+
+未入力への変更（クリア）はネイティブ日付入力のクリア操作にそのまま委ねる（専用クリアボタンは追加しない）。
+
+### 2-3. 探訪画面ヘッダーでのカウンター表示
+
+`public/index.html`の`.course-screen-header`内、`.course-tab-bar`の直後に新規行を追加（`courseScreenTitle`直下、タブの下）:
+```html
+<div id="stamp-residency-counter" style="display:none;font-size:12px;color:var(--warm-gray);text-align:center;padding:6px 0 0;"></div>
+```
+
+未設定時は`display:none`のまま（設定を促す誘導文言は今回追加しない、スコープ外）。
+
+新規関数（`public/app.js`、`_getStampMemos()`等の近くに配置）:
+```js
+function _formatResidencyYM(years, months, lang) {
+  if (lang === 'ja') return years > 0 ? `${years}年${months}か月` : `${months}か月`;
+  const mStr = `${months}mo`;
+  return years > 0 ? `${years}yr${years > 1 ? 's' : ''} ${mStr}` : mStr;
+}
+
+function _renderResidencyCounter() {
+  const el = document.getElementById('stamp-residency-counter');
+  if (!el) return;
+  const arrivalStr = localStorage.getItem('app_arrival_date');
+  if (!arrivalStr) { el.style.display = 'none'; return; }
+  const arrival = new Date(arrivalStr + 'T00:00:00');
+  if (isNaN(arrival.getTime())) { el.style.display = 'none'; return; }
+  const today = new Date();
+  const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const days = Math.round((todayMid - arrivalMid) / 86400000);
+  if (days < 0) { el.style.display = 'none'; return; } // 未来日付は無視（フェイルセーフ、UIバリデーションはinput type=dateのmax属性でも別途行う）
+  let years = todayMid.getFullYear() - arrivalMid.getFullYear();
+  let months = todayMid.getMonth() - arrivalMid.getMonth();
+  if (todayMid.getDate() < arrivalMid.getDate()) months--;
+  if (months < 0) { years--; months += 12; }
+  const ym = _formatResidencyYM(years, months, getLang());
+  el.textContent = t('residencyCounterLabel').replace('{ym}', ym).replace('{days}', days);
+  el.style.display = '';
+}
+```
+
+`initCourseScreen()`（3667行目付近）の`await switchCourseTab('map');`の直後に`_renderResidencyCounter();`を追加する（画面に入るたびに最新の日数へ再計算、日付またぎにも自然に対応）。
+
+未来日付ガード: `<input type="date">`に`max`属性（当日日付、`initSettingsProfile()`で動的セット）を追加し、未来日付の選択自体をUI側でも防ぐ。
+
+### 2-4. i18n新規キー（ja/en同時）
+
+- `labelArrivalDate`: ja「来星日」/ en「Arrival Date」
+- `residencyCounterLabel`: ja「在住 {ym}（{days}日）」/ en「{ym} in Singapore ({days} days)」
+
+`{ym}`（年月の複合表記）は`_formatResidencyYM()`内でJS側で組み立てるため、`{y}`/`{m}`個別キーは作らない（既存の`stampLevelUnlockSubtext`同様、複数トークン`.replace()`の前例を踏襲）。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 7490-7513行目: `_collectBackupPayload()`（設計書121で追加済みの`stampMemos`の直後に1フィールド追加）
+- `public/app.js` 7516-7570行目付近: `_applyRestoredBackup()`（既存`avatar`マージ処理の直後に追加）
+- `public/app.js` 3097行目: `initSettingsProfile()`（既存who/age初期化処理と同様の追加）
+- `public/app.js` 3667行目: `initCourseScreen()`（`switchCourseTab('map')`直後にカウンター再描画を追加）
+- `public/index.html` 229-277行目: 設定画面プロフィールセクション（都市選択行の直後に新規行）
+- `public/index.html` 143-152行目付近: `.course-screen-header`（`.course-tab-bar`直後にカウンター表示行を追加）
+- `openDatePickerSheet()`（5679行目）・`buildDateChipsHtml()`（6007行目、`getScheduleWeeks()`ベースの近未来週チップ）: 過去日付選択に不向きなため**再利用しないと判断**（調査の結果、既存流用ではなくネイティブ`<input type=date>`を新規採用）
+
+## 4. スコープ外
+
+- ホーム画面など他画面への表示（今回は探訪画面ヘッダーのみ）
+- 未設定時の入力誘導バナー・通知
+- 年間振り返り・帰国前アルバム機能（設計書121のブレストで出た将来アイデア、今回のスコープ外）
+- 探訪のレベル解禁条件（現状チェックイン数ベース）への在住日数の反映（本カウンターは表示専用、既存の`STAMP_LEVEL_GATES`ロジックには一切影響しない）
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ（`public/app.js`/`public/index.html`）。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映（新規ネイティブプラグイン等は不要なため、他の変更と合わせた通常のビルドで反映可能）。
+
+## 承認状況
+2026-07-23 ユーザーが「探訪タブいいですね。在住 2年3か月（ｘｘ日）として。」と明示。**ユーザー承認済み**。
