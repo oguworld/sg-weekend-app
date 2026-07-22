@@ -12939,3 +12939,266 @@ _getCurrentPositionOnce().then(pos => {
 
 ## 承認状況
 2026-07-22 ユーザーが「よろしくお願いします」と明示。**ユーザー承認済み**。
+
+# 設計書121 — 探訪チェックイン時の「思い出」機能（写真ローカル保存＋メモ）
+
+（2026-07-22 ユーザーとの会話で確定。モック2案（単体シート・4ステップフロー）を提示し承認済み。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーとの会話で「シンガポールでの限られた生活は振り返らないとすぐ忘れる」という課題意識から、探訪チェックイン時に写真・一言メモを残せる機能の要望があった。写真は「サーバーには送りたくない、ローカルで完結させたい」という明確な方針、メモ文言は既存のゼロ知識暗号化バックアップ（設計書54/118）に乗せて複数端末対応させる方針を、会話の中で合意済み。モックアップ（単体シート案・チェックインからの4ステップフロー）をユーザーに提示し「残した情報は後でどうやってみるの？」の質問に対し「一覧でざっと見る」「スポット詳細で全部見る」の2箇所での見返し方を回答、了承を得た上で「設計に進んで」と明示された。
+
+## 2. 確定済み仕様
+
+### 2-1. データモデル
+
+**写真（ローカルのみ、サーバー送信なし）**: 新規IndexedDBデータベース`dosuru_stamp_memories`、オブジェクトストア`photos`（keyPath: `spotId`）に、リサイズ済みJPEG Blobを保存する。
+
+**メモ（テキスト、既存バックアップに統合）**: `localStorage`新規キー`sg_stamp_memos`に`{[spotId]: {text, updatedAt}}`形式で保存。`_collectBackupPayload()`（設計書58、`public/app.js`）に新規フィールド`stampMemos`を追加（`version:2`のまま、既存の「新フィールドは古いバックアップ復元時に単に存在しないだけ」という後方互換設計を踏襲、バージョン番号は上げない）。`_applyRestoredBackup()`にマージロジックを追加: `dec.stampMemos`の各エントリを、ローカル側に同じ`spotId`のエントリが無い、またはリモート側の`updatedAt`がローカルより新しい場合のみ採用する（`updatedAt`比較によるマージ、既存の「ローカル優先・空なら埋める」パターンより一段丁寧な調整）。
+
+### 2-2. 新規ヘルパー関数（`public/app.js`）
+
+```js
+// IndexedDB（写真、ローカルのみ）
+function _openStampMemoryDB() { /* Promise<IDBDatabase>、dosuru_stamp_memories / photos ストア */ }
+async function _saveStampMemoryPhotoBlob(spotId, blob) { /* upsert */ }
+async function _getStampMemoryPhotoBlob(spotId) { /* 単体取得、無ければnull */ }
+async function _getAllStampMemoryPhotoBlobs() { /* 一括取得、{[spotId]: Blob} */ }
+
+// 画像リサイズ共通ヘルパー（Web/iOS両方の取得結果に対して適用、canvas経由でJPEG圧縮・最大辺1080pxに縮小）
+async function _resizeImageBlob(blob, maxDim = 1080, quality = 0.8) { /* Promise<Blob> */ }
+
+// メモ（テキスト、localStorage）
+function _getStampMemos() { /* {[spotId]: {text, updatedAt}} を返す、パース失敗時は{} */ }
+function _setStampMemoText(spotId, text) { /* 該当spotIdのエントリをupdatedAt付きで更新・保存 */ }
+
+// Capacitor Cameraプラグイン取得（_getCapGeoPlugin()と同じ防御的パターン、registerPlugin優先→Pluginsフォールバック）
+let _CapCamera = null;
+function _getCapCameraPlugin() { /* ... */ }
+
+// 写真取得（iOS: @capacitor/camera、Web: <input type=file>フォールバック）
+async function _pickStampMemoryPhotoBlob() { /* Promise<Blob|null>、キャンセル・権限拒否時はnull */ }
+```
+
+`_pickStampMemoryPhotoBlob()`内部: `_isCapacitorApp`時は`_getCapCameraPlugin().getPhoto({ resultType: 'dataUrl', source: 'PROMPT', quality: 80 })`でカメラ/フォトライブラリを選択させ、返ってきたdataURLを`fetch(dataUrl).then(r=>r.blob())`でBlob化。Web版は動的生成した`<input type="file" accept="image/*" capture="environment">`の`change`イベントで`event.target.files[0]`を取得。**いずれの経路で取得したBlobも`_resizeImageBlob()`を必ず通してから保存する**（iOS側の`quality`パラメータだけに頼らず、保存前サイズを両プラットフォームで統一的に保証するため）。`CameraResultType`/`CameraSource`の文字列値（`'dataUrl'`/`'PROMPT'`）は`@capacitor/camera`の安定版APIの値だが、builder実装時にnpmパッケージの型定義で最終確認すること。
+
+### 2-3. チェックイン後の「思い出を残す」ミニシート
+
+新規HTML（`public/index.html`、`#stamp-level-unlock-modal`の直後、z-index 3704/3705）:
+
+```html
+<div class="chat-overlay" id="stamp-memory-overlay" onclick="if(!_touchCapableDetected) _skipStampMemory()" style="z-index:3704;"></div>
+<div id="stamp-memory-sheet" class="plan-modal" style="z-index:3705; background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
+  <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
+    <div style="text-align:center;margin-bottom:18px;">
+      <div style="font-size:30px;margin-bottom:6px;">🎉</div>
+      <div id="stamp-memory-title" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);" data-i18n="stampMemorySheetTitle">この瞬間を残しますか？</div>
+      <div id="stamp-memory-spot-name" style="font-size:12px;color:var(--warm-gray);"></div>
+    </div>
+    <div id="stamp-memory-photo-box" class="stamp-memory-photo-box" onclick="if(!_touchCapableDetected) _pickStampMemoryPhoto()">
+      <div class="icon">📷</div>
+      <div class="label" data-i18n="stampMemoryPhotoAddLabel">写真を追加</div>
+    </div>
+    <textarea id="stamp-memory-text" class="stamp-memory-textarea" maxlength="300" data-i18n-ph="stampMemoryTextPlaceholder" placeholder="気づきや感想を残す（任意）"></textarea>
+    <div class="stamp-memory-local-note" data-i18n="stampMemoryPhotoLocalNote">🔒 写真は端末内にのみ保存されます</div>
+    <div style="display:flex;gap:10px;margin-top:12px;margin-bottom:8px;">
+      <button onclick="if(!_touchCapableDetected) _skipStampMemory()" style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);" data-i18n="stampMemorySkipBtn">スキップ</button>
+      <button id="stamp-memory-save-btn" onclick="if(!_touchCapableDetected) _saveStampMemory()" style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;" data-i18n="stampMemorySaveBtn">保存する</button>
+    </div>
+  </div>
+</div>
+```
+
+新規JS関数:
+
+```js
+let _stampMemorySpotId = null;
+let _stampMemoryPendingUnlock = null; // {level, newlyUnlockedLevel} または null
+let _stampMemoryPickedBlob = null;
+
+function _openStampMemorySheet(spot, newlyUnlockedLevel) {
+  _stampMemorySpotId = spot.id;
+  _stampMemoryPendingUnlock = newlyUnlockedLevel ? { level: spot.level, newlyUnlockedLevel } : null;
+  _stampMemoryPickedBlob = null;
+  document.getElementById('stamp-memory-spot-name').textContent = (getLang()==='ja' ? (spot.nameJa||spot.name) : (spot.name||spot.nameJa)) || '';
+  document.getElementById('stamp-memory-text').value = '';
+  _resetStampMemoryPhotoBox();
+  lockScroll();
+  document.getElementById('stamp-memory-overlay').classList.add('visible');
+  document.getElementById('stamp-memory-sheet').classList.add('visible');
+}
+
+function _closeStampMemorySheetInternal() {
+  _blurIfFocusInside('stamp-memory-sheet');
+  unlockScroll();
+  document.getElementById('stamp-memory-overlay').classList.remove('visible');
+  document.getElementById('stamp-memory-sheet').classList.remove('visible');
+  // 保留中のレベル解禁演出があれば、閉じた後にチェーンして開く
+  if (_stampMemoryPendingUnlock) {
+    const { level, newlyUnlockedLevel } = _stampMemoryPendingUnlock;
+    _stampMemoryPendingUnlock = null;
+    setTimeout(() => openStampLevelUnlockModal(level, newlyUnlockedLevel), 500);
+  }
+}
+
+function _skipStampMemory() { _closeStampMemorySheetInternal(); }
+
+async function _pickStampMemoryPhoto() {
+  try {
+    const blob = await _pickStampMemoryPhotoBlob();
+    if (!blob) return; // キャンセル・権限拒否
+    _stampMemoryPickedBlob = await _resizeImageBlob(blob);
+    const url = URL.createObjectURL(_stampMemoryPickedBlob);
+    const box = document.getElementById('stamp-memory-photo-box');
+    box.classList.add('stamp-memory-photo-box--filled');
+    box.style.backgroundImage = `url('${url}')`;
+    box.innerHTML = '<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); if(!_touchCapableDetected) _resetStampMemoryPhotoBox()">✕</div>';
+  } catch (e) {
+    showToast(t('toastStampMemoryError'));
+  }
+}
+
+function _resetStampMemoryPhotoBox() {
+  _stampMemoryPickedBlob = null;
+  const box = document.getElementById('stamp-memory-photo-box');
+  box.classList.remove('stamp-memory-photo-box--filled');
+  box.style.backgroundImage = '';
+  box.innerHTML = '<div class="icon">📷</div><div class="label" data-i18n="stampMemoryPhotoAddLabel">' + t('stampMemoryPhotoAddLabel') + '</div>';
+}
+
+async function _saveStampMemory() {
+  const spotId = _stampMemorySpotId;
+  if (!spotId) return;
+  const text = (document.getElementById('stamp-memory-text').value || '').trim();
+  try {
+    if (_stampMemoryPickedBlob) await _saveStampMemoryPhotoBlob(spotId, _stampMemoryPickedBlob);
+    if (text) _setStampMemoText(spotId, text);
+    await _refreshStampMemoryCacheForSpot(spotId); // サムネイル用インメモリキャッシュ更新
+    _renderStampCollectionList();
+    if (_stampSelectedSpot && _stampSelectedSpot.id === spotId) _renderStampDetailMemorySection(_stampSelectedSpot);
+    _syncBackupToServer(); // メモのみ既存バックアップに反映（fire-and-forget、既存挙動を踏襲）
+    showToast(t('toastStampMemorySaved'));
+  } catch (e) {
+    showToast(t('toastStampMemoryError'));
+  }
+  _closeStampMemorySheetInternal();
+}
+```
+
+`doStampCheckin()`（4367行目付近）の変更: 既存の「新規解禁レベルがあれば`setTimeout(...1600)`で`openStampLevelUnlockModal()`を呼ぶ」処理を、「常に`setTimeout(...900)`で`_openStampMemorySheet(spot, newlyUnlockedLevel)`を呼ぶ（`newlyUnlockedLevel`はnullの場合あり）」に置き換える。レベル解禁演出は思い出シートを閉じた後にチェーンされる（`_closeStampMemorySheetInternal()`内で処理、上記参照）。
+
+### 2-4. 一覧・詳細シートでの見返し表示
+
+**コレクション一覧（`_renderStampLevelRowInProgress()`/`_renderStampLevelRowComplete()`、4134/4185行目付近）**: サムネイル生成部分で、`_stampMemoryPhotoUrlCache[spot.id]`（インメモリキャッシュ、後述）があれば`spot.imageUrl`より優先して使用する。メモ表示部分（`.stamp-card-desc`）は、`_getStampMemos()[spot.id]?.text`があれば「📝 」プレフィックス付きでそちらを表示、無ければ既存通り`spot.description`を表示する（新規CSSクラス追加は不要、既存クラスの中身の出し分けのみ）。
+
+**スポット詳細シート（`openStampSpotDetail()`、4228行目付近）**: 新規関数`_renderStampDetailMemorySection(spot)`を呼び出し、チェックイン済みかつ（個人写真 or メモ）がある場合は「あなたの記録」セクション（新規`#stamp-spot-detail-memory`、`#stamp-spot-detail-desc`の直後）に表示する。チェックイン済みだが記録が無い場合は「📷 思い出を追加」ボタン（`_openStampMemorySheet(spot, null)`を呼ぶ、レベル解禁演出はチェーンされない）を表示する。未チェックインの場合はセクション自体を非表示にする。
+
+### 2-5. インメモリキャッシュ（サムネイル同期描画用）
+
+IndexedDBは非同期APIのため、一覧描画のたびに個別に読みに行くのは煩雑。`initStampMapTab()`実行時に一度だけ`_getAllStampMemoryPhotoBlobs()`で全件取得し、`URL.createObjectURL()`で変換した結果を`_stampMemoryPhotoUrlCache`（`{[spotId]: objectURL}`）に保持する。取得完了後（非同期）に`_renderStampCollectionList()`を再実行してサムネイルを反映する。`_saveStampMemory()`成功時は該当spotIdのみ`_refreshStampMemoryCacheForSpot(spotId)`で個別更新する（全件再取得はしない）。
+
+```js
+let _stampMemoryPhotoUrlCache = {};
+async function _refreshStampMemoryCacheForSpot(spotId) {
+  const blob = await _getStampMemoryPhotoBlob(spotId);
+  if (blob) _stampMemoryPhotoUrlCache[spotId] = URL.createObjectURL(blob);
+}
+```
+
+`initStampMapTab()`（3805行目付近）に、既存の描画呼び出し列の後段で以下を追加（fire-and-forget）:
+```js
+_getAllStampMemoryPhotoBlobs().then(blobs => {
+  Object.entries(blobs).forEach(([spotId, blob]) => { _stampMemoryPhotoUrlCache[spotId] = URL.createObjectURL(blob); });
+  _renderStampCollectionList();
+});
+```
+
+### 2-6. i18n新規キー（ja/en同時）
+
+`stampMemorySheetTitle`・`stampMemoryPhotoAddLabel`・`stampMemoryPhotoLocalNote`・`stampMemoryTextPlaceholder`・`stampMemorySkipBtn`・`stampMemorySaveBtn`・`stampDetailMemoryLabel`（「あなたの記録」）・`stampMemoryAddRetroactiveBtn`（「📷 思い出を追加」）・`toastStampMemorySaved`（「思い出を保存しました」）・`toastStampMemoryError`（「保存に失敗しました」）
+
+### 2-7. CSS新規クラス（`public/app.css`）
+
+`.stamp-memory-photo-box`（点線ボーダー、空状態）・`.stamp-memory-photo-box--filled`（背景画像表示、border消去）・`.stamp-memory-photo-remove`（✕ボタン）・`.stamp-memory-textarea`（既存パスフレーズ入力欄のスタイルパターンを踏襲）・`.stamp-detail-memory-section`（詳細シート内「あなたの記録」ブロック）。ダークモード（`html[data-theme="dark"]`）は既存CSS変数（`--warm-white`/`--sand-dark`/`--midnight`等）ベースで実装し自動追従させる。
+
+### 2-8. iOS: Capacitor Cameraプラグイン追加
+
+`ios-app/package.json`に`@capacitor/camera@^6.0.0`を追加。`.github/workflows/ios-deploy.yml`:
+- 既存「Set camera usage description in Info.plist」ステップ（91-92行目）の説明文を、QRコード読み取り用途に加え本機能の用途も含む内容に更新: 「予定表の共有グループへの参加、および探訪スタンプ帳での思い出の写真撮影のためカメラを使用します」
+- 新規ステップ「Set photo library usage description in Info.plist」を追加し、`NSPhotoLibraryUsageDescription`をPlistBuddyで設定（既存パターンを踏襲）。`saveToGallery`オプションは使用しない設計のため`NSPhotoLibraryAddUsageDescription`は不要（スコープ外として明示）
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 3757-3768行目: `_getCapGeoPlugin()`（`_getCapCameraPlugin()`のミラー元パターン）
+- `public/app.js` 4078-4225行目: `_renderStampCollectionList()`/`_renderStampLevelRowLocked()`/`_renderStampLevelRowInProgress()`/`_renderStampLevelRowComplete()`
+- `public/app.js` 4228-4270行目: `openStampSpotDetail()`
+- `public/app.js` 4367-4422行目: `doStampCheckin()`
+- `public/app.js` `_collectBackupPayload()`/`_applyRestoredBackup()`/`_syncBackupToServer()`（設計書58、無変更で再利用・拡張）
+- `.github/workflows/ios-deploy.yml` 89-93行目: 既存`NSCameraUsageDescription`設定ステップ
+
+## 4. スコープ外
+
+- 写真の複数枚対応（1スポットにつき1枚のみ、上書き保存）
+- 訪問ごとの個別記録（`checkinLog`は複数訪問を記録できる設計だが、思い出〈写真・メモ〉は「そのスポットについて1つ」というシンプルなモデルとする）
+- 写真のトリミング・編集機能
+- 年間振り返り・帰国前アルバムのような、記録をまとめて閲覧する専用画面（今回はブレストで出た将来アイデア、v1のスコープ外）
+- BKK/SYD対応（探訪機能自体が既存でSGのみのため）
+- IndexedDB非対応環境への特別なフォールバックUI（`window.indexedDB`が無い場合は写真機能を静かにスキップし、メモ機能のみ動作させる）
+
+## 5. データモデル・API影響
+
+- `data/stamp-progress/{userId}.json`（サーバー側）は無変更
+- `data/user-plans/{userId}.json`のバックアップ暗号化ペイロード内部構造にのみ`stampMemos`フィールドが追加される（サーバー側は暗号化Blobとして扱うのみのため`server.js`は無変更）
+- 写真データは一切サーバーに送信されない（IndexedDBのみ）
+
+## 6. データ共有影響（Web版/iOS App Store版）
+
+- Web版: `<input type=file>`フォールバック経由で写真機能が動作する（IndexedDB自体はWeb標準APIのため両OS共通で利用可能）
+- iOS版: `@capacitor/camera`導入、Info.plist更新が必要なため**次回TestFlightビルドが必須**
+- `server.js`無変更のため`pm2 restart`不要。キャッシュバスティングを更新
+
+## 承認状況
+2026-07-22 ユーザーが「なるほどよさそうですね。設計に進んで」と明示。モックアップ（単体シート案・4ステップフロー案）は事前に提示・確認済み。**ユーザー承認済み**。
+
+## 設計書121 追記: 思い出フレーム（Cパターン）
+
+（2026-07-22 モックC「ポラロイド風・少し斜め＋キャプション」で確定。同じ設計書121のスコープに含める。）
+
+### 適用箇所の切り分け
+
+- **スポット詳細シート「あなたの記録」セクション**（`_renderStampDetailMemorySection()`）: ポラロイド風フレームを適用する。キャプションはモックでは「スポット名」だったが、詳細シート内ではスポット名が既にヘッダーに表示され冗長なため、**代わりにチェックイン日付**（`_stampCheckinDateFor(spot.id)`、既存ヘルパー再利用）を手書き風キャプションとして表示する
+- **チェックイン直後の「思い出を残す」ミニシート内の写真プレビュー**（`#stamp-memory-photo-box`の選択後プレビュー）: フレームは**適用しない**（✕削除ボタンによる編集操作と「物理的な写真」の斜め演出が両立しづらいため、既存設計通りシンプルな角丸サムネイル＋削除ボタンのまま）
+- **コレクション一覧のサムネイル**（56px程度の小サイズ）: フレームは**適用しない**（小さすぎてポラロイドの余白・斜め表現が潰れるため、既存の丸角サムネイルのまま）
+
+### CSS新規クラス（`public/app.css`）
+
+```css
+.stamp-detail-memory-photo-frame {
+  width: 100%;
+  max-width: 240px;
+  margin: 0 auto 14px;
+  background: #fff;
+  padding: 10px 10px 30px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  transform: rotate(-4deg);
+  box-sizing: border-box;
+}
+.stamp-detail-memory-photo-frame img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+.stamp-detail-memory-photo-caption {
+  text-align: center;
+  font-family: 'Kaisei Opti', serif;
+  font-size: 12px;
+  color: var(--warm-gray);
+  margin-top: 6px;
+}
+```
+
+`_renderStampDetailMemorySection(spot)`実装時、個人写真がある場合はこのフレーム構造（`.stamp-detail-memory-photo-frame` > `<img>` + `.stamp-detail-memory-photo-caption`にチェックイン日付）でHTML生成する。ダークモードでは白い台紙（`background:#fff`固定）を意図的に維持する（ポラロイド＝物理的な白い台紙という比喩を保つため、他要素のようにCSS変数へ追従させない設計判断）。
+
+### 承認状況
+2026-07-22 ユーザーが提示した3案（フレームなし/ポラロイド風まっすぐ/ポラロイド風斜め＋キャプション）から「Cで！」と明示選択。**承認済み**。

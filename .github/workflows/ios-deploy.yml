@@ -88,8 +88,15 @@ jobs:
       - name: Set camera usage description in Info.plist
         run: |
           cd ios-app
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist || \
-          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループに参加するためQRコードを読み取ります" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループへの参加、および探訪スタンプ帳での思い出の写真撮影のためカメラを使用します" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループへの参加、および探訪スタンプ帳での思い出の写真撮影のためカメラを使用します" ios/App/App/Info.plist
+
+      # 探訪スタンプ帳の「思い出」機能（設計書121）: チェックイン時にフォトライブラリから既存の写真を選択できるようにするため
+      - name: Set photo library usage description in Info.plist
+        run: |
+          cd ios-app
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist
 
       # スタンプラリー機能（設計書69）: GPS近接検知によるチェックインのため位置情報（使用中のみ）を利用する
       - name: Set location usage description in Info.plist
