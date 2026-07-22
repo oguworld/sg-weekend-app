@@ -13334,3 +13334,86 @@ function _renderResidencyCounter() {
 
 ## 承認状況
 2026-07-23 ユーザーが「探訪タブいいですね。在住 2年3か月（ｘｘ日）として。」と明示。**ユーザー承認済み**。
+
+# 設計書123 — 来星日入力欄の表示崩れ修正（カスタムフォーマット表示への切り替え）
+
+（2026-07-23 ユーザーが実機スクリーンショットで発見。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書122実装後、実機（TestFlight）で来星日入力欄が「1/10/15」のような判読しづらい圧縮表示になる不具合が確認された。同じ画面の在住日数カウンター（「在住 10年9か月（3948日）」）は正しく計算されており、逆算すると保存値は`2015-10-01`（ISO形式）で正しい。つまり**保存データ自体は正常**で、`<input type="date">`のネイティブ「閉じた状態」表示がWKWebView上でカスタムCSS（`border:none`/`text-align:right`等）と干渉し、OS標準のロケール依存フォーマットが圧縮された形で表示されてしまっているのが原因と推測される（ネイティブdate input表示のブラウザ内部レンダリングであり、テキストコンテンツとして直接制御できないため、確証はないがCSS競合の可能性が高い）。
+
+## 2. 確定済み仕様
+
+ネイティブ`<input type="date">`表示のフォーマットに依存せず、**アプリ側で完全にフォーマットを制御するカスタム表示ラベル**に切り替える。`<input type="date">`自体は透明化して「タップで日付ピッカーを開く」ためだけの機能レイヤーとして残す（既存の`.city-select-wrapper::after`のようなカスタム制御パターンの発展形）。
+
+`public/index.html`の来星日入力行（280-285行目）を以下に変更:
+
+```html
+<div class="settings-item" style="padding:12px 18px;">
+  <span class="settings-item-label" data-i18n="labelArrivalDate">来星日</span>
+  <div style="position:relative;">
+    <span id="arrival-date-display" style="font-size:15px;color:var(--text);font-family:'Noto Sans JP',sans-serif;pointer-events:none;"></span>
+    <input id="arrival-date-input" type="date"
+      style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
+      onchange="_saveArrivalDate(this.value)">
+  </div>
+</div>
+```
+
+`public/app.js`に新規関数`_formatArrivalDateDisplay(value, lang)`を追加し、`initSettingsProfile()`（来星日入力欄の初期値セット箇所）と`_saveArrivalDate()`の両方から`#arrival-date-display`のテキストを更新する:
+
+```js
+function _formatArrivalDateDisplay(value, lang) {
+  if (!value) return t('genreStatusUnset'); // 既存の「未設定」キーを再利用（lang引数は将来の拡張余地として残すが現状tがgetLang()を内部で見るため実質未使用）
+  const d = new Date(value + 'T00:00:00');
+  if (isNaN(d.getTime())) return t('genreStatusUnset');
+  if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+```
+
+`initSettingsProfile()`の来星日初期値セット箇所を修正:
+```js
+const arrivalInput = document.getElementById('arrival-date-input');
+if (arrivalInput) {
+  const savedArrival = localStorage.getItem('app_arrival_date') || '';
+  arrivalInput.value = savedArrival;
+  arrivalInput.max = fmtDateKey(new Date()); // 既存の未来日付ガードは維持
+  const displayEl = document.getElementById('arrival-date-display');
+  if (displayEl) displayEl.textContent = _formatArrivalDateDisplay(savedArrival);
+}
+```
+
+`_saveArrivalDate(value)`にも表示更新を追加:
+```js
+function _saveArrivalDate(value) {
+  if (value) localStorage.setItem('app_arrival_date', value);
+  else localStorage.removeItem('app_arrival_date');
+  const displayEl = document.getElementById('arrival-date-display');
+  if (displayEl) displayEl.textContent = _formatArrivalDateDisplay(value);
+  _renderResidencyCounter();
+  _syncBackupToServer();
+}
+```
+
+透明化した`<input type="date">`はタップ領域としてのみ機能し、ネイティブの日付ピッカー（カレンダーホイール）を開く役割は維持される。選択確定後の`change`イベントで`_saveArrivalDate()`が呼ばれ、カスタムラベル側に正しいフォーマットで反映される。
+
+## 3. 既存コードの調査結果
+
+- `public/index.html` 280-285行目: 設計書122で追加した来星日入力行
+- `public/app.js`: `initSettingsProfile()`内の来星日初期値セット処理（設計書122で追加）、`_saveArrivalDate()`（設計書122で追加）
+- `public/app.js` `genreStatusUnset`キー（「未設定」/「Not set」）: 新規i18nキーを追加せず再利用
+- `public/app.css` `.city-select-wrapper`（238-265行目）: ネイティブ要素を透明化し独自表示を重ねる既存の類似パターン（参考、直接の再利用はしない）
+
+## 4. スコープ外
+
+在住日数カウンター（`_renderResidencyCounter()`、探訪画面ヘッダー）自体のロジック・表示形式は無変更（既に正しく動作している）。バックアップ payload・復元ロジックも無変更（データ自体は最初から正しく保存されていたため）。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。表示ロジックのみの修正、保存データの形式・意味は無変更。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映（実機での見た目再確認が必要）。
+
+## 承認状況
+2026-07-23 ユーザーが実機スクリーンショットで表示崩れを報告。原因調査・修正方針をユーザーに説明済み、軽微な表示修正のため詳細確認は省略し実装に進める。

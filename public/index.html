@@ -279,9 +279,12 @@
 
       <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="labelArrivalDate">来星日</span>
-        <input id="arrival-date-input" type="date"
-          style="border:none;background:transparent;font-size:15px;color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;text-align:right;"
-          onchange="_saveArrivalDate(this.value)">
+        <div style="position:relative;">
+          <span id="arrival-date-display" style="font-size:15px;color:var(--text);font-family:'Noto Sans JP',sans-serif;pointer-events:none;"></span>
+          <input id="arrival-date-input" type="date"
+            style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
+            onchange="_saveArrivalDate(this.value)">
+        </div>
       </div>
 
       <!-- おでかけスタイル（折りたたみ） -->
@@ -1147,7 +1150,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260723a"></script>
+  <script src="/app.js?v=20260723b"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

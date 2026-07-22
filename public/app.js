@@ -3141,12 +3141,14 @@
       }
 
       // 設計書122: 来星日入力欄の初期値セット＋未来日付選択防止のmax属性
+      // 設計書123: カスタム表示ラベルへの反映を追加
       const arrivalInput = document.getElementById('arrival-date-input');
       if (arrivalInput) {
-        arrivalInput.value = localStorage.getItem('app_arrival_date') || '';
-        const today = new Date();
-        const pad = n => String(n).padStart(2, '0');
-        arrivalInput.max = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+        const savedArrival = localStorage.getItem('app_arrival_date') || '';
+        arrivalInput.value = savedArrival;
+        arrivalInput.max = fmtDateKey(new Date()); // 既存の未来日付ガードは維持
+        const displayEl = document.getElementById('arrival-date-display');
+        if (displayEl) displayEl.textContent = _formatArrivalDateDisplay(savedArrival);
       }
     }
 
@@ -3960,9 +3962,22 @@
     }
 
     // ─── 来星日登録＋在住日数カウンター（設計書122） ───
+    // 設計書123: ネイティブ<input type=date>の「閉じた状態」表示がWKWebViewで圧縮表示になる不具合対策として、
+    // アプリ側で完全にフォーマットを制御するカスタム表示ラベル（#arrival-date-display）に切り替え
+    function _formatArrivalDateDisplay(value, lang) {
+      if (!value) return t('genreStatusUnset'); // 既存の「未設定」キーを再利用（lang引数は将来の拡張余地として残すが現状tがgetLang()を内部で見るため実質未使用）
+      const d = new Date(value + 'T00:00:00');
+      if (isNaN(d.getTime())) return t('genreStatusUnset');
+      if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+
     function _saveArrivalDate(value) {
       if (value) localStorage.setItem('app_arrival_date', value);
       else localStorage.removeItem('app_arrival_date');
+      const displayEl = document.getElementById('arrival-date-display');
+      if (displayEl) displayEl.textContent = _formatArrivalDateDisplay(value);
       _renderResidencyCounter();
       _syncBackupToServer();
     }
