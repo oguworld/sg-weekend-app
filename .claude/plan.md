@@ -13417,3 +13417,74 @@ function _saveArrivalDate(value) {
 
 ## 承認状況
 2026-07-23 ユーザーが実機スクリーンショットで表示崩れを報告。原因調査・修正方針をユーザーに説明済み、軽微な表示修正のため詳細確認は省略し実装に進める。
+
+# 設計書124 — 来星日を未設定に戻すリセットボタンを追加
+
+（2026-07-23 ユーザーがWeb版で確認中に要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書123で来星日入力欄を「透明化した`<input type="date">` + カスタム表示span」構成に変更した結果、ネイティブdate inputの「閉じる（クリア）」操作の見た目（ブラウザ標準の✕アイコン等）も透明化されて見えなくなり、一度設定した来星日をクリアする手段が事実上失われた。ユーザーから「設定でも未設定に戻せるようにしたい」との要望。
+
+なお、初期状態（未設定時）に「未設定」ラベルを表示する仕様（`_formatArrivalDateDisplay('')`が`t('genreStatusUnset')`を返す）は設計書123で既に実装済みで、調査の結果正しく動作している（追加対応不要）。
+
+## 2. 確定済み仕様
+
+来星日表示の隣に、値が設定されている時のみ表示される小さな✕リセットボタンを追加する。
+
+`public/index.html`の来星日入力行を以下に変更（設計書123の構成に✕ボタンを追加）:
+
+```html
+<div class="settings-item" style="padding:12px 18px;">
+  <span class="settings-item-label" data-i18n="labelArrivalDate">来星日</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div style="position:relative;">
+      <span id="arrival-date-display" style="font-size:15px;color:var(--text);font-family:'Noto Sans JP',sans-serif;pointer-events:none;"></span>
+      <input id="arrival-date-input" type="date"
+        style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
+        onchange="_saveArrivalDate(this.value)">
+    </div>
+    <button id="arrival-date-reset-btn" onclick="if(!_touchCapableDetected) _resetArrivalDate()"
+      style="display:none;background:var(--sand);border-radius:50%;width:20px;height:20px;border:none;
+             font-size:11px;color:var(--warm-gray);cursor:pointer;flex-shrink:0;align-items:center;justify-content:center;padding:0;">✕</button>
+  </div>
+</div>
+```
+
+`public/app.js`に新規関数`_resetArrivalDate()`を追加:
+```js
+function _resetArrivalDate() {
+  const input = document.getElementById('arrival-date-input');
+  if (input) input.value = '';
+  _saveArrivalDate('');
+}
+```
+
+`initSettingsProfile()`の来星日初期化箇所・`_saveArrivalDate()`の両方に、リセットボタンの表示切り替えを追加:
+```js
+const resetBtn = document.getElementById('arrival-date-reset-btn');
+if (resetBtn) resetBtn.style.display = value ? 'flex' : 'none'; // value/savedArrivalの有無に応じて
+```
+
+**設定画面のtouchendデリゲーション一覧（`public/app.js`、2153-2170行目）に`#arrival-date-reset-btn`を追加する**（CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知アンチパターン——ガードのみ付与しtouchendハンドラ登録を忘れると実機タップが機能しなくなる——を踏まえた必須対応）:
+```js
+if (e.target.closest('#arrival-date-reset-btn')) { e.preventDefault(); _resetArrivalDate(); return; }
+```
+
+## 3. 既存コードの調査結果
+
+- `public/index.html` 280-287行目付近: 設計書123で実装済みの来星日入力行
+- `public/app.js` 3966-3983行目: `_formatArrivalDateDisplay()`/`_saveArrivalDate()`（設計書123で実装済み、`_formatArrivalDateDisplay('')`が既に「未設定」を返すことを確認済み、追加対応不要）
+- `public/app.js` 2153-2170行目: 設定画面touchendデリゲーション一覧（`#delete-account-btn`等の既存パターンに倣い新規ボタンを追加）
+- `public/app.js` 3101行目: `initSettingsProfile()`（来星日初期化箇所にリセットボタン表示切り替えを追加）
+
+## 4. スコープ外
+
+「未設定」表示ロジック自体（既に実装済み、動作確認のみで変更なし）。リセット時の確認ダイアログ（`confirm()`）は付けない（バックアップの無効化等と異なりデータ喪失の重大性が低い単一プロフィール項目のため、都度確認は付けない設計判断）。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーが「あと設定でも未設定に戻せるようにしたいです」と明示。軽微な追加のため詳細確認は省略し実装に進める。
