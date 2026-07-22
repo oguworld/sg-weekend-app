@@ -12606,3 +12606,34 @@ if (screen === 'course') {
 
 ## 承認状況
 2026-07-22 ユーザーがAskUserQuestionで「探訪2タブとも全ブロック」「予定表も全ブロック（既存匿名データ非表示も想定内）」と明示回答。**ユーザー承認済み**。
+
+# 設計書117 — アカウント連携ゲートオーバーレイのダークモード背景色を修正
+
+（2026-07-22 メインエージェントが設計書116実装直後のセルフレビューで発見。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書116で追加した`.screen-auth-gate`の背景色`rgba(255, 253, 249, 0.55)`（`--warm-white`のライトモード値に相当する固定rgba）がCSS変数を使わないハードコード値になっており、ダークモード時にも同じ明るいクリーム色の半透明背景がそのまま使われてしまう。`.screen-auth-gate-msg`の`color:var(--midnight)`はダークモードで自動的に明るい文字色（`#F0E8DF`）に切り替わる一方、背景だけライトモードのまま浮いて見える見た目の不整合がある。
+
+## 2. 確定済み仕様
+
+`public/app.css`の`html[data-theme="dark"]`ブロック（3111行目付近）に、`.screen-auth-gate`の背景色オーバーライドを追加する。既存の`.chat-overlay`が`rgba(44,36,32,0.45)`という暗い中立色を採用しダークモードでも違和感なく機能している前提を踏まえ、ダークモード用の暗い半透明背景に切り替える:
+
+```css
+html[data-theme="dark"] .screen-auth-gate {
+  background: rgba(23, 17, 13, 0.6);
+}
+```
+
+（`--warm-white`のダークモード値`#17110D`に相当する固定rgbaを直接指定。既存の`html[data-theme="dark"] .spot-card, ...`のような要素別上書きパターンに倣う）
+
+## 3. スコープ外
+
+`.screen-auth-gate-card`/`.screen-auth-gate-icon`/`.screen-auth-gate-msg`/`.screen-auth-gate-btn`は`var(--midnight)`/`var(--caramel)`を使用しておりダークモードに自動追従するため変更不要。設計書116のJS・HTML・i18nは無変更。
+
+## 4〜6. データモデル・API・データ共有影響
+
+**変更なし**。CSS1箇所のみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティング（`index.html`のapp.css `?v=`、`sw.js`のCACHE_NAME）を更新。Web版・iOS版両方に反映。
+
+## 承認状況
+2026-07-22 メインエージェントが設計書116実装直後に自己発見・ユーザーに一言断ったうえで修正。軽微なCSS1行修正のため詳細確認は省略。

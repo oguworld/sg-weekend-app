@@ -3122,6 +3122,9 @@
       --shadow-card: 0 6px 28px rgba(0,0,0,0.5);
       color-scheme: dark;
     }
+    html[data-theme="dark"] .screen-auth-gate {
+      background: rgba(23, 17, 13, 0.6);
+    }
     html[data-theme="dark"] .spot-card,
     html[data-theme="dark"] .pin-card,
     html[data-theme="dark"] .cal-month-block,
