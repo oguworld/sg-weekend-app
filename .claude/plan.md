@@ -12777,3 +12777,71 @@ el.innerHTML = `
 
 ## 承認状況
 2026-07-22 ユーザーが「アカウント連携する時に必ずパスフレーズの入力をしてもらって...アカウント連携している以上バックアップをしない状態はない」と明示。AskUserQuestionで「別端末再連携時にパスフレーズを忘れた場合の逃げ道」について「リセット」選択肢を採用することを確認済み。**ユーザー承認済み**。
+
+# 設計書119 — バックアップパスフレーズ入力欄が反応しない不具合の診断ログ追加
+
+（2026-07-22 ユーザーがTestFlightビルドで実機報告。Web版Playwright再現（iPhone touch emulation含む）を試みたが再現せず、原因未確定のため実機デバッグ用ログを仕込む。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書118（アカウント連携時のバックアップパスフレーズ入力必須化）を含むTestFlightビルドで、ユーザーが実機スクリーンショットとともに「このモーダル入力できません」と報告。画面は`#backup-passphrase-sheet`のrestoreモード（別端末想定、`パスフレーズを忘れた場合はこちら`リンクが表示されているため`mandatory=true`かつ`mode='restore'`と判定できる）。
+
+メインエージェントがサンドボックス内Playwright（iPhone 13タッチエミュレーション、`localStorage.app_auth_token`をfakeでセットした上で`openBackupPassphraseSheet('restore', true)`を直接呼び出し）で再現を試みたが、入力欄へのtap・フォーカス・タイプとも正常に動作し再現しなかった。関連しそうな既存コード（`lockScroll()`/`_preventBgScroll`のtouchmoveハンドラ、`document`レベルの`[data-close]`委譲touchendハンドラ、`openBackupPassphraseSheet`本体のDOM操作）を読解したが、明確な原因は特定できていない。**Web版での簡易再現ができなかったため、iOS実機（WKWebView）固有の挙動である可能性が高いと推測されるが確証はない。**
+
+ユーザーからは「度々起こるのでデバッグ前提でちゃんと調査してね」との指示があり、CLAUDE.md既定の実機デバッグ用ログ収集機能（`_sendDebugLog()`/`POST /api/debug-log`/`logs/debug-nav.log`）を使った診断ログを仕込み、次回実機再現時にログで原因を特定する方針とする。
+
+## 2. 確定済み仕様（診断ログの追加のみ、機能変更なし）
+
+### 2-1. `openBackupPassphraseSheet(mode, mandatory)`にシート表示時のログを追加
+
+```js
+async function openBackupPassphraseSheet(mode, mandatory = false) {
+  if (!getAuthToken()) { showToast(t('backupLoginRequired')); return; }
+  _sendDebugLog('backup_passphrase_sheet_open', { mode, mandatory, isCapacitor: _isCapacitorApp, ua: navigator.userAgent });
+  // ...既存処理は無変更...
+}
+```
+
+### 2-2. `#backup-passphrase-input`への一度きりのタッチ/フォーカス診断リスナー登録
+
+**入力内容（パスフレーズ本文）自体は絶対にログに含めない**（`value.length`のみ記録し、値そのものは送信しない）。`openBackupPassphraseSheet`関数の直後あたりに、モジュール初期化時に一度だけ登録する（`_backupInputDiagInit`のような一度きりフラグは不要、`{once:false}`の通常リスナーで十分。要素自体は静的HTMLで常に存在するため）:
+
+```js
+(function _initBackupPassphraseInputDiag() {
+  const input = document.getElementById('backup-passphrase-input');
+  if (!input) return;
+  ['touchstart', 'touchend', 'focus', 'blur', 'input'].forEach(evtName => {
+    input.addEventListener(evtName, () => {
+      _sendDebugLog('backup_passphrase_input_event', {
+        evt: evtName,
+        valueLength: input.value.length,
+        activeElementIsInput: document.activeElement === input,
+        isCapacitor: _isCapacitorApp,
+      });
+    }, { passive: true });
+  });
+})();
+```
+
+このIIFEは`getAuthToken()`等の関数に依存せず、DOM要素の存在のみに依存するため、起動時同期フロー（`loadEventData()`等）より前に配置しても後に配置してもTDZリスクはない。ただし念のため他の起動時IIFE群と同じ並び（`_consumeAppleAuthTokenFromHash`IIFEの近く等）に配置する。
+
+### 2-3. スコープ
+
+診断ログの追加のみ。`openBackupPassphraseSheet`本体のロジック・`closeBackupPassphraseSheet`・`_checkMandatoryBackupSetup`等、設計書118で実装した機能ロジックには一切手を加えない。
+
+## 3. 今後の対応方針
+
+このビルドをTestFlightに配信後、ユーザーに実機で再現してもらい、`logs/debug-nav.log`で以下を確認する:
+- `backup_passphrase_sheet_open`が記録されているか（シート自体は正しく開いているか）
+- ユーザーが入力欄をタップした際に`touchstart`/`touchend`/`focus`イベントが記録されるか（記録されなければタップ自体がヒットしていない = z-index/pointer-events等のCSS問題を疑う）
+- `focus`は記録されるが`input`イベントが記録されない場合（フォーカスは取れるがキーボード入力が伝播していない = iOS側のキーボード表示・IME関連の問題を疑う）
+- `input`イベント自体は記録されるが`valueLength`が0のまま変化しない場合（何らかの理由で値がリセットされ続けている = 二重初期化・多重呼び出しを疑う）
+
+ログの解析結果を踏まえて、原因特定後に本格的な修正の設計書を別途起票する。この診断ログ自体は原因確定後に削除してよい使い捨てコード（CLAUDE.md既存運用ルール通り）。
+
+## 4〜6. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ、既存の`_sendDebugLog()`/`POST /api/debug-log`（無変更、恒久ユーティリティ）を使うのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、**iOS実機での再現・ログ収集が目的のため次回TestFlightビルドが必須**。
+
+## 承認状況
+2026-07-22 ユーザーが実機不具合を報告し「原因調査して」「度々起こるのでデバッグ前提でちゃんと調査してね」と明示。診断ログ追加は軽微かつCLAUDE.md既定の標準デバッグ手法のため、詳細確認は省略し実装に進める。

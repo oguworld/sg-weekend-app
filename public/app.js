@@ -7289,6 +7289,7 @@
 
     async function openBackupPassphraseSheet(mode, mandatory = false) {
       if (!getAuthToken()) { showToast(t('backupLoginRequired')); return; }
+      _sendDebugLog('backup_passphrase_sheet_open', { mode, mandatory, isCapacitor: _isCapacitorApp, ua: navigator.userAgent });
       _backupSheetMode = mode;
       _backupSheetMandatory = mandatory;
       const titleEl = document.getElementById('backup-passphrase-title');
@@ -7326,6 +7327,21 @@
       document.getElementById('backup-passphrase-overlay').classList.remove('visible');
       document.getElementById('backup-passphrase-sheet').classList.remove('visible');
     }
+
+    (function _initBackupPassphraseInputDiag() {
+      const input = document.getElementById('backup-passphrase-input');
+      if (!input) return;
+      ['touchstart', 'touchend', 'focus', 'blur', 'input'].forEach(evtName => {
+        input.addEventListener(evtName, () => {
+          _sendDebugLog('backup_passphrase_input_event', {
+            evt: evtName,
+            valueLength: input.value.length,
+            activeElementIsInput: document.activeElement === input,
+            isCapacitor: _isCapacitorApp,
+          });
+        }, { passive: true });
+      });
+    })();
 
     async function submitBackupPassphrase() {
       const passphrase = (document.getElementById('backup-passphrase-input').value || '').trim();
