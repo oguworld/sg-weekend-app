@@ -295,6 +295,10 @@
         </div>
       </div>
 
+      <div id="arrival-notif-test-row" style="padding:4px 18px 8px;text-align:right;">
+        <span onclick="if(!_touchCapableDetected) _sendTestArrivalNotification()" style="font-size:11px;color:var(--warm-gray);text-decoration:underline;cursor:pointer;">🔔 テスト通知を送る（10秒後）</span>
+      </div>
+
       <!-- おでかけスタイル（折りたたみ） -->
       <div class="settings-item" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0;" onclick="toggleWhoPanel()">
         <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -1158,7 +1162,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260723g"></script>
+  <script src="/app.js?v=20260723h"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

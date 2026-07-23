@@ -3917,6 +3917,28 @@
       } catch (_) {}
     }
 
+    // ─── 記念日通知の実機テスト用ボタン（設計書129、使い捨て。実機確認後に削除予定） ───
+    async function _sendTestArrivalNotification() {
+      if (!_isCapacitorApp) { showToast('iOS版でのみ動作します'); return; }
+      const plugin = _getCapLocalNotifPlugin();
+      if (!plugin) { showToast('通知プラグインが見つかりません'); return; }
+      try {
+        const perm = await plugin.requestPermissions();
+        if (perm.display !== 'granted') { showToast('通知が許可されていません'); return; }
+        await plugin.schedule({
+          notifications: [{
+            id: 90099, // テスト専用の予約ID（ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID=90100と重複しない）
+            title: t('arrivalAnniversaryNotifTitle'),
+            body: t('arrivalAnniversaryNotifBody').replace('{n}', 'テスト'),
+            schedule: { at: new Date(Date.now() + 10000) },
+          }],
+        });
+        showToast('10秒後にテスト通知が届きます');
+      } catch (e) {
+        showToast('テスト通知の送信に失敗しました: ' + (e?.message || String(e)));
+      }
+    }
+
     // ─── 「思い出」機能: IndexedDB（写真、ローカルのみ、サーバー送信一切なし）（設計書121） ───
     const STAMP_MEMORY_DB_NAME = 'dosuru_stamp_memories';
     const STAMP_MEMORY_STORE_NAME = 'photos';

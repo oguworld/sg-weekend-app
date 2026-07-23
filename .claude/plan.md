@@ -13787,3 +13787,66 @@ if (savedArrival) _scheduleArrivalAnniversaryNotifications(savedArrival);
 
 ## 承認状況
 2026-07-23 ユーザーが「一年の記念日に通知を送りたい」と要望、AskUserQuestionで「毎年繰り返し（推奨）」を選択。**承認済み**。
+
+# 設計書129 — 記念日通知の実機テスト用ボタン（使い捨て）
+
+（2026-07-23 ユーザーが実装後のテストを要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書128（来星記念日のローカル通知）はiOS実機（Capacitor）でしか動作せず、かつユーザーはSafari Web Inspectorでのリアルタイムデバッグ手段を持たない（CLAUDE.md既定の制約）。実際に年単位で待たないと本物の記念日通知は発火しないため、動作確認用に「数十秒後に発火するテスト通知」を即座に送れるボタンを設定画面に一時的に追加する。
+
+## 2. 確定済み仕様
+
+設定画面の来星日入力欄の近くに、小さなテキストリンク「🔔 テスト通知を送る（10秒後）」を追加する。タップすると`_getCapLocalNotifPlugin()`（設計書128で実装済み）を使い、10秒後に発火する単発のローカル通知を1件スケジュールする。
+
+`public/index.html`、来星日入力行の直後に追加:
+```html
+<div id="arrival-notif-test-row" style="padding:4px 18px 8px;text-align:right;">
+  <span onclick="if(!_touchCapableDetected) _sendTestArrivalNotification()" style="font-size:11px;color:var(--warm-gray);text-decoration:underline;cursor:pointer;">🔔 テスト通知を送る（10秒後）</span>
+</div>
+```
+
+`public/app.js`に新規関数`_sendTestArrivalNotification()`を追加（設計書128の`_scheduleArrivalAnniversaryNotifications()`と同じプラグイン取得・権限リクエストパターンを踏襲、専用の固定ID・即時日時を使う点のみ異なる）:
+
+```js
+async function _sendTestArrivalNotification() {
+  if (!_isCapacitorApp) { showToast('iOS版でのみ動作します'); return; }
+  const plugin = _getCapLocalNotifPlugin();
+  if (!plugin) { showToast('通知プラグインが見つかりません'); return; }
+  try {
+    const perm = await plugin.requestPermissions();
+    if (perm.display !== 'granted') { showToast('通知が許可されていません'); return; }
+    await plugin.schedule({
+      notifications: [{
+        id: 90099, // テスト専用の予約ID（ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID=90100と重複しない）
+        title: t('arrivalAnniversaryNotifTitle'),
+        body: t('arrivalAnniversaryNotifBody').replace('{n}', 'テスト'),
+        schedule: { at: new Date(Date.now() + 10000) },
+      }],
+    });
+    showToast('10秒後にテスト通知が届きます');
+  } catch (e) {
+    showToast('テスト通知の送信に失敗しました: ' + (e?.message || String(e)));
+  }
+}
+```
+
+設定画面のtouchendデリゲーション一覧への追加は不要（`onclick`のみのシンプルなテキストリンク、既存の同種パターン「地図で見る」等と同じくガードのみで運用。もしタップ不発が実機で確認されたら別途対応）。
+
+新規i18nキーは追加しない（トースト文言はテスト用の一時的なものとして日本語ハードコードで許容、後述の通り本ボタン自体を丸ごと削除するため）。
+
+## 3. これは使い捨てである
+
+**この機能一式（`#arrival-notif-test-row`・`_sendTestArrivalNotification()`）はCLAUDE.md既定の「実機デバッグ用」使い捨てコードとして扱う。** ユーザーが次回TestFlightビルドで実機テストを行い、記念日通知が正常にスケジュール・発火することを確認できたら、このボタン一式を削除する（別途指示があった際に対応）。
+
+## 4. スコープ外
+
+記念日通知本体のロジック（設計書128）は無変更。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。`server.js`・データファイル無変更のため`pm2 restart`不要。iOS版のみに影響（`_isCapacitorApp`ガードによりWeb版では即座にtoastを出すのみ）。次回TestFlightビルドが必須。
+
+## 承認状況
+2026-07-23 ユーザーが「実装終わったらテスト通知を送って」と要望。実機でしか検証できないためテストボタンとして実装する方針で対応。
