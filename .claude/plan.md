@@ -14024,3 +14024,49 @@ bodyEl.innerHTML = photoHtml + textHtml + editBtnHtml;
 
 ## 承認状況
 2026-07-23 ユーザーが「やっぱりカメラが押せなかったね」「思い出情報は後からでも編集できるようにしたいかな」と明示。**承認済み**。
+
+# 設計書132 — 記念日通知テストボタンの削除＋思い出メモ欄のiOS自動ズーム修正
+
+（2026-07-23 ユーザーが記念日通知の実機動作確認完了・テストボタン不要と判断。あわせて思い出メモ欄フォーカス時の自動ズーム不具合を報告。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書129で追加したテスト通知ボタンについて、ユーザーが実機で記念日通知の動作を確認済み（「完璧です」）。当初の設計書129で「確認できたら削除する」と明記していた通り、使い捨てコードを削除する。
+
+あわせて、思い出を残すミニシート（設計書121）のメモ入力欄（`#stamp-memory-text`）にフォーカスすると画面がズームされる不具合が報告された。原因は`.stamp-memory-textarea`の`font-size: 14px`（`public/app.css` 2277行目）。iOS Safari/WKWebViewには、フォーカスされた`<input>`/`<textarea>`の`font-size`が16px未満だと自動的にズームインする既知の仕様があり、これに該当していた。
+
+なお、思い出写真ピッカーが押せない件（design 131で診断ログを追加済み）については、`logs/debug-nav.log`を確認したところ該当ログが1件も記録されていなかった。これは**ユーザーが直近テストしていたビルドがdesign 131（診断ログ）を含む前のもの**だったためと判明（design 131はまだTestFlightビルドされていなかった）。今回のビルドでdesign 131のログが実際に反映されるため、次回実機テスト後に改めてログを確認する。
+
+## 2. 確定済み仕様
+
+### 2-1. テスト通知ボタンの削除（設計書129の後始末）
+
+`public/index.html`から`#arrival-notif-test-row`要素を削除。`public/app.js`から`_sendTestArrivalNotification()`関数を削除。記念日通知本体のロジック（設計書128、`_scheduleArrivalAnniversaryNotifications()`等）は無変更のまま維持する。
+
+### 2-2. 思い出メモ欄のフォントサイズ修正
+
+`public/app.css`の`.stamp-memory-textarea`（2275-2286行目付近）:
+```css
+/* 変更前 */
+font-size: 14px; line-height: 1.6;
+/* 変更後 */
+font-size: 16px; line-height: 1.6;
+```
+
+## 3. 既存コードの調査結果
+
+- `public/index.html`: `#arrival-notif-test-row`（設計書129で追加）
+- `public/app.js`: `_sendTestArrivalNotification()`（設計書129で追加）
+- `public/app.css` 2275-2286行目: `.stamp-memory-textarea`（設計書121で追加、`font-size:14px`が原因）
+- `logs/debug-nav.log`: `stamp_memory_photo_pick_*`系ログが0件（design 131のログ自体はまだ実機に反映されていないビルドで検証していたため。今回のビルド後に改めて確認が必要）
+
+## 4. スコープ外
+
+カメラピッカーの根本原因調査は今回のスコープ外（design 131で仕込んだ診断ログが今回のビルドで初めて実機に反映されるため、次回のユーザーテスト後にログを確認してから対応する）。記念日通知本体のロジックは無変更。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーが「もうテストは消しちゃっていいです」「ズームされちゃうので...直してください」と明示。**承認済み**。
