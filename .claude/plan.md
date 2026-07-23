@@ -13680,3 +13680,110 @@ function _renderResidencyCounter() {
 
 ## 承認状況
 2026-07-23 ユーザーがモック案Dを選択し「よろしくお願いします」と明示。**承認済み**。
+
+# 設計書128 — 来星記念日のローカル通知（毎年繰り返し、iOS版のみ）
+
+（2026-07-23 ユーザーとの会話で確定。AskUserQuestionで頻度（毎年繰り返し）を確認済み。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーから「一年の記念日に通知を送りたい」との要望。来星日（設計書122）は端末ローカル（`localStorage`）にのみ保存され、サーバー側はゼロ知識暗号化バックアップ経由でしか間接的に保持しない（暗号文のまま、内容を読めない）設計のため、サーバー側で「今日は誰の記念日か」を判定してプッシュ配信する方式は取れない（取るには来星日を平文でサーバーに送る必要があり、このセッションで一貫してきた「サーバーに個人データを極力持たない」方針から外れる）。
+
+代替として、**端末内で完結するローカル通知**（`@capacitor/local-notifications`、新規プラグイン）を採用する。来星日をOSに直接予約するだけで、サーバーは一切関与しない。**技術的にiOS版（Capacitor）のみの対応となり、Web版は対象外**（ブラウザの永続的なローカル通知スケジューリングは実用的でないため）。AskUserQuestionでユーザーに頻度を確認し、「毎年繰り返し」を選択（来星1年目・2年目・3年目...と、探訪のティア制「見習い→定住レベル→...」と一貫した「毎年の節目を祝う」体験とする）。
+
+## 2. 確定済み仕様
+
+### 2-1. スケジューリング方式
+
+Capacitor LocalNotificationsは`repeats:true, every:'year'`で単純な繰り返し通知を予約できるが、その場合通知本文に「在住◯年目」という年数を動的に埋め込めない（OS側がスケジュール時点の固定テキストをそのまま発火時に表示するため）。年数入りの personalized な文言を維持するため、**単一の繰り返し通知ではなく、向こう10年分の個別通知をまとめて事前スケジュールする**方式を採る（Capacitor `schedule()`は複数件を1回のAPI呼び出しでまとめて予約できる）。10年を超えた際は自動延長されない既知の制約として許容する（v1スコープ、後述）。
+
+### 2-2. 新規ヘルパー関数（`public/app.js`）
+
+```js
+// Capacitor LocalNotificationsプラグイン取得（_getCapGeoPlugin()/_getCapCameraPlugin()と同じ防御的パターン）
+let _CapLocalNotif = null;
+function _getCapLocalNotifPlugin() {
+  if (_CapLocalNotif) return _CapLocalNotif;
+  try {
+    if (window.Capacitor?.registerPlugin) _CapLocalNotif = window.Capacitor.registerPlugin('LocalNotifications');
+  } catch (_) {}
+  if (!_CapLocalNotif) _CapLocalNotif = window.Capacitor?.Plugins?.LocalNotifications;
+  return _CapLocalNotif;
+}
+
+const ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID = 90100; // 既存の通知IDと衝突しない予約帯
+const ARRIVAL_ANNIVERSARY_YEARS_AHEAD = 10;
+
+// 来星日の保存・変更・クリアのたびに呼ばれる。既存の予約を全キャンセルしてから、
+// 値がある場合のみ向こう10年分を再スケジュールする（idが固定のため再実行は冪等）
+async function _scheduleArrivalAnniversaryNotifications(arrivalStr) {
+  if (!_isCapacitorApp) return; // Web版は対象外
+  const plugin = _getCapLocalNotifPlugin();
+  if (!plugin) return;
+  try {
+    await plugin.cancel({
+      notifications: Array.from({ length: ARRIVAL_ANNIVERSARY_YEARS_AHEAD }, (_, i) => ({ id: ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID + i + 1 })),
+    });
+    if (!arrivalStr) return; // クリア時はキャンセルのみで終了
+    const perm = await plugin.requestPermissions();
+    if (perm.display !== 'granted') return;
+    const arrival = new Date(arrivalStr + 'T00:00:00');
+    if (isNaN(arrival.getTime())) return;
+    const now = new Date();
+    const notifications = [];
+    for (let n = 1; n <= ARRIVAL_ANNIVERSARY_YEARS_AHEAD; n++) {
+      const fireDate = new Date(arrival.getFullYear() + n, arrival.getMonth(), arrival.getDate(), 10, 0, 0);
+      if (fireDate <= now) continue; // 既に過ぎた年はスキップ
+      notifications.push({
+        id: ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID + n,
+        title: t('arrivalAnniversaryNotifTitle'),
+        body: t('arrivalAnniversaryNotifBody').replace('{n}', n),
+        schedule: { at: fireDate },
+      });
+    }
+    if (notifications.length) await plugin.schedule({ notifications });
+  } catch (_) {}
+}
+```
+
+### 2-3. 呼び出し箇所
+
+`_saveArrivalDate(value)`（設計書122・123）の末尾に追加:
+```js
+_scheduleArrivalAnniversaryNotifications(value);
+```
+
+`initSettingsProfile()`の来星日初期化箇所にも、既存値がある場合の防御的な再スケジュール呼び出しを追加する（アプリ再インストール等でOS側の予約が失われているケースへの自己修復。設定画面を開くたびに`schedule()`を呼び直すコストは無視できるレベルのため、フラグ管理等の複雑化はしない）:
+```js
+if (savedArrival) _scheduleArrivalAnniversaryNotifications(savedArrival);
+```
+
+### 2-4. i18n新規キー（ja/en同時）
+
+- `arrivalAnniversaryNotifTitle`: ja「🎉 来星記念日です！」/ en「🎉 Happy Arrival Anniversary!」
+- `arrivalAnniversaryNotifBody`: ja「シンガポール生活{n}年目に突入しました。探訪の記録を振り返ってみませんか？」/ en「You've reached {n} year(s) in Singapore! Take a look back at your journey.」
+
+### 2-5. iOS: Capacitor LocalNotificationsプラグイン追加
+
+`ios-app/package.json`に`@capacitor/local-notifications@^6.0.0`を追加。**Info.plistの新規エントリは不要と推測される**（ローカル通知の許可はプッシュ通知と同じ`UNUserNotificationCenter`権限系統を使うため、既存のプッシュ通知機能で許可済みの場合は追加プロンプトなしで動作する可能性が高い。ただし一次情報での確証はなく、builder実装時に`@capacitor/local-notifications`公式ドキュメントで追加設定要否を確認すること）。
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 3816-3832行目付近: `_getCapGeoPlugin()`（新規`_getCapLocalNotifPlugin()`のミラー元パターン）
+- `public/app.js` 3851行目付近: 設計書121で追加した`_getCapCameraPlugin()`（同様の防御的パターンの既存の別実装例）
+- `public/app.js` `_saveArrivalDate()`（設計書122・123、末尾に1行追加）
+- `public/app.js` `initSettingsProfile()`（来星日初期化箇所、条件付き再スケジュール呼び出しを追加）
+
+## 4. スコープ外
+
+- Web版でのプッシュ通知連動（技術的制約によりv1スコープ外、必要であれば将来的にサーバー側に暗号化されていない来星日を持つ設計への転換を要する大きな変更のため別途検討）
+- 10年を超えた在住者への自動延長スケジューリング（v1は向こう10年分の一括予約のみ、設定画面を開くたびの再スケジュール処理はカバー範囲だが「10年間一度も設定画面を開かない」極端なケースは想定しない）
+- 通知タップ時の遷移先制御（探訪画面への誘導等）は今回追加しない、OS標準のアプリ起動のみ
+- 記念日通知のオン/オフを来星日設定と切り離した専用トグル（今回は来星日設定と自動連動、既存のGPS・カメラ等のコンテキスト起点の許可リクエストパターンを踏襲）
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。来星日はローカルのみで完結（既存のバックアップ暗号化ペイロードにも変更なし）。`server.js`は無変更のため`pm2 restart`不要。**iOS版のみに影響する変更のため、Web版への影響なし。次回TestFlightビルドが必須**（新規ネイティブプラグイン）。
+
+## 承認状況
+2026-07-23 ユーザーが「一年の記念日に通知を送りたい」と要望、AskUserQuestionで「毎年繰り返し（推奨）」を選択。**承認済み**。

@@ -318,6 +318,8 @@
         labelCity: '都市',
         labelArrivalDate: '来星日',
         residencyCounterLabel: '在住 <b>{ym}</b><br>（{days}日）',
+        arrivalAnniversaryNotifTitle: '🎉 来星記念日です！',
+        arrivalAnniversaryNotifBody: 'シンガポール生活{n}年目に突入しました。探訪の記録を振り返ってみませんか？',
         shareLabel: 'シェア',
         tabsLabel: 'いつ行く？',
         tabWeekend: '今週',
@@ -604,6 +606,8 @@
         labelCity: 'City',
         labelArrivalDate: 'Arrival Date',
         residencyCounterLabel: '<b>{ym}</b> in Singapore<br>({days} days)',
+        arrivalAnniversaryNotifTitle: '🎉 Happy Arrival Anniversary!',
+        arrivalAnniversaryNotifBody: "You've reached {n} year(s) in Singapore! Take a look back at your journey.",
         shareLabel: 'Share',
         tabsLabel: 'When?',
         tabWeekend: 'This Week',
@@ -2281,6 +2285,13 @@
     let _nativePushDenied = false;
     let _CapPush = null;
 
+    // 来星記念日ローカル通知用プラグイン参照（設計書128）: initSettingsProfile()が起動時同期実行部
+    // （下記 initSettingsProfile() 呼び出し）から _scheduleArrivalAnniversaryNotifications() 経由で
+    // 参照するため、呼び出しより前に宣言する（設計書50/51と同じTDZ回避パターン）。
+    let _CapLocalNotif = null;
+    const ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID = 90100; // 既存の通知IDと衝突しない予約帯
+    const ARRIVAL_ANNIVERSARY_YEARS_AHEAD = 10;
+
     loadEventData();
     initPushState();
     initSettingsProfile();
@@ -3149,6 +3160,8 @@
         arrivalInput.max = fmtDateKey(new Date()); // 既存の未来日付ガードは維持
         const displayEl = document.getElementById('arrival-date-display');
         if (displayEl) displayEl.innerHTML = _formatArrivalDateDisplay(savedArrival);
+        // 設計書128: アプリ再インストール等でOS側の予約が失われているケースへの自己修復
+        if (savedArrival) _scheduleArrivalAnniversaryNotifications(savedArrival);
       }
     }
 
@@ -3861,6 +3874,49 @@
       return _CapCamera;
     }
 
+    // ─── 来星記念日のローカル通知（設計書128、_getCapGeoPlugin()と同じ防御的パターン） ───
+    // _CapLocalNotif / ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID / ARRIVAL_ANNIVERSARY_YEARS_AHEAD は
+    // 起動時同期フロー（initSettingsProfile()）からの参照があるため loadEventData() 直前へ移動済み（TDZ回避）。
+    function _getCapLocalNotifPlugin() {
+      if (_CapLocalNotif) return _CapLocalNotif;
+      try {
+        if (window.Capacitor?.registerPlugin) _CapLocalNotif = window.Capacitor.registerPlugin('LocalNotifications');
+      } catch (_) {}
+      if (!_CapLocalNotif) _CapLocalNotif = window.Capacitor?.Plugins?.LocalNotifications;
+      return _CapLocalNotif;
+    }
+
+    // 来星日の保存・変更・クリアのたびに呼ばれる。既存の予約を全キャンセルしてから、
+    // 値がある場合のみ向こう10年分を再スケジュールする（idが固定のため再実行は冪等）
+    async function _scheduleArrivalAnniversaryNotifications(arrivalStr) {
+      if (!_isCapacitorApp) return; // Web版は対象外
+      const plugin = _getCapLocalNotifPlugin();
+      if (!plugin) return;
+      try {
+        await plugin.cancel({
+          notifications: Array.from({ length: ARRIVAL_ANNIVERSARY_YEARS_AHEAD }, (_, i) => ({ id: ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID + i + 1 })),
+        });
+        if (!arrivalStr) return; // クリア時はキャンセルのみで終了
+        const perm = await plugin.requestPermissions();
+        if (perm.display !== 'granted') return;
+        const arrival = new Date(arrivalStr + 'T00:00:00');
+        if (isNaN(arrival.getTime())) return;
+        const now = new Date();
+        const notifications = [];
+        for (let n = 1; n <= ARRIVAL_ANNIVERSARY_YEARS_AHEAD; n++) {
+          const fireDate = new Date(arrival.getFullYear() + n, arrival.getMonth(), arrival.getDate(), 10, 0, 0);
+          if (fireDate <= now) continue; // 既に過ぎた年はスキップ
+          notifications.push({
+            id: ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID + n,
+            title: t('arrivalAnniversaryNotifTitle'),
+            body: t('arrivalAnniversaryNotifBody').replace('{n}', n),
+            schedule: { at: fireDate },
+          });
+        }
+        if (notifications.length) await plugin.schedule({ notifications });
+      } catch (_) {}
+    }
+
     // ─── 「思い出」機能: IndexedDB（写真、ローカルのみ、サーバー送信一切なし）（設計書121） ───
     const STAMP_MEMORY_DB_NAME = 'dosuru_stamp_memories';
     const STAMP_MEMORY_STORE_NAME = 'photos';
@@ -3983,6 +4039,7 @@
       if (displayEl) displayEl.innerHTML = _formatArrivalDateDisplay(value);
       _renderResidencyCounter();
       _syncBackupToServer();
+      _scheduleArrivalAnniversaryNotifications(value);
     }
 
     function _formatResidencyYM(years, months, lang) {
