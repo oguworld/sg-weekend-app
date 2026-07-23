@@ -142,14 +142,16 @@
   <!-- ─── COURSE SCREEN ─── -->
   <div class="screen" id="screen-course" style="display:none;">
     <div class="course-screen-header plan-title-header">
-      <span class="screen-title" data-i18n="courseScreenTitle">シンガポール探訪</span>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+        <span class="screen-title" data-i18n="courseScreenTitle">シンガポール探訪</span>
+        <div id="stamp-residency-counter" style="display:none;font-size:11px;color:var(--warm-gray);font-weight:600;text-align:right;line-height:1.5;margin-top:4px;flex-shrink:0;"></div>
+      </div>
       <!-- ピルタブ -->
       <div class="course-tab-bar">
         <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">探訪スタンプ帳</button>
         <button class="course-tab" data-tab="everyone" onclick="switchCourseTab('everyone')" data-i18n="courseTabEveryone">モデルコース</button>
         <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')" data-i18n="courseTabMylist" style="display:none;">マイコース</button>
       </div>
-      <div id="stamp-residency-counter" style="display:none;font-size:12px;color:var(--warm-gray);text-align:center;padding:6px 0 0;"></div>
     </div>
     <div class="screen-content" id="course-screen-content">
 
@@ -1156,7 +1158,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260723e"></script>
+  <script src="/app.js?v=20260723f"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

@@ -317,7 +317,7 @@
         headerSubtitle: 'シンガポール在住者の週末おでかけガイド', // city-specific: overridden by updateCityUI()
         labelCity: '都市',
         labelArrivalDate: '来星日',
-        residencyCounterLabel: '在住 {ym}（{days}日）',
+        residencyCounterLabel: '在住 <b>{ym}</b><br>（{days}日）',
         shareLabel: 'シェア',
         tabsLabel: 'いつ行く？',
         tabWeekend: '今週',
@@ -603,7 +603,7 @@
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
         labelCity: 'City',
         labelArrivalDate: 'Arrival Date',
-        residencyCounterLabel: '{ym} in Singapore ({days} days)',
+        residencyCounterLabel: '<b>{ym}</b> in Singapore<br>({days} days)',
         shareLabel: 'Share',
         tabsLabel: 'When?',
         tabWeekend: 'This Week',
@@ -4008,7 +4008,7 @@
       if (todayMid.getDate() < arrivalMid.getDate()) months--;
       if (months < 0) { years--; months += 12; }
       const ym = _formatResidencyYM(years, months, getLang());
-      el.textContent = t('residencyCounterLabel').replace('{ym}', ym).replace('{days}', days);
+      el.innerHTML = t('residencyCounterLabel').replace('{ym}', ym).replace('{days}', days);
       el.style.display = '';
     }
 

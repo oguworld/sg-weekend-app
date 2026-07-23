@@ -13597,3 +13597,86 @@ displayEl.innerHTML = _formatArrivalDateDisplay(savedArrival);
 
 ## 承認状況
 2026-07-23 ユーザーが実機スクリーンショットで「この❌ボタン要らないです。リセットあるので」と明示。**承認済み**。
+
+# 設計書127 — 在住日数カウンターをタイトル行右上のバッジに変更
+
+（2026-07-23 ユーザーがモック案Dを選択。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書122で追加した在住日数カウンター（`#stamp-residency-counter`）は、タブバーの下に全幅1行で表示される構成だったが、ユーザーから「変」との指摘があり、モック4案（A: 小ピルチップ／B: 年月+日数2段ピル／C: アイコン付きスタットバッジ／D: テキストのみ控えめ）を提示。**D案（タイトル行右上、控えめなテキスト2行）**を選択。
+
+## 2. 確定済み仕様
+
+### 2-1. HTML構造変更
+
+`#screen-course .course-screen-header`は`flex-direction:column`（`public/app.css` 3318-3323行目）のため、`.screen-title`と`.course-tab-bar`は現状縦積みになっている。タイトル行の右側にバッジを置くには、`.screen-title`を新規の横並びラッパーで包む必要がある。
+
+`public/index.html`の`.course-screen-header`内マークアップを以下に変更:
+
+```html
+<div class="course-screen-header plan-title-header">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+    <span class="screen-title" data-i18n="courseScreenTitle">シンガポール探訪</span>
+    <div id="stamp-residency-counter" style="display:none;font-size:11px;color:var(--warm-gray);font-weight:600;text-align:right;line-height:1.5;margin-top:4px;flex-shrink:0;"></div>
+  </div>
+  <div class="course-tab-bar">
+    <!-- 既存のタブボタン3つ、無変更 -->
+  </div>
+</div>
+```
+
+設計書122時点で`.course-tab-bar`の直後に追加されていた旧`#stamp-residency-counter`（全幅1行版）は削除し、上記の位置に置き換える。
+
+### 2-2. 表示形式（2行、モックD準拠）
+
+`residencyCounterLabel`の値を、単一行の「在住 {ym}（{days}日）」から、太字強調＋改行を含むHTML形式に変更する:
+
+- ja: `在住 <b>{ym}</b><br>（{days}日）`
+- en: `<b>{ym}</b> in Singapore<br>({days} days)`
+
+`_renderResidencyCounter()`関数の描画部分（`el.textContent = ...`）を`el.innerHTML = ...`に変更する（設計書123の`_formatArrivalDateDisplay`と同様のHTML化パターン）。`<b>`タグの色は新規CSSクラス不要、`<b style="color:var(--caramel);">`のようにインライン指定するか、既存のシンプルな`<b>`タグ+周囲のグレーテキストで自然に強調される形で十分（過度に作り込まない）。
+
+```js
+function _renderResidencyCounter() {
+  const el = document.getElementById('stamp-residency-counter');
+  if (!el) return;
+  const arrivalStr = localStorage.getItem('app_arrival_date');
+  if (!arrivalStr) { el.style.display = 'none'; return; }
+  const arrival = new Date(arrivalStr + 'T00:00:00');
+  if (isNaN(arrival.getTime())) { el.style.display = 'none'; return; }
+  const today = new Date();
+  const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const days = Math.round((todayMid - arrivalMid) / 86400000);
+  if (days < 0) { el.style.display = 'none'; return; }
+  let years = todayMid.getFullYear() - arrivalMid.getFullYear();
+  let months = todayMid.getMonth() - arrivalMid.getMonth();
+  if (todayMid.getDate() < arrivalMid.getDate()) months--;
+  if (months < 0) { years--; months += 12; }
+  const ym = _formatResidencyYM(years, months, getLang());
+  el.innerHTML = t('residencyCounterLabel').replace('{ym}', ym).replace('{days}', days);
+  el.style.display = '';
+}
+```
+
+（既存ロジックの計算部分は完全に無変更、末尾の描画1行のみ`textContent`→`innerHTML`＋新フォーマットに変更）
+
+## 3. 既存コードの調査結果
+
+- `public/index.html`: 設計書122で追加した`.course-screen-header`内`#stamp-residency-counter`（タブバー直後の全幅1行版、位置を移動）
+- `public/app.css` 3318-3323行目: `#screen-course .course-screen-header { flex-direction: column; ... }`（縦積みのため新規ラッパーが必要と判明）
+- `public/app.css` 2509-2510行目: `.plan-title-header { display:flex; ... } .plan-title-header .screen-title { flex:1; }`（本来の横並びベースパターン、参考）
+- `public/app.js` `_renderResidencyCounter()`（設計書122で追加済み、末尾の描画部分のみ変更）
+- `public/app.js` `residencyCounterLabel`キー（設計書122で追加済み、値のみ変更）
+
+## 4. スコープ外
+
+`_formatResidencyYM()`・日数計算ロジック自体は無変更（設計書122で実装済み、正しく動作確認済みのため）。`initCourseScreen()`からの呼び出しタイミングも無変更。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。見た目のみの調整。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーがモック案Dを選択し「よろしくお願いします」と明示。**承認済み**。
