@@ -443,7 +443,7 @@
         stampLevelNiche: 'シンガポール通',
         stampLevelSpecial: '極めし者',
         stampProgressSummary: '{unlocked}レベル解禁中・{checked}/{total}スポット制覇',
-        stampCheckedInBadge: '✓ 制覇済み',
+        stampCheckedInBadge: '✓ 訪問済み',
         stampCheckinBtn: '現在地を確認中…',
         stampCheckinBtnReady: 'チェックインする',
         stampCheckinBtnTooFar: '近づくとチェックインできます',
@@ -732,7 +732,7 @@
         stampLevelNiche: 'Singapore Expert',
         stampLevelSpecial: 'Grandmaster',
         stampProgressSummary: '{unlocked} level(s) unlocked · {checked}/{total} spots collected',
-        stampCheckedInBadge: '✓ Collected',
+        stampCheckedInBadge: '✓ Visited',
         stampCheckinBtn: 'Checking your location…',
         stampCheckinBtnReady: 'Check in',
         stampCheckinBtnTooFar: 'Get closer to check in',
@@ -4089,7 +4089,6 @@
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.setAttribute('capture', 'environment');
             input.style.display = 'none';
             input.addEventListener('change', () => {
               const file = input.files && input.files[0];
@@ -4607,10 +4606,6 @@
         }
       }
 
-      const checked = _stampSpotIsChecked(spot.id);
-      const checkedEl = document.getElementById('stamp-spot-detail-checked');
-      if (checkedEl) checkedEl.style.display = checked ? 'block' : 'none';
-
       _renderStampDetailMemorySection(spot);
 
       _updateStampCheckinButton();
@@ -4750,8 +4745,6 @@
         _renderStampFog();
         _renderStampCollectionList();
         _renderStampAreaBadges();
-        const checkedEl = document.getElementById('stamp-spot-detail-checked');
-        if (checkedEl) checkedEl.style.display = 'block';
         _updateStampCheckinButton();
       } catch (_) {
         showToast(t('toastStampCheckinError'));

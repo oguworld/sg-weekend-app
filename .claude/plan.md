@@ -14070,3 +14070,60 @@ font-size: 16px; line-height: 1.6;
 
 ## 承認状況
 2026-07-23 ユーザーが「もうテストは消しちゃっていいです」「ズームされちゃうので...直してください」と明示。**承認済み**。
+
+# 設計書133 — 「制覇済み」表示の重複解消・文言変更＋Web版フォトライブラリ選択対応
+
+（2026-07-23 ユーザーが実機スクリーンショットで指摘。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+スポット詳細シートで「✓ 制覇済み」が2箇所（`#stamp-spot-detail-checked`バッジ・チェックインボタン自体が無効化されて表示するテキスト）に重複表示されていることが判明（既存の設計、design 121で「あなたの記録」セクションが追加され画面が縦に伸びたことで初めて両方が同時に視認されやすくなった）。あわせて「制覇済み」という文言がやや大げさ・不自然との指摘があり、より自然な表現への変更を要望。またWeb版の写真選択が実質カメラ起動のみに固定されており（`<input capture="environment">`指定）、フォトライブラリから選べないとの指摘。
+
+## 2. 確定済み仕様
+
+### 2-1. 重複バッジの解消
+
+`#stamp-spot-detail-checked`（`public/index.html` 869行目、独立した「✓ 制覇済み」パネル）を削除する。チェックイン状態の表示はチェックインボタン自体の無効化＋テキスト変化（`_updateStampCheckinButton()`）のみに一本化する。
+
+`public/app.js`の以下2箇所から、削除した要素への参照処理を除去する:
+- `openStampSpotDetail()`（4611行目付近）: `checkedEl`の取得・`display`切替処理を削除
+- `doStampCheckin()`（4753行目付近）: 同様の処理を削除
+
+### 2-2. 文言変更（「制覇済み」→「訪問済み」）
+
+`stampCheckedInBadge`の値を変更（キー名は不変）:
+- ja: 「✓ 制覇済み」→「✓ 訪問済み」
+- en: 「✓ Collected」→「✓ Visited」
+
+このキーはチェックインボタンの無効化時テキストとしてのみ使われる（`_updateStampCheckinButton()`、上記2-1の重複解消後は参照箇所が1つに統一される）。
+
+### 2-3. Web版でフォトライブラリからも選べるようにする
+
+`_pickStampMemoryPhotoBlob()`（`public/app.js`）のWeb版分岐（`<input type="file">`生成部分）から`capture`属性の指定を削除する。`capture="environment"`を指定するとモバイルブラウザによってはカメラが強制的に直接起動し、フォトライブラリを選ぶ選択肢自体が出ない実装になっていた。属性を外すことで、OS標準の「写真を撮る／ライブラリから選ぶ」の選択肢が表示されるようになる（`accept="image/*"`のみで十分、`capture`属性はモバイルSafari等で任意選択の余地を狭める効果があるため削除する）。
+
+```js
+// 変更前
+input.setAttribute('capture', 'environment');
+// 変更後: この行を削除
+```
+
+iOS版（Capacitor Camera、`source:'PROMPT'`）は元々カメラ/フォトライブラリの選択肢を提示する設計のため今回変更不要（現在進行中のiOS起動不具合〈design 131の診断ログで調査中〉が解消すれば自動的にこちらも機能する想定）。
+
+## 3. 既存コードの調査結果
+
+- `public/index.html` 869行目: `#stamp-spot-detail-checked`
+- `public/app.js` 4611行目付近: `openStampSpotDetail()`内の`checkedEl`処理
+- `public/app.js` 4753行目付近: `doStampCheckin()`内の`checkedEl`処理
+- `public/app.js` 4658-4669行目: `_updateStampCheckinButton()`（`stampCheckedInBadge`の唯一の参照元として残る）
+- `public/app.js` `_pickStampMemoryPhotoBlob()`のWeb版`<input type="file">`生成部分（`capture`属性削除）
+
+## 4. スコープ外
+
+iOS版のカメラ起動不具合自体の根本解決（design 131の診断ログを次回ビルド後に確認してから別途対応）。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーが実機スクリーンショットで「制覇済みが2つあります」「日本語おかしくない？自然なものに変えたい」「カメラだけじゃなくフォトライブラリから選べるようにできない？」と明示。**承認済み**（文言は「訪問済み」を提案、明示的な代替案が無ければこの値で進める）。
