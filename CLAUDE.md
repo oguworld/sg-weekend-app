@@ -947,6 +947,13 @@ design 131で仕込んだ診断ログ（`stamp_memory_photo_pick_error`）を実
 - `server.js`・`public/`配下・データファイルは無変更。CI設定ファイルのみの変更のため`pm2 restart`不要
 - **未検証（次回TestFlightビルド後にフォロー）**: カメラピッカーが正常起動しフォトライブラリから写真選択できるかの実機確認が必須。確認できたらdesign 131の診断ログを削除する。設計書69〜136自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
 
+### 思い出写真ピッカーの診断ログを削除（design 131の後始末）（2026-07-24実装、設計書138）
+design 131で追加した診断ログ（`stamp_memory_photo_pick_start`/`_result`/`_error`）により、design 137でカメラピッカー起動不能の根本原因（`NSPhotoLibraryAddUsageDescription`欠落）を特定・修正できた。ユーザーが実機でカメラ/フォトライブラリ選択の正常動作を確認済みのため、CLAUDE.md既定の運用ルール通り役目を終えた使い捨て診断ログを削除した。
+- `public/app.js`の`_pickStampMemoryPhotoBlob()`から3箇所の`_sendDebugLog()`呼び出しを削除。関数本体のロジック（プラグイン取得・`getPhoto()`呼び出し・Web版`<input type=file>`分岐）は無変更のまま維持
+- `_sendDebugLog`関数自体・`POST /api/debug-log`エンドポイント自体は恒久ユーティリティのため削除していない（他機能の計装で引き続き使用）
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723n`→`20260724a`、`sw.js` CACHE_NAME=`sg-weekend-v689`→`v690`（`app.css`は無変更のため据え置き）
+- **このタスクをもってdesign 131〜138（思い出写真ピッカー実機診断）は解決済み**。設計書69〜137自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
+
 ### ⚠️ 設定画面セクション構成の変更（2026-07-19実装、設計書64、上記の`secBackup`/`secLogin`関連記述は歴史的経緯として一部実態と乖離）
 設定画面が「プロフィール→ログイン→予定表のバックアップ（HTMLコメント上「2.5」）→アプリ設定→その他」という5セクション構成になっていたのを、「プロフィール→**アカウント**（ログイン+バックアップ統合）→アプリ設定→**サポート・情報**→**フィードバック**」の5セクションに再編成した（機能・ロジック変更は一切なし、`.settings-item`内部のid/onclick/classは無変更、見た目上の再編成のみ）。
 - **旧「ログイン」セクション（見出しキー`secLogin`）と旧「予定表のバックアップ」セクション（見出しキー`secBackup`）を1つの`.settings-section`に統合**し、見出しを新規キー`secAccount`（ja「アカウント」/en「Account」）に変更。`secLogin`/`secBackup`キー自体はHTML上で無参照になったため`STRINGS.ja`/`STRINGS.en`から削除済み（他機能からの参照なしを`grep`で確認済み）

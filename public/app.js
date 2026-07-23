@@ -4079,10 +4079,8 @@
       try {
         if (_isCapacitorApp) {
           const plugin = _getCapCameraPlugin();
-          _sendDebugLog('stamp_memory_photo_pick_start', { hasPlugin: !!plugin, hasGetPhoto: !!plugin?.getPhoto });
           if (!plugin?.getPhoto) return null;
           const photo = await plugin.getPhoto({ resultType: 'dataUrl', source: 'PROMPT', quality: 80 });
-          _sendDebugLog('stamp_memory_photo_pick_result', { hasDataUrl: !!photo?.dataUrl });
           if (!photo?.dataUrl) return null;
           const res = await fetch(photo.dataUrl);
           return await res.blob();
@@ -4102,7 +4100,6 @@
           });
         }
       } catch (e) {
-        _sendDebugLog('stamp_memory_photo_pick_error', { errorName: e?.name || null, errorMessage: e?.message || String(e) });
         return null;
       }
     }
