@@ -13895,3 +13895,132 @@ CLAUDE.mdの確立された修正パターン（新規touchendハンドラを追
 
 ## 承認状況
 2026-07-23 ユーザーが実機で「テスト通知ボタン」「写真を追加ボタン」が押せないと報告、「デバッグをベースに調べて」と明示。原因特定・確立済み修正パターンの適用のため詳細確認は省略し実装に進める。
+
+# 設計書131 — 思い出写真ピッカーの実機診断ログ追加＋既存の思い出を編集可能にする
+
+（2026-07-23 ユーザーが実機で「カメラが押せない（設計書130適用後も）」と再報告、あわせて「思い出情報は後からでも編集できるようにしたい」と要望。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+設計書130でタップ不発（onclick属性ガード未対応touchend）を修正済みだが、ユーザーから「やっぱりカメラが押せなかった」と再報告があった。コード調査の結果、`_pickStampMemoryPhotoBlob()`が`catch (_) { return null; }`で**全てのエラーを握りつぶし**、呼び出し元`_pickStampMemoryPhoto()`も`if (!blob) return;`で無言で終了する実装だったため、タップ自体は成功していても（設計書130の修正が効いていても）、`@capacitor/camera`のプラグイン取得失敗・権限拒否・API呼び出しエラーのいずれが起きてもユーザーからは「何も起きない」ように見える状態だった。実機でのSafari Web Inspectorが使えない制約のため、CLAUDE.md既定の実機デバッグ用ログ収集機能で原因を切り分ける。
+
+あわせて、ユーザーから「思い出情報は後からでも編集できるようにしたい」との要望があった。現状`_openStampMemorySheet()`は常に空の状態でシートを開く実装のため、既にチェックイン済みで思い出を保存済みのスポットに対する「編集」導線が存在しない（スポット詳細シートの「あなたの記録」セクションには、思い出が未保存の場合のみ「思い出を追加」ボタンが出る設計だった）。
+
+## 2. 確定済み仕様
+
+### 2-1. 診断ログ追加（`_pickStampMemoryPhotoBlob()`、使い捨て）
+
+```js
+async function _pickStampMemoryPhotoBlob() {
+  try {
+    if (_isCapacitorApp) {
+      const plugin = _getCapCameraPlugin();
+      _sendDebugLog('stamp_memory_photo_pick_start', { hasPlugin: !!plugin, hasGetPhoto: !!plugin?.getPhoto });
+      if (!plugin?.getPhoto) return null;
+      const photo = await plugin.getPhoto({ resultType: 'dataUrl', source: 'PROMPT', quality: 80 });
+      _sendDebugLog('stamp_memory_photo_pick_result', { hasDataUrl: !!photo?.dataUrl });
+      if (!photo?.dataUrl) return null;
+      const res = await fetch(photo.dataUrl);
+      return await res.blob();
+    } else {
+      // ...既存のWeb版<input type=file>分岐は無変更...
+    }
+  } catch (e) {
+    _sendDebugLog('stamp_memory_photo_pick_error', { errorName: e?.name || null, errorMessage: e?.message || String(e) });
+    return null;
+  }
+}
+```
+
+（Web版の`<input type=file>`分岐自体は無変更、tryブロックの外枠のcatchにログを追加するのみ）
+
+### 2-2. 既存の思い出を編集できるようにする
+
+**共通ヘルパーの切り出し**: `_pickStampMemoryPhoto()`内の写真プレビュー表示ロジックを新規関数`_showStampMemoryPhotoPreview(blob)`に切り出す（`_openStampMemorySheet()`の編集時プリロードからも共用するため）:
+
+```js
+function _showStampMemoryPhotoPreview(blob) {
+  const url = URL.createObjectURL(blob);
+  const box = document.getElementById('stamp-memory-photo-box');
+  if (!box) return;
+  box.classList.add('stamp-memory-photo-box--filled');
+  box.style.backgroundImage = `url('${url}')`;
+  box.innerHTML = '<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); _resetStampMemoryPhotoBox()">✕</div>';
+}
+
+async function _pickStampMemoryPhoto() {
+  try {
+    const blob = await _pickStampMemoryPhotoBlob();
+    if (!blob) return;
+    _stampMemoryPickedBlob = await _resizeImageBlob(blob);
+    _showStampMemoryPhotoPreview(_stampMemoryPickedBlob);
+  } catch (e) {
+    showToast(t('toastStampMemoryError'));
+  }
+}
+```
+
+**`_openStampMemorySheet()`を`async`化し、既存の思い出（メモ・写真）があれば事前入力する**:
+
+```js
+async function _openStampMemorySheet(spot, newlyUnlockedLevel) {
+  _stampMemorySpotId = spot.id;
+  _stampMemoryPendingUnlock = newlyUnlockedLevel ? { level: spot.level, newlyUnlockedLevel } : null;
+  _stampMemoryPickedBlob = null;
+  const nameEl = document.getElementById('stamp-memory-spot-name');
+  if (nameEl) nameEl.textContent = (getLang() === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+  const textEl = document.getElementById('stamp-memory-text');
+  const existingMemo = _getStampMemos()[spot.id];
+  if (textEl) textEl.value = existingMemo?.text || '';
+  _resetStampMemoryPhotoBox();
+  lockScroll();
+  document.getElementById('stamp-memory-overlay').classList.add('visible');
+  document.getElementById('stamp-memory-sheet').classList.add('visible');
+  // 既存の写真があれば非同期で読み込んでプレビュー表示（新規チェックイン時はIndexedDBに何もないため何も起きない）
+  try {
+    const existingBlob = await _getStampMemoryPhotoBlob(spot.id);
+    if (existingBlob && _stampMemorySpotId === spot.id) { // 読み込み中にシートが別スポット用に開き直されていないか確認
+      _stampMemoryPickedBlob = existingBlob;
+      _showStampMemoryPhotoPreview(existingBlob);
+    }
+  } catch (_) {}
+}
+```
+
+（`_saveStampMemory()`側は無変更。「保存」時に`_stampMemoryPickedBlob`が既存の写真のまま変更されていなければ、同一内容で上書き保存されるだけで実害なし。ユーザーが新しい写真を選び直せば`_pickStampMemoryPhoto()`が`_stampMemoryPickedBlob`を新しい写真で上書きする）
+
+**スポット詳細シートに「編集」ボタンを追加**（`_renderStampDetailMemorySection()`、思い出が既にある場合の分岐末尾）:
+
+```js
+sectionEl.style.display = 'block';
+const checkinDate = _stampCheckinDateFor(spot.id);
+const photoHtml = hasPhoto ? `...(無変更)...` : '';
+const textHtml = hasMemo ? `<div class="stamp-detail-memory-text">${escapeHtml(memo.text)}</div>` : '';
+const editBtnHtml = `<button type="button" class="stamp-memory-edit-btn" onclick="_openStampMemorySheet(_stampSelectedSpot, null)">${t('stampMemoryEditBtn')}</button>`;
+bodyEl.innerHTML = photoHtml + textHtml + editBtnHtml;
+```
+
+新規CSSクラス`.stamp-memory-edit-btn`（`public/app.css`）は既存の`.stamp-memory-add-retroactive-btn`と似た控えめなテキストリンク調で統一する。
+
+### 2-3. i18n新規キー（ja/en同時）
+
+- `stampMemoryEditBtn`: ja「✏️ 編集」/ en「✏️ Edit」
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 4096-4124行目: `_pickStampMemoryPhotoBlob()`（catchブロックにログ追加）
+- `public/app.js` 4847-4859行目: `_openStampMemorySheet()`（async化＋既存データのプリロード追加）
+- `public/app.js` 4876-4890行目: `_pickStampMemoryPhoto()`（プレビュー表示ロジックを`_showStampMemoryPhotoPreview()`へ切り出し）
+- `public/app.js` 4927-4959行目: `_renderStampDetailMemorySection()`（既存思い出ありの分岐に編集ボタン追加）
+
+## 4. スコープ外
+
+- 写真の「完全削除」（既存写真がある状態で編集シートを開き✕で消して「保存」しても、IndexedDB上の既存写真は上書きされないまま残る。写真の差し替えは可能だが完全削除は今回スコープ外、既存の「写真は1件のみ・上書き保存」というモデルの延長として許容する）
+- 記念日通知の残課題（テストボタンで押せなかった件、design 130の修正が今回のビルドに含まれ次第別途確認）
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーが「やっぱりカメラが押せなかったね」「思い出情報は後からでも編集できるようにしたいかな」と明示。**承認済み**。

@@ -2314,6 +2314,16 @@
       font-family: inherit;
       cursor: pointer;
     }
+    .stamp-memory-edit-btn {
+      display: block;
+      margin: 10px auto 0;
+      padding: 6px 4px;
+      background: transparent;
+      border: none;
+      font-size: 12px; font-weight: 700; color: var(--caramel);
+      font-family: inherit;
+      cursor: pointer;
+    }
 
     /* ─── 思い出フレーム（ポラロイド風、Cパターン、設計書121追記） ─── */
     .stamp-detail-memory-photo-frame {

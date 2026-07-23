@@ -475,6 +475,7 @@
         stampMemorySaveBtn: '保存する',
         stampDetailMemoryLabel: 'あなたの記録',
         stampMemoryAddRetroactiveBtn: '📷 思い出を追加',
+        stampMemoryEditBtn: '✏️ 編集',
         toastStampMemorySaved: '思い出を保存しました',
         toastStampMemoryError: '保存に失敗しました',
         courseSheetTitle: 'コースを作る',
@@ -763,6 +764,7 @@
         stampMemorySaveBtn: 'Save',
         stampDetailMemoryLabel: 'Your record',
         stampMemoryAddRetroactiveBtn: '📷 Add a memory',
+        stampMemoryEditBtn: '✏️ Edit',
         toastStampMemorySaved: 'Memory saved',
         toastStampMemoryError: 'Failed to save',
         courseSheetTitle: 'Create Course',
@@ -4097,8 +4099,10 @@
       try {
         if (_isCapacitorApp) {
           const plugin = _getCapCameraPlugin();
+          _sendDebugLog('stamp_memory_photo_pick_start', { hasPlugin: !!plugin, hasGetPhoto: !!plugin?.getPhoto });
           if (!plugin?.getPhoto) return null;
           const photo = await plugin.getPhoto({ resultType: 'dataUrl', source: 'PROMPT', quality: 80 });
+          _sendDebugLog('stamp_memory_photo_pick_result', { hasDataUrl: !!photo?.dataUrl });
           if (!photo?.dataUrl) return null;
           const res = await fetch(photo.dataUrl);
           return await res.blob();
@@ -4118,7 +4122,8 @@
             input.click();
           });
         }
-      } catch (_) {
+      } catch (e) {
+        _sendDebugLog('stamp_memory_photo_pick_error', { errorName: e?.name || null, errorMessage: e?.message || String(e) });
         return null;
       }
     }
@@ -4844,18 +4849,27 @@
     // ─── 「思い出」機能: チェックイン後ミニシート（設計書121） ───
     // newlyUnlockedLevel: doStampCheckin()から渡される新規解禁レベル（無ければnull）。
     // シートを閉じた後にレベル解禁演出をチェーンして開くために保持しておく。
-    function _openStampMemorySheet(spot, newlyUnlockedLevel) {
+    async function _openStampMemorySheet(spot, newlyUnlockedLevel) {
       _stampMemorySpotId = spot.id;
       _stampMemoryPendingUnlock = newlyUnlockedLevel ? { level: spot.level, newlyUnlockedLevel } : null;
       _stampMemoryPickedBlob = null;
       const nameEl = document.getElementById('stamp-memory-spot-name');
       if (nameEl) nameEl.textContent = (getLang() === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
       const textEl = document.getElementById('stamp-memory-text');
-      if (textEl) textEl.value = '';
+      const existingMemo = _getStampMemos()[spot.id];
+      if (textEl) textEl.value = existingMemo?.text || '';
       _resetStampMemoryPhotoBox();
       lockScroll();
       document.getElementById('stamp-memory-overlay').classList.add('visible');
       document.getElementById('stamp-memory-sheet').classList.add('visible');
+      // 既存の写真があれば非同期で読み込んでプレビュー表示（新規チェックイン時はIndexedDBに何もないため何も起きない）
+      try {
+        const existingBlob = await _getStampMemoryPhotoBlob(spot.id);
+        if (existingBlob && _stampMemorySpotId === spot.id) { // 読み込み中にシートが別スポット用に開き直されていないか確認
+          _stampMemoryPickedBlob = existingBlob;
+          _showStampMemoryPhotoPreview(existingBlob);
+        }
+      } catch (_) {}
     }
 
     function _closeStampMemorySheetInternal() {
@@ -4873,17 +4887,21 @@
 
     function _skipStampMemory() { _closeStampMemorySheetInternal(); }
 
+    function _showStampMemoryPhotoPreview(blob) {
+      const url = URL.createObjectURL(blob);
+      const box = document.getElementById('stamp-memory-photo-box');
+      if (!box) return;
+      box.classList.add('stamp-memory-photo-box--filled');
+      box.style.backgroundImage = `url('${url}')`;
+      box.innerHTML = '<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); _resetStampMemoryPhotoBox()">✕</div>';
+    }
+
     async function _pickStampMemoryPhoto() {
       try {
         const blob = await _pickStampMemoryPhotoBlob();
         if (!blob) return; // キャンセル・権限拒否
         _stampMemoryPickedBlob = await _resizeImageBlob(blob);
-        const url = URL.createObjectURL(_stampMemoryPickedBlob);
-        const box = document.getElementById('stamp-memory-photo-box');
-        if (!box) return;
-        box.classList.add('stamp-memory-photo-box--filled');
-        box.style.backgroundImage = `url('${url}')`;
-        box.innerHTML = '<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); _resetStampMemoryPhotoBox()">✕</div>';
+        _showStampMemoryPhotoPreview(_stampMemoryPickedBlob);
       } catch (e) {
         showToast(t('toastStampMemoryError'));
       }
@@ -4955,7 +4973,8 @@
           </div>`
         : '';
       const textHtml = hasMemo ? `<div class="stamp-detail-memory-text">${escapeHtml(memo.text)}</div>` : '';
-      bodyEl.innerHTML = photoHtml + textHtml;
+      const editBtnHtml = `<button type="button" class="stamp-memory-edit-btn" onclick="_openStampMemorySheet(_stampSelectedSpot, null)">${t('stampMemoryEditBtn')}</button>`;
+      bodyEl.innerHTML = photoHtml + textHtml + editBtnHtml;
     }
 
     // コース一覧レンダリング
