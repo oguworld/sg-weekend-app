@@ -2161,7 +2161,6 @@
         if (e.target.closest('#apple-login-btn'))    { e.preventDefault(); handleAppleLoginClick();  return; }
         if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
         if (e.target.closest('#delete-account-btn')) { e.preventDefault(); handleDeleteAccountClick(); return; }
-        if (e.target.closest('#arrival-date-reset-btn')) { e.preventDefault(); _resetArrivalDate(); return; }
         if (e.target.closest('#backup-section-content button')) {
           const btn = e.target.closest('button');
           e.preventDefault();
@@ -3150,8 +3149,6 @@
         arrivalInput.max = fmtDateKey(new Date()); // 既存の未来日付ガードは維持
         const displayEl = document.getElementById('arrival-date-display');
         if (displayEl) displayEl.innerHTML = _formatArrivalDateDisplay(savedArrival);
-        const resetBtn = document.getElementById('arrival-date-reset-btn');
-        if (resetBtn) resetBtn.style.display = savedArrival ? 'flex' : 'none';
       }
     }
 
@@ -3984,17 +3981,8 @@
       else localStorage.removeItem('app_arrival_date');
       const displayEl = document.getElementById('arrival-date-display');
       if (displayEl) displayEl.innerHTML = _formatArrivalDateDisplay(value);
-      const resetBtn = document.getElementById('arrival-date-reset-btn');
-      if (resetBtn) resetBtn.style.display = value ? 'flex' : 'none';
       _renderResidencyCounter();
       _syncBackupToServer();
-    }
-
-    // 設計書124: 来星日を未設定に戻すリセットボタン
-    function _resetArrivalDate() {
-      const input = document.getElementById('arrival-date-input');
-      if (input) input.value = '';
-      _saveArrivalDate('');
     }
 
     function _formatResidencyYM(years, months, lang) {

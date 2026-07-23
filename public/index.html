@@ -290,9 +290,6 @@
               style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
               onchange="_saveArrivalDate(this.value)">
           </div>
-          <button id="arrival-date-reset-btn" onclick="if(!_touchCapableDetected) _resetArrivalDate()"
-            style="display:none;background:var(--sand);border-radius:50%;width:20px;height:20px;border:none;
-                   font-size:11px;color:var(--warm-gray);cursor:pointer;flex-shrink:0;align-items:center;justify-content:center;padding:0;">✕</button>
         </div>
       </div>
 
@@ -1159,7 +1156,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260723d"></script>
+  <script src="/app.js?v=20260723e"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
