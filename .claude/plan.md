@@ -14337,3 +14337,48 @@ const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
 
 ## 承認状況
 2026-07-23 ユーザーが実機スクリーンショット2枚で「サイズが変わる」「スポットのサムネイルは公式写真で」「チェックイン日はラベルをつけてエリア情報の右におけるか」と明示。**承認済み**。
+
+# 設計書137 — カメラピッカー起動不能の根本原因判明・修正（Info.plistに`NSPhotoLibraryAddUsageDescription`追加）
+
+（2026-07-23 design 131の診断ログで実機ログから根本原因を特定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+design 131で仕込んだ診断ログ（`stamp_memory_photo_pick_error`）を実機で確認したところ、以下のエラーメッセージが記録されていた:
+
+```
+You are missing NSPhotoLibraryAddUsageDescription in your Info.plist file. Camera will not function without it.
+```
+
+design 121実装時、`NSPhotoLibraryUsageDescription`（フォトライブラリの**読み取り**許可）はCI（`.github/workflows/ios-deploy.yml` 94-99行目）に追加済みだったが、`NSPhotoLibraryAddUsageDescription`（フォトライブラリへの**書き込み**許可、読み取りとは別のInfo.plistキー）が抜けていた。`@capacitor/camera`の`getPhoto()`は、`saveToGallery`オプションを使っていなくても、内部実装上このキーの存在を起動時に検査しており、欠落しているとエラーを投げてピッカー自体が一切起動しない（写真は撮る前もライブラリを選ぶ前もいずれも失敗する）仕様だったと判明した。design 121完了報告時のchecker確認は「読み取り」用のキーのみを確認しており、この「書き込み」用キーの必要性を見落としていた。
+
+## 2. 確定済み仕様
+
+`.github/workflows/ios-deploy.yml`の既存「Set photo library usage description in Info.plist」ステップ（94-99行目）に、`NSPhotoLibraryAddUsageDescription`の設定を追加する（既存の`NSPhotoLibraryUsageDescription`と同じPlistBuddyパターン）:
+
+```yaml
+      # 探訪スタンプ帳の「思い出」機能（設計書121）: チェックイン時にフォトライブラリから既存の写真を選択できるようにするため
+      - name: Set photo library usage description in Info.plist
+        run: |
+          cd ios-app
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 探訪スタンプ帳で撮影した思い出の写真を保存するためフォトライブラリへのアクセスを使用します" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryAddUsageDescription 探訪スタンプ帳で撮影した思い出の写真を保存するためフォトライブラリへのアクセスを使用します" ios/App/App/Info.plist
+```
+
+## 3. 既存コードの調査結果
+
+- `.github/workflows/ios-deploy.yml` 94-99行目: 既存の`NSPhotoLibraryUsageDescription`設定ステップ（同ステップ内に追加）
+- `logs/debug-nav.log`: design 131の診断ログ（`stamp_memory_photo_pick_error`）で原因を特定済み
+
+## 4. 診断ログの取り扱い
+
+design 131の診断ログ（`stamp_memory_photo_pick_start`/`_result`/`_error`、`public/app.js`の`_pickStampMemoryPhotoBlob()`）は、今回の修正が実機で正しく動作することを確認できるまで**削除せず残置**する。次回ビルド後の実機確認で正常動作が確認できたら削除する。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。CI設定ファイルのみの変更。`server.js`・`public/`配下・データファイルは無変更。**次回TestFlightビルドが必須**（Web版には影響しない、Web版は元々フォトライブラリ選択可能で無関係）。
+
+## 承認状況
+2026-07-23 診断ログで原因が明確に特定できたため、確立されたCI設定パターンの延長として実装に進める。

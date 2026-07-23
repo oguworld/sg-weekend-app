@@ -97,6 +97,8 @@ jobs:
           cd ios-app
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist || \
           /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 探訪スタンプ帳で撮影した思い出の写真を保存するためフォトライブラリへのアクセスを使用します" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryAddUsageDescription 探訪スタンプ帳で撮影した思い出の写真を保存するためフォトライブラリへのアクセスを使用します" ios/App/App/Info.plist
 
       # スタンプラリー機能（設計書69）: GPS近接検知によるチェックインのため位置情報（使用中のみ）を利用する
       - name: Set location usage description in Info.plist
