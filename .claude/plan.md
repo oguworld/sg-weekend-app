@@ -13488,3 +13488,82 @@ if (e.target.closest('#arrival-date-reset-btn')) { e.preventDefault(); _resetArr
 
 ## 承認状況
 2026-07-23 ユーザーが「あと設定でも未設定に戻せるようにしたいです」と明示。軽微な追加のため詳細確認は省略し実装に進める。
+
+# 設計書125 — 来星日表示を他のプロフィール項目と同じピルボタン風に統一
+
+（2026-07-23 ユーザーが実機スクリーンショットで指摘。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+「都市」（`.city-select`、囲み枠のピル）・「一緒に行く人」（`#settings-who-summary`、囲み枠＋▼のピル）・「ジャンル・興味」（同様のピル）は全て縁取りのある丸ボタン風の見た目で統一されているが、「来星日」（設計書123・124）は素のテキスト＋透明化した`<input type="date">`という構成のため、見た目だけ浮いていた。ユーザーから「他と揃えられないか、ボタンみたいな感じで」との指摘。
+
+## 2. 確定済み仕様
+
+`#arrival-date-display`を、`#settings-who-summary`と同じピルスタイル（枠線・背景・角丸・▼インジケーター）でラップする。透明化した`<input type="date">`・✕リセットボタンの構造・機能（設計書123・124）は無変更、見た目のみの調整。
+
+`public/index.html`の来星日入力行（設計書124時点の構成）を以下に変更:
+
+```html
+<div class="settings-item" style="padding:12px 18px;">
+  <span class="settings-item-label" data-i18n="labelArrivalDate">来星日</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div style="position:relative;">
+      <span id="arrival-date-display"
+        style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;
+               border:1.5px solid var(--sand-dark);background:var(--warm-white);
+               font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;
+               color:var(--midnight);pointer-events:none;"></span>
+      <input id="arrival-date-input" type="date"
+        style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
+        onchange="_saveArrivalDate(this.value)">
+    </div>
+    <button id="arrival-date-reset-btn" onclick="if(!_touchCapableDetected) _resetArrivalDate()"
+      style="display:none;background:var(--sand);border-radius:50%;width:20px;height:20px;border:none;
+             font-size:11px;color:var(--warm-gray);cursor:pointer;flex-shrink:0;align-items:center;justify-content:center;padding:0;">✕</button>
+  </div>
+</div>
+```
+
+`public/app.js`の`_formatArrivalDateDisplay(value, lang)`に、末尾へ「▼」インジケーターを付加する（`#settings-who-summary`内の`#settings-who-arrow`相当。ただし来星日はタップで直接ネイティブピッカーが開く一段構成のため、開閉トグルではなく装飾として固定表示のみで良い。既存の`settings-who-arrow`のような`transform`アニメーションは不要）:
+
+```js
+function _formatArrivalDateDisplay(value, lang) {
+  const text = !value
+    ? t('genreStatusUnset')
+    : (() => {
+        const d = new Date(value + 'T00:00:00');
+        if (isNaN(d.getTime())) return t('genreStatusUnset');
+        if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      })();
+  return `${text} <span style="font-size:11px;color:var(--warm-gray);">▼</span>`;
+}
+```
+
+`_formatArrivalDateDisplay()`の戻り値にHTMLタグ（▼のspan）が含まれるようになるため、呼び出し元2箇所（`initSettingsProfile()`・`_saveArrivalDate()`）の代入方法を`textContent`から`innerHTML`に変更する:
+
+```js
+// 変更前: displayEl.textContent = _formatArrivalDateDisplay(savedArrival);
+// 変更後:
+displayEl.innerHTML = _formatArrivalDateDisplay(savedArrival);
+```
+
+（`_formatArrivalDateDisplay()`の入力`value`はネイティブ`<input type="date">`が返す値のためユーザー自由入力ではなくXSSリスクはない。ただし念のため既存の他箇所同様、動的文字列を持ち込む設計にはしない）
+
+## 3. 既存コードの調査結果
+
+- `public/index.html` 設定画面「一緒に行く人」行: `#settings-who-summary`のピルスタイル（参考・コピー元）
+- `public/index.html` 来星日入力行（設計書124時点）
+- `public/app.js` `_formatArrivalDateDisplay()`/`initSettingsProfile()`/`_saveArrivalDate()`（設計書123・124で実装済み、`textContent`→`innerHTML`への変更が必要）
+
+## 4. スコープ外
+
+`<input type="date">`・✕リセットボタンの機能面（設計書123・124の実装）は無変更。「都市」`.city-select`のようなドロップダウン開閉インジケーターの回転アニメーションは今回追加しない（来星日はタップで即ネイティブピッカーが開く一段構成のため不要と判断）。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。見た目のみの調整。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーが実機スクリーンショットで「他と揃えるの難しい？ボタンみたいな感じで」と指摘。**承認済み**。

@@ -3149,7 +3149,7 @@
         arrivalInput.value = savedArrival;
         arrivalInput.max = fmtDateKey(new Date()); // 既存の未来日付ガードは維持
         const displayEl = document.getElementById('arrival-date-display');
-        if (displayEl) displayEl.textContent = _formatArrivalDateDisplay(savedArrival);
+        if (displayEl) displayEl.innerHTML = _formatArrivalDateDisplay(savedArrival);
         const resetBtn = document.getElementById('arrival-date-reset-btn');
         if (resetBtn) resetBtn.style.display = savedArrival ? 'flex' : 'none';
       }
@@ -3968,19 +3968,22 @@
     // 設計書123: ネイティブ<input type=date>の「閉じた状態」表示がWKWebViewで圧縮表示になる不具合対策として、
     // アプリ側で完全にフォーマットを制御するカスタム表示ラベル（#arrival-date-display）に切り替え
     function _formatArrivalDateDisplay(value, lang) {
-      if (!value) return t('genreStatusUnset'); // 既存の「未設定」キーを再利用（lang引数は将来の拡張余地として残すが現状tがgetLang()を内部で見るため実質未使用）
-      const d = new Date(value + 'T00:00:00');
-      if (isNaN(d.getTime())) return t('genreStatusUnset');
-      if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      const text = (() => {
+        if (!value) return t('genreStatusUnset'); // 既存の「未設定」キーを再利用（lang引数は将来の拡張余地として残すが現状tがgetLang()を内部で見るため実質未使用）
+        const d = new Date(value + 'T00:00:00');
+        if (isNaN(d.getTime())) return t('genreStatusUnset');
+        if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      })();
+      return `${text} <span style="font-size:11px;color:var(--warm-gray);">▼</span>`;
     }
 
     function _saveArrivalDate(value) {
       if (value) localStorage.setItem('app_arrival_date', value);
       else localStorage.removeItem('app_arrival_date');
       const displayEl = document.getElementById('arrival-date-display');
-      if (displayEl) displayEl.textContent = _formatArrivalDateDisplay(value);
+      if (displayEl) displayEl.innerHTML = _formatArrivalDateDisplay(value);
       const resetBtn = document.getElementById('arrival-date-reset-btn');
       if (resetBtn) resetBtn.style.display = value ? 'flex' : 'none';
       _renderResidencyCounter();
