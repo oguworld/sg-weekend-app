@@ -2160,6 +2160,9 @@
       font-size: 14px; font-weight: 700; color: var(--midnight);
     }
     .stamp-card-area { font-size: 11px; color: var(--warm-gray); margin-top: 2px; }
+    .stamp-card-area-row {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    }
     .stamp-card-next-tag {
       font-size: 10px; font-weight: 700; color: white;
       background: var(--caramel); padding: 1px 7px; border-radius: 50px;
@@ -2248,7 +2251,7 @@
     /* ─── 「思い出」機能: チェックイン後ミニシート（設計書121） ─── */
     .stamp-memory-photo-box {
       width: 100%;
-      height: 160px;
+      height: 220px;
       border: 2px dashed var(--sand-dark);
       border-radius: 14px;
       background: var(--sand) center/cover no-repeat;

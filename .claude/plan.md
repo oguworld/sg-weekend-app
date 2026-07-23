@@ -14243,3 +14243,97 @@ const metaHtml = checked
 
 ## 承認状況
 2026-07-23 ユーザーが「Cで。ボタンとチェックイン日付を大きくするだけでいいです。」と明示。**承認済み**。
+
+# 設計書136 — 思い出写真のクロップ比率統一・一覧サムネイルを公式写真に固定・チェックイン日付にラベル追加してエリア行に統合
+
+（2026-07-23 ユーザーが実機スクリーンショット2枚で指摘。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+3点の指摘があった。
+
+1. 「これでもこの保存がこうなるのおかしくない？サイズが変わるというか」: 思い出を残すミニシートの写真プレビュー（`.stamp-memory-photo-box`、幅100%×高さ160px、横長比率）と、保存後にスポット詳細シートへ表示されるポラロイド風フレーム（`.stamp-detail-memory-photo-frame img`、幅最大240px×高さ200px、より正方形に近い比率）とでクロップ比率が大きく異なり、同じ写真なのに選択時と保存後で見た目（トリミング範囲）が大きく変わってしまっていた。
+2. 「スポットのサムネイルは公式写真で」: design 121で「個人の思い出写真があればスポット公式画像より優先してサムネイルに使う」としていたコレクション一覧の挙動を、常にスポット公式写真を使う仕様に戻す（個人写真は詳細シートの「あなたの記録」でのみ見せる）。
+3. 「チェックイン日はラベルをつけてエリア情報の右における？」: 現状チェックイン日は独立した行（`.stamp-card-meta`）に表示されているが、エリア表示と同じ行にまとめ、日付にラベル（「訪問日: 」等）を付ける。
+
+## 2. 確定済み仕様
+
+### 2-1. 写真クロップ比率の統一
+
+`.stamp-memory-photo-box`の高さを160px→220pxに拡大し、ポラロイドフレーム側の比率（240×200 ≈ 1.2:1）により近づける（コンテナ幅の違い〈ミニシートは100%幅・ポラロイドは最大240px〉によりピクセル単位の完全一致はできないが、体感的なクロップ範囲のズレを大きく縮める）:
+
+```css
+/* 変更前 */
+.stamp-memory-photo-box { width: 100%; height: 160px; ... }
+/* 変更後 */
+.stamp-memory-photo-box { width: 100%; height: 220px; ... }
+```
+
+### 2-2. コレクション一覧サムネイルを常にスポット公式写真にする
+
+`public/app.js`の`_renderStampLevelRowInProgress()`内、サムネイル選定ロジックから個人写真優先ロジックを削除する:
+
+```js
+// 変更前
+const memoryPhotoUrl = _stampMemoryPhotoUrlCache[spot.id] || '';
+const thumbSrc = memoryPhotoUrl || spot.imageUrl || '';
+// 変更後
+const thumbSrc = spot.imageUrl || '';
+```
+
+`_stampMemoryPhotoUrlCache`自体（インメモリキャッシュ機構）・`_refreshStampMemoryCacheForSpot()`は削除しない（スポット詳細シートの「あなたの記録」表示で個人写真の取得に引き続き使われるため）。
+
+### 2-3. チェックイン日付にラベルを付けてエリア行に統合
+
+`public/app.js`の`_renderStampLevelRowInProgress()`内、カードのHTML生成部分を変更し、エリアと日付を同じ行（`justify-content:space-between`）にまとめる:
+
+```js
+// 変更前
+const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
+const metaHtml = checked
+  ? `<div class="stamp-card-meta">
+      ${checkinDate ? `<span class="stamp-card-date">${checkinDate}</span>` : ''}
+    </div>`
+  : '';
+// ...
+<div class="stamp-card-area">${spot.area || ''}</div>
+${metaHtml}
+
+// 変更後
+const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
+// ...
+<div class="stamp-card-area-row">
+  <span class="stamp-card-area">${spot.area || ''}</span>
+  ${checkinDate ? `<span class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</span>` : ''}
+</div>
+```
+
+（`metaHtml`変数・`.stamp-card-meta`ブロックは削除し、`.stamp-card-area`を新規`.stamp-card-area-row`でラップする形に統合）
+
+新規CSSクラス`.stamp-card-area-row`（`public/app.css`）:
+```css
+.stamp-card-area-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+```
+
+`.stamp-card-area`自体のCSS（margin等）は既存のまま踏襲しつつ、新規ラッパーとの整合を取る（builderがdisplay:block由来のmarginが`.stamp-card-area-row`のflexレイアウトと衝突しないか確認すること）。
+
+新規i18nキー`stampCardVisitDateLabel`（ja/en同時）: ja「訪問日: 」/ en「Visited: 」
+
+## 3. 既存コードの調査結果
+
+- `public/app.css` 2249-2261行目: `.stamp-memory-photo-box`
+- `public/app.css` 2329-2344行目: `.stamp-detail-memory-photo-frame`/`img`
+- `public/app.js` `_renderStampLevelRowInProgress()`（4455-4487行目付近）: サムネイル選定ロジック・カードHTML生成部分
+
+## 4. スコープ外
+
+`_renderStampLevelRowComplete()`（全制覇バッジの展開カード一覧）は元々公式写真のみ・日付のみのシンプルな表示のため対象外（design 108時点から個人写真優先ロジックを持っていない）。スポット詳細シート「あなたの記録」のポラロイド表示自体（design 121・127）はサイズ変更なし、ミニシート側を歩み寄らせる方針。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーが実機スクリーンショット2枚で「サイズが変わる」「スポットのサムネイルは公式写真で」「チェックイン日はラベルをつけてエリア情報の右におけるか」と明示。**承認済み**。

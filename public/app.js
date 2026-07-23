@@ -464,6 +464,7 @@
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
         stampCardDoneMark: '済',
+        stampCardVisitDateLabel: '訪問日: ',
         stampDetailMapLink: '📍 地図で見る',
         stampCompleteListShow: 'スポット一覧を見る ▾',
         stampCompleteListHide: '閉じる ▴',
@@ -753,6 +754,7 @@
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
         stampCardDoneMark: '✓',
+        stampCardVisitDateLabel: 'Visited: ',
         stampDetailMapLink: '📍 View on map',
         stampCompleteListShow: 'Show spots ▾',
         stampCompleteListHide: 'Hide ▴',
@@ -4458,9 +4460,8 @@
         const isNext = !!nextTarget && nextTarget.id === spot.id;
         const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
 
-        // 設計書121 §2-4: 個人の思い出写真があればスポット画像より優先してサムネイルに使う
-        const memoryPhotoUrl = _stampMemoryPhotoUrlCache[spot.id] || '';
-        const thumbSrc = memoryPhotoUrl || spot.imageUrl || '';
+        // 設計書136: コレクション一覧サムネイルは常にスポット公式写真を使う（個人写真優先ロジックは削除）
+        const thumbSrc = spot.imageUrl || '';
         const thumbInner = thumbSrc
           ? `<img src="${thumbSrc}" alt="${name}" class="stamp-card-thumb-img">`
           : `<div class="stamp-card-thumb-placeholder">📍</div>`;
@@ -4470,18 +4471,15 @@
         const thumbHtml = `<div class="stamp-card-thumb">${thumbInner}${doneStampHtml}</div>`;
 
         const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
-        const metaHtml = checked
-          ? `<div class="stamp-card-meta">
-              ${checkinDate ? `<span class="stamp-card-date">${checkinDate}</span>` : ''}
-            </div>`
-          : '';
 
         return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
           ${thumbHtml}
           <div class="stamp-card-body">
             <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
-            <div class="stamp-card-area">${spot.area || ''}</div>
-            ${metaHtml}
+            <div class="stamp-card-area-row">
+              <span class="stamp-card-area">${spot.area || ''}</span>
+              ${checkinDate ? `<span class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</span>` : ''}
+            </div>
           </div>
         </div>`;
       }).join('');
