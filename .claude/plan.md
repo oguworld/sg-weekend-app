@@ -13850,3 +13850,48 @@ async function _sendTestArrivalNotification() {
 
 ## 承認状況
 2026-07-23 ユーザーが「実装終わったらテスト通知を送って」と要望。実機でしか検証できないためテストボタンとして実装する方針で対応。
+
+# 設計書130 — 思い出機能・記念日テストボタンのタップ不発を修正（onclick属性ガード未対応touchend、7箇所）
+
+（2026-07-23 ユーザーが実機で報告。CLAUDE.md既知アンチパターン「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」の再発。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+ユーザーから「テスト通知ボタンが押せない」「写真を追加ボタンも押せない」と実機報告があった。調査の結果、設計書121（思い出機能）・設計書129（テスト通知ボタン）で追加した7箇所のonclick属性が、いずれも`if(!_touchCapableDetected) fn()`ガードのみを持ち、対応する`touchend`ハンドラの登録（設定画面touchendデリゲーション等）を伴っていなかった。これはCLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節に記録済みの既知アンチパターンの再発（設計書38・84・99と同型）。実機でタッチ操作が一度でも発生すると`_touchCapableDetected`が`true`になり、以降ガードが常に偽と評価されて対象の関数が一切呼ばれなくなる。
+
+設計書129自体が「既存の『地図で見る』等と同じくガードのみで運用」と誤った前提で書かれていた（実際には設計書99で『地図で見る』はガードを撤去する形で修正済みだったことを見落としていた）。設計書121の思い出機能一式についても、実装時に同種のガードを機械的に追加してしまい、実機での動作検証（Web版Playwrightでは`_touchCapableDetected`が`false`のままのため再現しない）を経ないまま今回まで気づかれずに残っていた。
+
+## 2. 確定済み仕様
+
+CLAUDE.mdの確立された修正パターン（新規touchendハンドラを追加登録するのではなく、ガード自体を撤去する）に倣い、以下7箇所全てから`if(!_touchCapableDetected) `部分のみを削除する（関数呼び出し自体は維持）:
+
+1. `public/index.html` 299行目: `#arrival-notif-test-row`内span → `_sendTestArrivalNotification()`
+2. `public/index.html` 900行目: `#stamp-memory-overlay`（背景タップで閉じる） → `_skipStampMemory()`
+3. `public/index.html` 908行目: `#stamp-memory-photo-box` → `_pickStampMemoryPhoto()`
+4. `public/index.html` 915行目: 「スキップ」ボタン → `_skipStampMemory()`
+5. `public/index.html` 916行目: 「保存する」ボタン（`#stamp-memory-save-btn`） → `_saveStampMemory()`
+6. `public/app.js` 4886行目: 動的生成される写真削除✕ボタン → `_resetStampMemoryPhotoBox()`（`event.stopPropagation();`部分は維持、ガード部分のみ削除）
+7. `public/app.js` 4945行目: スポット詳細シート内「思い出を追加」ボタン → `_openStampMemorySheet(_stampSelectedSpot, null)`
+
+修正例（1番）:
+```html
+<!-- 変更前 -->
+<span onclick="if(!_touchCapableDetected) _sendTestArrivalNotification()" ...>
+<!-- 変更後 -->
+<span onclick="_sendTestArrivalNotification()" ...>
+```
+
+## 3. 既存コードの調査結果
+
+`grep -n "if(!_touchCapableDetected)" public/index.html public/app.js`で全箇所を洗い出し、設計書121・129由来の7箇所を特定済み（上記2章に列挙）。他の既存箇所（設定画面ボタン群等）は既にtouchendデリゲーションに正しく登録済みのため対象外。
+
+## 4. スコープ外
+
+`_stampMemoryPickedBlob`関連のロジック・IndexedDB周りのコード・記念日通知のスケジューリングロジック自体は無変更。今回は7箇所のonclick属性からガード文字列を削除するのみ。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映（実機での再検証が必要）。
+
+## 承認状況
+2026-07-23 ユーザーが実機で「テスト通知ボタン」「写真を追加ボタン」が押せないと報告、「デバッグをベースに調べて」と明示。原因特定・確立済み修正パターンの適用のため詳細確認は省略し実装に進める。

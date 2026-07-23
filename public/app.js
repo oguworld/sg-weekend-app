@@ -4883,7 +4883,7 @@
         if (!box) return;
         box.classList.add('stamp-memory-photo-box--filled');
         box.style.backgroundImage = `url('${url}')`;
-        box.innerHTML = '<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); if(!_touchCapableDetected) _resetStampMemoryPhotoBox()">✕</div>';
+        box.innerHTML = '<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); _resetStampMemoryPhotoBox()">✕</div>';
       } catch (e) {
         showToast(t('toastStampMemoryError'));
       }
@@ -4942,7 +4942,7 @@
       if (!hasMemo && !hasPhoto) {
         sectionEl.style.display = 'block';
         bodyEl.innerHTML = `<button type="button" class="stamp-memory-add-retroactive-btn"
-          onclick="if(!_touchCapableDetected) _openStampMemorySheet(_stampSelectedSpot, null)">${t('stampMemoryAddRetroactiveBtn')}</button>`;
+          onclick="_openStampMemorySheet(_stampSelectedSpot, null)">${t('stampMemoryAddRetroactiveBtn')}</button>`;
         return;
       }
 
