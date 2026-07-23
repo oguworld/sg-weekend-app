@@ -14183,3 +14183,63 @@ const metaHtml = checked
 
 ## 承認状況
 2026-07-23 ユーザーがモック3案から「チェックイン日付だけ出そうかな」と選択。**承認済み**。
+
+# 設計書135 — 訪問済みバッジ・チェックイン日付を拡大
+
+（2026-07-23 ユーザーがモック案Cから「バッジとチェックイン日付を大きくするだけでいい」と絞り込み。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+モック4案（A背景タイント/B左アクセントバー/C太ボーダー+大バッジ/Dチェックリボン）からC案をベースに選んだ上で、「ボタン（済バッジ）とチェックイン日付を大きくするだけでいい」とスコープを絞った要望があった。太いボーダー等の装飾追加は行わず、既存2要素のサイズ拡大のみで対応する。
+
+## 2. 確定済み仕様
+
+`public/app.css`の2箇所をサイズ拡大する:
+
+```css
+/* 変更前 */
+.stamp-card-done-mark {
+  position: absolute; bottom: -6px; right: -6px;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: white;
+  border: 2px solid var(--cream);
+  transform: rotate(-12deg);
+  box-shadow: 0 2px 4px rgba(44,36,32,0.25);
+}
+/* 変更後 */
+.stamp-card-done-mark {
+  position: absolute; bottom: -7px; right: -7px;
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: white;
+  border: 2.5px solid var(--cream);
+  transform: rotate(-12deg);
+  box-shadow: 0 2px 5px rgba(44,36,32,0.3);
+}
+```
+
+```css
+/* 変更前 */
+.stamp-card-date { font-size: 10px; font-weight: 700; color: var(--caramel); }
+/* 変更後 */
+.stamp-card-date { font-size: 13px; font-weight: 700; color: var(--caramel); }
+```
+
+（`bottom`/`right`のオフセット値・`box-shadow`はサイズ拡大分に比例して微調整。色・回転角・配置ロジックは無変更）
+
+## 3. 既存コードの調査結果
+
+- `public/app.css` 2148-2156行目: `.stamp-card-done-mark`
+- `public/app.css` 2171行目: `.stamp-card-date`
+
+## 4. スコープ外
+
+太いボーダー（モック案Cの`border:2px solid var(--caramel)`）・背景タイント等の他の装飾は追加しない。カード全体のレイアウト・サムネイルサイズは無変更。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。CSSのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-23 ユーザーが「Cで。ボタンとチェックイン日付を大きくするだけでいいです。」と明示。**承認済み**。
