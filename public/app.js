@@ -4470,15 +4470,9 @@
         const thumbHtml = `<div class="stamp-card-thumb">${thumbInner}${doneStampHtml}</div>`;
 
         const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
-        // 設計書121 §2-4: 個人メモがあれば「📝 」プレフィックス付きで優先表示、無ければ既存通りspot.descriptionを表示
-        const memoText = (_getStampMemos()[spot.id] || {}).text || '';
-        const descHtml = memoText
-          ? `<span class="stamp-card-desc">📝 ${escapeHtml(memoText)}</span>`
-          : (spot.description ? `<span class="stamp-card-desc">${spot.description}</span>` : '');
         const metaHtml = checked
           ? `<div class="stamp-card-meta">
               ${checkinDate ? `<span class="stamp-card-date">${checkinDate}</span>` : ''}
-              ${descHtml}
             </div>`
           : '';
 
