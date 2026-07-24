@@ -4447,7 +4447,7 @@
         if (state === 'locked') {
           return _renderStampLevelRowLocked(meta, checkedCount, totalCount);
         } else if (state === 'inProgress') {
-          return _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount);
+          return _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount, level);
         } else {
           return _renderStampLevelRowComplete(meta, spotsInLevel, totalCount, level, lang);
         }
@@ -4468,7 +4468,7 @@
     }
 
     // 状態B: 解禁中・未全制覇 — レベル見出し＋横長カード一覧（order昇順）
-    function _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount) {
+    function _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount, level) {
       const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const cardsHtml = sorted.map(spot => {
         const checked = _stampSpotIsChecked(spot.id);
@@ -4503,13 +4503,39 @@
       const checkedN = typeof checkedCount === 'number' ? checkedCount : spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
       const pct = total > 0 ? Math.round((checkedN / total) * 100) : 0;
 
+      // 設計書145: 進捗バーに「解禁ライン」を2色セグメント＋🔓マークで可視化する。
+      // 閾値は server.js の computeUnlockedLevels() と同じ算出式（次レベル総数の半数・切り上げ）をクライアント側で再現。
+      const idx = STAMP_LEVEL_ORDER_CLIENT.indexOf(level);
+      const hasNextLevel = idx >= 0 && idx < STAMP_LEVEL_ORDER_CLIENT.length - 1;
+      const threshold = hasNextLevel ? Math.ceil(total / 2) : null;
+      const thresholdPct = (threshold !== null && total > 0) ? Math.min(100, Math.round((threshold / total) * 100)) : null;
+
+      let trackInnerHtml;
+      if (thresholdPct !== null && thresholdPct < 100) {
+        const seg1Pct = Math.min(pct, thresholdPct);
+        const seg2Pct = Math.max(0, pct - thresholdPct);
+        trackInnerHtml = `
+          <div class="stamp-level-progress-seg1" style="width:${seg1Pct}%;"></div>
+          <div class="stamp-level-progress-seg2" style="left:${thresholdPct}%;width:${seg2Pct}%;"></div>
+        `;
+      } else {
+        // 次レベルが無い（special）、または閾値が総数と同値（total=1等の極小ケース）の場合は既存の単色バーのまま
+        trackInnerHtml = `<div class="stamp-level-progress-fill" style="width:${pct}%;"></div>`;
+      }
+      const lockMarkHtml = (thresholdPct !== null && thresholdPct < 100)
+        ? `<span class="stamp-level-progress-lockmark" style="left:${thresholdPct}%;">🔓</span>`
+        : '';
+
       return `<div class="stamp-level-section">
         <div class="stamp-level-section-title">
           ${meta.emoji}
           ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）
         </div>
         <div class="stamp-level-progress-row">
-          <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
+          <div class="stamp-level-progress-track-wrap">
+            <div class="stamp-level-progress-track">${trackInnerHtml}</div>
+            ${lockMarkHtml}
+          </div>
           <span class="stamp-level-progress-label">${checkedN}/${total}</span>
         </div>
         <div class="stamp-card-list">${cardsHtml}</div>

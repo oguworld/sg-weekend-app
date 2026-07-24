@@ -830,6 +830,18 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
 - データモデル・API（写真は引き続き端末内IndexedDBのみ、サーバー送信なし）は無変更。`server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260723d`→`20260724a`、app.js `?v=20260724e`→`20260724f`、`sw.js` CACHE_NAME=`sg-weekend-v694`→`v695`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での3スロット入力UI・散らし配置表示の見た目、design 121時点で既に1枚保存済みのユーザーが実際に3スロット化後も正しく読み込めるかの実機確認、複数枚同時保存→リロード後の表示は2026-07-24時点でロジック単体テスト・コード確認のみ完了、実機未確認
 
+### 探訪スタンプ帳の進捗バーに「解禁ライン」を視覚的に明示（2色セグメント＋🔓マーク）（2026-07-24実装、設計書145）
+コレクション一覧の状態B（解禁中・未全制覇）の進捗バー（design 83導入・design 111視認性強化）は単色フィルバーのみで、「あとどれだけチェックインすれば次のレベルが解禁されるか」（design 142のティア半数解禁）が視覚的に分からなかった。ユーザー要望「ロック解放と全制覇がポイントとして分かるようにしたい」を受け、モック3案（案1:マイルストーンドット／案2:2色セグメント／案3:progress以外の表現）を提示しユーザーが案2「2色セグメント」を選択・承認。
+
+- `_renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount, level)`に第7引数`level`を追加（呼び出し元`_renderStampCollectionList()`の`.map(level => {...})`クロージャ内、既存呼び出しに`level`を渡すだけ）
+- 閾値計算はクライアント側で`server.js`の`computeUnlockedLevels()`と同じ式を再現: `STAMP_LEVEL_ORDER_CLIENT`内での位置から次のレベルが存在するか判定し（`special`は次レベルなし）、存在すれば`threshold = Math.ceil(total / 2)`（`total`はそのレベル自身の総数）。`thresholdPct = Math.min(100, Math.round((threshold / total) * 100))`
+- `thresholdPct !== null && thresholdPct < 100`のとき、`0〜閾値`区間を`.stamp-level-progress-seg1`（`var(--caramel-light)`）、`閾値〜現在値`区間を`.stamp-level-progress-seg2`（`var(--caramel)`濃色）の2色セグメントで塗り分け、閾値位置に`.stamp-level-progress-lockmark`（🔓、円形バッジ、`position:absolute;left:${thresholdPct}%`）を重ねる。それ以外（`special`＝次レベルなし、または`total=1`等の極小ケースで`thresholdPct=100`）は既存の単色`.stamp-level-progress-fill`表示のまま変更しない
+- **🔓マークは`.stamp-level-progress-track`の外（新規`.stamp-level-progress-track-wrap`の直接の子、trackと兄弟）に配置**: `.stamp-level-progress-track`は既存`overflow:hidden`（design 111由来）を持つため、track内部に配置すると15px前後のマーク円がtrackの高さ（12px）でクリップされてしまう。`-track-wrap`側は`position:relative;flex:1`（既存`.stamp-level-progress-track`が持っていた`flex:1`をこちらに移動）の単なるラッパーとし、マークはtrackの外側の絶対位置層に重ねる
+- 状態A（ロック中、`_renderStampLevelRowLocked()`）・状態C（全制覇済み、`_renderStampLevelRowComplete()`）は進捗バー自体を持たないため無変更。レジェンド文言（テキスト説明）は追加せず🔓アイコン単体で意味を伝えるミニマルな方針
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。閾値計算式はクライアント側で`server.js`の`computeUnlockedLevels()`と同じ式を再現するのみ（サーバー呼び出しの追加なし）
+- キャッシュバスティング: `index.html` app.css `?v=20260724a`→`20260724b`、app.js `?v=20260724f`→`20260724g`、`sw.js` CACHE_NAME=`sg-weekend-v695`→`v696`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での2色セグメント・🔓マークの見た目、`special`レベル（次レベルなし）で従来通り単色バーが表示されることは2026-07-24時点でNode単体ロジック検証・コード確認のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 

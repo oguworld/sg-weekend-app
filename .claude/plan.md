@@ -14918,3 +14918,110 @@ function _buildStampMemoryPhotoScatterHtml(photoUrls) {
 
 ## 承認状況
 2026-07-24 ユーザーがモック（3スロット入力・詳細シート散らし配置）に「バッチリです」と明示。**承認済み**。
+
+# 設計書145 — 探訪スタンプ帳の進捗バーに「解禁ライン」を視覚的に明示（2色セグメント＋🔓マーク）
+
+（2026-07-24 モック3案を提示しユーザーが案2「2色セグメント」を選択・承認済み）
+
+## 1. 背景
+
+コレクション一覧の状態B（解禁中・未全制覇）で表示されるレベルごとの進捗バー（`.stamp-level-progress-row`、design 83で導入・design 111で視認性強化済み）は、現在チェック済み数/総数の単純な単色フィルバーのみで、「あとどれだけチェックインすれば次のレベルが解禁されるか」（design 142: そのレベルの総数の半数・切り上げ）が視覚的に分からない。ユーザー要望「ロック解放と全制覇がポイントとして分かるようにしたい」を受け、進捗バー上に解禁ラインを明示する。
+
+## 2. 確定仕様（案2: 2色セグメント）
+
+`0〜解禁閾値`の区間を`var(--caramel-light)`、`解禁閾値〜現在値`の区間を`var(--caramel)`（濃色）で塗り分け、解禁閾値の位置に小さな🔓マークを重ねる。全制覇（バーの右端=100%）は既存同様、バーが端まで埋まった状態で表現する（明示的な🏁アイコン等は追加しない。案2は「解禁ラインの可視化」に絞ったシンプル版のため）。
+
+### 2-1. 閾値計算（`server.js`のdesign 142ロジックをクライアント側で再現）
+
+`_renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount, level)`に第7引数`level`を追加（呼び出し元`_renderStampCollectionList()`の`.map(level => {...})`クロージャ内、既存の呼び出し行に`level`を追加で渡すだけでよい）。
+
+```js
+const idx = STAMP_LEVEL_ORDER_CLIENT.indexOf(level);
+const hasNextLevel = idx >= 0 && idx < STAMP_LEVEL_ORDER_CLIENT.length - 1;
+const threshold = hasNextLevel ? Math.ceil(total / 2) : null; // server.js computeUnlockedLevels() と同じ算出式
+const thresholdPct = (threshold !== null && total > 0) ? Math.min(100, Math.round((threshold / total) * 100)) : null;
+```
+
+`special`（`STAMP_LEVEL_ORDER_CLIENT`の最後）は次のレベルが存在しないため`hasNextLevel=false`となり、閾値マークは表示されない（従来通りの単色バーのまま、下記2-2「閾値なし時」の分岐）。
+
+### 2-2. バーのHTML生成
+
+```js
+let trackInnerHtml;
+if (thresholdPct !== null && thresholdPct < 100) {
+  const seg1Pct = Math.min(pct, thresholdPct);
+  const seg2Pct = Math.max(0, pct - thresholdPct);
+  trackInnerHtml = `
+    <div class="stamp-level-progress-seg1" style="width:${seg1Pct}%;"></div>
+    <div class="stamp-level-progress-seg2" style="left:${thresholdPct}%;width:${seg2Pct}%;"></div>
+  `;
+} else {
+  // 次レベルが無い（special）、または閾値が総数と同値（total=1等の極小ケース）の場合は既存の単色バーのまま
+  trackInnerHtml = `<div class="stamp-level-progress-fill" style="width:${pct}%;"></div>`;
+}
+const lockMarkHtml = (thresholdPct !== null && thresholdPct < 100)
+  ? `<span class="stamp-level-progress-lockmark" style="left:${thresholdPct}%;">🔓</span>`
+  : '';
+```
+
+既存のマークアップ:
+```html
+<div class="stamp-level-progress-row">
+  <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
+  <span class="stamp-level-progress-label">${checkedN}/${total}</span>
+</div>
+```
+を、以下に置き換える:
+```html
+<div class="stamp-level-progress-row">
+  <div class="stamp-level-progress-track-wrap">
+    <div class="stamp-level-progress-track">${trackInnerHtml}</div>
+    ${lockMarkHtml}
+  </div>
+  <span class="stamp-level-progress-label">${checkedN}/${total}</span>
+</div>
+```
+**🔓マークを`.stamp-level-progress-track`の外（`-track-wrap`の直接の子、trackと兄弟）に配置する点が実装上の必須事項**: `.stamp-level-progress-track`は既存`overflow:hidden`（design 111で角丸フィル用に設定済み）を持つため、track内部に配置すると16px前後のマーク円がtrackの高さ（12px）でクリップされる。`-track-wrap`側は`overflow`指定なしの単なる`position:relative`ラッパーとし、マークだけをtrackの外側（同じ絶対位置系だがoverflow制約を受けない層）に重ねる。
+
+### 2-3. CSS（`public/app.css`、design 111時点の既存定義の直後に追記）
+
+```css
+.stamp-level-progress-track-wrap {
+  position: relative;
+  flex: 1;
+}
+.stamp-level-progress-track {
+  /* flex:1 を削除し、track-wrap側に移動（幅は wrap の 100% に自動追従） */
+}
+.stamp-level-progress-seg1 {
+  position: absolute; left: 0; top: 0; height: 100%;
+  background: var(--caramel-light);
+}
+.stamp-level-progress-seg2 {
+  position: absolute; top: 0; height: 100%;
+  background: var(--caramel);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);
+}
+.stamp-level-progress-lockmark {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--warm-white);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; line-height: 1;
+  box-shadow: 0 0 0 1.5px var(--sand-dark) inset, 0 1px 2px rgba(44,36,32,0.2);
+  z-index: 2;
+}
+```
+
+`.stamp-level-progress-track`の既存`flex:1`宣言（design 111時点）を削除し、`.stamp-level-progress-track-wrap`側に移すことに注意（`grep -n "stamp-level-progress-track"`で現在の定義を確認してから着手すること）。`.stamp-level-progress-fill`（閾値なし時に使う単色フィル、design 83由来）は無変更のまま残置。
+
+## 3. 影響範囲・スコープ外
+
+- 状態C（`_renderStampLevelRowComplete()`、全制覇済み）は進捗バー自体を表示しない設計のため無変更
+- 状態A（ロック中、`_renderStampLevelRowLocked()`）も進捗バーを持たないため無変更
+- レジェンド文言（「次レベル解禁まで」等のテキスト説明）は追加しない。🔓アイコン単体で意味を伝える、既存の他ロック表現（🔒等）と同様のミニマルな方針を踏襲
+- 🏁全制覇マーク等、閾値マーク以外の追加アイコンは付けない（案2はシンプル版として選定されたため）
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。閾値計算式はクライアント側で`server.js`の`computeUnlockedLevels()`と同じ式を再現するのみ（サーバー呼び出しの追加なし）
+
+## 4. 承認状況
+2026-07-24 モック3案提示、ユーザーが「案2: 2色セグメント」を選択。**承認済み**。
