@@ -937,6 +937,15 @@ design 144〜152の積み重ねで探訪スタンプ帳のレベル見出し・�
 - キャッシュバスティング: `index.html` app.css `?v=20260724i`→`20260724j`、app.js `?v=20260724k`→`20260724l`、`sw.js` CACHE_NAME=`sg-weekend-v703`→`v704`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での見出し2段組み表示・カードのフラット化後の見た目バランス（枠線除去による他要素との境界の視認性）は2026-07-24時点で`node --check`構文検証・CSS波括弧バランス確認・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
 
+### 探訪スタンプ帳の見出し・カードのサイズを少し拡大（2026-07-24実装、設計書154。design 153が縮めすぎだったための調整）
+design 153実装直後、ユーザーが「ちょっと細かくなりすぎたかな。デザインは今のままでいいので文字サイズとスポットのカードを少し大きくして見やすくして」とフィードバック。レイアウト構造（見出し2階層構成・カードのフラット化）自体は維持し、`public/app.css`のサイズ数値のみ引き上げた。
+
+- 変更14項目（design 153時点→design 154）: `.stamp-level-title-main`(15px→16px)・`.stamp-level-title-sub`(10px→11px)・`.stamp-card`(padding 8px 10px→10px 12px、gap 10px→11px)・`.stamp-card-list`(gap 6px→7px)・`.stamp-card-thumb`/`.stamp-card-thumb-img`/`.stamp-card-thumb-placeholder`(40px→46px、border-radius 9px→10px、プレースホルダーfont-size 17px→19px)・`.stamp-card-done-mark`(26px→30px、font-size 11px→13px、border-width 2px→2.2px、位置オフセット-5px→-6px)・`.stamp-card-name`(13px→14px)・`.stamp-card-area`(10px→11px)・`.stamp-card-date`(12px→13px)
+- `public/app.js`は無変更（HTML生成ロジック自体はdesign 153で確定済みのため今回は触っていない）。状態A（`_renderStampLevelRowLocked()`）・状態C（`_renderStampLevelRowComplete()`）・全制覇バッジの展開カード一覧はdesign 153から継続してスコープ外、無変更
+- `server.js`・データファイルは無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.css `?v=20260724j`→`20260724k`、`sw.js` CACHE_NAME=`sg-weekend-v704`→`v705`（`app.js`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での拡大後の見た目バランス（カード高さ増加によるスクロール量変化含む）は2026-07-24時点で`git diff`による表との突き合わせ・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 

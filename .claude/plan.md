@@ -15712,3 +15712,37 @@ CSS（`public/app.css`、`.stamp-level-section-title`を置き換え）:
 
 ## 4. 承認状況
 2026-07-24 モック3案（見出し軽量化+フラットカード／見出しミニマル+圧縮カード／余白拡大のみ）を提示、ユーザーが「案1の見出しと案2のリストカードで」と組み合わせを選択。**承認済み**。
+
+# 設計書154 — 探訪スタンプ帳の見出し・カードのサイズを少し拡大（design 153が縮めすぎだったための調整）
+
+（2026-07-24 design 153実装直後、ユーザーが「ちょっと細かくなりすぎたかな。デザインは今のままでいいので文字サイズとスポットのカードを少し大きくして見やすくして」とフィードバック。レイアウト構造〈見出し2階層・カードのフラット化〉自体は維持し、サイズ数値のみ引き上げる）
+
+## 1. 確定仕様
+
+`public/app.css`の以下の値を変更する（構造・クラス名・機能は無変更、数値のみ調整）:
+
+| クラス | プロパティ | design 153時点 | design 154 |
+|---|---|---|---|
+| `.stamp-level-title-main` | font-size | 15px | 16px |
+| `.stamp-level-title-sub` | font-size | 10px | 11px |
+| `.stamp-card` | padding | 8px 10px | 10px 12px |
+| `.stamp-card` | gap | 10px | 11px |
+| `.stamp-card-list` | gap | 6px | 7px |
+| `.stamp-card-thumb` | width/height | 40px | 46px |
+| `.stamp-card-thumb-img` | width/height | 40px | 46px |
+| `.stamp-card-thumb-placeholder` | width/height | 40px | 46px |
+| `.stamp-card-thumb-placeholder` | font-size | 17px | 19px |
+| `.stamp-card-done-mark` | width/height | 26px | 30px |
+| `.stamp-card-done-mark` | font-size | 11px | 13px |
+| `.stamp-card-done-mark` | border-width | 2px | 2.2px |
+| `.stamp-card-name` | font-size | 13px | 14px |
+| `.stamp-card-area` | font-size | 10px | 11px |
+| `.stamp-card-date` | font-size | 12px | 13px |
+
+`.stamp-card-thumb-img`/`.stamp-card-thumb-placeholder`のborder-radius（design 153時点9px）は`.stamp-card-thumb`拡大に比例させ10pxに調整する。`.stamp-card-done-mark`の位置オフセット（`bottom`/`right`、design 153時点`-5px`）はサイズ比に合わせて`-6px`に微調整する。
+
+## 2. スコープ外
+レイアウト構造（見出し2階層構成・カードのフラット化・枠線なし）自体は変更しない。状態A・状態C・全制覇展開カード一覧は対象外（design 153から継続）。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「デザインは今のままでいいので文字サイズとスポットのカードを少し大きくして見やすくして」。**承認済み**。
