@@ -15311,3 +15311,32 @@ design 148で導入した`.stamp-level-progress-icon`（バー上に直接乗る
 
 ## 3. 承認状況
 2026-07-24 ユーザー「絵文字もうちょい大きくしてもいいかな」。**承認済み**（内容が明確な小粒修正のため直接実装に進める）。
+
+# 設計書151 — 進捗バーのアイコンの縦位置をバー下端に揃える
+
+（2026-07-24 design 150〈絵文字拡大〉直後、ユーザーが「絵文字は下に合わせて。もしくは上下を合わせて」と追加要望。現状は`top:50%;transform:translate(-50%,-50%)`でCSSボックス上は数値的に中央揃えだが、絵文字グリフ自体の視覚的な重心が上寄りになりやすいフォント特性のため、見た目上バーの上に浮いて見えていたと推測される）
+
+## 1. 確定仕様
+
+`.stamp-level-progress-icon`の縦位置を、トラック中心基準（`top:50%`）から**トラック下端基準**（アイコンの下端をトラックの下端に揃える）に変更する。
+
+```css
+.stamp-level-progress-icon {
+  position: absolute; left: 0; bottom: 0; top: auto;
+  transform: translateX(-50%);
+  /* width/height/border-radius/background/display/align-items/justify-content/font-size/line-height/filter/z-index は design 150時点のまま無変更 */
+}
+```
+
+`.stamp-level-progress-icon--end`も同様に`transform`をX軸のみに変更する:
+```css
+.stamp-level-progress-icon--end {
+  transform: translateX(-100%);
+}
+```
+
+## 2. スコープ外
+サイズ（26px/font-size17px、design 150）・透過背景（design 149）・水平方向の配置ロジック（`left`のインラインstyle）は変更しない。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「絵文字は下に合わせて。もしくは上下を合わせて」。**承認済み**（第一希望の「下に合わせる」で実装する）。

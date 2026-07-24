@@ -900,6 +900,15 @@ design 149（透過化）直後、ユーザーが「絵文字もうちょい大�
 - キャッシュバスティング: `index.html` app.css `?v=20260724f`→`20260724g`、`sw.js` CACHE_NAME=`sg-weekend-v700`→`v701`（`app.js`は無変更のため据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での拡大後の視認性・バランスは2026-07-24時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
 
+### 進捗バーのアイコンの縦位置をバー下端に揃える（2026-07-24実装、設計書151）
+design 150（絵文字拡大）直後、ユーザーが「絵文字は下に合わせて。もしくは上下を合わせて」と追加要望（第一希望の「下に合わせる」で実装）。トラック中心基準（`top:50%`）だとCSSボックス上は数値的に中央揃えでも、絵文字グリフ自体の視覚的重心が上寄りになりやすいフォント特性のため、見た目上バーの上に浮いて見えていたと推測される。
+
+- `public/app.css`の`.stamp-level-progress-icon`: `position/top:50%`→`bottom:0;top:auto`、`transform:translate(-50%,-50%)`→`translateX(-50%)`に変更（アイコンの下端をトラックの下端に揃える）。`.stamp-level-progress-icon--end`も`transform:translate(-100%,-50%)`→`translateX(-100%)`にX軸のみへ変更
+- 他プロパティ（width/height/border-radius/background/display/align-items/justify-content/font-size/line-height/filter/z-index、design 150時点のまま）・サイズ・透過背景（design 149）・水平方向の配置ロジック（`left`のインラインstyle）は無変更
+- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.css `?v=20260724g`→`20260724h`、`sw.js` CACHE_NAME=`sg-weekend-v701`→`v702`（`app.js`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での下端揃え後の見た目バランスは2026-07-24時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 
