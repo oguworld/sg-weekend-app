@@ -4513,6 +4513,8 @@
       const tickHtml = (thresholdPct !== null && thresholdPct < 100)
         ? `<div class="stamp-level-progress-tick" style="left:${thresholdPct}%;"><span class="stamp-level-progress-tick-icon">🔓</span><span class="stamp-level-progress-tick-line"></span></div>`
         : '';
+      // 設計書147: 全制覇ライン（旧🏁単独アイコン）も解禁ラインと同じ目盛り線構造に統一し、絵文字を🏆に変更
+      const flagHtml = `<div class="stamp-level-progress-tick stamp-level-progress-tick--end" style="left:100%;"><span class="stamp-level-progress-tick-icon">🏆</span><span class="stamp-level-progress-tick-line"></span></div>`;
 
       return `<div class="stamp-level-section">
         <div class="stamp-level-section-title">
@@ -4523,7 +4525,7 @@
           <div class="stamp-level-progress-track-wrap">
             <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
             ${tickHtml}
-            <span class="stamp-level-progress-flag">🏁</span>
+            ${flagHtml}
           </div>
           <span class="stamp-level-progress-label">${checkedN}/${total}</span>
         </div>

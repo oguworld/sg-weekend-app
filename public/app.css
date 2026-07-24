@@ -2130,8 +2130,9 @@
     .stamp-level-progress-tick-line {
       width: 2px; height: 18px; background: var(--midnight); opacity: 0.35; margin-top: 2px;
     }
-    .stamp-level-progress-flag {
-      position: absolute; right: -2px; top: 0; font-size: 12px;
+    /* 設計書147: 全制覇ライン（右端）は中央揃えではなく右揃えにし、トラック右端からアイコンがはみ出さないようにする */
+    .stamp-level-progress-tick--end {
+      transform: translateX(-100%);
     }
     .stamp-card-list {
       display: flex; flex-direction: column; gap: 8px;

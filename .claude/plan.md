@@ -15120,3 +15120,40 @@ return `<div class="stamp-level-section">
 
 ## 4. 承認状況
 2026-07-24 ユーザー「すいません案1がいいです」。**承認済み**（design 145の見た目部分を置き換える形で実装する）。
+
+# 設計書147 — 進捗バーの全制覇マークにも目盛り線を追加＋絵文字をトロフィーに変更
+
+（2026-07-24 design 146の実機/Web確認後、ユーザーがスクリーンショットとともにフィードバック。この変更は本セッションのVPS上のWorking Directory＝Web版本番サーバーであるため、design 145/146同様、git commit時点でWeb版に即座に反映される）
+
+## 1. 背景
+
+design 146で追加した🔓ロックアイコン（解禁ライン、目盛り線つき）と🏁フラグアイコン（全制覇ライン、右端に浮かせるのみで目盛り線なし）で、見た目の統一感が欠けていた。ユーザーからスクリーンショット付きで「全制覇のメモリ（目盛り）あった方がよくない？」「絵文字はトロフィーで」とフィードバック。
+
+## 2. 確定仕様
+
+`public/app.js`の`_renderStampLevelRowInProgress()`内、現在の`.stamp-level-progress-flag`（`<span class="stamp-level-progress-flag">🏁</span>`、4526行目）を、`.stamp-level-progress-tick`と同じ構造（アイコン＋目盛り線）を持つ新規要素に置き換える。絵文字は🏆（トロフィー）に変更。
+
+```js
+const flagHtml = `<div class="stamp-level-progress-tick stamp-level-progress-tick--end" style="left:100%;"><span class="stamp-level-progress-tick-icon">🏆</span><span class="stamp-level-progress-tick-line"></span></div>`;
+```
+
+`.stamp-level-progress-tick`は`transform:translateX(-50%)`（design 146時点、中央揃え）を持つため、`left:100%`のままだとアイコンがトラック右端からはみ出す。`--end`修飾子で右端専用の位置調整を行う:
+
+```css
+.stamp-level-progress-tick--end {
+  transform: translateX(-100%); /* 右端でトラックからはみ出さないよう、中央揃えではなく右揃えにする */
+}
+```
+
+`public/app.css`の`.stamp-level-progress-flag`（4133行目付近）は削除する（新要素`.stamp-level-progress-tick--end`が完全に置き換えるため）。
+
+HTML生成部分（4506行目付近〜返り値のtemplate literal内）を、既存の`<span class="stamp-level-progress-flag">🏁</span>`を`${flagHtml}`に差し替える形に変更する。
+
+## 3. スコープ外
+
+🔓アイコン側（解禁ライン）の見た目・位置・閾値計算ロジックは変更しない。`hasNextLevel`が偽（special、次のレベルがない）の場合の🔓非表示ロジックも変更しない（トロフィーは`hasNextLevel`の有無に関わらず常時表示、design 146から変更なし）。
+
+`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 4. 承認状況
+2026-07-24 ユーザーがスクリーンショット付きでフィードバック、上記2点の変更として解釈し実装する。**承認済み**（内容が明確な小粒修正のため、追加のモック確認は行わず直接実装に進める）。
