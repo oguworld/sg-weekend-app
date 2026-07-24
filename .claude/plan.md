@@ -15896,3 +15896,42 @@ CSS（`public/app.css`）: `.stamp-card-area-row`を削除し、新規`.stamp-ca
 
 ## 3. 承認状況
 2026-07-24 ユーザーが「体操教室」の例（`.plan-card-title`）を指してフォント統一を確認。**承認済み**（Kaisei Optiへの統一で実装する）。
+
+# 設計書160 — アプリ全体のフォント統一感チェック（見出し役割のテキストにKaisei Optiを横展開）
+
+（2026-07-24 design 159〈予定タイトル・スタンプ名のフォント統一〉の流れで、ユーザーが「全体的にチェックして統一感を持たせて」と依頼。`public/app.css`内の「タイトル/名前」系クラスを全件洗い出し、既存の確立済みルール〈本文=Noto Sans JP、見出し・固有名詞タイトル=Kaisei Opti明朝系セリフ〉に沿っていないものを特定した）
+
+## 1. 調査結果
+
+`grep`で`-title`/`-name`系クラス26個を全件抽出し、既存の`font-family`設定を確認した。**既にKaisei Opti適用済み（design 159時点までの状態、変更不要）**: `.section-title`/`.card-title`/`.empty-title`/`.pin-empty-title`/`.pin-card-title`/`.cal-popup-title`/`.gems-title`/`.gem-name`/`.detail-title`/`.detail-section-title`/`.sale-empty-title`/`.settings-section-title`/`.pin-detail-title`/`.plan-sheet-title`/`.plan-event-info-name`/`.sched-row-name`/`.plan-modal-title`/`.plan-section-title`/`.plan-card-title`（design159）/`.stamp-card-name`（design159）/`.schedule-row-name`/`.course-timeline-name`/`.sec-cover-title`。
+
+**未適用で今回追加対象**（固有名詞・named-entityのタイトル/名前としての役割を持ちながらNoto Sans JPのまま）:
+1. `.unscheduled-pin-name`（予定表「未定」欄のピン名。`.plan-event-info-name`と同役割）
+2. `.course-card-title`（モデルコースカードのコース名タイトル。`.pin-card-title`/`.plan-card-title`と同役割）
+3. `.stamp-level-complete-badge-title`（探訪スタンプ帳・全制覇バッジのタイトル）
+4. `.stamp-complete-card-name`（探訪スタンプ帳・全制覇済み展開カードのスポット名）
+5. `.badge-row-name`（卒業アルバム・実績バッジのレベル名）
+6. `.stamp-level-title-main`（探訪スタンプ帳・レベル見出しのメインラベル、design 153で新設。`.section-title`と同じ「見出し」役割）
+
+**意図的に対象外とする（小さいキャプション/補足ラベルであり、見出しではないと判断）**: `.stamp-detail-memory-title`（12px、「あなたの記録」ラベル）・`.ga-section-title`（12px、卒業アルバムのミニ見出し）・`.stamp-level-title-sub`（design 153の年数目安サブラベル、意図的に控えめな補足表示）・`.plan-modal-subtitle`（サブタイトル、同様の既存パターン）・`.schedule-action-name`/`.plan-pin-dropdown-name`（明示的にNoto Sans JP指定済みのドロップダウン/アクション一覧項目）。
+
+**対象外・変更不要と判断した軽微な例外**: `.card-new-ribbon--today`のbare `font-family: sans-serif;`（「NEW」等の英語リボン表示用、意図的な素のsans-serifと判断）・`.photo-quote::before`の`font-family: Georgia, serif;`（卒業アルバムの引用符装飾グリフのみに使う単発指定、実害なし）。いずれも今回のスコープ外とする。
+
+## 2. 確定仕様
+
+`public/app.css`の以下6箇所に`font-family: 'Kaisei Opti', serif;`を追加する（フォントサイズ・太さ・色・その他プロパティは一切変更しない）:
+
+```css
+.unscheduled-pin-name { font-family: 'Kaisei Opti', serif; /* 既存のflex/font-size/color等は無変更 */ }
+.course-card-title { font-family: 'Kaisei Opti', serif; /* 既存のfont-size/font-weight/line-height等は無変更 */ }
+.stamp-level-complete-badge-title { font-family: 'Kaisei Opti', serif; /* 既存のfont-size/font-weight/color/margin-bottomは無変更 */ }
+.stamp-complete-card-name { font-family: 'Kaisei Opti', serif; /* 既存のfont-size/font-weight/color/white-space/overflow/text-overflowは無変更 */ }
+.badge-row-name { font-family: 'Kaisei Opti', serif; /* 既存のfont-size/font-weight/colorは無変更 */ }
+.stamp-level-title-main { font-family: 'Kaisei Opti', serif; /* 既存のfont-size/font-weight/color/display/align-items/gapは無変更 */ }
+```
+
+## 3. スコープ外
+上記「意図的に対象外」の各要素は変更しない。既にKaisei Optiが適用済みの要素も無変更。`public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 4. 承認状況
+2026-07-24 ユーザー「全体的にチェックして統一感を持たせて」。**承認済み**（調査結果に基づく明確なフォント統一のため、追加のモック確認は行わず直接実装に進める）。

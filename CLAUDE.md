@@ -989,6 +989,16 @@ design 157〈ニックネーム非表示〉直後、ユーザー「アバター�
 - キャッシュバスティング: `index.html` app.css `?v=20260724l`→`20260724m`、`sw.js` CACHE_NAME=`sg-weekend-v709`→`v710`（`app.js`は内容変更なしのため`?v=`据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新フォント表示・文字幅変化によるタイトル省略（`text-overflow:ellipsis`）位置への影響は2026-07-24時点で`git diff`によるコード照合・curlでのWeb版配信反映確認のみ完了、実ブラウザ・実機とも未確認
 
+### アプリ全体のフォント統一感チェック（見出し役割のテキストにKaisei Optiを横展開）（2026-07-24実装、設計書160）
+design 159（予定タイトル・スタンプ名のフォント統一）の流れで、ユーザーが「全体的にチェックして統一感を持たせて」と依頼。`public/app.css`内の「タイトル/名前」系クラス26個を全件洗い出し、既存の確立済みルール（本文=Noto Sans JP、見出し・固有名詞タイトル=Kaisei Opti明朝系セリフ）に沿っていないものを特定し、6箇所を追加対応した。
+
+- `public/app.css`の以下6クラスに`font-family: 'Kaisei Opti', serif;`を追加（フォントサイズ・太さ・色・その他プロパティは一切変更なし）: `.unscheduled-pin-name`（予定表「未定」欄のピン名）・`.course-card-title`（モデルコースカードのコース名タイトル）・`.stamp-level-complete-badge-title`（探訪スタンプ帳・全制覇バッジのタイトル）・`.stamp-complete-card-name`（探訪スタンプ帳・全制覇済み展開カードのスポット名）・`.badge-row-name`（卒業アルバム・実績バッジのレベル名）・`.stamp-level-title-main`（探訪スタンプ帳・レベル見出しのメインラベル、design 153で新設）
+- **意図的に対象外（小さいキャプション/補足ラベルであり見出しではないと判断、無変更のまま）**: `.stamp-detail-memory-title`（12px「あなたの記録」ラベル）・`.ga-section-title`（12px、卒業アルバムのミニ見出し）・`.stamp-level-title-sub`（design 153の年数目安サブラベル）・`.plan-modal-subtitle`・`.schedule-action-name`・`.plan-pin-dropdown-name`（明示的にNoto Sans JP指定済みのドロップダウン/アクション一覧項目）・`.card-new-ribbon--today`（bare `font-family: sans-serif;`、英語リボン表示用）・`.photo-quote::before`（`font-family: Georgia, serif;`、卒業アルバムの引用符装飾グリフ単発指定）
+- 既にKaisei Opti適用済みの要素（`.section-title`/`.card-title`/`.pin-card-title`/`.plan-card-title`/`.stamp-card-name`等、design 159までに対応済み）は無変更
+- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.css `?v=20260724m`→`20260724n`、`sw.js` CACHE_NAME=`sg-weekend-v710`→`v711`（`app.js`は内容変更なしのため`?v=`据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での6箇所の新フォント表示・文字幅変化によるレイアウト崩れ有無は2026-07-24時点で`git diff`によるコード照合・curlでのWeb版配信反映確認のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 

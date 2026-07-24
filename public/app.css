@@ -1803,7 +1803,7 @@
       flex: 1;
       font-size: 15px;
       color: var(--midnight);
-      font-family: 'Noto Sans JP', sans-serif;
+      font-family: 'Kaisei Opti', serif;
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
@@ -2097,6 +2097,7 @@
     }
     .stamp-level-title-main {
       font-size: 16px; font-weight: 700; color: var(--midnight);
+      font-family: 'Kaisei Opti', serif;
       display: inline-flex; align-items: center; gap: 6px;
     }
     .stamp-level-title-sub {
@@ -2225,6 +2226,7 @@
     }
     .stamp-level-complete-badge-title {
       font-size: 19px; font-weight: 700; color: var(--midnight);
+      font-family: 'Kaisei Opti', serif;
       margin-bottom: 4px;
     }
     .stamp-level-complete-badge-count {
@@ -2271,6 +2273,7 @@
     .stamp-complete-card-body { flex: 1; min-width: 0; }
     .stamp-complete-card-name {
       font-size: 12px; font-weight: 700; color: var(--midnight);
+      font-family: 'Kaisei Opti', serif;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .stamp-complete-card-area { font-size: 10px; color: var(--warm-gray); margin-top: 1px; }
@@ -2430,6 +2433,7 @@
     .course-card-img { width: 100%; height: 110px; object-fit: cover; background: var(--sand); flex-shrink: 0; }
     .course-card-body { flex: 1; overflow: hidden; padding: 10px; }
     .course-card-title { font-size: 16px; font-weight: 700; line-height: 1.3; margin-bottom: 4px;
+      font-family: 'Kaisei Opti', serif;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
       min-height: calc(14px * 1.3 * 2); }
     .course-card-tagline { font-size: 14px; color: var(--warm-gray); line-height: 1.4;
@@ -3562,7 +3566,7 @@
     }
     .badge-row img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
     .badge-row-body { flex: 1; }
-    .badge-row-name { font-size: 13px; font-weight: 700; color: var(--midnight); }
+    .badge-row-name { font-size: 13px; font-weight: 700; color: var(--midnight); font-family: 'Kaisei Opti', serif; }
     .badge-row-track { height: 6px; background: var(--sand-dark); border-radius: 4px; margin-top: 5px; overflow: hidden; }
     .badge-row-fill { height: 100%; background: var(--caramel); border-radius: 4px; }
     .badge-row-count { font-size: 11px; color: var(--caramel); font-weight: 700; white-space: nowrap; }
