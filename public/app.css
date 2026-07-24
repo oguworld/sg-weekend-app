@@ -2116,10 +2116,10 @@
       position: absolute; top: 50%; left: 0;
       transform: translate(-50%, -50%);
       width: 22px; height: 22px; border-radius: 50%;
-      background: var(--warm-white);
+      background: transparent;
       display: flex; align-items: center; justify-content: center;
       font-size: 14px; line-height: 1;
-      box-shadow: 0 0 0 1.5px var(--sand-dark) inset, 0 1px 2px rgba(44,36,32,0.2);
+      filter: drop-shadow(0 1px 2px rgba(44,36,32,0.35));
       z-index: 2;
     }
     .stamp-level-progress-icon--end {

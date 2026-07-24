@@ -15253,3 +15253,39 @@ design 147時点は`.stamp-level-progress-row`に`margin-bottom:10px`があっ�
 
 ## 4. 承認状況
 2026-07-24 モック3案（A/B/C）提示、ユーザーが「案Cでいいけど絵文字を少し大きくして見やすくして」と回答。**承認済み**。
+
+# 設計書149 — 進捗バーのアイコン背景を透過に変更
+
+（2026-07-24 design 148のスクリーンショットでユーザーが「大きさは大丈夫、絵文字透過にできる？」と回答）
+
+## 1. 背景
+
+design 148で導入した`.stamp-level-progress-icon`（バー上に直接乗る🔓/🏆アイコン）は、白い円形バッジ（`background:var(--warm-white)`＋`box-shadow`のリング）で絵文字を囲っていた。ユーザーはサイズ（22px/font-size 14px）には満足したが、この白背景の円自体を透過にしたいとの要望。
+
+## 2. 確定仕様
+
+`.stamp-level-progress-icon`の`background`と`box-shadow`（リング＋落ち影）を削除し、絵文字がバーの上に直接浮かぶ見た目に変更する。可読性維持のため、白背景リングの代わりに軽い`filter:drop-shadow(...)`のみ残す（バー地色〈sand/caramel系〉の上でも絵文字の輪郭が沈まないようにするための最小限の対応）。
+
+```css
+.stamp-level-progress-icon {
+  position: absolute; top: 50%; left: 0;
+  transform: translate(-50%, -50%);
+  width: 22px; height: 22px;
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(44,36,32,0.35));
+  z-index: 2;
+}
+```
+
+`border-radius:50%`は円形の当たり判定（クリック領域等）目的ではなく単なる背景装飾用だったため、backgroundが透明になった今は意味を持たなくなるが、実害がないため削除せず残置してよい（builderの裁量）。`.stamp-level-progress-icon--end`（`transform:translate(-100%,-50%)`、右端の🏆用オフセット）は無変更。
+
+## 3. スコープ外
+
+サイズ（22px/font-size 14px、design 148で確定済み）・アイコンの配置ロジック・数字ラベルの位置は変更しない。
+
+`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 4. 承認状況
+2026-07-24 ユーザー「大きさは大丈夫です。絵文字透過にできる？」。**承認済み**（内容が明確な小粒修正のため直接実装に進める）。
