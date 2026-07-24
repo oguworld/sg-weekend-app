@@ -14450,3 +14450,35 @@ local:    { ..., yearRange: '2〜4年', yearRangeEn: '2-4 years' },
 
 ## 承認状況
 2026-07-24 ユーザーが「見習いが０～１年、定住が2年～4年、５年以上、１０年以上にして」と明示。**承認済み**。
+
+# 設計書140 — 年数目安の接頭辞を「在住」→「在住歴」に変更
+
+（2026-07-24 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 確定済み仕様
+
+`public/app.js`の`_stampLevelYearRange(meta)`関数の戻り値を変更する（ja側のみ、en側は無変更）:
+
+```js
+// 変更前
+function _stampLevelYearRange(meta) {
+  return getLang() === 'ja' ? `目安：在住${meta.yearRange}` : `approx. ${meta.yearRangeEn} in Singapore`;
+}
+// 変更後
+function _stampLevelYearRange(meta) {
+  return getLang() === 'ja' ? `目安：在住歴${meta.yearRange}` : `approx. ${meta.yearRangeEn} in Singapore`;
+}
+```
+
+表示は「目安：在住歴0〜1年」のようになる。この関数1つの変更で既存4箇所の呼び出し元全てに反映される（既存パターン踏襲）。
+
+## 2. スコープ外
+
+`yearRange`/`yearRangeEn`の値自体（design 139で確定済み）は無変更。英語表記は変更しない。
+
+## 3〜5. データモデル・API・データ共有影響
+
+**変更なし**。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。
+
+## 承認状況
+2026-07-24 ユーザーが「在住歴」案に「はい、お願いします」と明示。**承認済み**。

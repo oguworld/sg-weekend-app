@@ -3790,8 +3790,9 @@
     // 設計書110: STAMP_LEVEL_META.yearRange/yearRangeEnを現在の言語に応じて取得する共通ヘルパー
     // 設計書112: 厳密な必須条件に読めないよう「目安」/「approx.」を接頭辞として追加
     // 設計書113: 年数表記に「在住」を追加
+    // 設計書140: 年数目安の接頭辞を「在住」→「在住歴」に変更
     function _stampLevelYearRange(meta) {
-      return getLang() === 'ja' ? `目安：在住${meta.yearRange}` : `approx. ${meta.yearRangeEn} in Singapore`;
+      return getLang() === 'ja' ? `目安：在住歴${meta.yearRange}` : `approx. ${meta.yearRangeEn} in Singapore`;
     }
 
     // エリア制覇バッジ対象エリア（設計書77）。Island-wideは概念的に1地点GPSチェックインと相性が悪いため対象外（§2-2）。
