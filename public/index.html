@@ -881,7 +881,7 @@
     box-shadow:0 -4px 20px rgba(0,0,0,0.12);align-items:center;text-align:center;">
     <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;">
       <div id="stamp-level-unlock-emoji" class="stamp-unlock-emoji"></div>
-      <div style="font-family:'Kaisei Opti',serif;font-size:20px;font-weight:700;color:var(--midnight);margin:14px 0 6px;" data-i18n="stampLevelUnlockModalTitle">スタンプ獲得！</div>
+      <div id="stamp-level-unlock-title" style="font-family:'Kaisei Opti',serif;font-size:20px;font-weight:700;color:var(--midnight);margin:14px 0 6px;" data-i18n="stampLevelUnlockModalTitle">🔓 新しいレベルが解禁されました！</div>
       <div id="stamp-level-unlock-name" style="font-size:16px;font-weight:700;color:var(--caramel);margin-bottom:14px;"></div>
       <div id="stamp-level-unlock-subtext" style="width:100%;background:var(--sand);border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;color:var(--midnight);margin-bottom:20px;"></div>
       <button onclick="if(!_touchCapableDetected) closeStampLevelUnlockModal()"
@@ -1157,7 +1157,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260724d"></script>
+  <script src="/app.js?v=20260724e"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

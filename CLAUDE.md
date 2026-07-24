@@ -603,6 +603,18 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
 - `server.js`のみの変更のため`pm2 restart`実施済み。データモデル・APIレスポンス構造は無変更（`unlockedLevels`配列という形式自体は変わらず、中身の解禁タイミングが変わるのみ）。Web版・iOS版とも即座に反映される（サーバー側ロジックのため、iOS版もアプリ更新不要でAPI呼び出し時点で新ロジックが適用される）
 - 実機curl検証済み: standardスポット9件チェックイン時点では`unlockedLevels:["standard"]`のまま（閾値10未満）、10件目のチェックインで`["standard","local"]`に切り替わることを確認。`GET /api/stamp-progress/me`のレスポンスとも一致、`GET /api/stamp-spots`で解禁済み`local`スポットがマスクなしで返ることも確認済み
 
+### アンロック演出を「スタンプ獲得」から本来の解禁演出に戻し、全制覇（コンプリート）専用モーダルを新設（2026-07-24実装、設計書143）
+設計書107で「アンロック演出モーダル」の主役を「新しく解禁されたレベル」から「チェックインしたスポット自身のレベル」に差し替え、タイトルも「スタンプ獲得！」に変更していた。ティア解禁条件が固定2件→ティア半数（設計書142）に変わり「アンロック＝通過点」「コンプリート＝完全制覇」の区別が重要になったため、ユーザー要望で設計書107以前の設計思想（設計書70・81）に戻しつつ、コンプリート専用の新モーダルを追加した。
+
+- **アンロックモーダルの再設計（単一パラメータに戻す）**: `openStampLevelUnlockModal(completedLevel, unlockedLevel)`（2引数）を`openStampLevelUnlockModal(unlockedLevel)`（1引数）に戻した。表示するバッジ・名前は「新しく解禁されたレベル自体」（設計書107以前の仕様）。`public/index.html`のタイトル要素に`id="stamp-level-unlock-title"`を新規付与しJSでタイトル文言を制御できるようにした。設計書107で追加した補足サブテキスト（🔓 {level}のロックが解除されました）は、バッジ・名前自体が解禁を表しているため重複表現として非表示化（`subtextEl.style.display='none'`）
+- **新設: 全制覇（コンプリート）モーダル**: 既存の`#stamp-level-unlock-overlay`/`#stamp-level-unlock-modal`のDOM・CSS（バッジ画像・紙吹雪演出）を共有する形で、新規関数`openStampLevelCompleteModal(completedLevel)`を追加。タイトルは新規i18nキー`stampLevelCompleteModalTitle`、サブテキストには`${total}/${total} ${t('stampLevelCompleteSpotsLabel')}`（既存キー、設計書83で追加済みの「スポット達成」/「spots collected」を再利用）を表示する。`closeStampLevelUnlockModal()`は両モーダル共通でそのまま使う（DOM共有のため無変更）
+- **`doStampCheckin()`の変更: コンプリート判定の追加とチェーン**: `_stampProgress`更新直後に、今回のチェックインでスポットのレベルが100%達成（全制覇）になったかを判定する`justCompletedLevel`を算出。`_openStampMemorySheet(spot, newlyUnlockedLevel, justCompletedLevel)`に第3引数を追加し、「思い出を残す」シートを閉じた後のチェーン処理（`_closeStampMemorySheetInternal()`）で、コンプリート演出とアンロック演出の両方が保留されている場合は「コンプリート（500ms後）→アンロック（3000ms後、コンプリート演出を見終えた後にずらして表示）」の順で連続表示する。片方のみの場合はそれぞれ500ms後に表示。両方が同時に発生するのは現在のティア件数（20/20/10/5）では実質起こらない想定だが念のため両対応した
+- `_stampMemoryPendingUnlock`（既存）を`{level, newlyUnlockedLevel}`から`newlyUnlockedLevel`単体保持に簡略化（`level`は今後使わないため）。新規`_stampMemoryPendingComplete`（`completedLevel`または`null`）を追加。いずれも既存の`_stampMemorySpotId`等と同じ並び（起動時同期フローより後方、ユーザー操作起点でのみ参照）に配置しTDZ対象外
+- i18n: `stampLevelUnlockModalTitle`の値変更（ja「スタンプ獲得！」→「🔓 新しいレベルが解禁されました！」、en「Stamp acquired!」→「🔓 New Level Unlocked!」）、新規`stampLevelCompleteModalTitle`をja/en同時追加（ja「🎉 全制覇！」/en「🎉 Fully Conquered!」）
+- コレクション一覧の全制覇バッジ（設計書108、状態C）自体は無変更（このモーダルとは別に、一覧を開くたびに常時表示され続ける既存の静的表示として共存する）
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260724d`→`20260724e`、`sw.js` CACHE_NAME=`sg-weekend-v693`→`v694`（`app.css`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのアンロックモーダル（旧「スタンプ獲得」演出から解禁演出への表示変更）・コンプリートモーダル（新規、紙吹雪演出込み）の見た目、両方が連続表示されるケース（コンプリート→3000ms後にアンロック）の間隔の自然さは2026-07-24時点でコード確認・`node --check`構文検証・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
+
 ## 広告表示機能フェーズ2: PRカード（スポンサー広告枠）（2026-07-13実装、設計書29 → 2026-07-16設計書47でテストデータ削除・非表示化）
 - イベント一覧に、Klookアフィリエイトとは別枠のスポンサー広告カード（PRカード）を条件付きで1件差し込む機能。設計書23フェーズ2の元設計を、plannerが現在の行番号ベースで再検証・確定した内容
 - ⚠️ **2026-07-16時点、非表示（テストデータ削除済み・設計書47）**: 広告掲載準備が整うまでの一時停止として、`data/sg/sponsored-cards.json`のテスト用ダミー2件（`sponsor_test_001`・`sponsor_test_002`）を削除し**空配列`[]`**にした。`_pickSponsoredCardForToday([])`が`null`を返すため`splice`されず、DOM分岐も通らずPRカードは表示されない。**コード（`_pickSponsoredCardForToday()`/`renderSponsoredCard()`/`__sponsored`分岐/`GET /api/sponsored-cards`）は一切無変更・残置**。再開は`sponsored-cards.json`に本番掲載データ（`active:true`・有効期間内）を追記するだけ（`pm2 restart`不要、`data/`は都度readFileSync）

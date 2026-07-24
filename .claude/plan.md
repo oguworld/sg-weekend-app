@@ -14603,3 +14603,145 @@ function computeUnlockedLevels(allSpots, checkedInSpotIds) {
 
 ## 承認状況
 2026-07-24 ユーザーが「半分制覇したら次のレベルに行ける」「見習いであれば十箇所制覇したらアンロック、定住レベルも十箇所制覇されたらアンロック」と明示。**承認済み**。
+
+# 設計書143 — アンロック演出を「スタンプ獲得」から本来の解禁演出に戻し、全制覇（コンプリート）専用モーダルを新設
+
+（2026-07-24 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+design 107で「アンロック演出モーダル」の主役を「新しく解禁されたレベル」から「チェックインしたスポット自身のレベル」に差し替え、タイトルも「スタンプ獲得！」に変更していた。しかしティア解禁条件が固定2件→ティア半数（design 142）に変わったことで、「アンロック＝そのティアの通過点（半分達成）」「コンプリート＝そのティアの完全制覇」という区別がより重要になった。ユーザーから「アンロック時はスタンプ獲得ではなく解禁演出のまま、その代わりコンプリート時に『全制覇！』モーダルを新設したい」との要望があり、design 107以前の設計思想（design 70/81）に近い形に戻しつつ、コンプリート専用の新モーダルを追加する。
+
+## 2. 確定済み仕様
+
+### 2-1. アンロックモーダルの再設計（単一パラメータに戻す）
+
+`openStampLevelUnlockModal(completedLevel, unlockedLevel)`（2引数）を`openStampLevelUnlockModal(unlockedLevel)`（1引数）に戻す。表示するバッジ・名前は「新しく解禁されたレベル自体」（design 107以前の仕様）。タイトルも解禁演出向けの文言に戻す。サブテキストは非表示にする（バッジ・名前自体が「このレベルが解禁された」ことを表しているため、design 107で追加した「🔓 {level}のロックが解除されました」の重複表現は不要になる）。
+
+`public/index.html`のタイトル要素にJS制御用の`id`を新規付与する:
+```html
+<!-- 変更前 -->
+<div style="..." data-i18n="stampLevelUnlockModalTitle">スタンプ獲得！</div>
+<!-- 変更後 -->
+<div id="stamp-level-unlock-title" style="..." data-i18n="stampLevelUnlockModalTitle">スタンプ獲得！</div>
+```
+
+`stampLevelUnlockModalTitle`の値を変更（キー名は不変）:
+- ja: 「スタンプ獲得！」→「🔓 新しいレベルが解禁されました！」
+- en: 「Stamp acquired!」→「🔓 New Level Unlocked!」
+
+`public/app.js`の`openStampLevelUnlockModal()`を単一パラメータ版に書き換え:
+```js
+function openStampLevelUnlockModal(unlockedLevel) {
+  const meta = STAMP_LEVEL_META[unlockedLevel] || STAMP_LEVEL_META.standard;
+  const emojiEl = document.getElementById('stamp-level-unlock-emoji');
+  const nameEl = document.getElementById('stamp-level-unlock-name');
+  const subtextEl = document.getElementById('stamp-level-unlock-subtext');
+  const titleEl = document.getElementById('stamp-level-unlock-title');
+  if (titleEl) titleEl.textContent = t('stampLevelUnlockModalTitle');
+  if (emojiEl) {
+    emojiEl.innerHTML = `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-unlock-img">`;
+    emojiEl.style.animation = 'none';
+    void emojiEl.offsetWidth;
+    emojiEl.style.animation = '';
+    const imgEl = emojiEl.querySelector('.stamp-unlock-img');
+    _burstStampConfetti(imgEl || emojiEl);
+  }
+  if (nameEl) nameEl.textContent = `${meta.emoji} ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）`;
+  if (subtextEl) subtextEl.style.display = 'none'; // コンプリートモーダルと共有DOMのため、アンロック時は非表示
+  lockScroll();
+  document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
+  document.getElementById('stamp-level-unlock-modal').classList.add('visible');
+}
+```
+
+### 2-2. 新設: 全制覇（コンプリート）モーダル
+
+既存の`#stamp-level-unlock-overlay`/`#stamp-level-unlock-modal`のDOM・CSS（バッジ画像・紙吹雪演出）を共有する形で、新規関数`openStampLevelCompleteModal(completedLevel)`を追加する:
+
+```js
+function openStampLevelCompleteModal(completedLevel) {
+  const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
+  const total = _stampSpots.filter(s => s.level === completedLevel).length;
+  const emojiEl = document.getElementById('stamp-level-unlock-emoji');
+  const nameEl = document.getElementById('stamp-level-unlock-name');
+  const subtextEl = document.getElementById('stamp-level-unlock-subtext');
+  const titleEl = document.getElementById('stamp-level-unlock-title');
+  if (titleEl) titleEl.textContent = t('stampLevelCompleteModalTitle');
+  if (emojiEl) {
+    emojiEl.innerHTML = `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-unlock-img">`;
+    emojiEl.style.animation = 'none';
+    void emojiEl.offsetWidth;
+    emojiEl.style.animation = '';
+    const imgEl = emojiEl.querySelector('.stamp-unlock-img');
+    _burstStampConfetti(imgEl || emojiEl);
+  }
+  if (nameEl) nameEl.textContent = `${meta.emoji} ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）`;
+  if (subtextEl) {
+    subtextEl.style.display = '';
+    subtextEl.textContent = `${total}/${total} ${t('stampLevelCompleteSpotsLabel')}`;
+  }
+  lockScroll();
+  document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
+  document.getElementById('stamp-level-unlock-modal').classList.add('visible');
+}
+```
+
+`stampLevelCompleteSpotsLabel`は既存キー（design 83、「スポット達成」/「spots collected」）を再利用。`closeStampLevelUnlockModal()`は両モーダル共通でそのまま使う（DOM共有のため無変更）。
+
+新規i18nキー`stampLevelCompleteModalTitle`（ja/en同時）: ja「🎉 全制覇！」/ en「🎉 Fully Conquered!」
+
+### 2-3. `doStampCheckin()`の変更: コンプリート判定の追加とチェーン
+
+`_stampProgress`更新直後に、今回のチェックインでスポットのレベルが100%達成になったかを判定する:
+
+```js
+// _stampProgress = {...} の直後に追加
+const totalForSpotLevel = _stampSpots.filter(s => s.level === spot.level).length;
+const checkedForSpotLevel = _stampProgress.checkedInSpotIds.filter(id => {
+  const sp = _stampSpots.find(s => s.id === id);
+  return sp && sp.level === spot.level;
+}).length;
+const justCompletedLevel = (checkedForSpotLevel === totalForSpotLevel) ? spot.level : null;
+```
+
+`_openStampMemorySheet(spot, newlyUnlockedLevel)`の呼び出しに`justCompletedLevel`も渡せるよう拡張し、思い出シートを閉じた後のチェーン処理（`_closeStampMemorySheetInternal()`）で、コンプリート演出とアンロック演出の両方が保留されている場合は「コンプリート→（一定時間後）アンロック」の順で連続表示する。両方が同時に発生するのは現在のティア件数（20/20/10/5）では実質起こらない想定だが、念のため両対応する。
+
+`_stampMemoryPendingUnlock`（既存）に加え、新規`_stampMemoryPendingComplete`を追加。`_closeStampMemorySheetInternal()`内:
+```js
+if (_stampMemoryPendingComplete) {
+  const completedLevel = _stampMemoryPendingComplete;
+  _stampMemoryPendingComplete = null;
+  setTimeout(() => openStampLevelCompleteModal(completedLevel), 500);
+  if (_stampMemoryPendingUnlock) {
+    const { newlyUnlockedLevel } = _stampMemoryPendingUnlock;
+    _stampMemoryPendingUnlock = null;
+    setTimeout(() => openStampLevelUnlockModal(newlyUnlockedLevel), 3000); // コンプリート演出を見終えた後にずらして表示
+  }
+} else if (_stampMemoryPendingUnlock) {
+  const { newlyUnlockedLevel } = _stampMemoryPendingUnlock;
+  _stampMemoryPendingUnlock = null;
+  setTimeout(() => openStampLevelUnlockModal(newlyUnlockedLevel), 500);
+}
+```
+
+（`_stampMemoryPendingUnlock`の構造も、`{level, newlyUnlockedLevel}`から`{newlyUnlockedLevel}`のみで足りるよう簡略化可能だが、`level`は今後使わないため`newlyUnlockedLevel`単体の保持に変更する）
+
+## 3. 既存コードの調査結果
+
+- `public/index.html` 878-892行目: `#stamp-level-unlock-overlay`/`#stamp-level-unlock-modal`（タイトル要素にid付与）
+- `public/app.js` `openStampLevelUnlockModal(completedLevel, unlockedLevel)`（4777-4802行目付近）: 単一パラメータ化・表示内容変更
+- `public/app.js` `doStampCheckin()`（4686-4743行目）: コンプリート判定・チェーン処理拡張
+- `public/app.js` `_closeStampMemorySheetInternal()`: チェーン処理拡張
+- `stampLevelCompleteSpotsLabel`（design 83で追加済み、「スポット達成」/「spots collected」）: 再利用
+
+## 4. スコープ外
+
+コレクション一覧の全制覇バッジ（design 108、状態C）自体は無変更（このモーダルとは別に、一覧を開くたびに常時表示され続ける既存の静的表示として共存する）。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**。フロントエンドのみ。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。
+
+## 承認状況
+2026-07-24 ユーザーが「アンロック時はスタンプ獲得なしでいいよ...代わりにコンプリート時もモーダルを出してほしいです。全制覇！というやつですね。」と明示。**承認済み**。

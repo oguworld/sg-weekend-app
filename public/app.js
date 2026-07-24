@@ -459,7 +459,8 @@
         stampNextTargetLabel: '次はここ！',
         stampLevelCompleteLabel: '制覇！',
         stampLevelCompleteSpotsLabel: 'スポット達成',
-        stampLevelUnlockModalTitle: 'スタンプ獲得！',
+        stampLevelUnlockModalTitle: '🔓 新しいレベルが解禁されました！',
+        stampLevelCompleteModalTitle: '🎉 全制覇！',
         stampLevelUnlockSubtext: '🔓 {level}のロックが解除されました',
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
@@ -749,7 +750,8 @@
         stampNextTargetLabel: 'Next up!',
         stampLevelCompleteLabel: 'Complete!',
         stampLevelCompleteSpotsLabel: 'spots collected',
-        stampLevelUnlockModalTitle: 'Stamp acquired!',
+        stampLevelUnlockModalTitle: '🔓 New Level Unlocked!',
+        stampLevelCompleteModalTitle: '🎉 Fully Conquered!',
         stampLevelUnlockSubtext: '🔓 {level} unlocked!',
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
@@ -3580,6 +3582,7 @@
     // （画面遷移直後に別画面でモーダルが突然開くのは体験として不適切なため、破棄する設計判断）。
     function _closeStampMemorySheetForNav() {
       _stampMemoryPendingUnlock = null;
+      _stampMemoryPendingComplete = null;
       const overlayEl = document.getElementById('stamp-memory-overlay');
       const sheetEl = document.getElementById('stamp-memory-sheet');
       if (overlayEl) overlayEl.classList.remove('visible');
@@ -3825,7 +3828,8 @@
     // 起動時同期フロー（loadEventData()等、2280行目付近）より後方のこのファイル末尾側に宣言されているため
     // TDZリスクは無い（本節冒頭の他の_stamp*変数群と同じ並びで、起動フローからは一切参照されない）。
     let _stampMemorySpotId = null;
-    let _stampMemoryPendingUnlock = null; // {level, newlyUnlockedLevel} または null
+    let _stampMemoryPendingUnlock = null; // newlyUnlockedLevel（レベル文字列）または null（設計書143でlevelフィールドは不要になり単体保持に簡略化）
+    let _stampMemoryPendingComplete = null; // completedLevel（レベル文字列）または null（設計書143新規）
     let _stampMemoryPickedBlob = null;
     let _stampMemoryPhotoUrlCache = {}; // spotId → objectURL（IndexedDB非同期読み込み結果のインメモリキャッシュ）
 
@@ -4721,16 +4725,23 @@
           unlockedLevels: data.unlockedLevels || _stampProgress.unlockedLevels,
           checkinLog: newCheckinLog,
         };
+        // 設計書143: 今回のチェックインでスポットのレベルが100%達成（全制覇）になったかを判定
+        const totalForSpotLevel = _stampSpots.filter(s => s.level === spot.level).length;
+        const checkedForSpotLevel = _stampProgress.checkedInSpotIds.filter(id => {
+          const sp = _stampSpots.find(s => s.id === id);
+          return sp && sp.level === spot.level;
+        }).length;
+        const justCompletedLevel = (totalForSpotLevel > 0 && checkedForSpotLevel === totalForSpotLevel) ? spot.level : null;
         showToast(t('toastStampCheckinSuccess'));
         // 設計書121: 常に900ms後に「思い出を残す」シートを開く（newlyUnlockedLevelはnullの場合あり）。
-        // レベル解禁演出は、このシートを閉じた後に_closeStampMemorySheetInternal()内でチェーンして開かれる
+        // レベル解禁演出・コンプリート演出は、このシートを閉じた後に_closeStampMemorySheetInternal()内でチェーンして開かれる
         // （旧: 新規解禁レベルがある場合のみ1600ms後にopenStampLevelUnlockModal()を直接呼ぶ実装だった）。
         let newlyUnlockedLevel = null;
         if (_stampProgress.unlockedLevels.length > prevUnlockedCount) {
           // 新しく解禁されたレベル（複数レベルが一度に解禁されるケースは想定しないが、念のため配列末尾＝最新を採用）
           newlyUnlockedLevel = _stampProgress.unlockedLevels[_stampProgress.unlockedLevels.length - 1];
         }
-        setTimeout(() => _openStampMemorySheet(spot, newlyUnlockedLevel), 900);
+        setTimeout(() => _openStampMemorySheet(spot, newlyUnlockedLevel, justCompletedLevel), 900);
         _renderStampMarkers();
         _renderStampFog();
         _renderStampCollectionList();
@@ -4771,15 +4782,15 @@
       }
     }
 
-    // ─── レベル解禁演出モーダル（設計書70改善3 → 設計書81でイラスト画像化 → 設計書107で刷新: 獲得スタンプ表示＋紙吹雪） ───
-    // completedLevel: チェックインしたスポットのレベル（メインで表示するスタンプ）
-    // unlockedLevel: 新しく解禁されたレベル（下部の補足ボックスで表示）
-    function openStampLevelUnlockModal(completedLevel, unlockedLevel) {
-      const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
-      const unlockedMeta = STAMP_LEVEL_META[unlockedLevel] || STAMP_LEVEL_META.standard;
+    // ─── レベル解禁演出モーダル（設計書70改善3 → 設計書81でイラスト画像化 → 設計書107で刷新（獲得スタンプ表示＋紙吹雪） → 設計書143で単一パラメータの解禁演出に戻す） ───
+    // unlockedLevel: 新しく解禁されたレベル（メインで表示するスタンプ・名前）
+    function openStampLevelUnlockModal(unlockedLevel) {
+      const meta = STAMP_LEVEL_META[unlockedLevel] || STAMP_LEVEL_META.standard;
       const emojiEl = document.getElementById('stamp-level-unlock-emoji');
       const nameEl = document.getElementById('stamp-level-unlock-name');
       const subtextEl = document.getElementById('stamp-level-unlock-subtext');
+      const titleEl = document.getElementById('stamp-level-unlock-title');
+      if (titleEl) titleEl.textContent = t('stampLevelUnlockModalTitle');
       if (emojiEl) {
         // 設計書81: 絵文字textContentからイラスト<img>表示に変更。モーダルを開くたびに
         // <img>要素を新規生成する方式（設計書75で確立、同一URL連続表示時のload/errorイベント
@@ -4793,8 +4804,37 @@
         _burstStampConfetti(imgEl || emojiEl);
       }
       if (nameEl) nameEl.textContent = `${meta.emoji} ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）`;
+      // 設計書143: バッジ・名前自体が「このレベルが解禁された」ことを表すため、
+      // design107で追加した補足サブテキスト（🔓 {level}のロックが解除されました）は非表示にする
+      // （コンプリートモーダルと共有DOMのため、コンプリート側は表示する）
+      if (subtextEl) subtextEl.style.display = 'none';
+      lockScroll();
+      document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
+      document.getElementById('stamp-level-unlock-modal').classList.add('visible');
+    }
+
+    // ─── 全制覇（コンプリート）モーダル（設計書143新規）───
+    // アンロックモーダルとDOM・CSS（バッジ画像・紙吹雪演出）を共有。completedLevel: 100%制覇したレベル
+    function openStampLevelCompleteModal(completedLevel) {
+      const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
+      const total = _stampSpots.filter(s => s.level === completedLevel).length;
+      const emojiEl = document.getElementById('stamp-level-unlock-emoji');
+      const nameEl = document.getElementById('stamp-level-unlock-name');
+      const subtextEl = document.getElementById('stamp-level-unlock-subtext');
+      const titleEl = document.getElementById('stamp-level-unlock-title');
+      if (titleEl) titleEl.textContent = t('stampLevelCompleteModalTitle');
+      if (emojiEl) {
+        emojiEl.innerHTML = `<img src="${meta.img}" alt="${t(meta.labelKey)}" class="stamp-unlock-img">`;
+        emojiEl.style.animation = 'none';
+        void emojiEl.offsetWidth;
+        emojiEl.style.animation = '';
+        const imgEl = emojiEl.querySelector('.stamp-unlock-img');
+        _burstStampConfetti(imgEl || emojiEl);
+      }
+      if (nameEl) nameEl.textContent = `${meta.emoji} ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）`;
       if (subtextEl) {
-        subtextEl.textContent = t('stampLevelUnlockSubtext').replace('{level}', `${unlockedMeta.emoji} ${t(unlockedMeta.labelKey)}`);
+        subtextEl.style.display = '';
+        subtextEl.textContent = `${total}/${total} ${t('stampLevelCompleteSpotsLabel')}`;
       }
       lockScroll();
       document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
@@ -4807,12 +4847,14 @@
       document.getElementById('stamp-level-unlock-modal').classList.remove('visible');
     }
 
-    // ─── 「思い出」機能: チェックイン後ミニシート（設計書121） ───
+    // ─── 「思い出」機能: チェックイン後ミニシート（設計書121 → 設計書143でコンプリート判定を追加） ───
     // newlyUnlockedLevel: doStampCheckin()から渡される新規解禁レベル（無ければnull）。
-    // シートを閉じた後にレベル解禁演出をチェーンして開くために保持しておく。
-    async function _openStampMemorySheet(spot, newlyUnlockedLevel) {
+    // justCompletedLevel: doStampCheckin()から渡される今回100%達成になったレベル（無ければnull）。
+    // シートを閉じた後にレベル解禁演出・コンプリート演出をチェーンして開くために保持しておく。
+    async function _openStampMemorySheet(spot, newlyUnlockedLevel, justCompletedLevel) {
       _stampMemorySpotId = spot.id;
-      _stampMemoryPendingUnlock = newlyUnlockedLevel ? { level: spot.level, newlyUnlockedLevel } : null;
+      _stampMemoryPendingUnlock = newlyUnlockedLevel || null;
+      _stampMemoryPendingComplete = justCompletedLevel || null;
       _stampMemoryPickedBlob = null;
       const nameEl = document.getElementById('stamp-memory-spot-name');
       if (nameEl) nameEl.textContent = (getLang() === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
@@ -4838,11 +4880,22 @@
       unlockScroll();
       document.getElementById('stamp-memory-overlay').classList.remove('visible');
       document.getElementById('stamp-memory-sheet').classList.remove('visible');
-      // 保留中のレベル解禁演出があれば、閉じた後にチェーンして開く（設計書121）
-      if (_stampMemoryPendingUnlock) {
-        const { level, newlyUnlockedLevel } = _stampMemoryPendingUnlock;
+      // 保留中のコンプリート演出・レベル解禁演出があれば、閉じた後にチェーンして開く（設計書121 → 設計書143でコンプリート演出を追加）。
+      // 両方が保留されている場合は「コンプリート→（一定時間後）アンロック」の順で連続表示する
+      // （現在のティア件数〈20/20/10/5〉では両方同時発生は実質起こらない想定だが、念のため両対応）
+      if (_stampMemoryPendingComplete) {
+        const completedLevel = _stampMemoryPendingComplete;
+        _stampMemoryPendingComplete = null;
+        setTimeout(() => openStampLevelCompleteModal(completedLevel), 500);
+        if (_stampMemoryPendingUnlock) {
+          const newlyUnlockedLevel = _stampMemoryPendingUnlock;
+          _stampMemoryPendingUnlock = null;
+          setTimeout(() => openStampLevelUnlockModal(newlyUnlockedLevel), 3000); // コンプリート演出を見終えた後にずらして表示
+        }
+      } else if (_stampMemoryPendingUnlock) {
+        const newlyUnlockedLevel = _stampMemoryPendingUnlock;
         _stampMemoryPendingUnlock = null;
-        setTimeout(() => openStampLevelUnlockModal(level, newlyUnlockedLevel), 500);
+        setTimeout(() => openStampLevelUnlockModal(newlyUnlockedLevel), 500);
       }
     }
 
