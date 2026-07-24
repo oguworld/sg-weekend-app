@@ -14509,3 +14509,97 @@ residencyCounterLabel: '在住歴 <b>{ym}</b><br>（{days}日）',
 
 ## 承認状況
 2026-07-24 ユーザーが実機スクリーンショットで「右上在住歴になっているので直しておいて」と明示。**承認済み**。
+
+# 設計書142 — 探訪ティア解禁条件を「固定2件」から「そのティアの半数チェックイン」に変更
+
+（2026-07-24 ユーザーとの会話で確定。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+現状、次のティアが解禁される条件は`STAMP_LEVEL_GATES`（`server.js`）で「前のティアを2件チェックインすると解禁」という固定値になっている（design 69時点、スポット総数が少なかった頃の設計）。ユーザーから「そのティアを半分制覇したら次のレベルに進める」形に変更したいとの要望。現在のティア件数（見習い20・定住レベル20・シンガポール通10・極めし者5）を踏まえると、見習い10件チェックインで定住レベル解禁、定住レベル10件チェックインでシンガポール通解禁、シンガポール通5件チェックインで極めし者解禁、となる。
+
+「アンロック（次のティアに進めること）」と「コンプリート（そのティアを完全制覇すること）」は現状の実装でも既に別概念（コレクション一覧の状態B〈解禁中・未全制覇〉/状態C〈解禁中・全制覇〉として区別済み、design 83）だが、閾値を固定2件から動的な半数に変更することで、この「アンロックしたが未完了」の期間がより長く・体感しやすくなる。
+
+## 2. 確定済み仕様
+
+`server.js`の`STAMP_LEVEL_GATES`から固定の`count`フィールドを削除し、`computeUnlockedLevels()`内で対象ティアの総スポット数から動的に閾値（`Math.ceil(総数 / 2)`）を算出する:
+
+```js
+// 変更前
+const STAMP_LEVEL_GATES = {
+  standard: null, // 常に解禁
+  local:   { requires: 'standard', count: 2 },
+  niche:   { requires: 'local',    count: 2 },
+  special: { requires: 'niche',    count: 2 },
+};
+const STAMP_LEVEL_ORDER = ['standard', 'local', 'niche', 'special'];
+
+function computeUnlockedLevels(allSpots, checkedInSpotIds) {
+  const checkedSet = new Set(checkedInSpotIds);
+  const countByLevel = {};
+  for (const s of allSpots) {
+    if (checkedSet.has(s.id)) countByLevel[s.level] = (countByLevel[s.level] || 0) + 1;
+  }
+  const unlocked = [];
+  for (const level of STAMP_LEVEL_ORDER) {
+    const gate = STAMP_LEVEL_GATES[level];
+    if (!gate) { unlocked.push(level); continue; }
+    if (unlocked.includes(gate.requires) && (countByLevel[gate.requires] || 0) >= gate.count) {
+      unlocked.push(level);
+    } else {
+      break;
+    }
+  }
+  return unlocked;
+}
+
+// 変更後
+const STAMP_LEVEL_GATES = {
+  standard: null, // 常に解禁
+  local:   { requires: 'standard' },
+  niche:   { requires: 'local' },
+  special: { requires: 'niche' },
+};
+const STAMP_LEVEL_ORDER = ['standard', 'local', 'niche', 'special'];
+
+// 解禁条件: 前レベルのスポット総数の半数（切り上げ）をチェックインすると次レベルが解禁される
+function computeUnlockedLevels(allSpots, checkedInSpotIds) {
+  const checkedSet = new Set(checkedInSpotIds);
+  const countByLevel = {};
+  const totalByLevel = {};
+  for (const s of allSpots) {
+    totalByLevel[s.level] = (totalByLevel[s.level] || 0) + 1;
+    if (checkedSet.has(s.id)) countByLevel[s.level] = (countByLevel[s.level] || 0) + 1;
+  }
+  const unlocked = [];
+  for (const level of STAMP_LEVEL_ORDER) {
+    const gate = STAMP_LEVEL_GATES[level];
+    if (!gate) { unlocked.push(level); continue; }
+    const threshold = Math.ceil((totalByLevel[gate.requires] || 0) / 2);
+    if (unlocked.includes(gate.requires) && (countByLevel[gate.requires] || 0) >= threshold) {
+      unlocked.push(level);
+    } else {
+      break;
+    }
+  }
+  return unlocked;
+}
+```
+
+スポット総数は`allSpots`（呼び出し元で既に`active !== false`フィルタ済み）から動的に算出するため、今後スポット数が増減しても閾値が自動的に追従する（固定値のハードコードを避け、design 77・120・122等でこのセッション中に何度もスポット数が変動してきた実態に合わせた設計判断）。
+
+## 3. 既存コードの調査結果
+
+- `server.js` 2005-2033行目: `STAMP_LEVEL_GATES`/`computeUnlockedLevels()`
+- 呼び出し元3箇所（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`）はいずれも`allSpots.filter(s => s.active !== false)`を渡しており、関数シグネチャ自体は無変更のため呼び出し元の修正は不要
+
+## 4. スコープ外
+
+コレクション一覧の状態A/B/C表示ロジック（design 83）自体は無変更（`unlockedLevels`の中身が変わるだけで、表示ロジックは既存の`unlocked`/`checkedCount < totalCount`判定をそのまま使う）。
+
+## 5〜7. データモデル・API・データ共有影響
+
+`server.js`の変更のため**`pm2 restart`が必要**。データモデル・APIレスポンス構造は無変更（`unlockedLevels`配列という形式自体は変わらず、中身の解禁タイミングが変わるのみ）。Web版・iOS版とも即座に反映される（サーバー側ロジックのため、iOS版もアプリ更新不要でAPI呼び出し時点で新ロジックが適用される）。
+
+## 承認状況
+2026-07-24 ユーザーが「半分制覇したら次のレベルに行ける」「見習いであれば十箇所制覇したらアンロック、定住レベルも十箇所制覇されたらアンロック」と明示。**承認済み**。

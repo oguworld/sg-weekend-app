@@ -2003,27 +2003,31 @@ function loadStampProgress(userId) {
 }
 
 // 段階ゲートの解禁条件（実装判断: standard→local→niche→specialの順に、
-// 前レベルを一定数チェックインすると次レベルが解禁される。スポット総数が少数〈v1は14件〉のため閾値は控えめに設定）
+// 前レベルのスポット総数の半数〈切り上げ〉をチェックインすると次レベルが解禁される。設計書142で固定件数〈2件〉から動的な半数方式に変更）
 const STAMP_LEVEL_GATES = {
   standard: null, // 常に解禁
-  local:   { requires: 'standard', count: 2 },
-  niche:   { requires: 'local',    count: 2 },
-  special: { requires: 'niche',    count: 2 },
+  local:   { requires: 'standard' },
+  niche:   { requires: 'local' },
+  special: { requires: 'niche' },
 };
 const STAMP_LEVEL_ORDER = ['standard', 'local', 'niche', 'special'];
 
 // checkedInSpotIds と全スポットリストから、解禁済みレベルの配列を算出する
+// 解禁条件: 前レベルのスポット総数の半数（切り上げ）をチェックインすると次レベルが解禁される
 function computeUnlockedLevels(allSpots, checkedInSpotIds) {
   const checkedSet = new Set(checkedInSpotIds);
   const countByLevel = {};
+  const totalByLevel = {};
   for (const s of allSpots) {
+    totalByLevel[s.level] = (totalByLevel[s.level] || 0) + 1;
     if (checkedSet.has(s.id)) countByLevel[s.level] = (countByLevel[s.level] || 0) + 1;
   }
   const unlocked = [];
   for (const level of STAMP_LEVEL_ORDER) {
     const gate = STAMP_LEVEL_GATES[level];
     if (!gate) { unlocked.push(level); continue; }
-    if (unlocked.includes(gate.requires) && (countByLevel[gate.requires] || 0) >= gate.count) {
+    const threshold = Math.ceil((totalByLevel[gate.requires] || 0) / 2);
+    if (unlocked.includes(gate.requires) && (countByLevel[gate.requires] || 0) >= threshold) {
       unlocked.push(level);
     } else {
       break; // レベルは順序通りにしか解禁されない

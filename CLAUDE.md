@@ -109,7 +109,7 @@ sg-weekend-app/
 既存のコース機能（AIコース生成、みんなのコース/マイコースの2タブ）とは**データ・生成ロジックとも完全に独立**した、SG実在スポットを段階的に「制覇」していくリテンション用コンテンツ。UI（コース画面の3タブ目「スタンプマップ」）のみ入口を共有する。
 
 - **データ**: `data/sg/stamp-spots.json`（新規、人力キュレーション、`.gitignore`のままVPS直接編集方式・git管理下への例外化はしない）。現在14件（standard/local/niche各4件+special2件）。`level`（`standard|local|niche|special`）/`area`（既存`CITY_COURSE_AREAS.sg`の7値と統一）/`category`/`checkinRadiusM`/`active`等のフィールドを持つ。ユーザー進捗は`data/stamp-progress/{userId}.json`（`data/user-plans`と同じ`usr_[a-f0-9]{24}`バリデーション、gitignore対象）
-- **段階ゲート**: `standard`は常時解禁。`local`/`niche`/`special`は前レベルを2件チェックインすると解禁（`server.js`の`STAMP_LEVEL_GATES`定数）。`special`レベルのスポットは未解禁ユーザーには`GET /api/stamp-spots`のレスポンス自体から除外される（フロントのフィルタだけに頼らず、ピンの存在自体をサーバー側で隠す設計）
+- **段階ゲート**: `standard`は常時解禁。`local`/`niche`/`special`は前レベルの総スポット数の半数（切り上げ）をチェックインすると解禁（`server.js`の`STAMP_LEVEL_GATES`定数・`computeUnlockedLevels()`関数。**2026-07-24実装の設計書142で固定2件から動的な半数方式に変更済み**、下記「探訪ティア解禁条件の変更」節参照）。`special`レベルのスポットは未解禁ユーザーには`GET /api/stamp-spots`のレスポンス自体から除外される（フロントのフィルタだけに頼らず、ピンの存在自体をサーバー側で隠す設計）
 - **API**: `GET /api/stamp-spots?city=sg`（認証不要、`verifyAppJwtOptional`で任意認証しspecial出し分け）、`GET /api/stamp-progress/me`（`requireAppAuth`必須）、`POST /api/stamp-progress/checkin`（`requireAppAuth`必須、`{spotId,lat,lng}`、`withFileLock`、冪等）。**v1時点ではサーバー側のGPS距離検証を行わずクライアント申告のlat/lngをそのまま信用する設計だったが、2026-07-21実装の設計書87でサーバー側のHaversine距離検証を追加済み（下記「スタンプチェックインのサーバー側GPS距離検証」節参照）。クライアント側GPS値自体の偽装（モック位置情報アプリ等）への対策は依然スコープ外**
 - **フロントエンド**: Leaflet 1.9.4を`public/vendor/leaflet/`にローカルバンドル（CDNではなくオフライン起動時の読み込み失敗リスクを回避）、OpenStreetMapタイル使用（APIキー不要）。フォグ・オブ・ウォーは新規イラスト素材なし、`#stamp-fog-overlay`に複数の`radial-gradient`を`background`として重ねてチェックイン済みスポット周辺だけ霧を薄くする方式（`mask-image`/`mask-composite`はブラウザ間差のリスクを考慮し不採用）。GPS近接判定+手動確認ボタンの2段階チェックイン（`@capacitor/geolocation`新規導入、Web版は`navigator.geolocation`フォールバック、Haversine距離計算で`checkinRadiusM`圏内のみボタン活性化）。ログイン必須（`getAuthToken()`で判定、未ログイン時は連携案内のみ表示）、パスフレーズ暗号化は無し（既存`requireAppAuth`保護で十分という設計判断）
 - z-index: `#stamp-spot-detail-overlay`3700/`#stamp-spot-detail-sheet`3701（設計書70で`#stamp-level-unlock-overlay`3702/`#stamp-level-unlock-modal`3703を追加、下記参照）
@@ -592,6 +592,16 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
 - `.screen-auth-gate-card`/`-icon`/`-msg`/`-btn`・JS・HTML・i18nはスコープ外で無変更
 - `server.js`・データファイルは無変更のため`pm2 restart`不要（未実施）。キャッシュバスティング: `index.html` app.css `?v=20260722a`→`20260722b`（app.jsは無変更のため据え置き）、`sw.js` CACHE_NAME=`sg-weekend-v669`→`v670`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのダークモード時の見た目は2026-07-22時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
+
+### 探訪ティア解禁条件の変更（固定2件→そのティアの半数チェックイン）（2026-07-24実装、設計書142）
+これまで次のティアが解禁される条件は「前のティアを2件チェックインすると解禁」という固定値だった（設計書69時点、スポット総数が少なかった頃の設計）。ユーザーから「そのティアを半分制覇したら次のレベルに進める」形に変更したいとの要望を受けて実装した。
+
+- `server.js`の`STAMP_LEVEL_GATES`定数から固定`count`フィールドを削除。`computeUnlockedLevels()`が、対象ティアの総スポット数（`allSpots`から動的算出、`Math.ceil(総数 / 2)`）を閾値として解禁判定するよう変更。スポット総数は呼び出し元が渡す`allSpots`（`active !== false`フィルタ済み）から都度算出するため、今後スポット数が増減しても閾値が自動的に追従する（固定値ハードコードを避けた設計）
+- 2026-07-24時点のティア件数（見習い20/定住レベル20/シンガポール通10/極めし者5）では、見習い10件チェックインで定住レベル解禁、定住レベル10件チェックインでシンガポール通解禁、シンガポール通5件チェックインで極めし者解禁、となる
+- 呼び出し元3箇所（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`）は`computeUnlockedLevels(allSpots, checkedInSpotIds)`のシグネチャが無変更のため修正不要
+- コレクション一覧の状態A（ロック中）/B（解禁中・未全制覇）/C（解禁中・全制覇）の表示ロジック（設計書83）は無変更（`unlockedLevels`の中身が変わるだけで、表示ロジックは既存の`unlocked`/`checkedCount < totalCount`判定をそのまま使う）
+- `server.js`のみの変更のため`pm2 restart`実施済み。データモデル・APIレスポンス構造は無変更（`unlockedLevels`配列という形式自体は変わらず、中身の解禁タイミングが変わるのみ）。Web版・iOS版とも即座に反映される（サーバー側ロジックのため、iOS版もアプリ更新不要でAPI呼び出し時点で新ロジックが適用される）
+- 実機curl検証済み: standardスポット9件チェックイン時点では`unlockedLevels:["standard"]`のまま（閾値10未満）、10件目のチェックインで`["standard","local"]`に切り替わることを確認。`GET /api/stamp-progress/me`のレスポンスとも一致、`GET /api/stamp-spots`で解禁済み`local`スポットがマスクなしで返ることも確認済み
 
 ## 広告表示機能フェーズ2: PRカード（スポンサー広告枠）（2026-07-13実装、設計書29 → 2026-07-16設計書47でテストデータ削除・非表示化）
 - イベント一覧に、Klookアフィリエイトとは別枠のスポンサー広告カード（PRカード）を条件付きで1件差し込む機能。設計書23フェーズ2の元設計を、plannerが現在の行番号ベースで再検証・確定した内容
