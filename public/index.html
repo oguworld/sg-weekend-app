@@ -238,10 +238,10 @@
 
       <!-- ニックネーム＋アバター -->
       <div class="settings-item" style="gap:10px;">
-        <span class="settings-item-label" style="white-space:nowrap;" data-i18n="labelNickname">ニックネーム</span>
+        <span class="settings-item-label" style="white-space:nowrap;display:none;" data-i18n="labelNickname">ニックネーム</span>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <input id="nickname-input" type="text" maxlength="20" data-i18n-ph="nicknamePlaceholder" placeholder="匿名"
-            style="width:90px;text-align:right;border:none;background:transparent;font-size:16px;
+            style="display:none;width:90px;text-align:right;border:none;background:transparent;font-size:16px;
                    color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
             oninput="localStorage.setItem('user_name', this.value.trim() || t('nicknamePlaceholder'))"
             onblur="if(!this.value.trim()) this.value=''">
@@ -1185,7 +1185,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260724n"></script>
+  <script src="/app.js?v=20260724o"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

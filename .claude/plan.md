@@ -15808,3 +15808,61 @@ CSS（`public/app.css`）: `.stamp-card-area-row`を削除し、新規`.stamp-ca
 
 ## 4. 承認状況
 2026-07-24 ユーザー「一番下切れてるね」（スクリーンショット添付）。**承認済み**（明確な不具合修正のため直接実装に進める）。
+
+# 設計書157 — 設定画面のニックネーム欄を非表示化
+
+（2026-07-24 ユーザー「ニックネーム入らなくなったので非表示にして」。マイコース非表示化〈design 94〉等により、ニックネームの実用上の出番が薄れたための対応と推測。既存の「機能は残しつつ表示のみ止める」プロジェクト方針〈design 94/95/102等〉を踏襲し、削除ではなく非表示化する）
+
+## 1. 確定仕様
+
+`public/index.html`のニックネーム欄（235-253行目付近、「ニックネーム＋アバター」の`.settings-item`ブロック全体）に`style="display:none;"`を追加して非表示化する。**アバター選択（`#avatar-preview`/`toggleAvatarPicker()`/アバター選択パネル）は同じブロック内に同居しているため、アバター機能自体は生かしたまま維持するか、ニックネームと同じ行にあるアバターボタンごと非表示にするかは実装時に確認が必要**。
+
+**方針**: ユーザーの発言は「ニックネーム」のみを指しているため、ニックネーム入力欄（`#nickname-input`）だけを非表示にし、アバター選択ボタン（`#avatar-preview`）は残す。ただし両者は同じ`.settings-item`の1行に横並びで実装されているため、レイアウトが崩れないよう、行全体の構造を保ったまま`#nickname-input`のみを`display:none`にし、アバターボタンだけが残る形にする（ラベル「ニックネーム」テキスト自体も、対応する入力欄がなくなるため一緒に非表示にする）。
+
+```html
+<div class="settings-item" style="gap:10px;">
+  <span class="settings-item-label" style="white-space:nowrap;display:none;" data-i18n="labelNickname">ニックネーム</span>
+  <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+    <input id="nickname-input" type="text" maxlength="20" data-i18n-ph="nicknamePlaceholder" placeholder="匿名"
+      style="display:none;width:90px;text-align:right;border:none;background:transparent;font-size:16px;
+             color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
+      oninput="localStorage.setItem('user_name', this.value.trim() || t('nicknamePlaceholder'))"
+      onblur="if(!this.value.trim()) this.value=''">
+    <button id="avatar-preview" onclick="toggleAvatarPicker()"
+      style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--sand-dark);
+             background:var(--sand);font-size:16px;cursor:pointer;flex-shrink:0;
+             display:flex;align-items:center;justify-content:center;padding:0;">🙂</button>
+  </div>
+</div>
+```
+
+**関数・ロジックは削除しない**（`initSettingsProfile()`内のニックネーム初期化処理、`getUserName()`、`oninput`/`onblur`ハンドラ、アバター選択パネルはすべて無変更のまま残置。復活時は`display:none`を外すだけでよい既存パターンを踏襲）。
+
+## 2. スコープ外
+アバター選択機能自体は非表示にしない（ユーザーの発言はニックネームのみを指しているため）。`getUserName()`の呼び出し元（コース公開機能等）のロジックは変更しない（`user_name`が未設定の場合は既存の`|| '匿名'`フォールバックがそのまま機能する）。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「ニックネーム入らなくなったので非表示にして」。**承認済み**（明確な小粒修正のため直接実装に進める）。
+
+# 設計書158 — 設定画面のアバター選択も非表示化（ニックネーム欄ごと1行を非表示に統一）
+
+（2026-07-24 design 157〈ニックネーム非表示〉直後、ユーザー「アバターも非表示で」。ニックネーム・アバターは同じ`.settings-item`1行に同居しており、両方非表示にすると行全体が空になるため、個別要素ではなく行自体を非表示にする）
+
+## 1. 確定仕様
+
+`public/index.html`の「ニックネーム＋アバター」の`.settings-item`ブロック（design 157時点、236-254行目付近）自体に`style="display:none;"`を追加する（個別要素への`display:none`の重ね掛けではなく、行全体を1箇所で非表示にすることで、空のパディング行が残る見た目の問題を避ける）。
+
+```html
+<!-- ニックネーム＋アバター -->
+<div class="settings-item" style="gap:10px;display:none;">
+  ... (中身は design 157 時点のまま無変更)
+</div>
+```
+
+**ロジック・関数は削除しない**（`toggleAvatarPicker()`・アバター選択パネル・`initSettingsProfile()`内の初期化処理はすべて無変更のまま残置。復活時はこの1箇所の`display:none`を外すだけでよい）。
+
+## 2. スコープ外
+`getUserName()`・`user_name`/`user_avatar`のlocalStorageキー・関連ロジックは変更しない。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「アバターも非表示で」。**承認済み**（明確な小粒修正のため直接実装に進める）。
