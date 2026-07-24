@@ -15157,3 +15157,99 @@ HTML生成部分（4506行目付近〜返り値のtemplate literal内）を、�
 
 ## 4. 承認状況
 2026-07-24 ユーザーがスクリーンショット付きでフィードバック、上記2点の変更として解釈し実装する。**承認済み**（内容が明確な小粒修正のため、追加のモック確認は行わず直接実装に進める）。
+
+# 設計書148 — 進捗バーを「アイコン直接乗せ＋数字は下に小さく」のコンパクト表示に変更（案C）＋絵文字拡大
+
+（2026-07-24 design 147のスクリーンショットにユーザーが「スマートじゃない」とフィードバック。モック3案〈A: 数字を下に／B: アイコンをバーに直接乗せる／C: 両方合わせたコンパクト版〉を提示し、ユーザーが案Cを選択、加えて「絵文字を少し大きく」と指定）
+
+## 1. 背景
+
+design 146・147で追加した「目盛り線＋アイコン」方式（アイコンがバーの上に浮き、細い縦線でバーにつながる構造）が、🔓/🏆の2つのアイコン＋右の数字ラベルが密集して見え「スマートじゃない」という印象になった。モックを提示し、ユーザーが「アイコンをバー上に直接乗せる（目盛り線を廃止）」「数字ラベルをバーの下に移動」の両方を合わせた案Cを選択。加えてアイコン自体をもう少し大きくして視認性を上げたいとの要望。
+
+## 2. 確定仕様
+
+### 2-1. HTML構造の変更（`_renderStampLevelRowInProgress()`、`public/app.js` 4502-4534行目付近を置き換え）
+
+- `.stamp-level-progress-tick`系（目盛り線＋浮遊アイコン、design 146・147）を廃止し、アイコンをトラック内に直接重ねて配置する新規`.stamp-level-progress-icon`に統一
+- `.stamp-level-progress-row`（トラックと数字ラベルを横並びにする行）を廃止し、トラック単体→数字ラベル（下・右寄せ・小さめ）の縦積みレイアウトに変更
+
+```js
+const tickHtml = (thresholdPct !== null && thresholdPct < 100)
+  ? `<span class="stamp-level-progress-icon" style="left:${thresholdPct}%;">🔓</span>`
+  : '';
+const flagHtml = `<span class="stamp-level-progress-icon stamp-level-progress-icon--end" style="left:100%;">🏆</span>`;
+
+return `<div class="stamp-level-section">
+  <div class="stamp-level-section-title">
+    ${meta.emoji}
+    ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）
+  </div>
+  <div class="stamp-level-progress-track-wrap">
+    <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
+    ${tickHtml}
+    ${flagHtml}
+  </div>
+  <div class="stamp-level-progress-count"><b>${checkedN}</b> / ${total}</div>
+  <div class="stamp-card-list">${cardsHtml}</div>
+</div>`;
+```
+
+閾値計算部分（`idx`/`hasNextLevel`/`threshold`/`thresholdPct`、design 145から流用のロジック）は無変更のまま維持する。
+
+### 2-2. CSS変更（`public/app.css`）
+
+design 146・147で追加した`.stamp-level-progress-row`/`.stamp-level-progress-tick`/`.stamp-level-progress-tick-icon`/`.stamp-level-progress-tick-line`/`.stamp-level-progress-tick--end`/`.stamp-level-progress-label`を削除し、以下に置き換える:
+
+```css
+.stamp-level-progress-track-wrap {
+  position: relative;
+  margin-bottom: 4px;
+}
+.stamp-level-progress-track {
+  height: 16px; border-radius: 50px;
+  background: var(--sand);
+  border: 1px solid var(--sand-dark);
+}
+.stamp-level-progress-fill {
+  height: 100%; border-radius: 50px;
+  background: linear-gradient(90deg, var(--caramel-light), var(--caramel));
+  transition: width 0.3s ease;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);
+}
+.stamp-level-progress-icon {
+  position: absolute; top: 50%; left: 0;
+  transform: translate(-50%, -50%);
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--warm-white);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1;
+  box-shadow: 0 0 0 1.5px var(--sand-dark) inset, 0 1px 2px rgba(44,36,32,0.2);
+  z-index: 2;
+}
+.stamp-level-progress-icon--end {
+  transform: translate(-100%, -50%);
+}
+.stamp-level-progress-count {
+  text-align: right;
+  font-size: 11px; color: var(--warm-gray); font-weight: 700;
+  margin-bottom: 10px;
+}
+.stamp-level-progress-count b {
+  color: var(--caramel); font-size: 12px; font-weight: 900;
+}
+```
+
+design 148 §2で指定した「絵文字を少し大きく」は、design 147時点の目盛りアイコン`font-size:11px`から`.stamp-level-progress-icon`の`font-size:14px`（アイコン円自体も18px→22pxへ拡大）に反映済み。
+
+### 2-3. `.stamp-card-list`とのmargin調整
+
+design 147時点は`.stamp-level-progress-row`に`margin-bottom:10px`があったが、新構造では`.stamp-level-progress-count`に`margin-bottom:10px`を持たせることで、`.stamp-card-list`（スポットカード一覧）との間隔を従来通り維持する。
+
+## 3. スコープ外
+
+閾値計算ロジック自体・`hasNextLevel`判定・状態A/C（ロック中・全制覇済み）の表示は変更しない。
+
+`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 4. 承認状況
+2026-07-24 モック3案（A/B/C）提示、ユーザーが「案Cでいいけど絵文字を少し大きくして見やすくして」と回答。**承認済み**。

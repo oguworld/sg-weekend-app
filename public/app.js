@@ -4510,25 +4510,23 @@
       const threshold = hasNextLevel ? Math.ceil(total / 2) : null;
       const thresholdPct = (threshold !== null && total > 0) ? Math.min(100, Math.round((threshold / total) * 100)) : null;
 
+      // 設計書148: 「目盛り線＋浮遊アイコン」方式を廃止し、アイコンをバー上に直接乗せる＋数字ラベルはバー下に小さく表示するコンパクト表示（案C）に変更
       const tickHtml = (thresholdPct !== null && thresholdPct < 100)
-        ? `<div class="stamp-level-progress-tick" style="left:${thresholdPct}%;"><span class="stamp-level-progress-tick-icon">🔓</span><span class="stamp-level-progress-tick-line"></span></div>`
+        ? `<span class="stamp-level-progress-icon" style="left:${thresholdPct}%;">🔓</span>`
         : '';
-      // 設計書147: 全制覇ライン（旧🏁単独アイコン）も解禁ラインと同じ目盛り線構造に統一し、絵文字を🏆に変更
-      const flagHtml = `<div class="stamp-level-progress-tick stamp-level-progress-tick--end" style="left:100%;"><span class="stamp-level-progress-tick-icon">🏆</span><span class="stamp-level-progress-tick-line"></span></div>`;
+      const flagHtml = `<span class="stamp-level-progress-icon stamp-level-progress-icon--end" style="left:100%;">🏆</span>`;
 
       return `<div class="stamp-level-section">
         <div class="stamp-level-section-title">
           ${meta.emoji}
           ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）
         </div>
-        <div class="stamp-level-progress-row">
-          <div class="stamp-level-progress-track-wrap">
-            <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
-            ${tickHtml}
-            ${flagHtml}
-          </div>
-          <span class="stamp-level-progress-label">${checkedN}/${total}</span>
+        <div class="stamp-level-progress-track-wrap">
+          <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
+          ${tickHtml}
+          ${flagHtml}
         </div>
+        <div class="stamp-level-progress-count"><b>${checkedN}</b> / ${total}</div>
         <div class="stamp-card-list">${cardsHtml}</div>
       </div>`;
     }

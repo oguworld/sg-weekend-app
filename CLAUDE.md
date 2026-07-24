@@ -867,6 +867,20 @@ design 146実装後、ユーザーがスクリーンショット付きで「全�
 - `server.js`・データファイルは無変更（`pm2 restart`不要）
 - キャッシュバスティング: `index.html` app.css `?v=20260724c`→`20260724d`、app.js `?v=20260724h`→`20260724i`、`sw.js` CACHE_NAME=`sg-weekend-v697`→`v698`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での全制覇ライン目盛り線・🏆アイコンの見た目、右端でのはみ出し有無は2026-07-24時点でコード確認・curlによる本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
+- **⚠️ 本節（目盛り線＋浮遊アイコン方式）は直後の設計書148により置き換えられている。以下「進捗バーを『アイコン直接乗せ＋数字は下に小さく』のコンパクト表示に変更」節を参照。閾値計算ロジック自体（設計書145から流用、`idx`/`hasNextLevel`/`threshold`/`thresholdPct`）はdesign 148でも無変更のままそのまま有効**
+
+### 進捗バーを「アイコン直接乗せ＋数字は下に小さく」のコンパクト表示に変更（案C）＋絵文字拡大（2026-07-24実装、設計書148。設計書146・147の見た目部分のみを置き換え）
+design 147のスクリーンショットに、ユーザーが「スマートじゃない」とフィードバック。🔓/🏆アイコン＋右の数字ラベルが密集して見える問題があった。モック3案（A: 数字を下に／B: アイコンをバーに直接乗せる／C: 両方合わせたコンパクト版）を提示し、ユーザーが案Cを選択、加えて「絵文字を少し大きく」と指定。
+
+- **「目盛り線＋浮遊アイコン」方式を廃止**: design 146・147で追加した`.stamp-level-progress-tick`（アイコン＋縦線がトラック上部に浮く構造）を削除し、アイコンをトラック内に直接重ねて配置する新規`.stamp-level-progress-icon`（`position:absolute;top:50%`でトラック中央に垂直センタリング）に統一。縦線（`-tick-line`）自体を廃止
+- **数字ラベルをバー下・右寄せの小さな表示に変更**: `.stamp-level-progress-row`（トラックと数字ラベルを横並びにしていた行）を廃止し、トラック→数字ラベル（`.stamp-level-progress-count`、`<b>チェック数</b> / 総数`形式）の縦積みレイアウトに変更
+- `_renderStampLevelRowInProgress()`（`public/app.js`）の`tickHtml`/`flagHtml`を、目盛り線を持たないシンプルな`<span class="stamp-level-progress-icon">`（🔓、閾値位置）・`<span class="stamp-level-progress-icon stamp-level-progress-icon--end">`（🏆、トラック右端、`hasNextLevel`の有無に関わらず常時表示、design 146・147から変更なし）に置き換え
+- **閾値計算部分（`idx`/`hasNextLevel`/`threshold`/`thresholdPct`、design 145から流用のロジック）は一切変更なし**
+- **CSS**: design 146・147の`.stamp-level-progress-row`/`.stamp-level-progress-tick`/`.stamp-level-progress-tick-icon`/`.stamp-level-progress-tick-line`/`.stamp-level-progress-tick--end`/`.stamp-level-progress-label`を削除し、`.stamp-level-progress-track-wrap`（`position:relative;margin-bottom:4px`）・`.stamp-level-progress-track`（`height:16px`）・`.stamp-level-progress-icon`（22px円、`font-size:14px`。design 147時点のアイコン`font-size:11px`より拡大＝ユーザーの「絵文字を少し大きく」要望への対応）・`.stamp-level-progress-icon--end`（`translate(-100%,-50%)`で右端はみ出し防止）・`.stamp-level-progress-count`（`text-align:right;font-size:11px`、`margin-bottom:10px`で`.stamp-card-list`との間隔をdesign 147時点と同程度に維持）に置き換え
+- 状態A（ロック中）・状態C（全制覇済み）・`special`レベル（次レベルなし、🔓は出ず🏆のみ表示）の既存挙動は無変更のまま維持
+- `server.js`・データファイルは無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.css `?v=20260724d`→`20260724e`、app.js `?v=20260724i`→`20260724j`、`sw.js` CACHE_NAME=`sg-weekend-v698`→`v699`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのアイコン直乗せ表示・数字ラベルの視認性、絵文字拡大後のバランスは2026-07-24時点でコード確認・`node --check`のみ完了、実ブラウザ・実機とも未確認（本タスク実施環境のサンドボックス制約によりPlaywrightでの実ブラウザ確認ができなかった）
 
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
