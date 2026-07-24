@@ -1423,6 +1423,16 @@ BKK/SYD 停止箇所:
 - キャッシュバスティング: `index.html` app.js `?v=20260724o`→`20260724p`、`sw.js` CACHE_NAME=`sg-weekend-v711`→`v712`（`app.css`は無変更のため据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での都市選択欄非表示・他プロフィール項目とのレイアウトバランスは2026-07-24時点でコード確認のみ完了、実機未確認
 
+### 探訪スタンプ帳の全制覇展開カード・次はここタグのフォントサイズ調整（2026-07-24実装、設計書162）
+「全体的にフォントバランスを整えて」の依頼を受け、design 154でメインのカード一覧側（`.stamp-card-area-right`=11px/`.stamp-card-date`=13px）が拡大された際に追従していなかった2箇所を統一した。`public/app.css`のみの変更。
+- `.stamp-complete-card-area`（全制覇済みレベルの展開カード内エリア表記、design 108由来）: font-size 10px→11px（`.stamp-card-area-right`と統一）
+- `.stamp-complete-card-date`（同、チェックイン日付表記）: font-size 10px→13px（`.stamp-card-date`と統一）
+- `.stamp-card-next-tag`（「次はここ！」タグ、design 154でカード自体が拡大されたのに追従していなかった）: font-size 10px→11px
+- 上記3クラスとも`font-size`以外のプロパティ（color/font-weight/margin/background/padding/border-radius等）は無変更
+- スコープ外: `.cal-count-badge`（8px）、他の9〜10px台の装飾・補助テキスト（区切り線・ミニラベル・マップピンバッジ等）はユーザーが対象外選択
+- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260724n`→`20260724o`、`sw.js` CACHE_NAME=`sg-weekend-v712`→`v713`（`app.js`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのフォントサイズ調整後の視認性・レイアウトバランスは2026-07-24時点でコード確認のみ完了、実機未確認
+
 ## SGエリア区分に「Sentosa」追加（2026-07-13実装、設計書24）
 SGのエリア区分がCentral/East/West/North/North-East/Island-wideの6区分から、**Sentosa追加で7区分**になった。Sentosaはケーブルカー・モノレールで渡る独立した「行き先」であり、ユニバーサル・スタジオ／S.E.A.水族館（→Singapore Oceanarium）／ビーチ等、単独でコース1本分埋まる濃さのエリアのため独立区分化。
 - 変更箇所: `public/app.js`の`CITY_COURSE_AREAS.sg`（コース作成画面のエリアチップ）、`public/index.html`の`#event-filter-sheet`内`.ef-chip`（イベント絞り込みシート、こちらはHTML直書きの別実装でJS定数とは独立）、`scripts/filter-events.js`の`CITY_AREAS.sg`（取り込みパイプラインのAI分類プロンプト用列挙値）

@@ -2193,7 +2193,7 @@
       white-space: nowrap;
     }
     .stamp-card-next-tag {
-      font-size: 10px; font-weight: 700; color: white;
+      font-size: 11px; font-weight: 700; color: white;
       background: var(--caramel); padding: 1px 7px; border-radius: 50px;
     }
     .stamp-card-meta {
@@ -2276,8 +2276,8 @@
       font-family: 'Kaisei Opti', serif;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .stamp-complete-card-area { font-size: 10px; color: var(--warm-gray); margin-top: 1px; }
-    .stamp-complete-card-date { font-size: 10px; font-weight: 700; color: var(--caramel); margin-top: 1px; }
+    .stamp-complete-card-area { font-size: 11px; color: var(--warm-gray); margin-top: 1px; }
+    .stamp-complete-card-date { font-size: 13px; font-weight: 700; color: var(--caramel); margin-top: 1px; }
 
     /* ─── 「思い出」機能: チェックイン後ミニシート（設計書121） ─── */
     /* 旧・単一ボックス版（design 121）。design 144で#stamp-memory-photo-slotsに置き換え、参照元がなくなったため

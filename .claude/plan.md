@@ -15960,3 +15960,32 @@ BKK/SYD再開時の復活手順（CLAUDE.md記載の`ACTIVE_CITIES`書き換え�
 
 ## 3. 承認状況
 2026-07-24 ユーザー「都市もシンガポールだけなので非表示で」。**承認済み**（明確な小粒修正のため直接実装に進める）。
+
+# 設計書162 — 探訪スタンプ帳の全制覇展開カード・次はここタグのフォントサイズ調整
+
+（2026-07-24 「全体的にフォントバランスを整えて」の依頼を受け、機械的な基準〈極小サイズ・design 154拡大後との整合性ズレ〉で3候補を洗い出しユーザーに提示。ユーザーが2点を選択）
+
+## 1. 確定仕様
+
+`public/app.css`の以下2箇所のfont-sizeを変更する（他プロパティは無変更）:
+
+1. **`.stamp-complete-card-area`/`.stamp-complete-card-date`**（全制覇済みレベルの展開カード内メタ表記、design 108由来。design 154でメインのカード一覧側〈`.stamp-card-area-right`=11px/`.stamp-card-date`=13px〉が拡大された際に追従していなかった）:
+```css
+.stamp-complete-card-area { font-size: 11px; /* 10px→11px、.stamp-card-area-rightと統一 */ color: var(--warm-gray); margin-top: 1px; }
+.stamp-complete-card-date { font-size: 13px; /* 10px→13px、.stamp-card-dateと統一 */ font-weight: 700; color: var(--caramel); margin-top: 1px; }
+```
+
+2. **`.stamp-card-next-tag`**（「次はここ！」タグ、design 154でカード自体が拡大されたのに追従していなかった）:
+```css
+.stamp-card-next-tag {
+  font-size: 11px; /* 10px→11px */
+  font-weight: 700; color: white;
+  /* 他プロパティ（background/padding/border-radius）は無変更 */
+}
+```
+
+## 2. スコープ外
+`.cal-count-badge`（8px）は今回対象外（ユーザーが1・2のみ選択）。他の9〜10px台の装飾・補助テキスト（区切り線・ミニラベル・マップピンバッジ等）も対象外。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「1、2をお願い」。**承認済み**。
