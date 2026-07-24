@@ -981,6 +981,14 @@ design 157〈ニックネーム非表示〉直後、ユーザー「アバター�
 - キャッシュバスティング: `sw.js` CACHE_NAME=`sg-weekend-v708`→`v709`（`app.js`/`app.css`は内容変更なしのため`?v=`据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのレイアウト崩れ有無（行全体非表示後のプロフィールセクション余白バランス）は2026-07-24時点で`git diff`によるコード照合のみ完了、実ブラウザ・実機とも未確認
 
+### 予定表の予定タイトル・探訪スタンプ帳のスポット名を見出しフォント（Kaisei Opti）に統一（2026-07-24実装、設計書159）
+フォント全体整理の会話の中で、ユーザーが予定表の予定タイトル（スクリーンショットで「体操教室」を例示）を指摘。調査の結果、`.plan-card-title`（予定表の予定タイトル）・`.stamp-card-name`（探訪スタンプ帳のスポット名）はいずれも他の見出し類（`.plan-modal-title`・`.course-timeline-name`・`#stamp-spot-detail-name`等）と異なりNoto Sans JP（ゴシック）のままで、Kaisei Opti（明朝系セリフ）が適用されていないことが判明。ユーザーが統一を選択した。
+
+- `public/app.css`の2箇所に`font-family: 'Kaisei Opti', serif;`を追加（他の設定値・プロパティは一切無変更）: `.plan-card-title`（`font-size:16px; font-weight:700; color:var(--midnight); margin-bottom:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;`はそのまま）、`.stamp-card-name`（`display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:14px; font-weight:700; color:var(--midnight);`はそのまま）
+- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.css `?v=20260724l`→`20260724m`、`sw.js` CACHE_NAME=`sg-weekend-v709`→`v710`（`app.js`は内容変更なしのため`?v=`据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新フォント表示・文字幅変化によるタイトル省略（`text-overflow:ellipsis`）位置への影響は2026-07-24時点で`git diff`によるコード照合・curlでのWeb版配信反映確認のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 

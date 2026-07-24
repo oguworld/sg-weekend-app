@@ -15866,3 +15866,33 @@ CSS（`public/app.css`）: `.stamp-card-area-row`を削除し、新規`.stamp-ca
 
 ## 3. 承認状況
 2026-07-24 ユーザー「アバターも非表示で」。**承認済み**（明確な小粒修正のため直接実装に進める）。
+
+# 設計書159 — 予定表の予定タイトル・探訪スタンプ帳のスポット名を見出しフォント（Kaisei Opti）に統一
+
+（2026-07-24 フォント全体整理の会話の中で、ユーザーが予定表の予定タイトル（スクリーンショットで「体操教室」を例示）を指摘。調査の結果、`.plan-card-title`（予定表の予定タイトル）・`.stamp-card-name`（探訪スタンプ帳のスポット名）はいずれも他の見出し類〈`.plan-modal-title`・`.course-timeline-name`・`#stamp-spot-detail-name`等〉と異なりNoto Sans JP〈ゴシック〉のままで、Kaisei Opti〈明朝系セリフ〉が適用されていないことが判明。ユーザーが統一を選択）
+
+## 1. 確定仕様
+
+`public/app.css`の2箇所に`font-family: 'Kaisei Opti', serif;`を追加する（他の設定値は無変更）:
+
+```css
+.plan-card-title {
+  font-family: 'Kaisei Opti', serif;
+  font-size: 16px; font-weight: 700; color: var(--midnight); margin-bottom: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+```
+
+```css
+.stamp-card-name {
+  font-family: 'Kaisei Opti', serif;
+  font-size: 14px; font-weight: 700; color: var(--midnight);
+  /* display/align-items/gap/flex-wrap は design 153時点のまま無変更 */
+}
+```
+
+## 2. スコープ外
+他の見出し・タイトル類（既にKaisei Optiが適用済みの要素）は変更しない。フォントサイズ・太さ・色は変更しない（フォントファミリーのみの変更）。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザーが「体操教室」の例（`.plan-card-title`）を指してフォント統一を確認。**承認済み**（Kaisei Optiへの統一で実装する）。

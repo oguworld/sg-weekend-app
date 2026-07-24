@@ -2179,6 +2179,7 @@
     }
     .stamp-card-body { flex: 1; min-width: 0; }
     .stamp-card-name {
+      font-family: 'Kaisei Opti', serif;
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
       font-size: 14px; font-weight: 700; color: var(--midnight);
     }
@@ -3037,7 +3038,7 @@
     }
     .plan-card--event .plan-card-emoji { background: var(--caramel-pale); }
     .plan-card-info { flex: 1; min-width: 0; }
-    .plan-card-title { font-size: 16px; font-weight: 700; color: var(--midnight); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .plan-card-title { font-family: 'Kaisei Opti', serif; font-size: 16px; font-weight: 700; color: var(--midnight); margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .plan-card-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 3px; }
     .plan-chip { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; background: var(--sand); color: var(--warm-gray); }
     .plan-chip--urgent { background: rgba(196,112,90,0.15); color: var(--terracotta); }
