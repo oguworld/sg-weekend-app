@@ -15786,3 +15786,25 @@ CSS（`public/app.css`）: `.stamp-card-area-row`を削除し、新規`.stamp-ca
 
 ## 3. 承認状況
 2026-07-24 ユーザー「エリアはカードの右端で」。**承認済み**（内容が明確な小粒修正のため直接実装に進める）。
+
+# 設計書156 — 卒業アルバム画面の下端がボトムナビに隠れて見切れる不具合を修正
+
+（2026-07-24 design 152実装後、ユーザーがスクリーンショットで「一番下切れてるね」と報告。クロージングセクションのブランドライン「おでかけNavi と歩いたシンガポール暮らし」がボトムナビの裏に隠れて見えなくなっていた）
+
+## 1. 原因
+
+`#graduation-album-content`（`public/index.html` 941行目付近）の`padding-bottom`が`calc(40px + env(safe-area-inset-bottom,0px))`のみで、ボトムナビ自体の高さ分の余白が確保されていなかった。本プロジェクトの既存方針（CLAUDE.md「z-index方針」節）により、モーダル・フルスクリーンオーバーレイはbottom-nav（z-index:9999）より下のz-indexに統一されており、bottom-navは常に最前面に表示され続ける。そのため、スクロール可能なコンテンツの末尾がbottom-navの高さ分だけ隠れないよう、十分な下部余白を確保する必要がある（既存の`.plan-modal-body`が`calc(84px + env(safe-area-inset-bottom,0px))`を使っているのと同じ理由）。
+
+## 2. 確定仕様
+
+`public/index.html`の`#graduation-album-content`の`padding`を、`.plan-modal-body`と同じ値に統一する:
+
+```html
+<div id="graduation-album-content" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));"></div>
+```
+
+## 3. スコープ外
+アルバム画面の他のレイアウト・データ生成ロジックは変更しない。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 4. 承認状況
+2026-07-24 ユーザー「一番下切れてるね」（スクリーンショット添付）。**承認済み**（明確な不具合修正のため直接実装に進める）。
