@@ -317,7 +317,7 @@
         headerSubtitle: 'シンガポール在住者の週末おでかけガイド', // city-specific: overridden by updateCityUI()
         labelCity: '都市',
         labelArrivalDate: '来星日',
-        residencyCounterLabel: '在住 <b>{ym}</b><br>（{days}日）',
+        residencyCounterLabel: '在住歴 <b>{ym}</b><br>（{days}日）',
         arrivalAnniversaryNotifTitle: '🎉 来星記念日です！',
         arrivalAnniversaryNotifBody: 'シンガポール生活{n}年目に突入しました。探訪の記録を振り返ってみませんか？',
         shareLabel: 'シェア',

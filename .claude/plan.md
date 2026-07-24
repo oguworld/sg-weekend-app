@@ -14482,3 +14482,30 @@ function _stampLevelYearRange(meta) {
 
 ## 承認状況
 2026-07-24 ユーザーが「在住歴」案に「はい、お願いします」と明示。**承認済み**。
+
+# 設計書141 — 探訪画面右上の在住日数バッジも「在住歴」表記に統一
+
+（2026-07-24 ユーザーが実機スクリーンショットで指摘。design 140でティア見出しは「在住歴」化されたが、右上バッジ〈design 127〉の`residencyCounterLabel`は別i18nキーのため未反映だった。コード実装はorchestratorに依頼する）
+
+## 1. 確定済み仕様
+
+`public/app.js`の`residencyCounterLabel`のja値のみ変更（en側は無変更、キー名も不変）:
+
+```js
+// 変更前
+residencyCounterLabel: '在住 <b>{ym}</b><br>（{days}日）',
+// 変更後
+residencyCounterLabel: '在住歴 <b>{ym}</b><br>（{days}日）',
+```
+
+## 2. 既存コードの調査結果
+
+- `public/app.js` 320行目: `residencyCounterLabel`（ja値）
+- `public/app.js` 4073行目: `_renderResidencyCounter()`内の参照箇所（無変更）
+
+## 3〜5. データモデル・API・データ共有影響
+
+**変更なし**。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。
+
+## 承認状況
+2026-07-24 ユーザーが実機スクリーンショットで「右上在住歴になっているので直しておいて」と明示。**承認済み**。
