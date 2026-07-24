@@ -2249,6 +2249,8 @@
     .stamp-complete-card-date { font-size: 10px; font-weight: 700; color: var(--caramel); margin-top: 1px; }
 
     /* ─── 「思い出」機能: チェックイン後ミニシート（設計書121） ─── */
+    /* 旧・単一ボックス版（design 121）。design 144で#stamp-memory-photo-slotsに置き換え、参照元がなくなったため
+       実質死にクラス化しているが実害がないため削除せず残置。 */
     .stamp-memory-photo-box {
       width: 100%;
       height: 220px;
@@ -2267,11 +2269,35 @@
     .stamp-memory-photo-box--filled {
       border: none;
     }
+
+    /* ─── 「思い出」機能: 3スロット入力UI（設計書144） ─── */
+    .stamp-memory-photo-slots {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stamp-memory-photo-slot {
+      flex: 1;
+      height: 100px;
+      border: 2px dashed var(--sand-dark);
+      border-radius: 14px;
+      background: var(--sand) center/cover no-repeat;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      position: relative;
+      box-sizing: border-box;
+    }
+    .stamp-memory-photo-slot .icon { font-size: 20px; }
+    .stamp-memory-photo-slot .lbl { font-size: 11px; font-weight: 700; color: var(--warm-gray); }
+    .stamp-memory-photo-slot--filled {
+      border: none;
+    }
     .stamp-memory-photo-remove {
-      position: absolute; top: 8px; right: 8px;
-      width: 28px; height: 28px; border-radius: 50%;
+      position: absolute; top: 6px; right: 6px;
+      width: 24px; height: 24px; border-radius: 50%;
       background: rgba(44,36,32,0.55);
-      color: white; font-size: 14px;
+      color: white; font-size: 12px;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer;
     }
@@ -2328,7 +2354,21 @@
       cursor: pointer;
     }
 
+    /* ─── 思い出フレーム: 最大3枚の散らし配置ポラロイドスタック（設計書144） ─── */
+    .stamp-memory-polaroid-stack { position: relative; height: 190px; width: 260px; margin: 0 auto 12px; }
+    .stamp-memory-polaroid {
+      position: absolute;
+      width: 130px;
+      background: #fff;
+      padding: 8px 8px 14px;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.22);
+      box-sizing: border-box;
+    }
+    .stamp-memory-polaroid img { width: 100%; height: 110px; object-fit: cover; display: block; }
+
     /* ─── 思い出フレーム（ポラロイド風、Cパターン、設計書121追記） ─── */
+    /* design 144で1枚専用の.stamp-detail-memory-photo-frameは.stamp-memory-polaroid-stackに置き換え、
+       参照元がなくなったため実質死にクラス化しているが実害がないため削除せず残置。 */
     .stamp-detail-memory-photo-frame {
       width: 100%;
       max-width: 240px;

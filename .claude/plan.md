@@ -14745,3 +14745,176 @@ if (_stampMemoryPendingComplete) {
 
 ## 承認状況
 2026-07-24 ユーザーが「アンロック時はスタンプ獲得なしでいいよ...代わりにコンプリート時もモーダルを出してほしいです。全制覇！というやつですね。」と明示。**承認済み**。
+
+# 設計書144 — 思い出写真を最大3枚まで対応（複数枚保存・散らし配置表示）
+
+（2026-07-24 ユーザーとの会話で確定。モック（3スロット入力・詳細シート散らし配置）を提示し承認済み。コード実装はorchestratorに依頼する）
+
+## 1. 背景
+
+design 121の思い出機能は1スポットにつき写真1枚のみ（明示的にスコープ外としていた「複数枚対応」）。ユーザーから「卒業アルバム（design 141ブレスト）をいい感じにするため、1枚だけでなく最大3枚まで保存できるようにしたい」との要望。モック（詳細シートは3枚のポラロイドを散らして重ねる配置、思い出を残すシートは3スロット横並びで空きスロットをタップして追加）を提示し承認済み。
+
+## 2. 確定済み仕様
+
+### 2-1. IndexedDBスキーマ変更（後方互換込み）
+
+`_openStampMemoryDB()`自体（`STAMP_MEMORY_DB_NAME`/`STAMP_MEMORY_STORE_NAME`/`keyPath:'spotId'`）は無変更。レコードの値を`{spotId, blob, updatedAt}`（1枚固定）から`{spotId, photos: Blob[], updatedAt}`（配列、最大3件）に変更する。**既存ユーザーが保存済みの旧スキーマレコード（`blob`フィールドのみ）を読み取り時に自動的に`[blob]`として扱う後方互換処理を必須とする**（設計書121時点で既に写真を保存しているユーザーがいる可能性があるため、マイグレーションなしで自然に読める設計にする）。
+
+新規/置き換えヘルパー関数（`public/app.js`、既存の`_saveStampMemoryPhotoBlob`/`_getStampMemoryPhotoBlob`/`_getAllStampMemoryPhotoBlobs`を置き換え）:
+
+```js
+async function _getStampMemoryPhotos(spotId) {
+  try {
+    const db = await _openStampMemoryDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STAMP_MEMORY_STORE_NAME, 'readonly');
+      const req = tx.objectStore(STAMP_MEMORY_STORE_NAME).get(spotId);
+      req.onsuccess = () => {
+        const row = req.result;
+        if (!row) { resolve([]); return; }
+        if (Array.isArray(row.photos)) resolve(row.photos);
+        else if (row.blob) resolve([row.blob]); // 旧スキーマ（design 121、1枚のみ）との後方互換
+        else resolve([]);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch (_) { return []; }
+}
+
+async function _saveStampMemoryPhotos(spotId, photosArray) {
+  const db = await _openStampMemoryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STAMP_MEMORY_STORE_NAME, 'readwrite');
+    tx.objectStore(STAMP_MEMORY_STORE_NAME).put({ spotId, photos: photosArray.slice(0, 3), updatedAt: new Date().toISOString() });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function _getAllStampMemoryPhotos() {
+  try {
+    const db = await _openStampMemoryDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STAMP_MEMORY_STORE_NAME, 'readonly');
+      const req = tx.objectStore(STAMP_MEMORY_STORE_NAME).getAll();
+      req.onsuccess = () => {
+        const out = {};
+        (req.result || []).forEach(row => {
+          if (!row || !row.spotId) return;
+          out[row.spotId] = Array.isArray(row.photos) ? row.photos : (row.blob ? [row.blob] : []);
+        });
+        resolve(out);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch (_) { return {}; }
+}
+```
+
+### 2-2. インメモリキャッシュを配列化
+
+`_stampMemoryPhotoUrlCache`（`{spotId: objectURL}`）を`{spotId: objectURL[]}`（配列）に変更する。既存の2つの利用箇所を配列対応に更新:
+- `_renderStampLevelRowComplete()`（状態C、design 108由来。design 136の対象外だった箇所）: `_stampMemoryPhotoUrlCache[spot.id]` → `(_stampMemoryPhotoUrlCache[spot.id] || [])[0]`（サムネイルは引き続き1枚目のみ使用、表示ロジック自体は変更しない）
+- `_renderStampDetailMemorySection()`: 配列全体を使って散らし配置で表示（後述）
+
+`initStampMapTab()`の一括読み込み・`_refreshStampMemoryCacheForSpot(spotId)`（個別更新）を新ヘルパーに対応させる:
+```js
+async function _refreshStampMemoryCacheForSpot(spotId) {
+  const photos = await _getStampMemoryPhotos(spotId);
+  _stampMemoryPhotoUrlCache[spotId] = photos.map(b => URL.createObjectURL(b));
+}
+```
+```js
+// initStampMapTab()内
+_getAllStampMemoryPhotos().then(photosMap => {
+  Object.entries(photosMap).forEach(([spotId, blobs]) => {
+    _stampMemoryPhotoUrlCache[spotId] = blobs.map(b => URL.createObjectURL(b));
+  });
+  _renderStampCollectionList();
+});
+```
+
+### 2-3. 「思い出を残す」シート: 3スロット入力UI
+
+`public/index.html`の`#stamp-memory-photo-box`（単一ボックス）を3スロット横並びに置き換える:
+
+```html
+<div id="stamp-memory-photo-slots" class="stamp-memory-photo-slots">
+  <div class="stamp-memory-photo-slot" data-slot="0" onclick="_pickStampMemoryPhoto(0)"><div class="icon">📷</div><div class="lbl" data-i18n="stampMemoryPhotoAddLabel">追加</div></div>
+  <div class="stamp-memory-photo-slot" data-slot="1" onclick="_pickStampMemoryPhoto(1)"><div class="icon">📷</div><div class="lbl" data-i18n="stampMemoryPhotoAddLabel">追加</div></div>
+  <div class="stamp-memory-photo-slot" data-slot="2" onclick="_pickStampMemoryPhoto(2)"><div class="icon">📷</div><div class="lbl" data-i18n="stampMemoryPhotoAddLabel">追加</div></div>
+</div>
+```
+
+新規CSS（`public/app.css`）: `.stamp-memory-photo-slots { display:flex; gap:8px; margin-bottom:12px; }` `.stamp-memory-photo-slot`は既存`.stamp-memory-photo-box`の点線枠デザインを踏襲しつつ3分割（`flex:1; height:100px;`）、`.stamp-memory-photo-slot--filled`で背景画像表示＋✕ボタンをオーバーレイ。
+
+`public/app.js`側のJS書き換え:
+- `_stampMemoryPickedBlob`（単一）→ `_stampMemoryPickedBlobs`（配列、最大3、`null`で空きスロットを表現。例: `[blob, null, null]`）
+- `_pickStampMemoryPhoto(slotIndex)`: 指定スロットに写真をピックして`_stampMemoryPickedBlobs[slotIndex]`にセットし、`_renderStampMemoryPhotoSlots()`で全スロット再描画
+- `_showStampMemoryPhotoPreview(blob)`（現行の単一プレビュー表示ロジック）は`_renderStampMemoryPhotoSlots()`に統合・置き換え（スロットごとに空/埋まり状態をDOM反映する共通関数）
+- `_resetStampMemoryPhotoBox()` → `_resetStampMemoryPhotoSlot(slotIndex)`（指定スロットのみクリア）
+- `_openStampMemorySheet()`: 既存メモ・写真のプリロード部分を、`_getStampMemoryPhotos(spot.id)`で取得した配列（最大3）を`_stampMemoryPickedBlobs`に反映する形に変更
+- `_saveStampMemory()`: `_stampMemoryPickedBlobs.filter(b => b)`（nullを除いた配列）を`_saveStampMemoryPhotos(spotId, ...)`に渡す
+
+### 2-4. スポット詳細シート「あなたの記録」: 散らし配置での複数枚表示
+
+`_renderStampDetailMemorySection(spot)`で、写真配列の枚数（1〜3）に応じたプリセット配置で表示する。新規CSS・JSヘルパー:
+
+```js
+const STAMP_MEMORY_SCATTER_LAYOUTS = {
+  1: [{ left: 65, top: 0, rot: -3 }],
+  2: [{ left: 10, top: 6, rot: -6 }, { left: 130, top: 0, rot: 5 }],
+  3: [{ left: 0, top: 10, rot: -7 }, { left: 70, top: 0, rot: 4 }, { left: 135, top: 16, rot: -3 }],
+};
+function _buildStampMemoryPhotoScatterHtml(photoUrls) {
+  const n = Math.min(photoUrls.length, 3);
+  const layout = STAMP_MEMORY_SCATTER_LAYOUTS[n] || [];
+  const polaroids = photoUrls.slice(0, 3).map((url, i) => {
+    const pos = layout[i] || { left: 0, top: 0, rot: 0 };
+    return `<div class="stamp-memory-polaroid" style="left:${pos.left}px;top:${pos.top}px;transform:rotate(${pos.rot}deg);z-index:${i + 1};">
+      <img src="${url}" alt="">
+    </div>`;
+  }).join('');
+  return `<div class="stamp-memory-polaroid-stack">${polaroids}</div>`;
+}
+```
+
+`_renderStampDetailMemorySection()`内、既存の単一`.stamp-detail-memory-photo-frame`生成部分をこの関数呼び出しに置き換える。チェックイン日付キャプション（design 121の`checkinDate`）は個々のポラロイドに付けず、スタック全体の下に1回だけ表示する形に変更する（写真ごとに同じ日付を繰り返し表示する冗長さを避けるため）。
+
+新規CSS（`public/app.css`）:
+```css
+.stamp-memory-polaroid-stack { position:relative; height:190px; width:260px; margin:0 auto 12px; }
+.stamp-memory-polaroid { position:absolute; width:130px; background:#fff; padding:8px 8px 14px; box-shadow:0 6px 14px rgba(0,0,0,0.22); box-sizing:border-box; }
+.stamp-memory-polaroid img { width:100%; height:110px; object-fit:cover; display:block; }
+```
+
+既存の`.stamp-detail-memory-photo-frame`/`-caption`（design 121追記分、1枚専用の大判ポラロイド表示）は削除せず残置する（写真が0枚または将来的な用途で参照される可能性を考慮し、無効化のみ。新規関数を使わなくなるため実質死にクラス化するが実害なし）。
+
+### 2-5. i18nキー
+
+新規キーは不要。`stampMemoryPhotoAddLabel`（既存、「写真を追加」）を再利用しつつ、3スロットでは短く「追加」と表示するため値を変更する:
+- ja: 「写真を追加」→「追加」
+- en: 「Add a photo」→「Add」
+
+（スロットが3つ横並びで幅が狭いため短縮。詳細シート等、他に参照箇所がないことを確認した上で変更する）
+
+## 3. 既存コードの調査結果
+
+- `public/app.js` 3932-3982行目付近: `_openStampMemoryDB()`/`_saveStampMemoryPhotoBlob()`/`_getStampMemoryPhotoBlob()`/`_getAllStampMemoryPhotoBlobs()`
+- `public/app.js` 3833-3834行目付近: `_stampMemoryPickedBlob`/`_stampMemoryPhotoUrlCache`宣言
+- `public/app.js` `_pickStampMemoryPhoto()`/`_showStampMemoryPhotoPreview()`/`_resetStampMemoryPhotoBox()`/`_openStampMemorySheet()`/`_saveStampMemory()`
+- `public/app.js` `_renderStampLevelRowComplete()`（4506-4524行目付近）: design 136の対象外だった`_stampMemoryPhotoUrlCache`参照箇所、配列の`[0]`を使うよう調整
+- `public/app.js` `_renderStampDetailMemorySection()`（design 121・127）: 散らし配置表示に置き換え
+- `public/index.html` 862-865行目: `#stamp-spot-detail-memory`（詳細シート、中身のみ変更）
+- `public/index.html` 903-906行目: `#stamp-memory-photo-box`（3スロットに置き換え）
+
+## 4. スコープ外
+
+写真の並び替え・特定の1枚だけ削除して他は残す高度な編集操作（3スロット全てに対する個別✕ボタンで代替済み、追加のUIは作らない）。卒業アルバム機能自体（design 141ブレスト、まだ着手前）は今回のスコープ外、今回はその土台となる複数枚保存機能のみ対応する。
+
+## 5〜7. データモデル・API・データ共有影響
+
+**変更なし**（写真は引き続き端末内IndexedDBのみ、サーバー送信なし）。`server.js`・データファイル無変更のため`pm2 restart`不要。キャッシュバスティングを更新。Web版・iOS版両方に反映、iOS版は次回TestFlightビルドで反映。
+
+## 承認状況
+2026-07-24 ユーザーがモック（3スロット入力・詳細シート散らし配置）に「バッチリです」と明示。**承認済み**。

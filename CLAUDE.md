@@ -816,6 +816,20 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
 - `server.js`は無変更（`data/user-plans/{userId}.json`はサーバー側では暗号化Blobとして扱うのみのため対応不要）。`pm2 restart`不要。キャッシュバスティング: `index.html` app.css `?v=20260722c`→`20260722d`、app.js `?v=20260722g`→`20260722h`、`sw.js` CACHE_NAME=`sg-weekend-v673`→`v674`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのカメラ/フォトライブラリ権限ダイアログ表示、撮影/選択→リサイズ→IndexedDB保存のフロー、思い出シート→レベル解禁演出のチェーン表示タイミング、詳細シートのポラロイド風フレーム表示、コレクション一覧のサムネイル・メモ優先表示は2026-07-22時点でWeb版のロジック・配線確認のみ完了、実機未確認
 
+### 思い出写真を最大3枚まで対応（複数枚保存・散らし配置表示）（2026-07-24実装、設計書144）
+上記「探訪チェックイン時の『思い出』機能」節（設計書121）は当初1スポットにつき写真1枚のみ（明示的にスコープ外だった「複数枚対応」）だったが、ユーザーから「卒業アルバム（design 141ブレスト）をいい感じにするため、最大3枚まで保存できるようにしたい」との要望を受け拡張した。モック（詳細シートは3枚のポラロイドを散らして重ねる配置、思い出を残すシートは3スロット横並び）を提示し承認済み。
+
+- **IndexedDBスキーマ変更（後方互換込み）**: `_openStampMemoryDB()`自体（`STAMP_MEMORY_DB_NAME`/`STAMP_MEMORY_STORE_NAME`/`keyPath:'spotId'`）は無変更。レコードの値を`{spotId, blob, updatedAt}`（1枚固定）から`{spotId, photos: Blob[], updatedAt}`（配列、最大3件）に変更。旧`_saveStampMemoryPhotoBlob()`/`_getStampMemoryPhotoBlob()`/`_getAllStampMemoryPhotoBlobs()`を`_saveStampMemoryPhotos()`/`_getStampMemoryPhotos()`/`_getAllStampMemoryPhotos()`に置き換え。**既存ユーザーが設計書121時点で保存済みの旧スキーマレコード（`blob`フィールドのみ）を読み取り時に自動的に`[blob]`として扱う後方互換処理を必須で含む**（マイグレーション処理は無し、読み取り時のフォールバックのみで自然に対応）
+- **インメモリキャッシュ配列化**: `_stampMemoryPhotoUrlCache`（`{spotId: objectURL}`）を`{spotId: objectURL[]}`（配列）に変更。利用箇所3つを配列対応: `initStampMapTab()`の一括読み込み（`_getAllStampMemoryPhotos()`）・`_refreshStampMemoryCacheForSpot(spotId)`（個別更新）・`_renderStampLevelRowComplete()`（状態C、design 108由来。design 136の対象外だった箇所で個人写真優先ロジックが残っていた。配列の`[0]`のみ使用、表示ロジック自体は無変更）・`_renderStampDetailMemorySection()`（配列全体を使い散らし配置で表示）
+- **「思い出を残す」シートを3スロット化**: `public/index.html`の`#stamp-memory-photo-box`（単一ボックス）を`#stamp-memory-photo-slots`（3スロット横並び、`data-slot="0/1/2"`）に置き換え。`_stampMemoryPickedBlob`（単一）→`_stampMemoryPickedBlobs`（配列、最大3、空きスロットは`null`）。旧`_showStampMemoryPhotoPreview()`/`_resetStampMemoryPhotoBox()`を、3スロット全体を一括再描画する共通関数`_renderStampMemoryPhotoSlots()`と`_resetStampMemoryPhotoSlot(slotIndex)`に統合・置き換え。`_pickStampMemoryPhoto()`は`_pickStampMemoryPhoto(slotIndex)`に変更（`_pickStampMemoryPhotoBlob()`本体はBlob1枚を返すだけの既存ヘルパーのため無変更）。`_openStampMemorySheet()`は既存写真（最大3枚）を配列で取得し各スロットへプリロード、`_saveStampMemory()`は`_stampMemoryPickedBlobs.filter(b => b)`（nullを除いた配列）を保存する
+- **スポット詳細シート「あなたの記録」: 散らし配置での複数枚表示**: `_renderStampDetailMemorySection(spot)`に、写真配列の枚数（1〜3）に応じたプリセット配置で表示する新規定数`STAMP_MEMORY_SCATTER_LAYOUTS`＋新規関数`_buildStampMemoryPhotoScatterHtml(photoUrls)`を追加。チェックイン日付キャプション（`_stampCheckinDateFor()`）は個々の写真ではなく、スタック全体の下に1回だけ表示する形に変更（写真ごとに同じ日付を繰り返す冗長さを避けるため）
+- **CSS**: 新規`.stamp-memory-photo-slots`（`display:flex`3分割）/`.stamp-memory-photo-slot`/`.stamp-memory-photo-slot--filled`、新規`.stamp-memory-polaroid-stack`/`.stamp-memory-polaroid`（散らし配置、`position:absolute`＋インラインstyleでレイアウトプリセットの`left`/`top`/`rotate`/`z-index`を個別指定）を追加。旧`.stamp-memory-photo-box`系（design 121の単一ボックス版）・`.stamp-detail-memory-photo-frame`系（design 121の1枚専用ポラロイド表示）は削除せず残置（参照元がなくなり死にクラス化するのみで実害なし）
+- **i18n**: `stampMemoryPhotoAddLabel`の**値のみ**変更（キー名は不変）: ja「写真を追加」→「追加」、en「Add a photo」→「Add」（3スロットで横幅が狭いため短縮。他に参照箇所がないことを確認済み）
+- onclick属性は既存の確立済みパターン（design 130で`_pickStampMemoryPhoto()`等のタッチガードを撤去し単純なonclick方式にしていた）をそのまま踏襲。新規スロット・削除✕ボタンとも新規touchendハンドラは追加していない
+- スコープ外（design 144時点で明示）: 写真の並び替え・特定の1枚だけ削除して他は残す高度な編集操作（3スロット全てへの個別✕ボタンで代替済み）、卒業アルバム機能自体（design 141ブレスト、まだ着手前）
+- データモデル・API（写真は引き続き端末内IndexedDBのみ、サーバー送信なし）は無変更。`server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260723d`→`20260724a`、app.js `?v=20260724e`→`20260724f`、`sw.js` CACHE_NAME=`sg-weekend-v694`→`v695`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での3スロット入力UI・散らし配置表示の見た目、design 121時点で既に1枚保存済みのユーザーが実際に3スロット化後も正しく読み込めるかの実機確認、複数枚同時保存→リロード後の表示は2026-07-24時点でロジック単体テスト・コード確認のみ完了、実機未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 

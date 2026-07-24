@@ -470,7 +470,7 @@
         stampCompleteListShow: 'スポット一覧を見る ▾',
         stampCompleteListHide: '閉じる ▴',
         stampMemorySheetTitle: 'この瞬間を残しますか？',
-        stampMemoryPhotoAddLabel: '写真を追加',
+        stampMemoryPhotoAddLabel: '追加',
         stampMemoryPhotoLocalNote: '🔒 写真は端末内にのみ保存されます',
         stampMemoryTextPlaceholder: '気づきや感想を残す（任意）',
         stampMemorySkipBtn: 'スキップ',
@@ -761,7 +761,7 @@
         stampCompleteListShow: 'Show spots ▾',
         stampCompleteListHide: 'Hide ▴',
         stampMemorySheetTitle: 'Save this moment?',
-        stampMemoryPhotoAddLabel: 'Add a photo',
+        stampMemoryPhotoAddLabel: 'Add',
         stampMemoryPhotoLocalNote: '🔒 Photos are stored on this device only',
         stampMemoryTextPlaceholder: 'Add a note or reflection (optional)',
         stampMemorySkipBtn: 'Skip',
@@ -3830,8 +3830,8 @@
     let _stampMemorySpotId = null;
     let _stampMemoryPendingUnlock = null; // newlyUnlockedLevel（レベル文字列）または null（設計書143でlevelフィールドは不要になり単体保持に簡略化）
     let _stampMemoryPendingComplete = null; // completedLevel（レベル文字列）または null（設計書143新規）
-    let _stampMemoryPickedBlob = null;
-    let _stampMemoryPhotoUrlCache = {}; // spotId → objectURL（IndexedDB非同期読み込み結果のインメモリキャッシュ）
+    let _stampMemoryPickedBlobs = [null, null, null]; // 設計書144: 3スロット固定配列、空きスロットはnull
+    let _stampMemoryPhotoUrlCache = {}; // spotId → objectURL[]（IndexedDB非同期読み込み結果のインメモリキャッシュ、設計書144で配列化）
 
     // Capacitor Geolocationプラグイン取得（registerPlugin優先→Pluginsフォールバック、既存Keyboard/PushNotificationsと同じ防御的パターン）
     let _CapGeo = null;
@@ -3944,31 +3944,39 @@
       });
     }
 
-    async function _saveStampMemoryPhotoBlob(spotId, blob) {
-      const db = await _openStampMemoryDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(STAMP_MEMORY_STORE_NAME, 'readwrite');
-        tx.objectStore(STAMP_MEMORY_STORE_NAME).put({ spotId, blob, updatedAt: new Date().toISOString() });
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    }
-
-    async function _getStampMemoryPhotoBlob(spotId) {
+    // 設計書144: 1スポットにつき最大3枚まで対応（配列化）。旧スキーマ（{spotId,blob,updatedAt}、design 121・1枚固定）
+    // で既に保存済みのユーザーのレコードも [blob] として自然に読める後方互換処理を必須で含む。
+    async function _getStampMemoryPhotos(spotId) {
       try {
         const db = await _openStampMemoryDB();
         return await new Promise((resolve, reject) => {
           const tx = db.transaction(STAMP_MEMORY_STORE_NAME, 'readonly');
           const req = tx.objectStore(STAMP_MEMORY_STORE_NAME).get(spotId);
-          req.onsuccess = () => resolve(req.result ? req.result.blob : null);
+          req.onsuccess = () => {
+            const row = req.result;
+            if (!row) { resolve([]); return; }
+            if (Array.isArray(row.photos)) resolve(row.photos);
+            else if (row.blob) resolve([row.blob]); // 旧スキーマ（design 121、1枚のみ）との後方互換
+            else resolve([]);
+          };
           req.onerror = () => reject(req.error);
         });
       } catch (_) {
-        return null;
+        return [];
       }
     }
 
-    async function _getAllStampMemoryPhotoBlobs() {
+    async function _saveStampMemoryPhotos(spotId, photosArray) {
+      const db = await _openStampMemoryDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STAMP_MEMORY_STORE_NAME, 'readwrite');
+        tx.objectStore(STAMP_MEMORY_STORE_NAME).put({ spotId, photos: photosArray.slice(0, 3), updatedAt: new Date().toISOString() });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function _getAllStampMemoryPhotos() {
       try {
         const db = await _openStampMemoryDB();
         return await new Promise((resolve, reject) => {
@@ -3976,7 +3984,10 @@
           const req = tx.objectStore(STAMP_MEMORY_STORE_NAME).getAll();
           req.onsuccess = () => {
             const out = {};
-            (req.result || []).forEach(row => { if (row && row.spotId) out[row.spotId] = row.blob; });
+            (req.result || []).forEach(row => {
+              if (!row || !row.spotId) return;
+              out[row.spotId] = Array.isArray(row.photos) ? row.photos : (row.blob ? [row.blob] : []);
+            });
             resolve(out);
           };
           req.onerror = () => reject(req.error);
@@ -4166,9 +4177,11 @@
         _renderStampUserLocation();
       });
 
-      // 「思い出」写真のインメモリキャッシュを一括構築（設計書121 §2-5、IndexedDB非同期読み込みのためfire-and-forget）
-      _getAllStampMemoryPhotoBlobs().then(blobs => {
-        Object.entries(blobs).forEach(([spotId, blob]) => { _stampMemoryPhotoUrlCache[spotId] = URL.createObjectURL(blob); });
+      // 「思い出」写真のインメモリキャッシュを一括構築（設計書121 §2-5、設計書144で配列化。IndexedDB非同期読み込みのためfire-and-forget）
+      _getAllStampMemoryPhotos().then(photosMap => {
+        Object.entries(photosMap).forEach(([spotId, blobs]) => {
+          _stampMemoryPhotoUrlCache[spotId] = (blobs || []).map(b => URL.createObjectURL(b));
+        });
         _renderStampCollectionList();
       });
     }
@@ -4509,8 +4522,8 @@
       const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       const cardsHtml = sorted.map(spot => {
         const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
-        // 設計書121 §2-4: 個人の思い出写真があればスポット画像より優先してサムネイルに使う
-        const memoryPhotoUrl = _stampMemoryPhotoUrlCache[spot.id] || '';
+        // 設計書121 §2-4: 個人の思い出写真があればスポット画像より優先してサムネイルに使う（設計書144: 配列の1枚目のみ使用）
+        const memoryPhotoUrl = (_stampMemoryPhotoUrlCache[spot.id] || [])[0] || '';
         const thumbSrc = memoryPhotoUrl || spot.imageUrl || '';
         const thumbInner = thumbSrc
           ? `<img src="${thumbSrc}" alt="${name}" class="stamp-complete-card-thumb-img">`
@@ -4855,22 +4868,22 @@
       _stampMemorySpotId = spot.id;
       _stampMemoryPendingUnlock = newlyUnlockedLevel || null;
       _stampMemoryPendingComplete = justCompletedLevel || null;
-      _stampMemoryPickedBlob = null;
+      _stampMemoryPickedBlobs = [null, null, null];
       const nameEl = document.getElementById('stamp-memory-spot-name');
       if (nameEl) nameEl.textContent = (getLang() === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
       const textEl = document.getElementById('stamp-memory-text');
       const existingMemo = _getStampMemos()[spot.id];
       if (textEl) textEl.value = existingMemo?.text || '';
-      _resetStampMemoryPhotoBox();
+      _renderStampMemoryPhotoSlots();
       lockScroll();
       document.getElementById('stamp-memory-overlay').classList.add('visible');
       document.getElementById('stamp-memory-sheet').classList.add('visible');
-      // 既存の写真があれば非同期で読み込んでプレビュー表示（新規チェックイン時はIndexedDBに何もないため何も起きない）
+      // 既存の写真があれば非同期で読み込んでプレビュー表示（新規チェックイン時はIndexedDBに何もないため何も起きない、設計書144で最大3枚対応）
       try {
-        const existingBlob = await _getStampMemoryPhotoBlob(spot.id);
-        if (existingBlob && _stampMemorySpotId === spot.id) { // 読み込み中にシートが別スポット用に開き直されていないか確認
-          _stampMemoryPickedBlob = existingBlob;
-          _showStampMemoryPhotoPreview(existingBlob);
+        const existingPhotos = await _getStampMemoryPhotos(spot.id);
+        if (existingPhotos.length && _stampMemorySpotId === spot.id) { // 読み込み中にシートが別スポット用に開き直されていないか確認
+          existingPhotos.slice(0, 3).forEach((blob, i) => { _stampMemoryPickedBlobs[i] = blob; });
+          _renderStampMemoryPhotoSlots();
         }
       } catch (_) {}
     }
@@ -4901,39 +4914,46 @@
 
     function _skipStampMemory() { _closeStampMemorySheetInternal(); }
 
-    function _showStampMemoryPhotoPreview(blob) {
-      const url = URL.createObjectURL(blob);
-      const box = document.getElementById('stamp-memory-photo-box');
-      if (!box) return;
-      box.classList.add('stamp-memory-photo-box--filled');
-      box.style.backgroundImage = `url('${url}')`;
-      box.innerHTML = '<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); _resetStampMemoryPhotoBox()">✕</div>';
+    // 設計書144: 3スロット全体をまとめて再描画する共通関数（_stampMemoryPickedBlobsの現在値をDOMに反映）
+    function _renderStampMemoryPhotoSlots() {
+      const container = document.getElementById('stamp-memory-photo-slots');
+      if (!container) return;
+      _stampMemoryPickedBlobs.forEach((blob, i) => {
+        const slot = container.querySelector(`.stamp-memory-photo-slot[data-slot="${i}"]`);
+        if (!slot) return;
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          slot.classList.add('stamp-memory-photo-slot--filled');
+          slot.style.backgroundImage = `url('${url}')`;
+          slot.innerHTML = `<div class="stamp-memory-photo-remove" onclick="event.stopPropagation(); _resetStampMemoryPhotoSlot(${i})">✕</div>`;
+        } else {
+          slot.classList.remove('stamp-memory-photo-slot--filled');
+          slot.style.backgroundImage = '';
+          slot.innerHTML = '<div class="icon">📷</div><div class="lbl">' + t('stampMemoryPhotoAddLabel') + '</div>';
+        }
+      });
     }
 
-    async function _pickStampMemoryPhoto() {
+    async function _pickStampMemoryPhoto(slotIndex) {
       try {
         const blob = await _pickStampMemoryPhotoBlob();
         if (!blob) return; // キャンセル・権限拒否
-        _stampMemoryPickedBlob = await _resizeImageBlob(blob);
-        _showStampMemoryPhotoPreview(_stampMemoryPickedBlob);
+        _stampMemoryPickedBlobs[slotIndex] = await _resizeImageBlob(blob);
+        _renderStampMemoryPhotoSlots();
       } catch (e) {
         showToast(t('toastStampMemoryError'));
       }
     }
 
-    function _resetStampMemoryPhotoBox() {
-      _stampMemoryPickedBlob = null;
-      const box = document.getElementById('stamp-memory-photo-box');
-      if (!box) return;
-      box.classList.remove('stamp-memory-photo-box--filled');
-      box.style.backgroundImage = '';
-      box.innerHTML = '<div class="icon">📷</div><div class="label">' + t('stampMemoryPhotoAddLabel') + '</div>';
+    function _resetStampMemoryPhotoSlot(slotIndex) {
+      _stampMemoryPickedBlobs[slotIndex] = null;
+      _renderStampMemoryPhotoSlots();
     }
 
-    // インメモリキャッシュ（サムネイル同期描画用）の該当spotIdのみ個別更新（設計書121 §2-5）
+    // インメモリキャッシュ（サムネイル同期描画用）の該当spotIdのみ個別更新（設計書121 §2-5、設計書144で配列化）
     async function _refreshStampMemoryCacheForSpot(spotId) {
-      const blob = await _getStampMemoryPhotoBlob(spotId);
-      if (blob) _stampMemoryPhotoUrlCache[spotId] = URL.createObjectURL(blob);
+      const photos = await _getStampMemoryPhotos(spotId);
+      _stampMemoryPhotoUrlCache[spotId] = photos.map(b => URL.createObjectURL(b));
     }
 
     async function _saveStampMemory() {
@@ -4942,7 +4962,8 @@
       const textEl = document.getElementById('stamp-memory-text');
       const text = (textEl ? textEl.value : '').trim();
       try {
-        if (_stampMemoryPickedBlob) await _saveStampMemoryPhotoBlob(spotId, _stampMemoryPickedBlob);
+        const photosToSave = _stampMemoryPickedBlobs.filter(b => b);
+        if (photosToSave.length) await _saveStampMemoryPhotos(spotId, photosToSave);
         if (text) _setStampMemoText(spotId, text);
         await _refreshStampMemoryCacheForSpot(spotId);
         _renderStampCollectionList();
@@ -4955,7 +4976,23 @@
       _closeStampMemorySheetInternal();
     }
 
-    // ─── 「思い出」機能: スポット詳細シート「あなたの記録」セクション（設計書121、Cパターン=ポラロイド風フレーム追記） ───
+    // ─── 「思い出」機能: スポット詳細シート「あなたの記録」セクション（設計書121、Cパターン=ポラロイド風フレーム追記 → 設計書144で最大3枚散らし配置に拡張） ───
+    const STAMP_MEMORY_SCATTER_LAYOUTS = {
+      1: [{ left: 65, top: 0, rot: -3 }],
+      2: [{ left: 10, top: 6, rot: -6 }, { left: 130, top: 0, rot: 5 }],
+      3: [{ left: 0, top: 10, rot: -7 }, { left: 70, top: 0, rot: 4 }, { left: 135, top: 16, rot: -3 }],
+    };
+    function _buildStampMemoryPhotoScatterHtml(photoUrls) {
+      const n = Math.min(photoUrls.length, 3);
+      const layout = STAMP_MEMORY_SCATTER_LAYOUTS[n] || [];
+      const polaroids = photoUrls.slice(0, 3).map((url, i) => {
+        const pos = layout[i] || { left: 0, top: 0, rot: 0 };
+        return `<div class="stamp-memory-polaroid" style="left:${pos.left}px;top:${pos.top}px;transform:rotate(${pos.rot}deg);z-index:${i + 1};">
+          <img src="${url}" alt="">
+        </div>`;
+      }).join('');
+      return `<div class="stamp-memory-polaroid-stack">${polaroids}</div>`;
+    }
     function _renderStampDetailMemorySection(spot) {
       const sectionEl = document.getElementById('stamp-spot-detail-memory');
       const bodyEl = document.getElementById('stamp-spot-detail-memory-body');
@@ -4967,9 +5004,9 @@
         return;
       }
       const memo = _getStampMemos()[spot.id];
-      const photoUrl = _stampMemoryPhotoUrlCache[spot.id] || '';
+      const photoUrls = _stampMemoryPhotoUrlCache[spot.id] || [];
       const hasMemo = !!(memo && memo.text);
-      const hasPhoto = !!photoUrl;
+      const hasPhoto = photoUrls.length > 0;
 
       if (!hasMemo && !hasPhoto) {
         sectionEl.style.display = 'block';
@@ -4980,11 +5017,10 @@
 
       sectionEl.style.display = 'block';
       const checkinDate = _stampCheckinDateFor(spot.id);
+      // 設計書144: 散らし配置ポラロイドスタック（1〜3枚）。チェックイン日付キャプションは個々の写真ではなく
+      // スタック全体の下に1回だけ表示する（写真ごとに同じ日付を繰り返す冗長さを避けるため）
       const photoHtml = hasPhoto
-        ? `<div class="stamp-detail-memory-photo-frame">
-            <img src="${photoUrl}" alt="">
-            ${checkinDate ? `<div class="stamp-detail-memory-photo-caption">${checkinDate}</div>` : ''}
-          </div>`
+        ? _buildStampMemoryPhotoScatterHtml(photoUrls) + (checkinDate ? `<div class="stamp-detail-memory-photo-caption">${checkinDate}</div>` : '')
         : '';
       const textHtml = hasMemo ? `<div class="stamp-detail-memory-text">${escapeHtml(memo.text)}</div>` : '';
       const editBtnHtml = `<button type="button" class="stamp-memory-edit-btn" onclick="_openStampMemorySheet(_stampSelectedSpot, null)">${t('stampMemoryEditBtn')}</button>`;
