@@ -15746,3 +15746,43 @@ CSS（`public/app.css`、`.stamp-level-section-title`を置き換え）:
 
 ## 3. 承認状況
 2026-07-24 ユーザー「デザインは今のままでいいので文字サイズとスポットのカードを少し大きくして見やすくして」。**承認済み**。
+
+# 設計書155 — 探訪スタンプ帳カードのエリア表記をカード右端に配置
+
+（2026-07-24 design 154直後、ユーザーが「エリアはカードの右端で」と指定）
+
+## 1. 確定仕様
+
+`_renderStampLevelRowInProgress()`（`public/app.js`、現在4716-4725行目付近）内のカード生成HTMLを変更する。エリア表記（`.stamp-card-area`）を`.stamp-card-body`内の`.stamp-card-area-row`から取り出し、`.stamp-card`の直接の子要素として右端に配置する。チェックイン日付（`.stamp-card-date`）は名前の下に残す（`.stamp-card-area-row`ごと廃止）。
+
+```js
+return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
+  ${thumbHtml}
+  <div class="stamp-card-body">
+    <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
+    ${checkinDate ? `<div class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</div>` : ''}
+  </div>
+  <span class="stamp-card-area-right">${spot.area || ''}</span>
+</div>`;
+```
+
+CSS（`public/app.css`）: `.stamp-card-area-row`を削除し、新規`.stamp-card-area-right`を追加する。既存`.stamp-card-area`（design 154時点font-size:11px, color:var(--warm-gray)）のスタイルをそのまま踏襲した右端配置用クラスとする:
+
+```css
+.stamp-card-area-right {
+  flex-shrink: 0;
+  font-size: 11px; color: var(--warm-gray);
+  margin-left: auto;
+  padding-left: 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+```
+
+`.stamp-card`は既存`align-items:center`（design 83以来）のため、右端のエリア表記はカード縦方向中央に自然に揃う。`.stamp-card-area`（旧クラス、他に参照箇所がないことを`grep`で確認済み）は削除してよい。
+
+## 2. スコープ外
+状態A・状態C・全制覇展開カード一覧は対象外（他に`.stamp-card-area-row`の参照箇所がないため影響なし）。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「エリアはカードの右端で」。**承認済み**（内容が明確な小粒修正のため直接実装に進める）。

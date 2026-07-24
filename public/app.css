@@ -2182,9 +2182,13 @@
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
       font-size: 14px; font-weight: 700; color: var(--midnight);
     }
-    .stamp-card-area { font-size: 11px; color: var(--warm-gray); margin-top: 2px; }
-    .stamp-card-area-row {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    .stamp-card-area-right {
+      flex-shrink: 0;
+      font-size: 11px; color: var(--warm-gray);
+      margin-left: auto;
+      padding-left: 8px;
+      text-align: right;
+      white-space: nowrap;
     }
     .stamp-card-next-tag {
       font-size: 10px; font-weight: 700; color: white;

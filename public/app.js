@@ -4717,11 +4717,9 @@
           ${thumbHtml}
           <div class="stamp-card-body">
             <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
-            <div class="stamp-card-area-row">
-              <span class="stamp-card-area">${spot.area || ''}</span>
-              ${checkinDate ? `<span class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</span>` : ''}
-            </div>
+            ${checkinDate ? `<div class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</div>` : ''}
           </div>
+          <span class="stamp-card-area-right">${spot.area || ''}</span>
         </div>`;
       }).join('');
 

@@ -946,6 +946,15 @@ design 153実装直後、ユーザーが「ちょっと細かくなりすぎた�
 - キャッシュバスティング: `index.html` app.css `?v=20260724j`→`20260724k`、`sw.js` CACHE_NAME=`sg-weekend-v704`→`v705`（`app.js`は無変更のため据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での拡大後の見た目バランス（カード高さ増加によるスクロール量変化含む）は2026-07-24時点で`git diff`による表との突き合わせ・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
 
+### 探訪スタンプ帳カードのエリア表記をカード右端に配置（2026-07-24実装、設計書155）
+design 154直後、ユーザーが「エリアはカードの右端で」と指定。`_renderStampLevelRowInProgress()`（`public/app.js`）内のカード生成HTMLを変更し、エリア表記（`.stamp-card-area`）を`.stamp-card-body`内の`.stamp-card-area-row`から取り出し、`.stamp-card`の直接の子要素として右端に配置（新規`<span class="stamp-card-area-right">`）した。チェックイン日付（`.stamp-card-date`）は`.stamp-card-body`内、名前の下に残る（`.stamp-card-area-row`ごと廃止）。
+
+- `public/app.css`: `.stamp-card-area-row`・`.stamp-card-area`（旧クラス、他に参照箇所なし）を削除し、新規`.stamp-card-area-right`（flex-shrink:0, font-size:11px, color:var(--warm-gray), margin-left:auto, padding-left:8px, text-align:right, white-space:nowrap）を追加。`.stamp-card`は既存`align-items:center`のため右端のエリア表記はカード縦方向中央に自然に揃う
+- 状態A（`_renderStampLevelRowLocked()`）・状態C（`_renderStampLevelRowComplete()`）・全制覇展開カード一覧は対象外（他に`.stamp-card-area-row`の参照箇所がないため無影響）
+- `server.js`・データファイルは無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.css `?v=20260724k`→`20260724l`、app.js `?v=20260724l`→`20260724m`、`sw.js` CACHE_NAME=`sg-weekend-v705`→`v706`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのカード右端エリア表記の見た目バランスは2026-07-24時点で`git diff`によるコード照合・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 
