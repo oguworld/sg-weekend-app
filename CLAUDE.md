@@ -909,6 +909,23 @@ design 150（絵文字拡大）直後、ユーザーが「絵文字は下に合�
 - キャッシュバスティング: `index.html` app.css `?v=20260724g`→`20260724h`、`sw.js` CACHE_NAME=`sg-weekend-v701`→`v702`（`app.js`は無変更のため据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での下端揃え後の見た目バランスは2026-07-24時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
 
+### 卒業アルバム機能 フェーズ1: 帰国予定日フィールド＋入口ゲート＋アルバム画面（実データ表示、保存・共有は次フェーズ）（2026-07-24実装、設計書152）
+design 141ブレストで確定した「卒業アルバム」構想の実装第一弾。design 122の「来星日」フィールドと対をなす「帰国予定日」フィールドを追加し、帰国が近づいたタイミングで探訪の記録を振り返る「卒業アルバム」画面を新設した。データモデル・生成ロジックは既存の探訪スタンプ帳（design 69〜151）・思い出機能（design 121・144）の蓄積データをそのまま流用し、新規データ収集は行っていない。
+
+- **帰国予定日フィールド（`app_departure_date`、来星日と完全に対称の実装）**: `public/index.html`の来星日欄の直後に同一構造で追加（ピル型カスタム表示`#departure-date-display`＋透明化した`<input type="date" id="departure-date-input">`）。`public/app.js`に`_formatDepartureDateDisplay(value, lang)`（来星日版と同じ日付整形＋▼インジケーター付与）・`_saveDepartureDate(value)`（`localStorage`書き込み→表示更新→`_renderGraduationAlbumLink()`→`_syncBackupToServer()`）を追加。`initSettingsProfile()`に初期値セット処理を追加、`min`属性（当日日付、過去日付選択不可。来星日の`max`属性と対称）を設定。**来星日の記念日通知（design 128）のような通知機能は帰国予定日には付けていない**（スコープ外）
+- **バックアップ統合**: `_collectBackupPayload()`に`departureDate`フィールドを追加、`_applyRestoredBackup()`に`arrivalDate`と同じ「ローカル未設定時のみ採用」パターンでマージロジックを追加
+- **i18n**: 新規キー`labelDepartureDate`（ja「帰国予定日」/en「Departure Date」）・`graduationAlbumLinkLabel`（ja「🎓 卒業アルバムを見る」/en「🎓 View Graduation Album」）をja/en同時追加
+- **探訪画面ヘッダーへの入口リンク（表示条件: 帰国予定日の1ヶ月前〜）**: `#stamp-residency-counter`の直後に`#graduation-album-link`（初期`display:none`）を新規追加。新規関数`_isGraduationAlbumUnlocked()`（`daysUntil <= 30`で`true`。**帰国日を過ぎた後も非表示に戻さない仕様〈下限なし〉**、過去に遡って記録を振り返れなくなるのは不自然なための意図的な設計）・`_renderGraduationAlbumLink()`（表示切替のみ）を追加。`initCourseScreen()`内`_renderResidencyCounter();`の直後に`_renderGraduationAlbumLink();`を追加し、画面に入るたびに再評価
+- **卒業アルバム画面（新規フルスクリーンオーバーレイ、実データ表示）**: `#graduation-album-screen`（`position:fixed;inset:0;z-index:3720`、既存の探訪関連モーダル群3700〜3710番台の直後）。ユーザー承認済みモックアップ（v2）のCSS/HTML構造をそのまま実装: 5セクション構成（`.sec-cover`表紙／`.sec-badges`実績バッジ／`.sec-photos`思い出フォト／`.sec-area`エリアの事実／`.sec-closing`クロージング、各間に`.sec-divider`区切り）。モックアップのCSSクラスのうち`.section-title`は既存クラス（20px serif見出し、別用途）と衝突するため`.ga-section-title`に改名して移植。`.share-btn-row`/`.share-btn`（画像保存・シェアボタン）は**今回実装しない**（フェーズ2スコープ、html2canvas等の新規ライブラリが必要なため）
+- **新規関数`_computeGraduationAlbumData()`**（async）: 表紙用の在住日数・年月（`_renderResidencyCounter()`と同じ計算式）、実績バッジ（`STAMP_LEVEL_ORDER_CLIENT`の各レベルで`total>0`のもののみ、checked/total）、思い出フォト（`_stampProgress.checkinLog`を時系列順に見て写真が存在するスポットを`_getAllStampMemoryPhotos()`〈design 144で実装済み〉から最大3件収集、`URL.createObjectURL()`で一時URL化）、メモの引用（`_getStampMemos()`から最新更新1件）、エリアの事実（チェック済みスポットのエリア別集計から最多エリア、および最初にチェックインしたスポット名）を算出して返す
+- **画像URLの後始末**: `photoUrls`は`URL.createObjectURL()`による一時URL。既存の使い回しキャッシュ`_stampMemoryPhotoUrlCache`とは別の、アルバム表示専用の一時変数`_graduationAlbumPhotoUrls`で保持し、`closeGraduationAlbum()`で`URL.revokeObjectURL()`を呼んで解放する。`openGraduationAlbum()`冒頭にも念のための解放処理を追加済み（連続オープン時の取りこぼし対策）
+- **データが少ない場合のフォールバック**: 実績バッジ0件・写真0枚（`.sec-photos`ごと非表示）・メモ0件（`.photo-quote`のみ非表示）・エリア情報なし（`.sec-area`ごと非表示）はそれぞれセクション単位で非表示化。来星日未設定時は表紙の日数・年月表示に既存`genreStatusUnset`（未設定）キーを流用
+- **`closeAllPopups()`に`closeGraduationAlbum()`の呼び出しを追加**（design 96と同型の必須対応、探訪タブでアルバムを開いたままボトムナビで他画面に切り替えた際に閉じ残るバグを防止）
+- **スコープ外（フェーズ2以降）**: 保存・共有機能（画像として保存/シェア、html2canvas等の新規ライブラリが必要）、帰国予定日の記念通知、BKK/SYD対応、アルバムの複数バージョン保存・閲覧履歴、エリア制覇バッジ（design 77、現在非表示中）データの利用
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。全て`public/`配下のフロントエンドのみの変更
+- キャッシュバスティング: `index.html` app.css `?v=20260724h`→`20260724i`、app.js `?v=20260724k`（末尾, `?v=20260724j`から連番）、`sw.js` CACHE_NAME=`sg-weekend-v702`→`v703`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での帰国予定日入力欄の見た目、卒業アルバム入口リンクの表示切替タイミング、アルバム画面の5セクション表示（実績バッジのグラフ・思い出フォトのコラージュレイアウト・エリアの事実の文言）、画面を開閉した際のメモリリーク有無は2026-07-24時点でロジック検証（`node --check`・簡易日数計算シミュレーション）のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 

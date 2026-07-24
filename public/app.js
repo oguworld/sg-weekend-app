@@ -317,7 +317,9 @@
         headerSubtitle: 'シンガポール在住者の週末おでかけガイド', // city-specific: overridden by updateCityUI()
         labelCity: '都市',
         labelArrivalDate: '来星日',
+        labelDepartureDate: '帰国予定日',
         residencyCounterLabel: '在住歴 <b>{ym}</b><br>（{days}日）',
+        graduationAlbumLinkLabel: '🎓 卒業アルバムを見る',
         arrivalAnniversaryNotifTitle: '🎉 来星記念日です！',
         arrivalAnniversaryNotifBody: 'シンガポール生活{n}年目に突入しました。探訪の記録を振り返ってみませんか？',
         shareLabel: 'シェア',
@@ -608,7 +610,9 @@
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
         labelCity: 'City',
         labelArrivalDate: 'Arrival Date',
+        labelDepartureDate: 'Departure Date',
         residencyCounterLabel: '<b>{ym}</b> in Singapore<br>({days} days)',
+        graduationAlbumLinkLabel: '🎓 View Graduation Album',
         arrivalAnniversaryNotifTitle: '🎉 Happy Arrival Anniversary!',
         arrivalAnniversaryNotifBody: "You've reached {n} year(s) in Singapore! Take a look back at your journey.",
         shareLabel: 'Share',
@@ -3169,6 +3173,16 @@
         // 設計書128: アプリ再インストール等でOS側の予約が失われているケースへの自己修復
         if (savedArrival) _scheduleArrivalAnniversaryNotifications(savedArrival);
       }
+
+      // 設計書152: 帰国予定日入力欄の初期値セット＋過去日付選択防止のmin属性（来星日のmax属性と対称）
+      const departureInput = document.getElementById('departure-date-input');
+      if (departureInput) {
+        const savedDeparture = localStorage.getItem('app_departure_date') || '';
+        departureInput.value = savedDeparture;
+        departureInput.min = fmtDateKey(new Date()); // 過去日付は選択不可
+        const displayEl = document.getElementById('departure-date-display');
+        if (displayEl) displayEl.innerHTML = _formatDepartureDateDisplay(savedDeparture);
+      }
     }
 
     function getProfile() {
@@ -3573,6 +3587,7 @@
       closeStampSpotDetail();
       closeStampLevelUnlockModal();
       _closeStampMemorySheetForNav();
+      closeGraduationAlbum(); // 設計書152: 探訪タブでアルバムを開いたままボトムナビで他画面に切り替えた際に閉じ残らないようにする
       const detail = document.getElementById('detail-screen');
       if (detail) detail.classList.remove('visible');
     }
@@ -3705,6 +3720,7 @@
       // 設計書71: スタンプラリーがメイン機能という位置づけのため、初期表示タブをスタンプマップに変更
       await switchCourseTab('map');
       _renderResidencyCounter(); // 設計書122: 画面に入るたびに最新の在住日数へ再計算
+      _renderGraduationAlbumLink(); // 設計書152: 画面に入るたびに卒業アルバム入口の表示条件を再評価
 
       // スワイプでタブ切り替え（初回のみ登録）
       const sc = document.querySelector('#screen-course .screen-content');
@@ -4062,6 +4078,28 @@
       _scheduleArrivalAnniversaryNotifications(value);
     }
 
+    // 帰国予定日（設計書152）。来星日と対称の実装。記念通知は付けない。
+    function _formatDepartureDateDisplay(value, lang) {
+      const text = (() => {
+        if (!value) return t('genreStatusUnset');
+        const d = new Date(value + 'T00:00:00');
+        if (isNaN(d.getTime())) return t('genreStatusUnset');
+        if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+        const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      })();
+      return `${text} <span style="font-size:11px;color:var(--warm-gray);">▼</span>`;
+    }
+
+    function _saveDepartureDate(value) {
+      if (value) localStorage.setItem('app_departure_date', value);
+      else localStorage.removeItem('app_departure_date');
+      const displayEl = document.getElementById('departure-date-display');
+      if (displayEl) displayEl.innerHTML = _formatDepartureDateDisplay(value);
+      _renderGraduationAlbumLink();
+      _syncBackupToServer();
+    }
+
     function _formatResidencyYM(years, months, lang) {
       if (lang === 'ja') return years > 0 ? `${years}年${months}か月` : `${months}か月`;
       const mStr = `${months}mo`;
@@ -4087,6 +4125,26 @@
       const ym = _formatResidencyYM(years, months, getLang());
       el.innerHTML = t('residencyCounterLabel').replace('{ym}', ym).replace('{days}', days);
       el.style.display = '';
+    }
+
+    // 卒業アルバム入口ゲート（設計書152）: 帰国予定日の1ヶ月（30日）前から表示。
+    // 過ぎた後も非表示に戻さない（下限なし、実装上の意図的な仕様）。
+    function _isGraduationAlbumUnlocked() {
+      const departureStr = localStorage.getItem('app_departure_date');
+      if (!departureStr) return false;
+      const departure = new Date(departureStr + 'T00:00:00');
+      if (isNaN(departure.getTime())) return false;
+      const today = new Date();
+      const departureMid = new Date(departure.getFullYear(), departure.getMonth(), departure.getDate());
+      const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const daysUntil = Math.round((departureMid - todayMid) / 86400000);
+      return daysUntil <= 30;
+    }
+
+    function _renderGraduationAlbumLink() {
+      const el = document.getElementById('graduation-album-link');
+      if (!el) return;
+      el.style.display = _isGraduationAlbumUnlocked() ? '' : 'none';
     }
 
     // 写真取得（iOS: @capacitor/camera、Web: <input type=file>フォールバック）。
@@ -4329,6 +4387,174 @@
           marker.on('click', () => openStampSpotDetail(spot.id));
           _stampMarkerRefs[spot.id] = marker;
         });
+    }
+
+    // ─── 卒業アルバム（設計書152、フェーズ1: 表示のみ） ───
+    // アルバム表示中に使う一時オブジェクトURL（URL.createObjectURL()で生成）。
+    // 既存の _stampMemoryPhotoUrlCache（使い回しキャッシュ）とは別の、アルバム表示専用の使い捨てURL群。
+    let _graduationAlbumPhotoUrls = [];
+
+    async function _computeGraduationAlbumData() {
+      const lang = getLang();
+      const arrivalStr = localStorage.getItem('app_arrival_date') || '';
+      const departureStr = localStorage.getItem('app_departure_date') || '';
+
+      // 表紙: 在住日数・年月（_renderResidencyCounter()と同じ計算ロジック）
+      let days = 0, years = 0, months = 0;
+      if (arrivalStr) {
+        const arrival = new Date(arrivalStr + 'T00:00:00');
+        const today = new Date();
+        const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+        const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        days = Math.max(0, Math.round((todayMid - arrivalMid) / 86400000));
+        years = todayMid.getFullYear() - arrivalMid.getFullYear();
+        months = todayMid.getMonth() - arrivalMid.getMonth();
+        if (todayMid.getDate() < arrivalMid.getDate()) months--;
+        if (months < 0) { years--; months += 12; }
+      }
+
+      // 実績バッジ: レベルごとの checked/total（スポット未取得等で total=0 のレベルは除外）
+      const badges = STAMP_LEVEL_ORDER_CLIENT.map(level => {
+        const spotsInLevel = _stampSpots.filter(s => s.level === level);
+        const total = spotsInLevel.length;
+        if (total === 0) return null;
+        const checked = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+        return { level, meta: STAMP_LEVEL_META[level], checked, total };
+      }).filter(Boolean);
+
+      // 思い出フォト: checkinLogを時系列順に見て、写真が存在するスポットを最大3件収集
+      const sortedLog = [...(_stampProgress.checkinLog || [])].sort((a, b) => new Date(a.checkedInAt) - new Date(b.checkedInAt));
+      const allPhotos = await _getAllStampMemoryPhotos(); // { spotId: Blob[] }
+      const photoUrls = [];
+      for (const entry of sortedLog) {
+        const photos = allPhotos[entry.spotId];
+        if (photos && photos.length) { photoUrls.push(URL.createObjectURL(photos[0])); }
+        if (photoUrls.length >= 3) break;
+      }
+
+      // メモの引用: 最も新しく更新されたメモを1件選ぶ
+      const memos = _getStampMemos();
+      let quote = null;
+      Object.entries(memos).forEach(([spotId, entry]) => {
+        if (!entry || !entry.text) return;
+        if (!quote || (entry.updatedAt || '') > (quote.updatedAt || '')) {
+          const spot = _stampSpots.find(s => s.id === spotId);
+          quote = { text: entry.text, spotName: spot ? (lang === 'ja' ? (spot.nameJa || spot.name) : spot.name) : '', updatedAt: entry.updatedAt };
+        }
+      });
+
+      // エリアの事実: チェック済みスポットのエリア別集計、最多エリアを算出
+      const checkedSpots = _stampSpots.filter(s => _stampSpotIsChecked(s.id));
+      const areaCounts = {};
+      checkedSpots.forEach(s => { if (s.area) areaCounts[s.area] = (areaCounts[s.area] || 0) + 1; });
+      let topArea = null, topAreaCount = 0;
+      Object.entries(areaCounts).forEach(([area, cnt]) => { if (cnt > topAreaCount) { topArea = area; topAreaCount = cnt; } });
+
+      // 最初に訪れたスポット
+      let firstSpotName = '';
+      if (sortedLog.length) {
+        const firstSpot = _stampSpots.find(s => s.id === sortedLog[0].spotId);
+        if (firstSpot) firstSpotName = lang === 'ja' ? (firstSpot.nameJa || firstSpot.name) : firstSpot.name;
+      }
+
+      return {
+        arrivalStr, departureStr, days, years, months,
+        badges, photoUrls, quote,
+        topArea, topAreaCount, totalChecked: checkedSpots.length,
+        firstSpotName,
+      };
+    }
+
+    function _escapeHtmlGa(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    async function openGraduationAlbum() {
+      const screenEl = document.getElementById('graduation-album-screen');
+      const contentEl = document.getElementById('graduation-album-content');
+      if (!screenEl || !contentEl) return;
+
+      // 念のため、再オープン等で前回分の一時URLが残っていれば先に解放する（通常はcloseGraduationAlbum()で解放済みのはず）
+      _graduationAlbumPhotoUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (_) {} });
+
+      const data = await _computeGraduationAlbumData();
+      _graduationAlbumPhotoUrls = data.photoUrls.slice();
+
+      const lang = getLang();
+      const arrivalDisplay = data.arrivalStr ? _formatArrivalDateDisplay(data.arrivalStr).replace(/\s*<span[^>]*>.*?<\/span>\s*$/, '') : t('genreStatusUnset');
+      const departureDisplay = data.departureStr ? _formatDepartureDateDisplay(data.departureStr).replace(/\s*<span[^>]*>.*?<\/span>\s*$/, '') : t('genreStatusUnset');
+      const ym = data.arrivalStr ? _formatResidencyYM(data.years, data.months, lang) : t('genreStatusUnset');
+      const daysLabel = data.arrivalStr ? `${data.days}${lang === 'ja' ? '日' : ' days'}` : '';
+
+      let html = '';
+
+      // 1. 表紙
+      html += `<div class="sec-cover">
+        <div class="sec-cover-eyebrow">GRADUATION ALBUM</div>
+        <div class="sec-cover-title">${lang === 'ja' ? 'シンガポール探訪の記録' : 'A Record of My Singapore Journey'}</div>
+        <div class="sec-cover-range">${_escapeHtmlGa(arrivalDisplay)} 〜 ${_escapeHtmlGa(departureDisplay)}</div>
+        <div class="sec-cover-days">${daysLabel}</div>
+        <div class="sec-cover-days-label">${data.arrivalStr ? (lang === 'ja' ? `の在住歴（${_escapeHtmlGa(ym)}）` : `in Singapore (${_escapeHtmlGa(ym)})`) : ''}</div>
+      </div>`;
+
+      // 2. 実績バッジ
+      if (data.badges.length > 0) {
+        html += `<div class="sec-divider">ACHIEVEMENTS</div>
+        <div class="sec-badges">
+          <div class="ga-section-title">🏆 ${lang === 'ja' ? '探訪の記録' : 'Discovery Record'}</div>
+          ${data.badges.map(b => {
+            const pct = b.total > 0 ? Math.round((b.checked / b.total) * 100) : 0;
+            return `<div class="badge-row">
+              <img src="${b.meta.img}" alt="">
+              <div class="badge-row-body">
+                <div class="badge-row-name">${b.meta.emoji} ${_escapeHtmlGa(t(b.meta.labelKey))}</div>
+                <div class="badge-row-track"><div class="badge-row-fill" style="width:${pct}%;"></div></div>
+              </div>
+              <div class="badge-row-count">${b.checked}/${b.total}</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }
+
+      // 3. 思い出フォト
+      if (data.photoUrls.length > 0) {
+        html += `<div class="sec-divider">MEMORIES</div>
+        <div class="sec-photos">
+          <div class="ga-section-title">📸 ${lang === 'ja' ? `残した思い出（${data.totalChecked}件のうち）` : `Memories saved (of ${data.totalChecked} visits)`}</div>
+          <div class="photo-collage">${data.photoUrls.map(u => `<img src="${u}">`).join('')}</div>
+          ${data.quote ? `<div class="photo-quote">${_escapeHtmlGa(data.quote.text)}${data.quote.spotName ? `<span class="photo-quote-spot">— ${_escapeHtmlGa(data.quote.spotName)}${lang === 'ja' ? 'にて' : ''}</span>` : ''}</div>` : ''}
+        </div>`;
+      }
+
+      // 4. エリアの事実
+      if (data.topArea) {
+        html += `<div class="sec-divider">JOURNEY</div>
+        <div class="sec-area">
+          <div class="area-fact">${lang === 'ja'
+            ? `一番よく歩いたエリアは<br><b>${_escapeHtmlGa(data.topArea)}（${data.topAreaCount}スポット）</b>${data.firstSpotName ? `<br>最初に訪れたのは<br><b>${_escapeHtmlGa(data.firstSpotName)}</b>でした` : ''}`
+            : `You explored <b>${_escapeHtmlGa(data.topArea)}</b> the most (${data.topAreaCount} spots)${data.firstSpotName ? `<br>Your first stop was<br><b>${_escapeHtmlGa(data.firstSpotName)}</b>` : ''}`}
+          </div>
+        </div>`;
+      }
+
+      // 5. クロージング
+      html += `<div class="sec-closing">
+        <div class="sec-closing-msg">${data.arrivalStr
+          ? (lang === 'ja' ? `${_escapeHtmlGa(ym)}、<br>おつかれさまでした。<br>また会う日まで、シンガポール。` : `${_escapeHtmlGa(ym)},<br>thank you for the memories.<br>See you again, Singapore.`)
+          : (lang === 'ja' ? 'おつかれさまでした。<br>また会う日まで、シンガポール。' : 'Thank you for the memories.<br>See you again, Singapore.')}
+        </div>
+        <div class="sec-closing-brand"><b>おでかけNavi</b> ${lang === 'ja' ? 'と歩いたシンガポール暮らし' : '— your Singapore journey companion'}</div>
+      </div>`;
+
+      contentEl.innerHTML = html;
+      screenEl.style.display = 'block';
+    }
+
+    function closeGraduationAlbum() {
+      const screenEl = document.getElementById('graduation-album-screen');
+      if (screenEl) screenEl.style.display = 'none';
+      _graduationAlbumPhotoUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (_) {} });
+      _graduationAlbumPhotoUrls = [];
     }
 
     // スポット詳細モーダル内「地図で見る」ボタンから該当ピンへフォーカスする（設計書92→設計書97でモーダルへ移動）。
@@ -7740,6 +7966,7 @@
         avatar: localStorage.getItem('user_avatar') || '',
         stampMemos: _getStampMemos(), // 設計書121: テキストのみ既存バックアップに統合（写真は一切含めない）
         arrivalDate: localStorage.getItem('app_arrival_date') || '', // 設計書122
+        departureDate: localStorage.getItem('app_departure_date') || '', // 設計書152
       };
     }
 
@@ -7793,6 +8020,10 @@
         // 設計書122: 来星日（単一スカラー値）。who/avatarと同じ「ローカル未設定時のみ採用」パターン
         if (dec.arrivalDate && !localStorage.getItem('app_arrival_date')) {
           localStorage.setItem('app_arrival_date', dec.arrivalDate);
+        }
+        // 設計書152: 帰国予定日（単一スカラー値）。arrivalDateと同じ「ローカル未設定時のみ採用」パターン
+        if (dec.departureDate && !localStorage.getItem('app_departure_date')) {
+          localStorage.setItem('app_departure_date', dec.departureDate);
         }
         // 設計書121: 思い出メモ（テキストのみ）のマージ。ローカルに同じspotIdが無い、
         // またはリモート側のupdatedAtがローカルより新しい場合のみ採用する（updatedAt比較によるマージ）

@@ -3520,3 +3520,65 @@
       font-size: 14px; font-weight: 700; font-family: inherit; color: white; cursor: pointer;
     }
     #screen-course, #screen-plan { position: relative; }
+
+    /* ─── 卒業アルバム（設計書152、フェーズ1）─── */
+    /* モックアップ（/tmp/.../mock-graduation-album-v2.html）のCSSをそのまま移植。
+       .section-title は既存クラス（20px serif見出し）と衝突するため .ga-section-title に改名。
+       .share-btn-row / .share-btn はフェーズ2（保存・共有）スコープのため今回は実装しない。 */
+    .sec-cover {
+      background: linear-gradient(160deg, #2C2420 0%, #4a3c32 100%);
+      color: white;
+      padding: 44px 28px 40px;
+      text-align: center;
+      position: relative;
+    }
+    .sec-cover-eyebrow { font-size: 11px; letter-spacing: 0.2em; color: var(--caramel-light); margin-bottom: 14px; }
+    .sec-cover-title { font-family: 'Kaisei Opti', serif; font-size: 26px; font-weight: 700; margin-bottom: 8px; line-height: 1.4; }
+    .sec-cover-range { font-size: 12px; color: #d8cfc4; margin-bottom: 26px; }
+    .sec-cover-days { font-family: 'Kaisei Opti', serif; font-size: 44px; font-weight: 700; color: var(--caramel-light); }
+    .sec-cover-days-label { font-size: 11px; color: #d8cfc4; margin-top: 4px; }
+
+    .sec-divider { text-align: center; padding: 18px 0 6px; font-size: 10px; letter-spacing: 0.15em; color: var(--warm-gray); }
+    .sec-divider::before, .sec-divider::after {
+      content: ''; display: inline-block; width: 24px; height: 1px;
+      background: var(--sand-dark); vertical-align: middle; margin: 0 8px;
+    }
+
+    .sec-badges { padding: 6px 24px 20px; }
+    .badge-row {
+      display: flex; gap: 10px; margin-bottom: 10px; align-items: center;
+      background: var(--sand); border-radius: 14px; padding: 10px 14px;
+    }
+    .badge-row img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
+    .badge-row-body { flex: 1; }
+    .badge-row-name { font-size: 13px; font-weight: 700; color: var(--midnight); }
+    .badge-row-track { height: 6px; background: var(--sand-dark); border-radius: 4px; margin-top: 5px; overflow: hidden; }
+    .badge-row-fill { height: 100%; background: var(--caramel); border-radius: 4px; }
+    .badge-row-count { font-size: 11px; color: var(--caramel); font-weight: 700; white-space: nowrap; }
+
+    .sec-photos { padding: 6px 24px 20px; }
+    .photo-collage {
+      display: grid; grid-template-columns: 1.3fr 1fr; grid-template-rows: auto auto; gap: 8px;
+    }
+    .photo-collage img:nth-child(1) { grid-row: span 2; width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+    .photo-collage img { width: 100%; height: 78px; object-fit: cover; border-radius: 10px; }
+    .photo-quote {
+      margin-top: 12px; background: var(--caramel-pale); border-radius: 12px; padding: 12px 14px;
+      font-size: 12px; color: var(--midnight); font-style: italic; line-height: 1.6; position: relative;
+    }
+    .photo-quote::before {
+      content: '"'; font-family: Georgia, serif; font-size: 28px; color: var(--caramel-light);
+      position: absolute; top: -6px; left: 8px;
+    }
+    .photo-quote-spot { display: block; margin-top: 6px; font-size: 10px; color: var(--warm-gray); font-style: normal; text-align: right; }
+
+    .sec-area { padding: 6px 24px 20px; text-align: center; }
+    .area-fact { font-size: 13px; color: var(--midnight); line-height: 1.8; }
+    .area-fact b { color: var(--caramel); font-size: 15px; }
+
+    .sec-closing { padding: 24px 24px 30px; text-align: center; background: var(--sand); }
+    .sec-closing-msg { font-family: 'Kaisei Opti', serif; font-size: 15px; color: var(--midnight); line-height: 1.8; margin-bottom: 16px; }
+    .sec-closing-brand { font-size: 11px; color: var(--warm-gray); }
+    .sec-closing-brand b { color: var(--caramel); }
+
+    .ga-section-title { font-size: 12px; font-weight: 700; color: var(--warm-gray); margin-bottom: 10px; padding-left: 2px; }

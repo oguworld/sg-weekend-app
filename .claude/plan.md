@@ -15340,3 +15340,283 @@ design 148で導入した`.stamp-level-progress-icon`（バー上に直接乗る
 
 ## 3. 承認状況
 2026-07-24 ユーザー「絵文字は下に合わせて。もしくは上下を合わせて」。**承認済み**（第一希望の「下に合わせる」で実装する）。
+
+# 設計書152 — 卒業アルバム機能 フェーズ1: 帰国予定日フィールド＋入口ゲート＋アルバム画面（実データ表示、保存・共有は次フェーズ）
+
+（2026-07-24 design 141ブレストで確定した「卒業アルバム」構想の実装第一弾。会話でユーザーが要件を段階的に確定: 全スポットの実データを使う／写真3枚保存機能は design 144で対応済み／入口は探訪画面ヘッダー〈AskUserQuestionで確定〉／入口の表示条件は帰国予定日の**1ヶ月前から**〈当初「2週間前」で確定しかけたが、ユーザーが直後に「やっぱり一ヶ月前にして」と訂正、最終的に1ヶ月前で確定〉。保存・共有機能はhtml2canvas等の新規ライブラリが必要になるため別フェーズに切り出し、今回はアルバム画面の表示のみ実装する）
+
+## 1. 背景
+
+design 122で「来星日」フィールド・在住日数カウンターを実装済み。ユーザーがシンガポールでの残り時間を意識する「帰国予定日」を対にして追加し、帰国が近づいたタイミングで探訪の記録を振り返る「卒業アルバム」画面を作る。データモデル・生成ロジックは既存の探訪スタンプ帳（design 69〜151）・思い出機能（design 121・144）の蓄積データをそのまま流用し、新規データ収集は行わない。
+
+## 2. 確定仕様
+
+### 2-1. 帰国予定日フィールド（`app_departure_date`、来星日と対称の実装）
+
+`public/index.html`の来星日欄（275-296行目付近）の直後に、全く同じ構造で追加する:
+
+```html
+<div class="settings-item" style="padding:12px 18px;">
+  <span class="settings-item-label" data-i18n="labelDepartureDate">帰国予定日</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div style="position:relative;">
+      <span id="departure-date-display"
+        style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;
+               border:1.5px solid var(--sand-dark);background:var(--warm-white);
+               font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;
+               color:var(--midnight);pointer-events:none;"></span>
+      <input id="departure-date-input" type="date"
+        style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
+        onchange="_saveDepartureDate(this.value)">
+    </div>
+  </div>
+</div>
+```
+
+`public/app.js`に以下を追加（`_formatArrivalDateDisplay`/`_saveArrivalDate`の直後が自然な配置）:
+
+```js
+function _formatDepartureDateDisplay(value, lang) {
+  const text = (() => {
+    if (!value) return t('genreStatusUnset');
+    const d = new Date(value + 'T00:00:00');
+    if (isNaN(d.getTime())) return t('genreStatusUnset');
+    if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  })();
+  return `${text} <span style="font-size:11px;color:var(--warm-gray);">▼</span>`;
+}
+
+function _saveDepartureDate(value) {
+  if (value) localStorage.setItem('app_departure_date', value);
+  else localStorage.removeItem('app_departure_date');
+  const displayEl = document.getElementById('departure-date-display');
+  if (displayEl) displayEl.innerHTML = _formatDepartureDateDisplay(value);
+  _renderGraduationAlbumLink();
+  _syncBackupToServer();
+}
+```
+
+`min`属性（未来日付のみ許可、来星日の`max`属性と対称）を`initSettingsProfile()`の来星日初期化ブロック直後に追加:
+
+```js
+const departureInput = document.getElementById('departure-date-input');
+if (departureInput) {
+  const savedDeparture = localStorage.getItem('app_departure_date') || '';
+  departureInput.value = savedDeparture;
+  departureInput.min = fmtDateKey(new Date()); // 過去日付は選択不可（来星日のmax属性と対称）
+  const displayEl = document.getElementById('departure-date-display');
+  if (displayEl) displayEl.innerHTML = _formatDepartureDateDisplay(savedDeparture);
+}
+```
+
+**来星日の記念日通知（design 128）のような通知機能は帰国予定日には付けない**（今回スコープ外、ユーザーから言及なし）。
+
+### 2-2. バックアップ統合
+
+`_collectBackupPayload()`（`public/app.js` 7720行目付近）に1行追加:
+```js
+departureDate: localStorage.getItem('app_departure_date') || '', // 設計書152
+```
+
+`_applyRestoredBackup()`（7793行目付近、`dec.arrivalDate`のマージ処理の直後）に、同じ「ローカル未設定時のみ採用」パターンで1ブロック追加:
+```js
+if (dec.departureDate && !localStorage.getItem('app_departure_date')) {
+  localStorage.setItem('app_departure_date', dec.departureDate);
+}
+```
+
+### 2-3. i18n
+
+新規キー`labelDepartureDate`（ja「帰国予定日」/en「Departure Date」）をja/en同時追加。
+
+### 2-4. 探訪画面ヘッダーへの入口リンク（表示条件: 帰国予定日の1ヶ月前〜）
+
+`public/index.html`の`#stamp-residency-counter`（144-147行目付近）の直後に新規要素を追加:
+```html
+<div id="graduation-album-link" style="display:none;text-align:right;margin-top:6px;" onclick="openGraduationAlbum()">
+  <span style="font-size:12px;font-weight:700;color:var(--caramel);cursor:pointer;" data-i18n="graduationAlbumLinkLabel">🎓 卒業アルバムを見る</span>
+</div>
+```
+
+`public/app.js`に新規関数（`_renderResidencyCounter()`の直後が自然）:
+```js
+function _isGraduationAlbumUnlocked() {
+  const departureStr = localStorage.getItem('app_departure_date');
+  if (!departureStr) return false;
+  const departure = new Date(departureStr + 'T00:00:00');
+  if (isNaN(departure.getTime())) return false;
+  const today = new Date();
+  const departureMid = new Date(departure.getFullYear(), departure.getMonth(), departure.getDate());
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const daysUntil = Math.round((departureMid - todayMid) / 86400000);
+  return daysUntil <= 30; // 帰国予定日の1ヶ月（30日）前から表示。過ぎた後も非表示に戻さない（下限なし、実装上の意図的な仕様）
+}
+
+function _renderGraduationAlbumLink() {
+  const el = document.getElementById('graduation-album-link');
+  if (!el) return;
+  el.style.display = _isGraduationAlbumUnlocked() ? '' : 'none';
+}
+```
+
+`initCourseScreen()`内、`_renderResidencyCounter();`の直後に`_renderGraduationAlbumLink();`を追加（既存の呼び出し箇所を踏襲、既存の`_renderResidencyCounter()`呼び出し行を`grep`で特定してから隣接させること）。
+
+**表示条件の解釈確認**: 「1ヶ月以内になったら見れる」は`daysUntil <= 30`（30日以内、帰国日当日〈0〉も含む）として実装する。帰国日を過ぎた後（`daysUntil`が負）も非表示に戻さない仕様とする（過去に遡って記録を振り返れなくなるのは不自然なため、下限を設けない）。
+
+### 2-5. 卒業アルバム画面（新規フルスクリーンオーバーレイ、実データ表示）
+
+`public/index.html`に新規`#graduation-album-screen`（`position:fixed;inset:0;z-index:3720;background:var(--warm-white);overflow-y:auto;display:none;`）を追加。閉じるボタン（✕、`position:sticky;top:0;`、safe-area-inset-top考慮、`onclick="closeGraduationAlbum()"`）を先頭に配置し、その下にコンテンツを`innerHTML`で動的生成する空コンテナ（`#graduation-album-content`）を置く。
+
+**レイアウト構造は下記モックアップ（v2、ユーザー承認済み）のCSS/HTML構造をそのまま実装に用いること。ファイルパス: `/tmp/claude-1000/-home-masahiko-sg-weekend-app/cf2492da-07b2-4426-a6e8-f71385083029/scratchpad/mock-graduation-album-v2.html`（builderは`Read`ツールでこのファイルを直接読んで構造を確認すること。念のため以下に主要CSS・HTML構造も転記する）**:
+
+5セクション構成（`.sec-cover`＝表紙、`.sec-badges`＝実績バッジ、`.sec-photos`＝思い出フォト、`.sec-area`＝エリアの事実、`.sec-closing`＝クロージング、各間に`.sec-divider`区切り）:
+
+```html
+<!-- 1. 表紙 -->
+<div class="sec-cover">
+  <div class="sec-cover-eyebrow">GRADUATION ALBUM</div>
+  <div class="sec-cover-title">シンガポール探訪の記録</div>
+  <div class="sec-cover-range">{来星日} 〜 {帰国予定日}</div>
+  <div class="sec-cover-days">{在住日数}<span style="font-size:20px;">日</span></div>
+  <div class="sec-cover-days-label">の在住歴（{年}年{月}か月）</div>
+</div>
+
+<div class="sec-divider">ACHIEVEMENTS</div>
+
+<!-- 2. 実績バッジ（レベルごと、totalCount>0のみ表示） -->
+<div class="sec-badges">
+  <div class="section-title">🏆 探訪の記録</div>
+  <!-- レベルごとに.badge-rowを繰り返す -->
+</div>
+
+<div class="sec-divider">MEMORIES</div>
+
+<!-- 3. 思い出フォト -->
+<div class="sec-photos">
+  <div class="section-title">📸 残した思い出（{総チェックイン数}件のうち）</div>
+  <div class="photo-collage"><!-- 最大3枚 --></div>
+  <div class="photo-quote">{メモ本文}<span class="photo-quote-spot">— {スポット名}にて</span></div>
+</div>
+
+<div class="sec-divider">JOURNEY</div>
+
+<!-- 4. エリアの事実 -->
+<div class="sec-area">
+  <div class="area-fact">一番よく歩いたエリアは<br><b>{エリア名}（{件数}スポット）</b><br>最初に訪れたのは<br><b>{スポット名}</b>でした</div>
+</div>
+
+<!-- 5. クロージング -->
+<div class="sec-closing">
+  <div class="sec-closing-msg">{年}年{月}か月、<br>おつかれさまでした。<br>また会う日まで、シンガポール。</div>
+  <div class="sec-closing-brand"><b>おでかけNavi</b> と歩いたシンガポール暮らし</div>
+</div>
+```
+
+CSS（`.sec-cover`〜`.sec-closing`、`.badge-row`〜`.badge-row-count`、`.photo-collage`〜`.photo-quote-spot`、`.area-fact`、`.sec-closing-msg`〜`.sec-closing-brand`、`.section-title`、`.sec-divider`）は上記モックファイルの`<style>`ブロックをそのまま`public/app.css`へ移植する（クラス名の衝突がないか`grep`で確認の上、そのまま流用可）。**今回は`.share-btn-row`（保存・シェアボタン）は実装しない**（フェーズ2でスコープ）。
+
+### 2-6. データ収集ロジック（新規関数`_computeGraduationAlbumData()`）
+
+```js
+async function _computeGraduationAlbumData() {
+  const lang = getLang();
+  const arrivalStr = localStorage.getItem('app_arrival_date') || '';
+  const departureStr = localStorage.getItem('app_departure_date') || '';
+
+  // 表紙: 在住日数・年月（_renderResidencyCounter()と同じ計算ロジックを再利用する形で実装）
+  let days = 0, years = 0, months = 0;
+  if (arrivalStr) {
+    const arrival = new Date(arrivalStr + 'T00:00:00');
+    const today = new Date();
+    const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+    const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    days = Math.max(0, Math.round((todayMid - arrivalMid) / 86400000));
+    years = todayMid.getFullYear() - arrivalMid.getFullYear();
+    months = todayMid.getMonth() - arrivalMid.getMonth();
+    if (todayMid.getDate() < arrivalMid.getDate()) months--;
+    if (months < 0) { years--; months += 12; }
+  }
+
+  // 実績バッジ: レベルごとの checked/total（special はスポット未取得時 total=0 のため除外）
+  const badges = STAMP_LEVEL_ORDER_CLIENT.map(level => {
+    const spotsInLevel = _stampSpots.filter(s => s.level === level);
+    const total = spotsInLevel.length;
+    if (total === 0) return null;
+    const checked = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+    return { level, meta: STAMP_LEVEL_META[level], checked, total };
+  }).filter(Boolean);
+
+  // 思い出フォト: checkinLogを時系列順に見て、写真が存在するスポットを最大3件収集
+  const sortedLog = [...(_stampProgress.checkinLog || [])].sort((a, b) => new Date(a.checkedInAt) - new Date(b.checkedInAt));
+  const allPhotos = await _getAllStampMemoryPhotos(); // { spotId: Blob[] }
+  const photoUrls = [];
+  for (const entry of sortedLog) {
+    const photos = allPhotos[entry.spotId];
+    if (photos && photos.length) { photoUrls.push(URL.createObjectURL(photos[0])); }
+    if (photoUrls.length >= 3) break;
+  }
+
+  // メモの引用: 最も新しく更新されたメモを1件選ぶ
+  const memos = _getStampMemos();
+  let quote = null;
+  Object.entries(memos).forEach(([spotId, entry]) => {
+    if (!entry || !entry.text) return;
+    if (!quote || (entry.updatedAt || '') > (quote.updatedAt || '')) {
+      const spot = _stampSpots.find(s => s.id === spotId);
+      quote = { text: entry.text, spotName: spot ? (lang === 'ja' ? (spot.nameJa || spot.name) : spot.name) : '', updatedAt: entry.updatedAt };
+    }
+  });
+
+  // エリアの事実: チェック済みスポットのエリア別集計、最多エリアを算出
+  const checkedSpots = _stampSpots.filter(s => _stampSpotIsChecked(s.id));
+  const areaCounts = {};
+  checkedSpots.forEach(s => { if (s.area) areaCounts[s.area] = (areaCounts[s.area] || 0) + 1; });
+  let topArea = null, topAreaCount = 0;
+  Object.entries(areaCounts).forEach(([area, cnt]) => { if (cnt > topAreaCount) { topArea = area; topAreaCount = cnt; } });
+
+  // 最初に訪れたスポット
+  let firstSpotName = '';
+  if (sortedLog.length) {
+    const firstSpot = _stampSpots.find(s => s.id === sortedLog[0].spotId);
+    if (firstSpot) firstSpotName = lang === 'ja' ? (firstSpot.nameJa || firstSpot.name) : firstSpot.name;
+  }
+
+  return {
+    arrivalStr, departureStr, days, years, months,
+    badges, photoUrls, quote,
+    topArea, topAreaCount, totalChecked: checkedSpots.length,
+    firstSpotName,
+  };
+}
+```
+
+**画像URLの後始末**: `photoUrls`は`URL.createObjectURL()`で生成した一時URL。アルバム画面を閉じる`closeGraduationAlbum()`で`URL.revokeObjectURL()`を呼び、開くたびに増え続けないようにする（既存の`_stampMemoryPhotoUrlCache`とは別の一時変数として保持すること。使い回しキャッシュと違い、アルバム表示専用の使い捨てURLのため）。
+
+`openGraduationAlbum()`は`await _computeGraduationAlbumData()`の結果を上記5セクションHTMLへ整形し`#graduation-album-content`に挿入、`#graduation-album-screen`を表示する。
+
+### 2-7. データが少ない場合のフォールバック表示
+
+- 実績バッジが1件もない（`badges.length === 0`、まだ何もチェックインしていない状態）: バッジセクション自体を非表示にする、または「まだ探訪の記録がありません」の1行のみ表示（builderの裁量、既存の空状態表現パターンに倣う）
+- 写真が1枚もない（`photoUrls.length === 0`）: `.sec-photos`セクション自体を非表示にする（コラージュ用の空スペースを残さない）
+- メモが1件もない（`quote === null`）: `.photo-quote`ブロックを非表示にする
+- エリア情報がない（`topArea === null`、チェックイン0件）: `.sec-area`セクション自体を非表示にする
+- 来星日未設定（`arrivalStr === ''`）: 表紙の日数・年月表示は「未設定」等のプレースホルダーにする（既存`genreStatusUnset`キー流用可）
+
+## 3. スコープ外（フェーズ2以降）
+
+- **保存・共有機能（画像として保存/シェア）は今回実装しない**。`html2canvas`（またはdom-to-image等）でのDOM→画像変換、Capacitor環境での`@capacitor/share`/`@capacitor/filesystem`によるネイティブ共有は、いずれも本プロジェクト未導入の新規ライブラリが必要なため、別途design docを立てて対応する
+- 帰国予定日の記念通知（来星日のdesign 128のような年1回通知）は帰国予定日には付けない
+- BKK/SYD対応（既存の探訪機能自体がSG限定のため対象外）
+- アルバムの複数バージョン保存・過去アルバムの閲覧履歴
+- エリア制覇バッジ（design 77、現在非表示中）データの利用
+
+## 4. 影響範囲・技術的注意
+
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。全て`public/`配下のフロントエンドのみの変更
+- 新規z-index: `#graduation-album-screen`は`3720`（既存の探訪関連モーダル群3700〜3710番台の直後、bottom-nav〈9999〉未満の方針を踏襲）
+- `closeAllPopups()`（design 96で確立済み、画面遷移時の一括クローズ関数）に`closeGraduationAlbum()`の呼び出しを追加すること（探訪タブでアルバムを開いたままボトムナビで他画面に切り替えた際に閉じ残るバグを防ぐ、design 96と同型の必須対応）
+- IndexedDB写真取得（`_getAllStampMemoryPhotos()`）は非同期のため、`openGraduationAlbum()`はasync関数とし、ローディング中の一瞬の空白は許容する（スピナー等の追加UIは今回スコープ外）
+
+## 5. 承認状況
+2026-07-24 ユーザーとの会話で段階的に確定。入口配置は探訪画面ヘッダー（AskUserQuestionで確定）。表示条件は「帰国予定日の1ヶ月前から」（当初2週間前で確定しかけたが、ユーザーが直後に訂正し1ヶ月前で最終確定）。**承認済み**（フェーズ1・2〈本設計書の範囲〉、保存・共有は次フェーズとして継続確認予定）。
