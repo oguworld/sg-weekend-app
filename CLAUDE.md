@@ -954,6 +954,13 @@ design 131で追加した診断ログ（`stamp_memory_photo_pick_start`/`_result
 - `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723n`→`20260724a`、`sw.js` CACHE_NAME=`sg-weekend-v689`→`v690`（`app.css`は無変更のため据え置き）
 - **このタスクをもってdesign 131〜138（思い出写真ピッカー実機診断）は解決済み**。設計書69〜137自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
 
+### 探訪ティアの年数目安ラベルを変更（見習い0〜1年、定住レベル2〜4年）（2026-07-24実装、設計書139）
+ユーザー要望により、探訪ティアの年数目安表示を再調整した。シンガポール通・極めし者は変更なし。
+- `public/app.js`の`STAMP_LEVEL_META`定数、`standard`と`local`の`yearRange`/`yearRangeEn`の値のみ変更（キー名・構造は不変）: standard「1〜2年」→「0〜1年」/「1-2 years」→「0-1 years」、local「3〜4年」→「2〜4年」/「3-4 years」→「2-4 years」。`niche`（5年以上/5+ years）・`special`（10年以上/10+ years）は無変更
+- レベル名（見習い/定住レベル/シンガポール通/極めし者）・絵文字・色・画像・`_stampLevelYearRange(meta)`ヘルパー本体は無変更
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260724a`→`20260724b`、`sw.js` CACHE_NAME=`sg-weekend-v690`→`v691`（`app.css`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新しい年数目安表示は2026-07-24時点でコード確認・ローカル配信反映確認のみ完了、実ブラウザ・実機とも未確認
+
 ### ⚠️ 設定画面セクション構成の変更（2026-07-19実装、設計書64、上記の`secBackup`/`secLogin`関連記述は歴史的経緯として一部実態と乖離）
 設定画面が「プロフィール→ログイン→予定表のバックアップ（HTMLコメント上「2.5」）→アプリ設定→その他」という5セクション構成になっていたのを、「プロフィール→**アカウント**（ログイン+バックアップ統合）→アプリ設定→**サポート・情報**→**フィードバック**」の5セクションに再編成した（機能・ロジック変更は一切なし、`.settings-item`内部のid/onclick/classは無変更、見た目上の再編成のみ）。
 - **旧「ログイン」セクション（見出しキー`secLogin`）と旧「予定表のバックアップ」セクション（見出しキー`secBackup`）を1つの`.settings-section`に統合**し、見出しを新規キー`secAccount`（ja「アカウント」/en「Account」）に変更。`secLogin`/`secBackup`キー自体はHTML上で無参照になったため`STRINGS.ja`/`STRINGS.en`から削除済み（他機能からの参照なしを`grep`で確認済み）

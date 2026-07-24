@@ -3781,8 +3781,8 @@
     // 設計書110: レベル名に併記する在住年数の目安（ja/en）。年数表記自体は数値＋単位のみだが、
     // 既存のi18n必須ルールに配慮し英語表記も用意する（yearRange=ja、yearRangeEn=en）。
     const STAMP_LEVEL_META = {
-      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '🔰', img: '/images/stamp-badges/badge-level-standard.png', yearRange: '1〜2年', yearRangeEn: '1-2 years' },
-      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏠', img: '/images/stamp-badges/badge-level-local.png', yearRange: '3〜4年', yearRangeEn: '3-4 years' },
+      standard: { labelKey: 'stampLevelStandard', color: '#C8804A', emoji: '🔰', img: '/images/stamp-badges/badge-level-standard.png', yearRange: '0〜1年', yearRangeEn: '0-1 years' },
+      local:    { labelKey: 'stampLevelLocal',     color: '#7A9B6E', emoji: '🏠', img: '/images/stamp-badges/badge-level-local.png', yearRange: '2〜4年', yearRangeEn: '2-4 years' },
       niche:    { labelKey: 'stampLevelNiche',      color: '#9370B0', emoji: '🦁', img: '/images/stamp-badges/badge-level-niche.png', yearRange: '5年以上', yearRangeEn: '5+ years' },
       special:  { labelKey: 'stampLevelSpecial',    color: '#C4705A', emoji: '✨', img: '/images/stamp-badges/badge-level-special.png', yearRange: '10年以上', yearRangeEn: '10+ years' },
     };
