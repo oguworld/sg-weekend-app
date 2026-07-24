@@ -482,6 +482,12 @@
         stampMemoryEditBtn: '✏️ 編集',
         toastStampMemorySaved: '思い出を保存しました',
         toastStampMemoryError: '保存に失敗しました',
+        stampShareToInstagram: 'Instagramでシェア',
+        stampShareToX: 'Xでシェア',
+        stampSharePreviewTitle: 'シェアする',
+        toastShareSavedForIG: '画像を保存しました。Instagramアプリで手動投稿してください',
+        toastShareSavedForX: '画像を保存しました。Xの投稿画面が開きます。保存した画像を添付してください',
+        toastStampShareGenError: '画像の生成に失敗しました。もう一度お試しください。',
         courseSheetTitle: 'コースを作る',
         coursePinsLabel: '軸にするイベント',
         coursePinsHint: '軸にするイベントをタップして選んでください',
@@ -775,6 +781,12 @@
         stampMemoryEditBtn: '✏️ Edit',
         toastStampMemorySaved: 'Memory saved',
         toastStampMemoryError: 'Failed to save',
+        stampShareToInstagram: 'Share to Instagram',
+        stampShareToX: 'Share to X',
+        stampSharePreviewTitle: 'Share',
+        toastShareSavedForIG: 'Image saved. Please post manually via the Instagram app',
+        toastShareSavedForX: "Image saved. Opening X's post screen — please attach the saved image",
+        toastStampShareGenError: 'Failed to generate the image. Please try again.',
         courseSheetTitle: 'Create Course',
         coursePinsLabel: 'Base pinned event',
         coursePinsHint: 'Tap to select',
@@ -3586,6 +3598,7 @@
       closePlanModal();
       closeStampSpotDetail();
       closeStampLevelUnlockModal();
+      closeStampSharePreview();
       _closeStampMemorySheetForNav();
       closeGraduationAlbum(); // 設計書152: 探訪タブでアルバムを開いたままボトムナビで他画面に切り替えた際に閉じ残らないようにする
       const detail = document.getElementById('detail-screen');
@@ -4854,6 +4867,10 @@
 
       _renderStampDetailMemorySection(spot);
 
+      // 設計書163: チェックイン済み（訪問済み）の場合のみシェアボタンを表示
+      const shareRowEl = document.getElementById('stamp-share-detail-btn-row');
+      if (shareRowEl) shareRowEl.style.display = _stampSpotIsChecked(spot.id) ? '' : 'none';
+
       _updateStampCheckinButton();
 
       lockScroll();
@@ -4999,6 +5016,9 @@
         _renderStampCollectionList();
         _renderStampAreaBadges();
         _updateStampCheckinButton();
+        // 設計書163: チェックイン成功によりシェアボタンの表示条件（訪問済み）が満たされるため即座に反映
+        const shareRowEl = document.getElementById('stamp-share-detail-btn-row');
+        if (shareRowEl) shareRowEl.style.display = '';
       } catch (_) {
         showToast(t('toastStampCheckinError'));
         if (btn) btn.disabled = false;
@@ -5060,12 +5080,15 @@
       // design107で追加した補足サブテキスト（🔓 {level}のロックが解除されました）は非表示にする
       // （コンプリートモーダルと共有DOMのため、コンプリート側は表示する）
       if (subtextEl) subtextEl.style.display = 'none';
+      // 設計書163: 単なる解禁演出（コンプリートではない）ではシェアボタンを表示しない
+      const shareRowEl = document.getElementById('stamp-share-complete-btn-row');
+      if (shareRowEl) shareRowEl.style.display = 'none';
       lockScroll();
       document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
       document.getElementById('stamp-level-unlock-modal').classList.add('visible');
     }
 
-    // ─── 全制覇（コンプリート）モーダル（設計書143新規）───
+    // ─── 全制覇（コンプリート）モーダル（設計書143新規 → 設計書163でシェアボタンを追加）───
     // アンロックモーダルとDOM・CSS（バッジ画像・紙吹雪演出）を共有。completedLevel: 100%制覇したレベル
     function openStampLevelCompleteModal(completedLevel) {
       const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
@@ -5088,6 +5111,13 @@
         subtextEl.style.display = '';
         subtextEl.textContent = `${total}/${total} ${t('stampLevelCompleteSpotsLabel')}`;
       }
+      // 設計書163: 全制覇（コンプリート）モーダルの時のみシェアボタンを表示。
+      // シェアボタンのonclickにcompletedLevelを埋め込む（この関数呼び出し時点で確定する値のため）
+      const shareRowEl = document.getElementById('stamp-share-complete-btn-row');
+      if (shareRowEl) {
+        shareRowEl.style.display = '';
+        shareRowEl.dataset.level = completedLevel;
+      }
       lockScroll();
       document.getElementById('stamp-level-unlock-overlay').classList.add('visible');
       document.getElementById('stamp-level-unlock-modal').classList.add('visible');
@@ -5097,6 +5127,14 @@
       unlockScroll();
       document.getElementById('stamp-level-unlock-overlay').classList.remove('visible');
       document.getElementById('stamp-level-unlock-modal').classList.remove('visible');
+    }
+
+    // #stamp-share-complete-btn-row のシェアボタンから呼ばれる。data-levelにopenStampLevelCompleteModal()時点の
+    // completedLevelを保持しているため、それを読んでshareStampCompleteCard()へ渡す。
+    function _shareStampCompleteBtnClick() {
+      const row = document.getElementById('stamp-share-complete-btn-row');
+      const level = row?.dataset?.level;
+      if (level) shareStampCompleteCard(level);
     }
 
     // ─── 「思い出」機能: チェックイン後ミニシート（設計書121 → 設計書143でコンプリート判定を追加） ───
@@ -5264,6 +5302,702 @@
       const textHtml = hasMemo ? `<div class="stamp-detail-memory-text">${escapeHtml(memo.text)}</div>` : '';
       const editBtnHtml = `<button type="button" class="stamp-memory-edit-btn" onclick="_openStampMemorySheet(_stampSelectedSpot, null)">${t('stampMemoryEditBtn')}</button>`;
       bodyEl.innerHTML = photoHtml + textHtml + editBtnHtml;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 探訪スタンプ帳シェア機能（設計書163）
+    // 3種類のシェアカード（全制覇／チェックイン／進捗スナップショット）をCanvas 2D APIで直接描画し、
+    // Instagram Stories・Xへ共有する。html2canvas等の外部ライブラリは使わない。
+    // 生成した最新のBlobは _currentShareCardBlob に保持し、共有プレビューミニモーダルから参照する。
+    // 起動時同期フローからは一切参照されないユーザー操作起点の変数のため、TDZ対象外。
+    // ═══════════════════════════════════════════════════════════
+    let _currentShareCardBlob = null;
+    let _currentShareCaptionText = '';
+
+    // カード共通配色（app.cssの:root変数の値をJS側にも定数として保持。Canvas上ではCSS変数を参照できないため）
+    const SHARE_CARD_COLORS = {
+      cream: '#FFF9F2',
+      sand: '#F0E6D3',
+      sandDark: '#E2D0B8',
+      caramel: '#C8804A',
+      caramelLight: '#E0A878',
+      midnight: '#2C2420',
+      warmGray: '#6B5E52',
+      warmWhite: '#FFFDF9',
+    };
+
+    // Canvas上でWebフォント（Kaisei Opti）を使うため、描画前に必ずdocument.fonts.readyを待つ。
+    // 未対応環境（フォント読み込み失敗）でもフォールバックフォントで描画は継続する（例外を投げない）。
+    async function _ensureShareCardFontsReady() {
+      try {
+        if (document.fonts && document.fonts.ready) {
+          await document.fonts.load('700 32px "Kaisei Opti"');
+          await document.fonts.load('400 24px "Kaisei Opti"');
+          await document.fonts.ready;
+        }
+      } catch (_) {}
+    }
+
+    // 角丸矩形パス（Canvas 2D APIには一部環境でroundRect()が無いため自前実装で統一する）
+    function _shareCardRoundRectPath(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    // 外部/同一オリジン問わず画像をロードする共通ヘルパー。CORS制約で失敗する可能性があるため
+    // crossOrigin='anonymous'を設定した上でPromiseで結果を返す（失敗時はnullでresolve、例外は投げない）。
+    function _loadImageForShareCard(url) {
+      return new Promise((resolve) => {
+        if (!url) { resolve(null); return; }
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+
+    // crossOrigin='anonymous'を設定してもonloadは発火するが、提供元サーバーが
+    // Access-Control-Allow-Originを返さない場合、その画像をdrawImageしたcanvasは「tainted」になり
+    // toBlob()/toDataURL()が失敗する（"tainted canvas"エラー）。事前に1x1の使い捨てcanvasへ
+    // drawImage→getImageData()を試すことでtainted判定を行い、tainted画像は使わずnullを返す
+    // （設計書163 §3・§8で必須とされているCORSフォールバックの実装）。
+    function _isImageTaintedForCanvas(img) {
+      try {
+        const testCanvas = document.createElement('canvas');
+        testCanvas.width = 1; testCanvas.height = 1;
+        const testCtx = testCanvas.getContext('2d');
+        testCtx.drawImage(img, 0, 0, 1, 1);
+        testCtx.getImageData(0, 0, 1, 1);
+        return false;
+      } catch (_) {
+        return true;
+      }
+    }
+
+    // _loadImageForShareCard() + tainted判定をまとめた安全版。tainted画像はnullを返す
+    // （呼び出し元はnull時にプレースホルダー描画やレイアウト詰めにフォールバックする）。
+    async function _loadSafeImageForShareCard(url) {
+      const img = await _loadImageForShareCard(url);
+      if (!img) return null;
+      if (_isImageTaintedForCanvas(img)) return null;
+      return img;
+    }
+
+    // canvas.toBlob()のPromiseラッパー。tainted canvas（CORS由来）等で失敗した場合はnullでresolveする。
+    function _shareCardCanvasToBlob(canvas) {
+      return new Promise((resolve) => {
+        try {
+          canvas.toBlob((blob) => resolve(blob || null), 'image/png');
+        } catch (_) {
+          resolve(null);
+        }
+      });
+    }
+
+    // 中央揃えテキストの折り返し描画（幅maxWidthを超える場合はスペース/文字単位で改行、最大lines行まで）
+    function _wrapShareCardText(ctx, text, maxWidth) {
+      if (!text) return [];
+      const lines = [];
+      let current = '';
+      for (const ch of text) {
+        const test = current + ch;
+        if (ctx.measureText(test).width > maxWidth && current) {
+          lines.push(current);
+          current = ch;
+        } else {
+          current = test;
+        }
+      }
+      if (current) lines.push(current);
+      return lines;
+    }
+
+    // ─── 3-1. 全制覇シェアカード（設計書163 §3-1、モック mock-share-card.html 準拠） ───
+    async function _buildStampCompleteShareCardBlob(completedLevel) {
+      await _ensureShareCardFontsReady();
+      const W = 1080, H = 1350;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      const C = SHARE_CARD_COLORS;
+
+      // 背景グラデーション（cream→sand、160deg相当）
+      const grad = ctx.createLinearGradient(0, 0, W * 0.34, H);
+      grad.addColorStop(0, C.cream);
+      grad.addColorStop(1, C.sand);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
+      const total = _stampSpots.filter(s => s.level === completedLevel).length;
+
+      ctx.textAlign = 'center';
+
+      // ブランド
+      ctx.fillStyle = C.caramel;
+      ctx.font = '700 30px "Noto Sans JP", sans-serif';
+      ctx.fillText('おでかけNavi', W / 2, 130);
+      ctx.fillStyle = C.warmGray;
+      ctx.font = '400 27px "Noto Sans JP", sans-serif';
+      ctx.fillText('シンガポール探訪の記録', W / 2, 175);
+
+      // バッジ画像（同一オリジンPNG想定、失敗時は円のプレースホルダーで代替しフローを止めない）
+      const badgeSize = 400;
+      const badgeY = 230;
+      try {
+        const badgeImg = await _loadSafeImageForShareCard(meta.img);
+        if (badgeImg) {
+          ctx.save();
+          ctx.shadowColor = 'rgba(44,36,32,0.25)';
+          ctx.shadowBlur = 30;
+          ctx.shadowOffsetY = 16;
+          ctx.drawImage(badgeImg, (W - badgeSize) / 2, badgeY, badgeSize, badgeSize);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = C.sandDark;
+          ctx.beginPath();
+          ctx.arc(W / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } catch (_) {}
+
+      let y = badgeY + badgeSize + 90;
+
+      // レベル名
+      ctx.fillStyle = C.midnight;
+      ctx.font = '700 58px "Kaisei Opti", serif';
+      ctx.fillText(`${meta.emoji} ${t(meta.labelKey)}`, W / 2, y);
+      y += 80;
+
+      // 「制覇！」
+      ctx.fillStyle = C.caramel;
+      ctx.font = '700 72px "Kaisei Opti", serif';
+      ctx.fillText(t('stampLevelCompleteLabel'), W / 2, y);
+      y += 70;
+
+      // 件数ピル
+      const countText = `${total} / ${total} ${t('stampLevelCompleteSpotsLabel')}`;
+      ctx.font = '700 34px "Noto Sans JP", sans-serif';
+      const pillPaddingX = 44, pillH = 74;
+      const pillW = ctx.measureText(countText).width + pillPaddingX * 2;
+      const pillX = (W - pillW) / 2, pillY = y;
+      ctx.save();
+      ctx.fillStyle = C.warmWhite;
+      ctx.strokeStyle = C.sandDark;
+      ctx.lineWidth = 2;
+      _shareCardRoundRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = C.warmGray;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(countText, W / 2, pillY + pillH / 2 + 2);
+      ctx.textBaseline = 'alphabetic';
+
+      // フッター: 在住歴（設定されている場合のみ）
+      const arrivalStr = localStorage.getItem('app_arrival_date');
+      if (arrivalStr) {
+        const arrival = new Date(arrivalStr + 'T00:00:00');
+        if (!isNaN(arrival.getTime())) {
+          const today = new Date();
+          const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+          const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          const days = Math.max(0, Math.round((todayMid - arrivalMid) / 86400000));
+          let years = todayMid.getFullYear() - arrivalMid.getFullYear();
+          let months = todayMid.getMonth() - arrivalMid.getMonth();
+          if (todayMid.getDate() < arrivalMid.getDate()) months--;
+          if (months < 0) { years--; months += 12; }
+          const ym = _formatResidencyYM(years, months, getLang());
+          const footerY = H - 90;
+          ctx.fillStyle = C.warmGray;
+          ctx.font = '400 26px "Noto Sans JP", sans-serif';
+          ctx.fillText(getLang() === 'ja' ? '在住歴' : 'Residency', W / 2, footerY);
+          ctx.fillStyle = C.caramel;
+          ctx.font = '700 32px "Noto Sans JP", sans-serif';
+          ctx.fillText(getLang() === 'ja' ? `${ym}（${days}日）` : `${ym} (${days} days)`, W / 2, footerY + 42);
+        }
+      }
+
+      return _shareCardCanvasToBlob(canvas);
+    }
+
+    // ─── 3-2. スポットチェックインシェアカード（設計書163 §3-2、モック mock-share-card-checkin.html 準拠） ───
+    async function _buildStampCheckinShareCardBlob(spot) {
+      await _ensureShareCardFontsReady();
+      const W = 1080, H = 1350;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      const C = SHARE_CARD_COLORS;
+
+      // 背景（カード全体）
+      ctx.fillStyle = C.cream;
+      ctx.fillRect(0, 0, W, H);
+
+      const lang = getLang();
+      const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+
+      // 写真エリア（個人の思い出写真があれば優先、無ければ公式画像。両方無ければ省略しレイアウトを詰める）
+      // 個人の思い出写真はIndexedDB由来のBlobから生成したobjectURL（同一オリジン相当）のためCORS問題は起きないが、
+      // spot.imageUrl（外部Unsplash画像等）はCORS制約でtainted canvasになりうるため、いずれも安全版ローダーで統一する
+      // （個人写真はtainted判定コストがわずかに増えるだけで実害はない）。
+      const photoUrls = _stampMemoryPhotoUrlCache[spot.id] || [];
+      const photoSrc = photoUrls[0] || spot.imageUrl || '';
+      const photoH = 866; // 260/405 * 1350 相当
+      let hasPhoto = false;
+      if (photoSrc) {
+        try {
+          const img = await _loadSafeImageForShareCard(photoSrc);
+          if (img) {
+            hasPhoto = true;
+            // object-fit: cover 相当（中央クロップ）
+            const srcRatio = img.width / img.height;
+            const dstRatio = W / photoH;
+            let sx, sy, sw, sh;
+            if (srcRatio > dstRatio) {
+              sh = img.height; sw = sh * dstRatio; sx = (img.width - sw) / 2; sy = 0;
+            } else {
+              sw = img.width; sh = sw / dstRatio; sx = 0; sy = (img.height - sh) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, photoH);
+          }
+        } catch (_) {
+          hasPhoto = false;
+        }
+      }
+
+      let bodyTop = hasPhoto ? photoH : 60;
+
+      // 「✓ 訪問済み」回転スタンプ（写真がある場合のみ、写真右上に重ねる）
+      if (hasPhoto) {
+        ctx.save();
+        const stampCx = W - 130, stampCy = 130, stampR = 90;
+        ctx.translate(stampCx, stampCy);
+        ctx.rotate(-10 * Math.PI / 180);
+        ctx.beginPath();
+        ctx.arc(0, 0, stampR, 0, Math.PI * 2);
+        ctx.fillStyle = C.caramel;
+        ctx.shadowColor = 'rgba(44,36,32,0.3)';
+        ctx.shadowBlur = 14;
+        ctx.shadowOffsetY = 5;
+        ctx.fill();
+        ctx.shadowColor = 'transparent';
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = C.cream;
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = '700 34px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('✓', 0, -6);
+        ctx.font = '700 24px "Noto Sans JP", sans-serif';
+        ctx.fillText(t('stampCheckedInBadge').replace('✓ ', ''), 0, 30);
+        ctx.restore();
+      }
+
+      // 本文（ブランド・スポット名・訪問日・メモ）
+      ctx.textAlign = 'center';
+      let y = bodyTop + 70;
+      ctx.fillStyle = C.caramel;
+      ctx.font = '700 24px "Noto Sans JP", sans-serif';
+      ctx.fillText(getLang() === 'ja' ? 'おでかけNavi・シンガポール探訪' : 'Odekake Navi · Explore Singapore', W / 2, y);
+      y += 60;
+
+      ctx.fillStyle = C.midnight;
+      ctx.font = '700 52px "Kaisei Opti", serif';
+      const nameLines = _wrapShareCardText(ctx, name, W - 140).slice(0, 2);
+      nameLines.forEach((line) => { ctx.fillText(line, W / 2, y); y += 62; });
+      y += 6;
+
+      const checkinDateFull = _stampCheckinDateFullFor(spot.id);
+      if (checkinDateFull) {
+        ctx.fillStyle = C.warmGray;
+        ctx.font = '400 28px "Noto Sans JP", sans-serif';
+        ctx.fillText(checkinDateFull, W / 2, y);
+        y += 60;
+      }
+
+      const memo = _getStampMemos()[spot.id];
+      if (memo && memo.text) {
+        ctx.fillStyle = C.midnight;
+        ctx.font = 'italic 400 30px "Noto Sans JP", sans-serif';
+        const memoText = memo.text.length > 80 ? memo.text.slice(0, 80) + '…' : memo.text;
+        const memoLines = _wrapShareCardText(ctx, memoText, W - 160).slice(0, 4);
+        memoLines.forEach((line) => { ctx.fillText(line, W / 2, y); y += 44; });
+      }
+
+      return _shareCardCanvasToBlob(canvas);
+    }
+
+    // _stampCheckinDateForは「M/D」形式（一覧カード用）のため、シェアカードでは
+    // 「年月日+訪問」の完全な日付文字列を返す専用ヘルパーを別途用意する。
+    function _stampCheckinDateFullFor(spotId) {
+      const entry = (_stampProgress.checkinLog || []).find(e => e.spotId === spotId);
+      if (!entry || !entry.checkedInAt) return '';
+      const d = new Date(entry.checkedInAt);
+      if (isNaN(d.getTime())) return '';
+      if (getLang() === 'ja') return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 訪問`;
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `Visited ${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+
+    // ─── 3-3. 進捗スナップショットシェアカード（設計書163 §3-3、モック mock-share-card-progress.html 準拠） ───
+    // ⚠️ 未解禁レベルはラベル名・絵文字とも「？？？」でマスクする（design 105のマスキング方針を踏襲、
+    // モック時点ではラベル名を表示したまま件数のみ伏せていたが、ユーザー指摘により実装ではラベル名も伏せる）。
+    async function _buildStampProgressShareCardBlob() {
+      await _ensureShareCardFontsReady();
+      const W = 1080, H = 1350;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      // ダーク背景グラデーション（160deg、#2C2420→#4a3c32相当）
+      const grad = ctx.createLinearGradient(0, 0, W * 0.34, H);
+      grad.addColorStop(0, '#2C2420');
+      grad.addColorStop(1, '#4a3c32');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      const caramelLight = SHARE_CARD_COLORS.caramelLight;
+      const lang = getLang();
+
+      ctx.textAlign = 'center';
+
+      // ブランド
+      ctx.fillStyle = caramelLight;
+      ctx.font = '700 28px "Noto Sans JP", sans-serif';
+      ctx.fillText(getLang() === 'ja' ? 'おでかけNavi・シンガポール探訪' : 'Odekake Navi · Explore Singapore', W / 2, 110);
+
+      // 在住日数・年月
+      const arrivalStr = localStorage.getItem('app_arrival_date');
+      let days = 0, ym = '';
+      if (arrivalStr) {
+        const arrival = new Date(arrivalStr + 'T00:00:00');
+        if (!isNaN(arrival.getTime())) {
+          const today = new Date();
+          const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+          const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          days = Math.max(0, Math.round((todayMid - arrivalMid) / 86400000));
+          let years = todayMid.getFullYear() - arrivalMid.getFullYear();
+          let months = todayMid.getMonth() - arrivalMid.getMonth();
+          if (todayMid.getDate() < arrivalMid.getDate()) months--;
+          if (months < 0) { years--; months += 12; }
+          ym = _formatResidencyYM(years, months, getLang());
+        }
+      }
+      let y = 240;
+      ctx.fillStyle = caramelLight;
+      ctx.font = '700 130px "Kaisei Opti", serif';
+      const daysLabel = getLang() === 'ja' ? '日' : ' days';
+      ctx.fillText(`${days}${daysLabel}`, W / 2, y);
+      y += 50;
+      ctx.fillStyle = '#d8cfc4';
+      ctx.font = '400 30px "Noto Sans JP", sans-serif';
+      ctx.fillText(arrivalStr ? (getLang() === 'ja' ? `在住歴 ${ym}` : `${ym} in Singapore`) : t('genreStatusUnset'), W / 2, y);
+      y += 70;
+
+      // レベルごとの進捗バー
+      const rowH = 92;
+      const trackX = 340, trackW = 520;
+      ctx.textAlign = 'left';
+      STAMP_LEVEL_ORDER_CLIENT.forEach((level) => {
+        const meta = STAMP_LEVEL_META[level];
+        const spotsInLevel = _stampSpots.filter(s => s.level === level);
+        const total = spotsInLevel.length;
+        const checked = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+        const unlocked = _stampProgress.unlockedLevels.includes(level);
+        // special等、未解禁時にtotal自体が0（サーバーがスポット自体を隠す設計）の場合もマスク対象として扱う
+        const isMasked = !unlocked;
+
+        ctx.save();
+        if (isMasked) ctx.globalAlpha = 0.45;
+
+        const rowCy = y + rowH / 2 - 20;
+
+        // 絵文字（マスク時は🔒に差し替え）
+        ctx.font = '400 34px "Noto Sans JP", sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isMasked ? '🔒' : meta.emoji, 90, rowCy);
+
+        // ラベル（マスク時はレベル名自体も「？？？」。日本語4〜5文字のレベル名を想定し22pxで詰めて表示崩れを防ぐ）
+        ctx.fillStyle = '#fff';
+        ctx.font = '700 22px "Noto Sans JP", sans-serif';
+        ctx.fillText(isMasked ? '？？？' : t(meta.labelKey), 160, rowCy);
+
+        // 進捗バー
+        const pct = (!isMasked && total > 0) ? (checked / total) : 0;
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        _shareCardRoundRectPath(ctx, trackX, rowCy - 14, trackW, 28, 14);
+        ctx.fill();
+        if (pct > 0) {
+          ctx.fillStyle = caramelLight;
+          _shareCardRoundRectPath(ctx, trackX, rowCy - 14, Math.max(28, trackW * pct), 28, 14);
+          ctx.fill();
+        }
+
+        // 件数（マスク時は「？？？」、非マスクかつtotal=0＝special未解禁等も「？？？」扱いにする）
+        ctx.fillStyle = '#d8cfc4';
+        ctx.font = '400 24px "Noto Sans JP", sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(isMasked ? '？？？' : `${checked}/${total}`, trackX + trackW + 110, rowCy);
+        ctx.textAlign = 'left';
+
+        ctx.restore();
+        y += rowH;
+      });
+
+      // フッター
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#c9beb2';
+      ctx.font = '400 26px "Noto Sans JP", sans-serif';
+      ctx.fillText(getLang() === 'ja' ? 'シンガポール探訪、続けています。' : 'Still exploring Singapore.', W / 2, H - 70);
+
+      return _shareCardCanvasToBlob(canvas);
+    }
+
+    // ─── 4. 共有先ディスパッチ ───
+
+    // 4-1. iOS用: Blobを一時PNGファイルとしてDirectory.Cacheへ書き込み、そのURIを返す
+    async function _saveShareCardToTempFile(blob) {
+      const Filesystem = _getCapFilesystemPlugin();
+      if (!Filesystem) return null;
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result || '';
+          const idx = result.indexOf(',');
+          resolve(idx >= 0 ? result.slice(idx + 1) : result);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+      const fileName = `dosuru-share-${Date.now()}.png`;
+      const res = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: 'CACHE',
+      });
+      return res.uri;
+    }
+
+    let _CapFilesystem = null;
+    function _getCapFilesystemPlugin() {
+      if (_CapFilesystem) return _CapFilesystem;
+      try {
+        if (window.Capacitor?.registerPlugin) _CapFilesystem = window.Capacitor.registerPlugin('Filesystem');
+      } catch (_) {}
+      if (!_CapFilesystem) _CapFilesystem = window.Capacitor?.Plugins?.Filesystem;
+      return _CapFilesystem;
+    }
+
+    let _CapShare = null;
+    function _getCapSharePlugin() {
+      if (_CapShare) return _CapShare;
+      try {
+        if (window.Capacitor?.registerPlugin) _CapShare = window.Capacitor.registerPlugin('Share');
+      } catch (_) {}
+      if (!_CapShare) _CapShare = window.Capacitor?.Plugins?.Share;
+      return _CapShare;
+    }
+
+    let _CapIgStories = null;
+    function _getCapIgStoriesPlugin() {
+      if (_CapIgStories) return _CapIgStories;
+      try {
+        if (window.Capacitor?.registerPlugin) _CapIgStories = window.Capacitor.registerPlugin('ShareToInstagramStories');
+      } catch (_) {}
+      if (!_CapIgStories) _CapIgStories = window.Capacitor?.Plugins?.ShareToInstagramStories;
+      return _CapIgStories;
+    }
+
+    // BlobをBase64文字列（data:プレフィックスなし）に変換する共通ヘルパー
+    function _blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result || '';
+          const idx = result.indexOf(',');
+          resolve(idx >= 0 ? result.slice(idx + 1) : result);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // Web版: Blobをダウンロードさせる共通ヘルパー
+    function _downloadShareCardBlob(blob, fileName) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'dosuru-share.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }
+
+    // 4-2. Instagram（Stories）へ共有。Capacitor環境はIG Storiesプラグイン、Web環境はダウンロード＋案内。
+    // IG Storiesプラグインの動作確認が取れない場合は、iOS版もダウンロード＋案内フォールバックに倒す
+    // （設計書163 §2・§8で明記済みの許容範囲）。
+    async function _shareStampCardToInstagram(blob) {
+      if (_isCapacitorApp) {
+        const plugin = _getCapIgStoriesPlugin();
+        if (plugin?.shareToInstagram) {
+          try {
+            const base64Image = await _blobToBase64(blob);
+            await plugin.shareToInstagram({
+              base64Image,
+              appId: 'app.dosuru',
+              topColor: SHARE_CARD_COLORS.sand,
+              bottomColor: SHARE_CARD_COLORS.cream,
+            });
+            return;
+          } catch (e) {
+            // プラグイン呼び出し失敗（Instagram未インストール等）時はダウンロード＋案内フォールバックへ
+          }
+        }
+      }
+      _downloadShareCardBlob(blob, 'dosuru-share.png');
+      showToast(t('toastShareSavedForIG'));
+    }
+
+    // 4-3. Xへ共有。画像を保存 → Xの投稿画面をテキスト付きで開く、の2ステップ方式。
+    async function _shareStampCardToX(blob, captionText) {
+      if (_isCapacitorApp) {
+        const shareApi = _getCapSharePlugin();
+        try {
+          if (shareApi?.share) {
+            const uri = await _saveShareCardToTempFile(blob);
+            if (uri) {
+              showToast(t('toastShareSavedForX'));
+              await shareApi.share({ files: [uri] });
+              if (window.Capacitor?.Plugins?.Browser) {
+                window.Capacitor.Plugins.Browser.open({ url: 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(captionText) });
+              } else {
+                window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(captionText), '_blank');
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          // ファイル書き込み・共有シートいずれかの失敗時はダウンロード＋intentフォールバックへ
+        }
+      }
+      _downloadShareCardBlob(blob, 'dosuru-share.png');
+      const tweetUrl = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(captionText);
+      if (_isCapacitorApp && window.Capacitor?.Plugins?.Browser) {
+        window.Capacitor.Plugins.Browser.open({ url: tweetUrl });
+      } else {
+        window.open(tweetUrl, '_blank');
+      }
+    }
+
+    // ─── 5-4. 共有プレビューミニモーダル（3箇所共通） ───
+    function _openStampSharePreview(blob, captionText) {
+      if (!blob) { showToast(t('toastStampShareGenError')); return; }
+      _currentShareCardBlob = blob;
+      _currentShareCaptionText = captionText || '';
+      const imgEl = document.getElementById('stamp-share-preview-img');
+      if (imgEl) {
+        const url = URL.createObjectURL(blob);
+        imgEl.src = url;
+        imgEl.dataset.objectUrl = url;
+      }
+      lockScroll();
+      document.getElementById('stamp-share-preview-overlay').classList.add('visible');
+      document.getElementById('stamp-share-preview-modal').classList.add('visible');
+    }
+
+    function closeStampSharePreview() {
+      const imgEl = document.getElementById('stamp-share-preview-img');
+      if (imgEl && imgEl.dataset.objectUrl) {
+        URL.revokeObjectURL(imgEl.dataset.objectUrl);
+        delete imgEl.dataset.objectUrl;
+      }
+      unlockScroll();
+      const overlayEl = document.getElementById('stamp-share-preview-overlay');
+      const modalEl = document.getElementById('stamp-share-preview-modal');
+      if (overlayEl) overlayEl.classList.remove('visible');
+      if (modalEl) modalEl.classList.remove('visible');
+      _currentShareCardBlob = null;
+      _currentShareCaptionText = '';
+    }
+
+    function _shareStampPreviewToInstagram() {
+      if (!_currentShareCardBlob) return;
+      _shareStampCardToInstagram(_currentShareCardBlob);
+    }
+
+    function _shareStampPreviewToX() {
+      if (!_currentShareCardBlob) return;
+      _shareStampCardToX(_currentShareCardBlob, _currentShareCaptionText);
+    }
+
+    // ─── 5. エントリーポイント ───
+
+    // 5-1. 全制覇モーダルからのシェア（openStampLevelCompleteModal()の時のみ呼ばれる想定）
+    async function shareStampCompleteCard(completedLevel) {
+      try {
+        const blob = await _buildStampCompleteShareCardBlob(completedLevel);
+        const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
+        const caption = getLang() === 'ja'
+          ? `シンガポール探訪で「${t(meta.labelKey)}」を制覇しました！ #おでかけNavi #シンガポール`
+          : `I've conquered "${t(meta.labelKey)}" in my Singapore exploration! #OdekakeNavi #Singapore`;
+        _openStampSharePreview(blob, caption);
+      } catch (e) {
+        showToast(t('toastStampShareGenError'));
+      }
+    }
+
+    // 5-2. スポット詳細シートからのシェア（チェックイン済みの場合のみボタンが表示される想定）
+    async function shareStampCheckinCard() {
+      if (!_stampSelectedSpot) return;
+      const spot = _stampSelectedSpot;
+      try {
+        const blob = await _buildStampCheckinShareCardBlob(spot);
+        const lang = getLang();
+        const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+        const caption = lang === 'ja'
+          ? `${name}を訪問しました！ #おでかけNavi #シンガポール`
+          : `I visited ${name}! #OdekakeNavi #Singapore`;
+        _openStampSharePreview(blob, caption);
+      } catch (e) {
+        showToast(t('toastStampShareGenError'));
+      }
+    }
+
+    // 5-3. 在住歴カウンターからのシェア（design 122・127の#stamp-residency-counterタップで起動）
+    async function shareStampProgressCard() {
+      try {
+        const blob = await _buildStampProgressShareCardBlob();
+        const arrivalStr = localStorage.getItem('app_arrival_date');
+        let caption;
+        if (arrivalStr) {
+          const arrival = new Date(arrivalStr + 'T00:00:00');
+          const today = new Date();
+          const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
+          const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          let years = todayMid.getFullYear() - arrivalMid.getFullYear();
+          let months = todayMid.getMonth() - arrivalMid.getMonth();
+          if (todayMid.getDate() < arrivalMid.getDate()) months--;
+          if (months < 0) { years--; months += 12; }
+          const ym = _formatResidencyYM(years, months, getLang());
+          caption = getLang() === 'ja'
+            ? `シンガポール探訪、在住歴${ym}で続けています。 #おでかけNavi #シンガポール`
+            : `Still exploring Singapore after ${ym} here. #OdekakeNavi #Singapore`;
+        } else {
+          caption = getLang() === 'ja' ? 'シンガポール探訪、続けています。 #おでかけNavi #シンガポール' : 'Still exploring Singapore. #OdekakeNavi #Singapore';
+        }
+        _openStampSharePreview(blob, caption);
+      } catch (e) {
+        showToast(t('toastStampShareGenError'));
+      }
     }
 
     // コース一覧レンダリング

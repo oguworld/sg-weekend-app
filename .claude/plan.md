@@ -15989,3 +15989,97 @@ BKK/SYD再開時の復活手順（CLAUDE.md記載の`ACTIVE_CITIES`書き換え�
 
 ## 3. 承認状況
 2026-07-24 ユーザー「1、2をお願い」。**承認済み**。
+
+# 設計書163 — 探訪スタンプ帳シェア機能（全制覇カード／チェックインカード／進捗スナップショットカード、X・Instagram向け）
+
+（2026-07-24 ユーザーとの会話で確定。「シェアしたくなる機能」ブレストから発展し、3種類のシェアカード〈全制覇/チェックイン/在住歴タップの進捗スナップショット〉をモックで提示・承認、共有先はX/Instagramの専用ボタンで実装することを確認。IG Storiesは既存Capacitorコミュニティプラグインの活用、Xは画像を保存→投稿画面を開く2ステップ方式で合意済み）
+
+## 1. 背景・確定事項
+
+design 141ブレストの延長で「ユーザーが劇的に増える機能」を検討し、「シェアしたくなる機能」の方向性を確定。3つの共有可能な瞬間を特定しモックで提示・承認済み:
+1. **全制覇カード**（`openStampLevelCompleteModal()`のタイミング、design 143）
+2. **スポットチェックインカード**（スポット詳細シート、`#stamp-spot-detail-sheet`）
+3. **進捗スナップショットカード**（探訪画面ヘッダーの在住歴バッジをタップ、design 127由来の`#stamp-residency-counter`）
+
+モックファイル（builderはReadツールで直接参照すること）:
+- `/tmp/claude-1000/-home-masahiko-sg-weekend-app/cf2492da-07b2-4426-a6e8-f71385083029/scratchpad/mock-share-card.html`（全制覇カード、2例）
+- `/tmp/claude-1000/-home-masahiko-sg-weekend-app/cf2492da-07b2-4426-a6e8-f71385083029/scratchpad/mock-share-card-checkin.html`（チェックインカード、写真+メモあり/なしの2例）
+- `/tmp/claude-1000/-home-masahiko-sg-weekend-app/cf2492da-07b2-4426-a6e8-f71385083029/scratchpad/mock-share-card-progress.html`（進捗スナップショットカード）
+
+**⚠️ 進捗スナップショットカードの修正点（ユーザー指摘）**: モック時点では「極めし者」のラベルは表示したまま件数のみ「？？？」にしていたが、未解禁時はdesign 105の既存マスキング方針（サーバー側`maskLockedStampSpot()`と同じ「レベル名自体も伏せる」思想）に倣い、**ラベル名も含めて「？？？」でマスクする**（`_renderStampLevelRowLocked()`の`hideLabel`引数と同じ考え方をこのカードにも適用）。
+
+**共有先の技術方針（ユーザー確認済み）**:
+- **Instagram（Stories）**: 既存のCapacitorコミュニティプラグイン（後述）を使い、画像を直接Instagram Storiesの投稿画面に渡す。iOS版のみ対応、Web版は画像ダウンロード＋案内メッセージのフォールバック
+- **X（旧Twitter）**: Xには「画像添付済みの投稿画面を直接開く」公開APIが存在しないため、「①画像を保存→②Xの投稿画面を文章付きで開く→③保存した画像をユーザーが手動で添付」の2ステップ方式とする（ユーザーに事前説明し合意済み）
+
+## 2. 新規依存関係
+
+`ios-app/package.json`に以下を追加（既存プラグインは全て`^6.0.0`系、Capacitor 6対応済み）:
+- `@capacitor/filesystem@^6.0.0`（画像blobを一時ファイルとして書き出すため、共有プラグインがファイルURIを要求するケースに対応）
+- `@capacitor/share@^6.0.0`（X向けの「画像を保存」ステップ、および汎用シェアシートのフォールバックに使用）
+- Instagram Stories共有用プラグイン: **builderは実装着手前に`npm view <候補パッケージ名> peerDependencies`でCapacitor 6対応を確認すること**（このプロジェクトの既存ルール、CLAUDE.md「iOS版（Capacitor）」節の教訓を踏襲）。候補: `ionic-share-to-instagram-stories`または`@koodos/share-to-insta-stories`（2026-07-24のWebSearch調査で発見、いずれも未検証。peerDependenciesでCapacitor 6/Capacitor Core互換性を確認し、対応していない場合は`registerPlugin('InstagramStories')`等の防御的取得パターンでも動かない可能性があるため、**インストール後に必ず`node --check`相当の起動確認、および最悪の場合はプラグイン自体の導入を見送りIG共有をWeb版と同じ「ダウンロード＋案内」フォールバックのみにする判断も許容する**（設計時点で確実な動作保証ができないため、実装時の裁量に委ねる）
+- Instagram Stories共有APIは一般に`source_application`パラメータにFacebook Developer Appの識別子を要求する実装がある。**取得済みのFacebook App ID等が無い場合、プラグインのデフォルト値や省略可能なパラメータで動作するか確認し、必須であれば「ユーザー側の追加作業が必要」として別途フォローアップする**（Google/Apple Sign-InのOAuthクライアントID取得と同種の外部サービス登録作業になる可能性がある旨、設計時点で明記しておく）
+
+## 3. カード生成（Canvas 2D API、html2canvas等の外部ライブラリは使わない）
+
+3つのカードとも共通で「1080×1350（4:5、縦長）」のcanvasに直接描画し、`canvas.toBlob('image/png')`でBlobを得る方式とする（DOM→画像化ライブラリに依存しない。既存の`STAMP_LEVEL_META[level].img`〈同一オリジンPNG〉や`spot.imageUrl`〈外部Unsplash画像、CORS制約に注意）を`new Image()`でロードしてから`ctx.drawImage()`する。**外部オリジン画像（`spot.imageUrl`）はCORS制約により、`crossOrigin='anonymous'`を設定しても提供元サーバーが`Access-Control-Allow-Origin`を返さない場合`canvas.toBlob()`が失敗しうる（"tainted canvas"エラー）。この場合は画像を諦めてカラー背景のみのフォールバックにする try-catch を必須とする**。
+
+### 3-1. 新規関数`_buildStampCompleteShareCardBlob(completedLevel)`
+モック`mock-share-card.html`のレイアウトを再現: 背景グラデーション（`--cream`→`--sand`）、上部に「おでかけNavi」「シンガポール探訪の記録」のブランドテキスト、中央に`STAMP_LEVEL_META[completedLevel].img`のバッジ画像、レベル名＋「制覇！」（Kaisei Opti相当のフォント指定。canvas上でWebフォントを使うには`document.fonts.ready`を待ってから描画する必要がある点に注意）、`{total}/{total} スポット達成`のピル、下部に在住歴（`app_arrival_date`があれば「在住歴 X年Yか月（Z日）」、無ければ省略）。
+
+### 3-2. 新規関数`_buildStampCheckinShareCardBlob(spot)`
+モック`mock-share-card-checkin.html`を再現: 上部に写真（個人の思い出写真があれば優先、無ければ`spot.imageUrl`、両方無ければ写真エリア自体を省略しレイアウトを詰める）、右上に「✓ 訪問済み」の回転スタンプ、下部に「おでかけNavi・シンガポール探訪」ブランド、スポット名（Kaisei Opti太字）、訪問日（`_stampCheckinDateFor(spot.id)`）、思い出メモがあれば引用形式で表示（`_getStampMemos()[spot.id]?.text`、長い場合は適度に省略）。
+
+### 3-3. 新規関数`_buildStampProgressShareCardBlob()`
+モック`mock-share-card-progress.html`を再現: ダークな背景（`--midnight`系グラデーション）、在住日数の大きな数字＋「在住歴 X年Yか月」、`STAMP_LEVEL_ORDER_CLIENT`の各レベルについて進捗バー行（絵文字＋レベル名＋バー＋件数）を描画。**未解禁レベル（`_stampProgress.unlockedLevels`に含まれない）は、ラベル名も件数も「？？？」でマスクする**（上記1章の修正点）。下部に「シンガポール探訪、続けています。」のフッター文言。
+
+## 4. 共有先ディスパッチ
+
+### 4-1. 共通ヘルパー`_saveShareCardToTempFile(blob)`（iOS用）
+`@capacitor/filesystem`で`Directory.Cache`配下に一時PNGファイルとして書き込み、そのURIを返す（base64変換が必要、`FileReader`でblobをbase64化してから`Filesystem.writeFile()`）。
+
+### 4-2. `_shareStampCardToInstagram(blob)`
+- Capacitor環境: 選定したIG Storiesプラグインの共有メソッドを呼ぶ（プラグインのAPI仕様に従う、多くは`base64Image`または`imageUrl`パラメータを取る）
+- Web環境: `URL.createObjectURL(blob)`から`<a download>`でPNGをダウンロードさせ、トースト「画像を保存しました。Instagramアプリで手動投稿してください」を表示（新規i18nキー）
+
+### 4-3. `_shareStampCardToX(blob, captionText)`
+- Capacitor環境: (1) `_saveShareCardToTempFile(blob)`でファイルURI取得 → `@capacitor/share`の`Share.share({ files: [uri] })`で画像保存ステップ（OSの共有シートから「画像を保存」を選んでもらう）→ (2) `Browser.open({ url: 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(captionText) })`でX投稿画面を開く。事前にトースト「画像を保存後、Xの投稿画面が開きます。保存した画像を添付してください」を表示（新規i18nキー）
+- Web環境: 画像を`<a download>`でダウンロードさせた後、`window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(captionText), '_blank')`
+
+`captionText`は各カード種別ごとに適切な文言を組み立てる（例: 全制覇カード→「シンガポール探訪で『{レベル名}』を制覇しました！ #おでかけNavi #シンガポール」、チェックインカード→「{スポット名}を訪問しました！ #おでかけNavi」、進捗カード→「シンガポール探訪、在住歴{X年Yか月}で続けています。 #おでかけNavi」）。ハッシュタグ・文言は既存のX自動投稿ペルソナ（`scripts/post-to-x.js`）とは無関係の独立した文言としてよい。
+
+## 5. UI・エントリーポイント
+
+### 5-1. 全制覇モーダルへのシェアボタン
+`#stamp-level-unlock-modal`（design 143、`openStampLevelCompleteModal()`と`openStampLevelUnlockModal()`で共有DOM）に、新規`#stamp-share-btn-row`（IGボタン・Xボタンの2つ、アイコン+ラベル）を追加。**`openStampLevelCompleteModal()`の時のみ表示し、`openStampLevelUnlockModal()`〈単なる解禁演出〉では非表示にする**（design 143の既存の`subtextEl.style.display`制御と同じ「2つの関数がDOMを共有するが表示内容を出し分ける」パターンを踏襲）。
+
+### 5-2. スポット詳細シートへのシェアボタン
+`#stamp-spot-detail-sheet`の「あなたの記録」セクション（design 121）付近、またはチェックイン済みバッジの近くに、同様のIG/Xシェアボタン2つを追加。**チェックイン済み（`_stampSpotIsChecked(spot.id)`）の場合のみ表示**（未訪問スポットはシェア対象外）。
+
+### 5-3. 在住歴カウンターのタップ導線
+`#stamp-residency-counter`（design 122・127、現在はタップ不可の表示専用div）に`onclick`を追加し、進捗スナップショットカードの共有シート（新規ミニモーダル、IG/Xボタン2つ＋プレビュー）を開く。既存の「onclick属性にタッチガードを付けるがtouchendハンドラを付け忘れる」バグパターン（design 84・99・130）を踏まえ、**ガードなしのシンプルなonclickにすること**。
+
+### 5-4. 共有プレビューミニモーダル（3箇所共通で使い回す）
+新規`#stamp-share-preview-overlay`/`#stamp-share-preview-modal`（z-index: 3730/3731、既存の探訪関連モーダル群3700〜3720番台の直後）。生成したカード画像を`<img>`でプレビュー表示し、その下にIG/Xボタンを配置する。3つのカード生成元（全制覇・チェックイン・進捗）はいずれもこの共通モーダルを呼び出す形にし、`_currentShareCardBlob`（モジュールスコープ変数、TDZ対象外・ユーザー操作起点のため問題なし）に生成済みBlobを保持しておく。
+
+## 6. i18n
+
+新規キー（ja/en同時追加）: `stampShareToInstagram`（Instagramでシェア/Share to Instagram）・`stampShareToX`（Xでシェア/Share to X）・`toastShareSavedForIG`（画像を保存しました。Instagramアプリで手動投稿してください/Image saved. Please post manually via the Instagram app）・`toastShareSavedForX`（画像を保存しました。Xの投稿画面が開きます。保存した画像を添付してください/Image saved. Opening X's post screen — please attach the saved image）・`stampShareCardCompleteTitle`等、キャプション文言に必要なキー一式（builderの裁量でキー名を決めてよいが、ja/en両方を必ず追加すること）。
+
+## 7. スコープ外
+
+- Facebook Developer App ID等、外部サービス登録が必須と判明した場合の実際の取得作業自体（ユーザー側の手動作業として別途フォローアップ、design 44のApple Developer Portal作業と同種の扱い）
+- Android対応（既存スコープ外方針を踏襲）
+- 生成したシェア画像の保存履歴・過去に生成した画像の再閲覧
+- Instagram Feed（フィード投稿）への直接共有（今回はStoriesのみ、または汎用共有シートへのフォールバック）
+- X以外のSNS（LINE等）への専用ボタン追加（既存の`shareViaLine()`〈共有カレンダー招待用〉とは無関係の新規実装、今回はIG/Xの2つのみ）
+
+## 8. リスク・不確実性（設計時点で明記）
+
+- Instagram Stories共有プラグインの選定・Capacitor 6互換性・実際の動作は2026-07-24時点で未検証（npm検索結果のみに基づく設計）。**実装時に動作確認が取れない場合は、IG共有もWeb版と同じ「ダウンロード＋案内」フォールバックへ切り替える判断を許容する**
+- Canvas上でのWebフォント（Kaisei Opti）描画は`document.fonts.ready`を待つ必要があり、タイミング次第でフォールバックフォント（システムフォント）になるリスクがある
+- 外部オリジン画像（Unsplash等の`spot.imageUrl`）のCORS制約により、チェックインカードで公式画像が使えない可能性がある（try-catchで検知しフォールバック必須）
+- `server.js`・データファイルは無変更（`pm2 restart`不要）
+
+## 9. 承認状況
+2026-07-24 ユーザーとの会話で段階的に確定。3種のシェアカード（モック提示・承認済み）、共有先はX/Instagram専用ボタン、Xは2ステップ方式（ユーザー「大丈夫です」で確認済み）、進捗カードの極めし者マスキング方針（ユーザー「極めし者は？？？でね」で確認済み）。**承認済み**。

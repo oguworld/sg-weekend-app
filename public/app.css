@@ -2424,6 +2424,41 @@
       margin-top: 6px;
     }
 
+    /* ─── 探訪スタンプ帳シェア機能（設計書163） ─── */
+    .stamp-share-btn-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .stamp-share-btn {
+      flex: 1;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 10px;
+      border-radius: 12px;
+      border: 1.5px solid var(--sand-dark);
+      background: var(--warm-white);
+      font-size: 13px; font-weight: 700;
+      font-family: 'Noto Sans JP', sans-serif;
+      color: var(--midnight);
+      cursor: pointer;
+    }
+    .stamp-share-btn span:first-child { font-size: 15px; }
+    .stamp-share-btn--main {
+      background: var(--caramel);
+      border-color: var(--caramel);
+      color: white;
+    }
+    .stamp-share-btn--ig {
+      background: linear-gradient(135deg, #f9ce34, #ee2a7b 45%, #6228d7);
+      border: none;
+      color: white;
+    }
+    .stamp-share-btn--x {
+      background: var(--midnight);
+      border: none;
+      color: white;
+    }
+
     .course-card {
       border-radius: 14px; overflow: hidden;
       background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
