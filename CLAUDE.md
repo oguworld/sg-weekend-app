@@ -891,6 +891,15 @@ design 148で導入した`.stamp-level-progress-icon`（🔓/🏆アイコン）
 - キャッシュバスティング: `index.html` app.css `?v=20260724e`→`20260724f`、`sw.js` CACHE_NAME=`sg-weekend-v699`→`v700`（`app.js`は無変更のため据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での透過アイコン表示・drop-shadowによる可読性は2026-07-24時点でCSS構文確認のみ完了、実ブラウザ・実機とも未確認
 
+### 進捗バーの絵文字をもう一段階拡大（2026-07-24実装、設計書150）
+design 149（透過化）直後、ユーザーが「絵文字もうちょい大きくしてもいいかな」と追加要望。
+
+- `public/app.css`の`.stamp-level-progress-icon`: `width`/`height`を22px→26px、`font-size`を14px→17pxに拡大。他プロパティ（`position`/`transform`/`background:transparent`/`filter`/`z-index`、design 149時点）は無変更
+- 配置ロジック（`left`のインラインstyle・`.stamp-level-progress-icon--end`修飾子）・数字ラベル（`.stamp-level-progress-count`）・閾値計算ロジックはいずれも無変更
+- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.css `?v=20260724f`→`20260724g`、`sw.js` CACHE_NAME=`sg-weekend-v700`→`v701`（`app.js`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での拡大後の視認性・バランスは2026-07-24時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
+
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
 

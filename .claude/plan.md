@@ -15289,3 +15289,25 @@ design 148で導入した`.stamp-level-progress-icon`（バー上に直接乗る
 
 ## 4. 承認状況
 2026-07-24 ユーザー「大きさは大丈夫です。絵文字透過にできる？」。**承認済み**（内容が明確な小粒修正のため直接実装に進める）。
+
+# 設計書150 — 進捗バーの絵文字をもう一段階拡大
+
+（2026-07-24 design 149〈透過化〉直後、ユーザーが「絵文字もうちょい大きくしてもいいかな」と追加要望）
+
+## 1. 確定仕様
+
+`.stamp-level-progress-icon`（`public/app.css`）のサイズをdesign 148時点の22px/font-size14pxから、26px/font-size17pxに拡大する。
+
+```css
+.stamp-level-progress-icon {
+  width: 26px; height: 26px;
+  font-size: 17px;
+  /* 他プロパティ（position/transform/background:transparent/filter/z-index）は design 149のまま無変更 */
+}
+```
+
+## 2. スコープ外
+配置ロジック（`left`のインラインstyle・`--end`修飾子）・透過背景（design 149）・数字ラベルは変更しない。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「絵文字もうちょい大きくしてもいいかな」。**承認済み**（内容が明確な小粒修正のため直接実装に進める）。
