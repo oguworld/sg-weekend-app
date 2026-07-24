@@ -4744,8 +4744,8 @@
 
       return `<div class="stamp-level-section">
         <div class="stamp-level-section-title">
-          ${meta.emoji}
-          ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）
+          <span class="stamp-level-title-main">${meta.emoji} ${t(meta.labelKey)}</span>
+          <span class="stamp-level-title-sub">${_stampLevelYearRange(meta)}</span>
         </div>
         <div class="stamp-level-progress-track-wrap">
           <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>

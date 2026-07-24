@@ -15620,3 +15620,95 @@ async function _computeGraduationAlbumData() {
 
 ## 5. 承認状況
 2026-07-24 ユーザーとの会話で段階的に確定。入口配置は探訪画面ヘッダー（AskUserQuestionで確定）。表示条件は「帰国予定日の1ヶ月前から」（当初2週間前で確定しかけたが、ユーザーが直後に訂正し1ヶ月前で最終確定）。**承認済み**（フェーズ1・2〈本設計書の範囲〉、保存・共有は次フェーズとして継続確認予定）。
+
+# 設計書153 — 探訪スタンプ帳のレベル見出しとカードをデコンパクト化（見出し=案1、カード=案2）
+
+（2026-07-24 design 152実装後、ユーザーが探訪画面全体の雰囲気を「ゴチャゴチャしてきた」とフィードバック。モック3案〈見出し軽量化＋カードをフラット化／見出しミニマル＋カードを1行に圧縮／要素構成そのまま余白拡大〉を提示し、ユーザーが「案1の見出しと案2のリストカードで」と組み合わせを選択）
+
+## 1. 背景
+
+design 144〜152の積み重ねにより、探訪スタンプ帳のレベル見出し（絵文字＋レベル名＋年数目安が1行に密集）とカード（56pxサムネイル＋枠線＋影＋タグ＋2行分のテキスト）が視覚的に重く感じられるようになった。見出しは案1（メインラベルとサブ情報を視覚的階層で分離）、カードは案2（よりコンパクトな密度）の方向性で軽量化する。
+
+## 2. 確定仕様
+
+### 2-1. レベル見出し（`_renderStampLevelRowInProgress()`、状態Bのみ対象）
+
+`public/app.js`の該当箇所（`grep -n "stamp-level-section-title" public/app.js`で特定。現在の実装は`${meta.emoji} ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）`を1つの`.stamp-level-section-title`に流し込む1行構成）を、メインラベル（絵文字＋レベル名）とサブラベル（年数目安）を視覚的階層で分けた2パーツ構成に変更する:
+
+```js
+<div class="stamp-level-section-title">
+  <span class="stamp-level-title-main">${meta.emoji} ${t(meta.labelKey)}</span>
+  <span class="stamp-level-title-sub">${_stampLevelYearRange(meta)}</span>
+</div>
+```
+
+`_stampLevelYearRange(meta)`の戻り値（「目安：在住歴0〜1年」等、design 112・140で確定済みの文言）は無変更のまま使う（括弧`（）`は付けない、サブラベル自体の視覚的な弱さで既に「補足情報」であることが伝わるため）。
+
+CSS（`public/app.css`、`.stamp-level-section-title`を置き換え）:
+```css
+.stamp-level-section-title {
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.stamp-level-title-main {
+  font-size: 15px; font-weight: 700; color: var(--midnight);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.stamp-level-title-sub {
+  font-size: 10px; color: var(--warm-gray); font-weight: 400;
+}
+```
+
+**状態A（`_renderStampLevelRowLocked()`）・状態C（`_renderStampLevelRowComplete()`）の見出しは今回のスコープ外**（ユーザーが確認したスクリーンショットは状態B「見習い」の表示のみだったため、他状態は変更しない）。
+
+### 2-2. カード（`.stamp-card`、状態Bのカード一覧のみ対象）
+
+サムネイル・パディング・フォントサイズを縮小し、枠線を除去してフラットな見た目にする。**既存機能（制覇済みスタンプ印`.stamp-card-done-mark`、チェックイン日付表示`.stamp-card-date`、次はここタグ`.stamp-card-next-tag`、チェック済み背景色`.stamp-card--checked`）はすべて維持し、サイズ・余白のみ縮小する**（モック案2はレイアウト方向性の参考例であり、実際のカードが持つ機能要素〈スタンプ印・日付〉を削除するものではないことに注意）。
+
+```css
+.stamp-card {
+  gap: 10px;
+  border: none; /* 枠線を除去しフラットに */
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+.stamp-card-list {
+  gap: 6px; /* 8px → 6px */
+}
+.stamp-card-thumb {
+  width: 40px; height: 40px; /* 56px → 40px */
+}
+.stamp-card-thumb-img {
+  width: 40px; height: 40px; border-radius: 9px;
+}
+.stamp-card-thumb-placeholder {
+  width: 40px; height: 40px; border-radius: 9px;
+  font-size: 17px; /* 22px → 17px、サムネイル縮小に比例 */
+}
+.stamp-card-done-mark {
+  width: 26px; height: 26px; /* 38px → 26px、サムネイル縮小に比例 */
+  bottom: -5px; right: -5px;
+  font-size: 11px; /* 15px → 11px */
+  border-width: 2px; /* 2.5px → 2px */
+}
+.stamp-card-name {
+  font-size: 13px; /* 14px → 13px */
+}
+.stamp-card-area {
+  font-size: 10px; /* 11px → 10px */
+}
+.stamp-card-date {
+  font-size: 12px; /* 13px → 12px、areaとのバランス維持のため微調整 */
+}
+```
+
+`.stamp-card-next-tag`（次はここタグ）・`.stamp-card-area-row`（design 136のエリア＋チェックイン日付を同じ行にまとめるレイアウト）の構造自体は変更しない（フォントサイズは上記`.stamp-card-area`/`.stamp-card-date`の縮小で自然に追従する）。
+
+## 3. スコープ外
+
+状態A（ロック中）・状態C（全制覇済み）の見出し・カード・バッジ表現は変更しない。全制覇バッジの展開カード一覧（`_renderStampLevelRowComplete()`内の`.stamp-complete-card`系）も対象外。
+
+`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 4. 承認状況
+2026-07-24 モック3案（見出し軽量化+フラットカード／見出しミニマル+圧縮カード／余白拡大のみ）を提示、ユーザーが「案1の見出しと案2のリストカードで」と組み合わせを選択。**承認済み**。
