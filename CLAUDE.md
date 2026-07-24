@@ -1415,6 +1415,14 @@ BKK/SYD 停止箇所:
 3. `run-source-analysis.sh` の `--city=sg` を `--city=all` に戻す
 4. crontabの `refresh-courses.js --city=sg` を `--city=all` に戻す
 
+### 設定画面の都市選択欄を非表示化（2026-07-24実装、設計書161）
+`ACTIVE_CITIES = ['sg']`により実質シンガポール固定のため、選択肢が1つしかない都市セレクタ（設定画面「都市」項目）をユーザー要望により非表示にした。
+- `public/index.html`の都市選択`.settings-item`ブロックのインラインstyleに`display:none;`を追加（`style="padding:12px 18px;display:none;"`）。中身（`labelCity`ラベル・`#city-select`セレクタ・`selectCity()`呼び出し）は無変更
+- **ロジックは削除していない**（`ACTIVE_CITIES`/`getCity()`/`selectCity()`/`#city-select`の選択肢生成処理はすべて無変更のまま残置。既存の「機能は残しつつ表示のみ止める」プロジェクト方針を踏襲。`getCity()`は`localStorage`未設定時`sg`にフォールバックする既存動作のため、セレクタ非表示でも動作に影響なし）
+- BKK/SYD再開時の復活手順（上記「復活手順」参照）には今回触れていない。`public/app.js`・`public/app.css`・`server.js`・`data/`配下は無変更（`pm2 restart`不要）
+- キャッシュバスティング: `index.html` app.js `?v=20260724o`→`20260724p`、`sw.js` CACHE_NAME=`sg-weekend-v711`→`v712`（`app.css`は無変更のため据え置き）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での都市選択欄非表示・他プロフィール項目とのレイアウトバランスは2026-07-24時点でコード確認のみ完了、実機未確認
+
 ## SGエリア区分に「Sentosa」追加（2026-07-13実装、設計書24）
 SGのエリア区分がCentral/East/West/North/North-East/Island-wideの6区分から、**Sentosa追加で7区分**になった。Sentosaはケーブルカー・モノレールで渡る独立した「行き先」であり、ユニバーサル・スタジオ／S.E.A.水族館（→Singapore Oceanarium）／ビーチ等、単独でコース1本分埋まる濃さのエリアのため独立区分化。
 - 変更箇所: `public/app.js`の`CITY_COURSE_AREAS.sg`（コース作成画面のエリアチップ）、`public/index.html`の`#event-filter-sheet`内`.ef-chip`（イベント絞り込みシート、こちらはHTML直書きの別実装でJS定数とは独立）、`scripts/filter-events.js`の`CITY_AREAS.sg`（取り込みパイプラインのAI分類プロンプト用列挙値）

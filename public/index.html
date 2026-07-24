@@ -275,7 +275,7 @@
         </div>
       </div>
 
-      <div class="settings-item" style="padding:12px 18px;">
+      <div class="settings-item" style="padding:12px 18px;display:none;">
         <span class="settings-item-label" data-i18n="labelCity">都市</span>
         <div class="city-select-wrapper">
           <select id="city-select" class="city-select" onchange="selectCity(this.value)"></select>
@@ -1185,7 +1185,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260724o"></script>
+  <script src="/app.js?v=20260724p"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

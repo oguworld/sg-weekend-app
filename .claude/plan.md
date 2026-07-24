@@ -15935,3 +15935,28 @@ CSS（`public/app.css`）: `.stamp-card-area-row`を削除し、新規`.stamp-ca
 
 ## 4. 承認状況
 2026-07-24 ユーザー「全体的にチェックして統一感を持たせて」。**承認済み**（調査結果に基づく明確なフォント統一のため、追加のモック確認は行わず直接実装に進める）。
+
+# 設計書161 — 設定画面の都市選択欄を非表示化（シンガポールのみ稼働中のため）
+
+（2026-07-24 ユーザー「都市もシンガポールだけなので非表示で」。`ACTIVE_CITIES = ['sg']`により実質シンガポール固定のため、選択肢が1つしかない都市セレクタを非表示にする。既存の「機能は残しつつ表示のみ止める」方針を踏襲、BKK/SYD再開時に備え削除はしない）
+
+## 1. 確定仕様
+
+`public/index.html`の都市選択欄（278-283行目付近、`.settings-item`ブロック）自体に`display:none;`を追加する。
+
+```html
+<div class="settings-item" style="padding:12px 18px;display:none;">
+  <span class="settings-item-label" data-i18n="labelCity">都市</span>
+  <div class="city-select-wrapper">
+    <select id="city-select" class="city-select" onchange="selectCity(this.value)"></select>
+  </div>
+</div>
+```
+
+**ロジックは削除しない**（`ACTIVE_CITIES`/`getCity()`/`selectCity()`/`#city-select`の選択肢生成処理はすべて無変更のまま残置。`getCity()`は`localStorage`未設定時`sg`にフォールバックする既存動作のため、セレクタが非表示でも動作に影響なし）。
+
+## 2. スコープ外
+BKK/SYD再開時の復活手順（CLAUDE.md記載の`ACTIVE_CITIES`書き換え等）には触れない。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 3. 承認状況
+2026-07-24 ユーザー「都市もシンガポールだけなので非表示で」。**承認済み**（明確な小粒修正のため直接実装に進める）。
