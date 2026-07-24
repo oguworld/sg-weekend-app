@@ -2097,7 +2097,7 @@
       margin-bottom: 10px;
     }
     .stamp-level-progress-row {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: flex-end; gap: 8px;
       margin-bottom: 10px;
     }
     .stamp-level-progress-track {
@@ -2116,28 +2116,22 @@
       font-size: 13px; font-weight: 900; color: var(--caramel);
       flex-shrink: 0;
     }
-    /* 設計書145: 進捗バーの解禁ライン（2色セグメント＋🔓マーク） */
+    /* 設計書146: 進捗バーの解禁ライン（目盛り線＋🔓アイコン）・全制覇ライン（🏁アイコン）。design 145の2色セグメント方式を置き換え */
     .stamp-level-progress-track-wrap {
       position: relative;
       flex: 1;
+      padding-top: 16px; /* トラック上部の目盛り線・🔓・🏁アイコン分の余白 */
     }
-    .stamp-level-progress-seg1 {
-      position: absolute; left: 0; top: 0; height: 100%;
-      background: var(--caramel-light);
+    .stamp-level-progress-tick {
+      position: absolute; top: 0; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center;
     }
-    .stamp-level-progress-seg2 {
-      position: absolute; top: 0; height: 100%;
-      background: var(--caramel);
-      box-shadow: inset 0 1px 2px rgba(255,255,255,0.3);
+    .stamp-level-progress-tick-icon { font-size: 11px; line-height: 1; }
+    .stamp-level-progress-tick-line {
+      width: 2px; height: 18px; background: var(--midnight); opacity: 0.35; margin-top: 2px;
     }
-    .stamp-level-progress-lockmark {
-      position: absolute; top: 50%; transform: translate(-50%, -50%);
-      width: 15px; height: 15px; border-radius: 50%;
-      background: var(--warm-white);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 9px; line-height: 1;
-      box-shadow: 0 0 0 1.5px var(--sand-dark) inset, 0 1px 2px rgba(44,36,32,0.2);
-      z-index: 2;
+    .stamp-level-progress-flag {
+      position: absolute; right: -2px; top: 0; font-size: 12px;
     }
     .stamp-card-list {
       display: flex; flex-direction: column; gap: 8px;

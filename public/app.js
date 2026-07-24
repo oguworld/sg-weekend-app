@@ -4503,27 +4503,15 @@
       const checkedN = typeof checkedCount === 'number' ? checkedCount : spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
       const pct = total > 0 ? Math.round((checkedN / total) * 100) : 0;
 
-      // 設計書145: 進捗バーに「解禁ライン」を2色セグメント＋🔓マークで可視化する。
-      // 閾値は server.js の computeUnlockedLevels() と同じ算出式（次レベル総数の半数・切り上げ）をクライアント側で再現。
+      // 設計書146: 進捗バーに「解禁ライン」を目盛り線＋🔓アイコン、全制覇ラインを🏁アイコンで可視化する（design 145の見た目を置き換え）。
+      // 閾値は server.js の computeUnlockedLevels() と同じ算出式（次レベル総数の半数・切り上げ）をクライアント側で再現（design 145から流用、変更なし）。
       const idx = STAMP_LEVEL_ORDER_CLIENT.indexOf(level);
       const hasNextLevel = idx >= 0 && idx < STAMP_LEVEL_ORDER_CLIENT.length - 1;
       const threshold = hasNextLevel ? Math.ceil(total / 2) : null;
       const thresholdPct = (threshold !== null && total > 0) ? Math.min(100, Math.round((threshold / total) * 100)) : null;
 
-      let trackInnerHtml;
-      if (thresholdPct !== null && thresholdPct < 100) {
-        const seg1Pct = Math.min(pct, thresholdPct);
-        const seg2Pct = Math.max(0, pct - thresholdPct);
-        trackInnerHtml = `
-          <div class="stamp-level-progress-seg1" style="width:${seg1Pct}%;"></div>
-          <div class="stamp-level-progress-seg2" style="left:${thresholdPct}%;width:${seg2Pct}%;"></div>
-        `;
-      } else {
-        // 次レベルが無い（special）、または閾値が総数と同値（total=1等の極小ケース）の場合は既存の単色バーのまま
-        trackInnerHtml = `<div class="stamp-level-progress-fill" style="width:${pct}%;"></div>`;
-      }
-      const lockMarkHtml = (thresholdPct !== null && thresholdPct < 100)
-        ? `<span class="stamp-level-progress-lockmark" style="left:${thresholdPct}%;">🔓</span>`
+      const tickHtml = (thresholdPct !== null && thresholdPct < 100)
+        ? `<div class="stamp-level-progress-tick" style="left:${thresholdPct}%;"><span class="stamp-level-progress-tick-icon">🔓</span><span class="stamp-level-progress-tick-line"></span></div>`
         : '';
 
       return `<div class="stamp-level-section">
@@ -4533,8 +4521,9 @@
         </div>
         <div class="stamp-level-progress-row">
           <div class="stamp-level-progress-track-wrap">
-            <div class="stamp-level-progress-track">${trackInnerHtml}</div>
-            ${lockMarkHtml}
+            <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
+            ${tickHtml}
+            <span class="stamp-level-progress-flag">🏁</span>
           </div>
           <span class="stamp-level-progress-label">${checkedN}/${total}</span>
         </div>

@@ -15025,3 +15025,98 @@ const lockMarkHtml = (thresholdPct !== null && thresholdPct < 100)
 
 ## 4. 承認状況
 2026-07-24 モック3案提示、ユーザーが「案2: 2色セグメント」を選択。**承認済み**。
+
+# 設計書146 — 進捗バーの解禁ライン表示を案2（2色セグメント）から案1（目盛り線＋🔓/🏁アイコン）へ変更
+
+（2026-07-24 design 145実装・コミット直後、ユーザーが「すいません案1がいいです」と再選択。design 145の見た目部分のみを置き換える）
+
+## 1. 背景
+
+design 145で案2（2色セグメント）を実装・ローカルコミット済み（`decebc0`、`release`未push）だったが、ユーザーが直後に案1（目盛り線＋🔓ロックアイコン／🏁全制覇フラグ）への変更を希望。閾値計算ロジック（`server.js`の`computeUnlockedLevels()`と同じ半数切り上げ式をクライアント側で再現する部分、`public/app.js` 4506-4511行目）はdesign 145のまま流用し、**見た目（バーの塗り方・マークの形）のみ**を差し替える。
+
+## 2. 確定仕様（案1）
+
+モック（`/tmp/.../scratchpad/mock-progress-markers.html`の「案1」ブロック）の構造をそのまま踏襲する。
+
+### 2-1. バー本体は単色フィルに戻す
+
+design 145で追加した2色セグメント（`.stamp-level-progress-seg1`/`.stamp-level-progress-seg2`）は使わず、design 83/111由来の単色`.stamp-level-progress-fill`（`linear-gradient(90deg, var(--caramel-light), var(--caramel))`）に統一する。閾値の有無に関わらずバー本体の塗り方は常にこの単色フィルのみ（design 145では「閾値なし時のみ単色」という条件分岐があったが、案1ではその条件分岐自体が不要になる）。
+
+### 2-2. 解禁ライン=目盛り線＋🔓アイコン（トラック上部に配置）
+
+閾値位置（`thresholdPct`、design 145 §2-1のロジックをそのまま再利用）に、トラックの**上**に浮かせる形で「🔓アイコン＋縦線」を配置する。`hasNextLevel`が偽（special）の場合はこのマーク自体を出さない（design 145から変更なし）。
+
+### 2-3. 全制覇=🏁アイコン（トラック右端の上に配置、常時表示）
+
+`hasNextLevel`の有無に関わらず、トラック右端の上に🏁アイコンを常時表示する（design 145にはなかった要素。次レベルが無い`special`でもこのアイコンだけは表示される、モックの3つ目の例の通り）。
+
+### 2-4. HTML生成（`_renderStampLevelRowInProgress()`、`public/app.js` 4502-4541行目付近を置き換え）
+
+```js
+const total = typeof totalCount === 'number' ? totalCount : spotsInLevel.length;
+const checkedN = typeof checkedCount === 'number' ? checkedCount : spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+const pct = total > 0 ? Math.round((checkedN / total) * 100) : 0;
+
+// 閾値計算（design 145から流用、server.js の computeUnlockedLevels() と同じ算出式）
+const idx = STAMP_LEVEL_ORDER_CLIENT.indexOf(level);
+const hasNextLevel = idx >= 0 && idx < STAMP_LEVEL_ORDER_CLIENT.length - 1;
+const threshold = hasNextLevel ? Math.ceil(total / 2) : null;
+const thresholdPct = (threshold !== null && total > 0) ? Math.min(100, Math.round((threshold / total) * 100)) : null;
+
+const tickHtml = (thresholdPct !== null && thresholdPct < 100)
+  ? `<div class="stamp-level-progress-tick" style="left:${thresholdPct}%;"><span class="stamp-level-progress-tick-icon">🔓</span><span class="stamp-level-progress-tick-line"></span></div>`
+  : '';
+
+return `<div class="stamp-level-section">
+  <div class="stamp-level-section-title">
+    ${meta.emoji}
+    ${t(meta.labelKey)}（${_stampLevelYearRange(meta)}）
+  </div>
+  <div class="stamp-level-progress-row">
+    <div class="stamp-level-progress-track-wrap">
+      <div class="stamp-level-progress-track"><div class="stamp-level-progress-fill" style="width:${pct}%;"></div></div>
+      ${tickHtml}
+      <span class="stamp-level-progress-flag">🏁</span>
+    </div>
+    <span class="stamp-level-progress-label">${checkedN}/${total}</span>
+  </div>
+  <div class="stamp-card-list">${cardsHtml}</div>
+</div>`;
+```
+
+### 2-5. CSS（`public/app.css`、design 145で追加した`.stamp-level-progress-seg1`/`-seg2`/`-lockmark`を削除し、以下に置き換える）
+
+モック（`.bar1-*`）の値をそのまま移植:
+
+```css
+.stamp-level-progress-track-wrap {
+  position: relative;
+  flex: 1;
+  padding-top: 16px; /* トラック上部の目盛り線・🔓・🏁アイコン分の余白 */
+}
+.stamp-level-progress-tick {
+  position: absolute; top: 0; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+}
+.stamp-level-progress-tick-icon { font-size: 11px; line-height: 1; }
+.stamp-level-progress-tick-line {
+  width: 2px; height: 18px; background: var(--midnight); opacity: 0.35; margin-top: 2px;
+}
+.stamp-level-progress-flag {
+  position: absolute; right: -2px; top: 0; font-size: 12px;
+}
+```
+
+`.stamp-level-progress-track`は`position:relative`のまま（design 145で`flex:1`を`-track-wrap`側に移動済みの状態を維持、変更不要）。`.stamp-level-progress-seg1`/`.stamp-level-progress-seg2`/`.stamp-level-progress-lockmark`（design 145で追加）は削除する（もう使わないため）。
+
+**注意**: `-track-wrap`に`padding-top:16px`を追加すると、`.stamp-level-progress-row`（`align-items:center`、既存）内での垂直位置がラベル（`.stamp-level-progress-label`）と揃わなくなる可能性がある。モック上は`align-items:center`のままで自然に見えていたため基本的には問題ないはずだが、実装後に目視確認しレイアウト崩れがあれば`.stamp-level-progress-row`に`align-items:flex-end`への変更を検討する（設計書には具体的な確定値を書かないが、崩れが出た場合の調整方針としてbuilderの裁量に委ねる）。
+
+## 3. スコープ外・影響範囲
+
+- 閾値計算ロジック自体（§2-4前半、design 145由来）は変更しない
+- 状態A・状態Cは無変更（design 145から変更なし）
+- レジェンド文言は追加しない（design 145から方針変更なし）
+- `server.js`・データファイルは無変更（`pm2 restart`不要）
+
+## 4. 承認状況
+2026-07-24 ユーザー「すいません案1がいいです」。**承認済み**（design 145の見た目部分を置き換える形で実装する）。

@@ -841,6 +841,21 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
 - `server.js`・データファイルは無変更（`pm2 restart`不要）。閾値計算式はクライアント側で`server.js`の`computeUnlockedLevels()`と同じ式を再現するのみ（サーバー呼び出しの追加なし）
 - キャッシュバスティング: `index.html` app.css `?v=20260724a`→`20260724b`、app.js `?v=20260724f`→`20260724g`、`sw.js` CACHE_NAME=`sg-weekend-v695`→`v696`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での2色セグメント・🔓マークの見た目、`special`レベル（次レベルなし）で従来通り単色バーが表示されることは2026-07-24時点でNode単体ロジック検証・コード確認のみ完了、実ブラウザ・実機とも未確認
+- **⚠️ 本節（2色セグメント方式）はこの直後の設計書146により見た目部分のみ置き換えられている。以下「探訪スタンプ帳の進捗バーの解禁ライン表示を目盛り線＋🔓/🏁アイコンへ変更」節を参照。閾値計算ロジック自体（上記2〜3項目）はdesign 146でも変更なくそのまま有効**
+
+### 探訪スタンプ帳の進捗バーの解禁ライン表示を目盛り線＋🔓/🏁アイコンへ変更（2026-07-24実装、設計書146。設計書145の見た目部分のみを置き換え）
+設計書145実装・ローカルコミット直後、ユーザーが「すいません案1がいいです」とモック案1（目盛り線＋🔓ロックアイコン／🏁全制覇フラグ）への変更を希望。閾値計算ロジック自体（設計書145で実装済み、`server.js`の`computeUnlockedLevels()`と同じ半数切り上げ式をクライアント側で再現する部分）は無変更のまま流用し、バーの塗り方・マークの形（見た目）のみを差し替えた。
+
+- **バー本体は単色フィルに統一**: design 145で追加した2色セグメント（`.stamp-level-progress-seg1`/`.stamp-level-progress-seg2`）を削除し、design 83/111由来の単色`.stamp-level-progress-fill`（`linear-gradient(90deg, var(--caramel-light), var(--caramel))`）に一本化。design 145にあった「閾値なし時のみ単色」という条件分岐自体が不要になり削除
+- **解禁ライン＝目盛り線＋🔓アイコン**（トラック上部に配置）: 閾値位置（`thresholdPct`、design 145のロジックをそのまま再利用）に、新規`.stamp-level-progress-tick`（🔓アイコン＋縦線、トラックの上に浮かせて配置）を表示。`hasNextLevel`が偽（`special`）の場合はマーク自体を出さない（design 145から変更なし）
+- **全制覇ライン＝🏁アイコン**（トラック右端の上に常時表示、design 145にはなかった新規要素）: `hasNextLevel`の有無に関わらず、新規`.stamp-level-progress-flag`を無条件で表示する（`special`でも🏁のみは出る）
+- `_renderStampLevelRowInProgress()`のHTML生成部分（旧`trackInnerHtml`/`lockMarkHtml`分岐）を、`tickHtml`（🔓＋縦線、条件付き）＋固定の`.stamp-level-progress-fill`＋固定の`.stamp-level-progress-flag`（🏁）に置き換え
+- **CSS**: `.stamp-level-progress-seg1`/`.stamp-level-progress-seg2`/`.stamp-level-progress-lockmark`（design 145）を削除し、`.stamp-level-progress-tick`/`.stamp-level-progress-tick-icon`/`.stamp-level-progress-tick-line`/`.stamp-level-progress-flag`を新規追加。`.stamp-level-progress-track-wrap`に`padding-top:16px`を追加（トラック上部の目盛り線・🔓・🏁アイコン分の余白確保のため）。`.stamp-level-progress-track`自体（`overflow:hidden`、design 111由来）は無変更のまま維持（マークは`-track-wrap`側の絶対位置層に配置するためtrackのクリップの影響を受けない、design 145から続く設計）
+- `-track-wrap`のpadding追加に伴い、`.stamp-level-progress-row`の`align-items`を`center`→`flex-end`にbuilderの裁量で微調整（トラック本体とラベルの視覚的な下端を揃えるため。設計書に確定値の指定はなく実装時の調整方針として明示委任されていた）
+- 状態A（ロック中）・状態C（全制覇済み）・レジェンド文言なしの方針はdesign 145から無変更
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。閾値計算ロジックは`server.js`の`computeUnlockedLevels()`と同じ式をクライアント側で再現するのみで無変更
+- キャッシュバスティング: `index.html` app.css `?v=20260724b`→`20260724c`、app.js `?v=20260724g`→`20260724h`、`sw.js` CACHE_NAME=`sg-weekend-v696`→`v697`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での目盛り線・🔓/🏁アイコンの見た目、`align-items:flex-end`変更後のラベルとバーの視覚的な整列、`special`レベルで🔓が出ず🏁のみ表示されることは2026-07-24時点でNode単体ロジック検証・コード確認のみ完了、実ブラウザ・実機とも未確認（本タスク実施環境のサンドボックス制約によりPlaywrightでの実ブラウザ確認ができなかった）
 
 ### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
 ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
