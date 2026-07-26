@@ -230,7 +230,7 @@ JSON配列のみ返すこと（前置き・説明・コードブロック不要�
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
+    max_tokens: 4000,
     system: [
       {
         type: 'text',
@@ -435,7 +435,17 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
       if (i + BATCH_SIZE < items.length) await new Promise(r => setTimeout(r, 500));
     } catch (e) {
       console.error(`    ❌ フィルタエラー: ${e.message}`);
-      totalRejected += batch.length;
+      console.log(`    🔁 フィルタリングをリトライします...`);
+      try {
+        const retryResults = await filterBatch(batch, cityKey, categoryStats);
+        totalRejected += batch.length - retryResults.length;
+        for (const r of retryResults) {
+          filtered.push({ filtered: r, original: batch[r.index] || {} });
+        }
+      } catch (e2) {
+        console.error(`    ❌ フィルタリングリトライも失敗: ${e2.message}`);
+        totalRejected += batch.length;
+      }
     }
   }
 

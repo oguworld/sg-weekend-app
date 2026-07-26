@@ -16545,3 +16545,64 @@ CSS Gridの標準的な折り返し挙動により、4つ目のバッジ（極�
 
 ## 3. 承認状況
 2026-07-26 ユーザー「バッジの横並びは三つまでお願いします」。**承認済み**（明確な小粒修正のため直接実装に進める）。
+
+# 設計書168 — イベント取り込みパイプラインのHaikuフィルタリングJSON解析エラーを修正（max_tokens不足＋リトライ欠如）
+
+（2026-07-27 ユーザー「イベント取り込み件数減ったけど何か変わった？」の調査結果。今回のセッションで取り込みパイプライン関連コード〈scripts/filter-events.js等〉には一切触れていないため「何かが変わった」わけではなく、以前から潜んでいた慢性バグと判明。`logs/run-fetch-all.log`を確認したところ、直近少なくとも1週間〈2026-07-19〜07-27〉毎日1〜4バッチのJSON解析エラーが発生し続けていた）
+
+## 1. 原因分析
+
+`scripts/filter-events.js`の`filterBatch()`（Haikuでのイベント判定、BATCH_SIZE=10件ずつ）が、以下2つの要因でJSON解析エラーを起こし、**該当バッチの候補イベント最大10件を丸ごと不採用扱いで破棄していた**:
+
+1. **`max_tokens: 2000`（`filterBatch()`内、229行目付近のAPI呼び出し）が不足気味**: 判定結果スキーマは`who`/`age`/`style`/`genres`など複数の配列フィールドを含み1件あたりの出力が長く、10件分だと2000トークンを超えることがある。超過するとAnthropic API側でレスポンスが途中で打ち切られ（truncation）、続く正規表現ベースのJSON抽出（`clean.match(/\[[\s\S]*\]/)`、貪欲マッチのため途中の内側配列の`]`を誤って外側配列の閉じ括弧として拾ってしまう）が壊れたJSON文字列を生成し、`JSON.parse()`が「Expected ',' or '}' after property value」で失敗する
+2. **`filterBatch()`の呼び出し元（`processBatch`内、429-439行目）にリトライ処理が一切ない**: 同じファイル内の`enrichBatch()`（記事生成、Sonnet）呼び出し側（458-469行目）は1回リトライする実装になっているのに対し、`filterBatch()`側は`catch`した瞬間に`totalRejected += batch.length;`でバッチ全体を即座に諦める非対称な実装になっていた
+
+`logs/run-fetch-all.log`確認結果（2026-07-19〜07-27の9日分）: 毎日必ず1〜4件のフィルタエラーが発生しており、新しく発生した問題ではなく既存の慢性バグ。直近の採用数低下（26→17→14→7→6）は、このバグの影響に加えて日々の取得元投稿数の自然な変動が重なった結果と推測される（本設計書はバグの修正のみを対象とし、取得元投稿数自体の変動要因は調査対象外）。
+
+## 2. 確定仕様
+
+### 2-1. `max_tokens`の引き上げ（根本対策）
+
+`filterBatch()`内のHaiku API呼び出し（`client.messages.create({model: 'claude-haiku-4-5-20251001', max_tokens: 2000, ...})`）の`max_tokens`を`2000`→`4000`に変更する。
+
+### 2-2. `filterBatch()`失敗時のリトライ追加（保険的対策、`enrichBatch()`と対称にする）
+
+`processBatch`内、`filterBatch()`呼び出しの`catch`ブロック（429-439行目付近）に、`enrichBatch()`と同じ「1回だけリトライ」パターンを追加する:
+
+```js
+try {
+  const results = await filterBatch(batch, cityKey, categoryStats);
+  totalRejected += batch.length - results.length;
+  for (const r of results) {
+    filtered.push({ filtered: r, original: batch[r.index] || {} });
+  }
+  if (i + BATCH_SIZE < items.length) await new Promise(r => setTimeout(r, 500));
+} catch (e) {
+  console.error(`    ❌ フィルタエラー: ${e.message}`);
+  console.log(`    🔁 フィルタリングをリトライします...`);
+  try {
+    const retryResults = await filterBatch(batch, cityKey, categoryStats);
+    totalRejected += batch.length - retryResults.length;
+    for (const r of retryResults) {
+      filtered.push({ filtered: r, original: batch[r.index] || {} });
+    }
+  } catch (e2) {
+    console.error(`    ❌ フィルタリングリトライも失敗: ${e2.message}`);
+    totalRejected += batch.length;
+  }
+}
+```
+
+**既存の`sourceStats`集計ロジック（423-427行目、リトライ前に`sent++`を加算済み）は無変更のまま**（リトライは同じバッチに対する再試行のため、`sent`カウントの二重加算は発生しない）。
+
+## 3. スコープ外
+
+- 取得元（Instagram/RSS）の投稿数自体の変動要因調査（`data/sources.json`の追加・停止判断等）は対象外
+- `enrichBatch()`側の`max_tokens: 6000`は今回のログでエラーが確認されていないため変更しない
+- 過去に誤って破棄された候補イベントの復元（ログにも本文は残っていないため復元不可）
+
+## 4. 影響範囲
+`scripts/filter-events.js`のみの変更。cron実行のバッチスクリプトのため`pm2 restart`不要、`server.js`・`public/`配下は無関係。次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）から効果を確認できる。
+
+## 5. 承認状況
+2026-07-27 ユーザー「お願いします」。**承認済み**。

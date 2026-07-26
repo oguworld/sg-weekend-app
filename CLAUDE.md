@@ -1559,6 +1559,15 @@ Alvinology（RSSソース）由来のイベントで、CDNオフロードプラ�
 - **cron頻度の訂正（口頭説明の誤りの記録）**: 上表の通り実イベントの`fetch-events.js`自体は**毎日**6:30 SGT実行であり、新規追加した3ソースの採用実績（`source-history.json`）は翌日の日次fetchから貯まり始める。水・日7:30 SGTの`discover-sources.js`/`analyze-sources.js`（本節で扱った候補探索・不良ソース自動判定）はこれとは別サイクルで、新規候補の発掘・既存ソースの自動停止判定のみを担当する
 - `server.js`・`public/`配下は無変更。`data/sources.json`/`data/source-pool.json`はgitignore対象のためgit管理外（`pm2 restart`不要）。`scripts/discover-sources.js`/`scripts/notify-fetch-summary.js`の変更はコミット・push済み（`main`のみ、cron専用スクリプトのためiOS/Web版への影響なし）
 
+### `scripts/filter-events.js` Haikuフィルタリングのmax_tokens不足＋リトライ欠如を修正（2026-07-27実装、設計書168）
+`filterBatch()`（Haikuでのイベント判定、BATCH_SIZE=10件ずつ）が、`max_tokens: 2000`不足によるレスポンス途中打ち切り（truncation）＋リトライ処理の欠如により、直近少なくとも1週間（2026-07-19〜07-27）毎日1〜4バッチの候補イベントを丸ごと不採用扱いで破棄していたことが`logs/run-fetch-all.log`の調査で判明した。
+- **原因1**: 判定結果スキーマは`who`/`age`/`style`/`genres`など複数の配列フィールドを含み1件あたりの出力が長く、10件分だと2000トークンを超えることがあった。超過するとレスポンスが途中で打ち切られ、続く正規表現ベースのJSON抽出（`clean.match(/\[[\s\S]*\]/)`、貪欲マッチで内側配列の`]`を外側の閉じ括弧と誤認）が壊れたJSON文字列を生成し`JSON.parse()`が失敗していた
+- **原因2**: 同ファイル内の`enrichBatch()`（Sonnet記事生成）呼び出し側は1回リトライする実装だったのに対し、`filterBatch()`側は`catch`した瞬間に`totalRejected += batch.length;`でバッチ全体を即座に諦める非対称な実装だった
+- **修正1**: `filterBatch()`内のHaiku API呼び出し（233行目）の`max_tokens`を`2000`→`4000`に変更。`enrichBatch()`側の`max_tokens: 6000`（301行目）はエラーが確認されていないため変更していない
+- **修正2**: `processBatch`内の`filterBatch()`呼び出しの`catch`ブロックに、`enrichBatch()`と同じ「1回だけリトライ」パターンを追加（リトライも失敗した場合のみ`totalRejected += batch.length;`でバッチを諦める）。`sourceStats`の`sent++`加算（`try`ブロックより前、リトライループの外側）は無変更のため、リトライしても二重加算は発生しない
+- スコープ外: 取得元（Instagram/RSS）の投稿数自体の変動要因調査、過去に誤って破棄された候補イベントの復元（ログにも本文は残っていないため復元不可）
+- `scripts/filter-events.js`のみの変更、`server.js`・`public/`配下は無関係。cron実行のバッチスクリプトのため`pm2 restart`不要。次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）から効果を確認できる
+
 ## 環境構成と注意事項（2026-07-07）
 
 ### Web版 = テスト環境 / iOS App Store版 = 本番環境
