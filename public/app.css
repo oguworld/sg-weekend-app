@@ -2279,6 +2279,45 @@
     .stamp-complete-card-area { font-size: 11px; color: var(--warm-gray); margin-top: 1px; }
     .stamp-complete-card-date { font-size: 13px; font-weight: 700; color: var(--caramel); margin-top: 1px; }
 
+    /* ─── テーマ別バッジ（設計書165、案2グリッド型トロフィーケース） ─── */
+    .stamp-theme-badges-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    }
+    .stamp-theme-badge {
+      display: flex; flex-direction: column; align-items: center;
+      background: var(--sand);
+      border-radius: 14px;
+      padding: 14px 8px;
+      cursor: pointer;
+    }
+    .stamp-theme-badge--done { background: var(--caramel-pale); }
+    .stamp-theme-badge-circle {
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 8px;
+    }
+    .stamp-theme-badge-circle--done {
+      background: var(--caramel);
+      box-shadow: 0 3px 8px rgba(200,128,74,0.4);
+    }
+    .stamp-theme-badge-circle--locked {
+      background: var(--warm-white);
+      border: 1.5px dashed var(--sand-dark);
+      filter: grayscale(1);
+      opacity: 0.5;
+    }
+    .stamp-theme-badge-label {
+      font-size: 10.5px; font-weight: 700; color: var(--midnight);
+      text-align: center; line-height: 1.3;
+    }
+    .stamp-theme-badge-count {
+      font-size: 9px; color: var(--caramel); font-weight: 700; margin-top: 2px;
+    }
+    .stamp-theme-badge-count--locked { color: var(--warm-gray); }
+    .stamp-theme-badge-spot-list {
+      margin: 10px 2px 4px;
+    }
+
     /* ─── 「思い出」機能: チェックイン後ミニシート（設計書121） ─── */
     /* 旧・単一ボックス版（design 121）。design 144で#stamp-memory-photo-slotsに置き換え、参照元がなくなったため
        実質死にクラス化しているが実害がないため削除せず残置。 */

@@ -466,6 +466,7 @@
         stampLevelUnlockSubtext: '🔓 {level}のロックが解除されました',
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
+        stampThemeBadgesTitle: 'テーマ別バッジ',
         stampCardDoneMark: '済',
         stampCardVisitDateLabel: '訪問日: ',
         stampDetailMapLink: '📍 地図で見る',
@@ -765,6 +766,7 @@
         stampLevelUnlockSubtext: '🔓 {level} unlocked!',
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
+        stampThemeBadgesTitle: 'Theme Badges',
         stampCardDoneMark: '✓',
         stampCardVisitDateLabel: 'Visited: ',
         stampDetailMapLink: '📍 View on map',
@@ -3840,6 +3842,17 @@
       { val: 'Sentosa',    emoji: '🏖', labelText: 'Sentosa',    img: '/images/stamp-badges/badge-sentosa.png' },
     ];
 
+    // テーマ別バッジ（設計書165）: 在住期間ベースの縦の進行軸（STAMP_LEVEL_META）とは独立した、
+    // 食文化テーマ別の横の軸。対象スポットは data/sg/stamp-spots.json の categoryId フィールドで判定する。
+    // categoryId を持つスポットは既存のレベル進行集計（server.js computeUnlockedLevels）から除外され、
+    // level は常時解禁の 'standard' に統一されているため、マスキング対象にもならない。
+    const STAMP_CATEGORY_META = {
+      kopi:        { label: 'Kopi巡り',       labelEn: 'Kopi Trail',         emoji: '☕', color: '#8B5A2B' },
+      bkt:         { label: 'バクテー巡り',    labelEn: 'Bak Kut Teh Trail',  emoji: '🍲', color: '#A0522D' },
+      chickenrice: { label: 'チキンライス巡り', labelEn: 'Chicken Rice Trail', emoji: '🍗', color: '#C8804A' },
+    };
+    const STAMP_CATEGORY_ORDER = ['kopi', 'bkt', 'chickenrice'];
+
     let _stampLeafletMap = null;
     let _stampMarkersLayer = null;
     let _stampSpots = [];
@@ -4289,7 +4302,7 @@
       for (const level of STAMP_LEVEL_ORDER_CLIENT) {
         if (!_stampProgress.unlockedLevels.includes(level)) continue;
         const spotsInLevel = _stampSpots
-          .filter(s => s.level === level)
+          .filter(s => s.level === level && !s.categoryId) // 設計書165: テーマ別バッジのスポットは既存レベル進行の対象外
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         const next = spotsInLevel.find(s => !_stampSpotIsChecked(s.id));
         if (next) return next;
@@ -4427,8 +4440,9 @@
       }
 
       // 実績バッジ: レベルごとの checked/total（スポット未取得等で total=0 のレベルは除外）
+      // 設計書165: テーマ別バッジのスポット（categoryId持ち）は既存レベル進行の集計から除外する
       const badges = STAMP_LEVEL_ORDER_CLIENT.map(level => {
-        const spotsInLevel = _stampSpots.filter(s => s.level === level);
+        const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
         const total = spotsInLevel.length;
         if (total === 0) return null;
         const checked = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
@@ -4647,6 +4661,96 @@
       }).join('');
     }
 
+    // ─── テーマ別バッジ（設計書165） ───
+    // 既存レベル進行（在住期間ベースの縦軸）とは独立した、食文化テーマ別の横軸。
+    // 対象スポットは stamp-spots.json の categoryId フィールドで判定。level は既存マスキング
+    // ロジックとの整合のため常時解禁の 'standard' に統一されている（server.js側の変更不要）。
+    function _computeStampThemeBadgeProgress() {
+      return STAMP_CATEGORY_ORDER.map(catId => {
+        const spots = _stampSpots.filter(s => s.categoryId === catId);
+        const total = spots.length;
+        const checked = spots.filter(s => _stampSpotIsChecked(s.id)).length;
+        return { catId, meta: STAMP_CATEGORY_META[catId], spots, total, checked, achieved: total > 0 && checked === total };
+      });
+    }
+
+    // グリッド型トロフィーケース表示（案2、モック承認済み）。タップで該当カテゴリーのスポット一覧を開閉トグルする。
+    function _renderStampThemeBadges() {
+      const el = document.getElementById('stamp-theme-badges');
+      if (!el) return;
+      const progress = _computeStampThemeBadgeProgress();
+      const lang = getLang();
+      el.innerHTML = progress.map(({ catId, meta, total, checked, achieved }) => {
+        const label = lang === 'ja' ? meta.label : meta.labelEn;
+        return `<div class="stamp-theme-badge ${achieved ? 'stamp-theme-badge--done' : ''}" onclick="_toggleStampThemeBadgeSpots('${catId}')">
+          <div class="stamp-theme-badge-circle ${achieved ? 'stamp-theme-badge-circle--done' : 'stamp-theme-badge-circle--locked'}">${meta.emoji}</div>
+          <div class="stamp-theme-badge-label">${label}</div>
+          <div class="stamp-theme-badge-count ${achieved ? '' : 'stamp-theme-badge-count--locked'}">${checked}/${total}</div>
+        </div>`;
+      }).join('');
+      // タップで開いていたカテゴリーの一覧を再描画のたびに閉じ直さないよう、既存の展開状態がある場合は維持する
+      STAMP_CATEGORY_ORDER.forEach(catId => {
+        const listEl = document.getElementById(`stamp-theme-spot-list-${catId}`);
+        if (listEl && listEl.dataset.wasOpen === '1') {
+          _renderStampThemeBadgeSpotList(catId);
+          listEl.style.display = 'flex';
+        }
+      });
+    }
+
+    // カテゴリー内のスポット一覧カードHTMLを生成し、展開コンテナに描画する（design 108の _toggleStampCompleteList と同じ開閉トグルパターンを踏襲）
+    function _renderStampThemeBadgeSpotList(catId) {
+      const listEl = document.getElementById(`stamp-theme-spot-list-${catId}`);
+      if (!listEl) return;
+      const lang = getLang();
+      const spots = _stampSpots.filter(s => s.categoryId === catId);
+      listEl.innerHTML = spots.map(spot => {
+        const checked = _stampSpotIsChecked(spot.id);
+        const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+        const thumbSrc = spot.imageUrl || '';
+        const thumbInner = thumbSrc
+          ? `<img src="${thumbSrc}" alt="${name}" class="stamp-card-thumb-img">`
+          : `<div class="stamp-card-thumb-placeholder">📍</div>`;
+        const meta = STAMP_CATEGORY_META[catId];
+        const doneStampHtml = checked
+          ? `<div class="stamp-card-done-mark" style="background:${meta.color};">${t('stampCardDoneMark')}</div>`
+          : '';
+        const thumbHtml = `<div class="stamp-card-thumb">${thumbInner}${doneStampHtml}</div>`;
+        const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
+        return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
+          ${thumbHtml}
+          <div class="stamp-card-body">
+            <div class="stamp-card-name">${name}</div>
+            ${checkinDate ? `<div class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</div>` : ''}
+          </div>
+          <span class="stamp-card-area-right">${spot.area || ''}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // テーマ別バッジタップで、そのカテゴリーのスポット一覧を開閉トグルする（design 108 _toggleStampCompleteList と同じパターン）
+    function _toggleStampThemeBadgeSpots(catId) {
+      let listEl = document.getElementById(`stamp-theme-spot-list-${catId}`);
+      const containerEl = document.getElementById('stamp-theme-badge-spot-lists');
+      if (!listEl) {
+        if (!containerEl) return;
+        listEl = document.createElement('div');
+        listEl.id = `stamp-theme-spot-list-${catId}`;
+        listEl.className = 'stamp-card-list stamp-theme-badge-spot-list';
+        listEl.style.display = 'none';
+        containerEl.appendChild(listEl);
+      }
+      const isOpen = listEl.style.display !== 'none';
+      if (isOpen) {
+        listEl.style.display = 'none';
+        listEl.dataset.wasOpen = '0';
+      } else {
+        _renderStampThemeBadgeSpotList(catId);
+        listEl.style.display = 'flex';
+        listEl.dataset.wasOpen = '1';
+      }
+    }
+
     // ─── コレクション一覧ビュー（設計書70改善1・2 → 設計書83で横長カード一覧＋レベル別3状態表示に全面リデザイン） ───
     // レベルごとに「ロック中」「解禁中・未全制覇」「解禁中・全制覇済み」の3状態いずれかに分類して描画する。
     // special レベルは既存サーバー仕様（未解禁時は GET /api/stamp-spots のレスポンス自体から除外）をそのまま踏襲するため、
@@ -4654,11 +4758,14 @@
     function _renderStampCollectionList() {
       const el = document.getElementById('stamp-collection-list');
       if (!el) return;
+      _renderStampThemeBadges(); // 設計書165: テーマ別バッジ（呼び出し漏れ防止のため既存の描画呼び出し列に追加）
       const nextTarget = _computeStampNextTarget();
       const lang = getLang();
 
       el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
-        const spotsInLevel = _stampSpots.filter(s => s.level === level);
+        // 設計書165: テーマ別バッジのスポット（categoryId持ち）は既存のレベル別カードリストから除外する
+        // （重複表示防止。テーマ別バッジ自体は _renderStampThemeBadges() が別セクションで描画する）
+        const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
         if (spotsInLevel.length === 0) {
           // special未解禁時等、該当レベルのスポットが1件もない場合。
           // special はサーバーが件数・存在自体を意図的に隠す設計（設計書69）のため、
@@ -5803,7 +5910,8 @@
       ctx.textAlign = 'left';
       STAMP_LEVEL_ORDER_CLIENT.forEach((level) => {
         const meta = STAMP_LEVEL_META[level];
-        const spotsInLevel = _stampSpots.filter(s => s.level === level);
+        // 設計書165: テーマ別バッジのスポット（categoryId持ち）は既存レベル進行の集計から除外する
+        const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
         const total = spotsInLevel.length;
         const checked = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
         const unlocked = _stampProgress.unlockedLevels.includes(level);

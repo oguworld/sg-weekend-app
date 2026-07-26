@@ -16133,3 +16133,196 @@ design 163で実装した3種類のシェアカード（全制覇/チェック�
 
 ## 5. 承認状況
 2026-07-26 ユーザー「前のやつは案2がいいかな」（卒業アルバムの1ページ風、design 164 §1モック参照）。**承認済み**。
+
+# 設計書165 — 探訪スタンプ帳「テーマ別バッジ」機能（Kopi巡り／バクテー巡り／チキンライス巡り）
+
+（2026-07-26 ユーザーとの会話で確定。既存の「見習い→定住レベル→シンガポール通→極めし者」という在住期間ベースの縦の進行軸とは別に、食文化テーマ別の横の軸を新設する。UIは案2「グリッド型トロフィーケース」で確定。カテゴリー名は「コピー屋」ではなく「Kopi」表記で確定〈日本語の「コピー」＝copy machineとの混同を避けるため〉）
+
+## 1. 背景・確定事項
+
+- 対象カテゴリー: ☕ Kopi巡り／🍲 バクテー巡り／🍗 チキンライス巡り の3つ、各3スポット（計9件新規追加）
+- スポットは既存の23件とは独立した新規スポット中心（ユーザー確認済み）
+- 既存の`level`ベースの進行（在住期間で解禁される縦軸）には一切影響させない（ユーザー確認済み、technical constraint）
+- UI: グリッド型トロフィーケース（案2、モック承認済み）。制覇済みは色付き丸、未制覇はグレーアウト＋点線
+
+## 2. スポットデータ（Web検索で実在・現行住所を確認済み、2026-07-26時点）
+
+| カテゴリー | 店名 | 住所 | 座標（概算、実装時要再照合） |
+|---|---|---|---|
+| kopi | Ya Kun Kaya Toast (Far East Square) | 18 China Street #01-01, Singapore 049560 | 1.2836, 103.8482 |
+| kopi | Killiney Kopitiam | 67 Killiney Road, Singapore 239525 | 1.2989, 103.8339 |
+| kopi | Tong Ah Eating House | 35 Keong Saik Road, Singapore 089142 | 1.2801, 103.8398 |
+| bkt | Founder Bak Kut Teh | 347 Balestier Rd, Singapore 329777 | 1.3266, 103.8447 |
+| bkt | Song Fa Bak Kut Teh | 11 New Bridge Rd, Singapore 059383 | 1.2870, 103.8459 |
+| bkt | Ng Ah Sio Bak Kut Teh | 208 Rangoon Road, Singapore 218453 | 1.3121, 103.8535 |
+| chickenrice | Tian Tian Hainanese Chicken Rice (Maxwell Food Centre) | 1 Kadayanallur St #01-10/11, Singapore 069184 | 1.2807, 103.8447 |
+| chickenrice | Wee Nam Kee Chicken Rice (United Square) | 101 Thomson Road #01-08, Singapore 307591 | 1.3203, 103.8437 |
+| chickenrice | Boon Tong Kee (Balestier) | 399/401/403 Balestier Rd, Singapore 329801 | 1.3255, 103.8440 |
+
+**⚠️ 座標は一次情報（Web検索結果の住所テキスト）から人力で概算したものであり、正確な緯度経度APIでの再検索は行っていない。builderは実装時に住所と座標の大まかな整合性（同じ道路・同じ地区内に収まっているか）を再確認すること**（design 77で確立した既存の運用方針と同じレベルの確認で可）。
+
+## 3. データモデル
+
+`data/sg/stamp-spots.json`に新規9件を追加する。各エントリの構造は既存スポットに準拠しつつ、新規フィールド`categoryId`を追加する:
+
+```json
+{
+  "id": "kopi-ya-kun",
+  "name": "Ya Kun Kaya Toast (Far East Square)",
+  "nameJa": "ヤクン・カヤトースト（本店）",
+  "lat": 1.2836, "lng": 103.8482,
+  "level": "standard",
+  "area": "Central",
+  "category": "gourmet",
+  "categoryId": "kopi",
+  "checkinRadiusM": 200,
+  "active": true,
+  "description": "1944年創業、シンガポールのカヤトースト文化発祥の老舗。",
+  "imageUrl": ""
+}
+```
+
+- `level: "standard"`に統一する（**理由**: `GET /api/stamp-spots`の既存マスキングロジック`if (!unlockedLevels.includes(s.level)) return maskLockedStampSpot(s);`は`standard`が常時解禁済みのため、新規スポットが誤ってマスクされる心配がない。他の値〈'theme'等、STAMP_LEVEL_ORDER外の値〉を使うと、`unlockedLevels`配列に絶対に含まれないため常時マスクされてしまう既存ロジック上のバグを踏むことが実装前の調査で判明したため、`standard`を流用する設計とした）
+- `categoryId`（新規フィールド、`"kopi"` / `"bkt"` / `"chickenrice"`のいずれか）: テーマ別バッジのグルーピングキー。既存23件には付与しない（`undefined`のまま）
+- `category`（既存フィールド、`event/gourmet/sale/edu`等の分類）は`"gourmet"`を設定（食関連スポットのため、既存フィールドの意味を踏襲するだけで新規ロジックには使わない）
+- `order`フィールドは付与しない（テーマ別バッジは`order`による「次はここ」表示等のレベル進行系ロジックの対象外のため不要）
+
+## 4. サーバー側の変更（`server.js`）
+
+### 4-1. `computeUnlockedLevels()`の1行修正（既存レベル進行への影響を完全に排除する必須の対応）
+
+```js
+function computeUnlockedLevels(allSpots, checkedInSpotIds) {
+  const checkedSet = new Set(checkedInSpotIds);
+  const countByLevel = {};
+  const totalByLevel = {};
+  for (const s of allSpots) {
+    if (s.categoryId) continue; // 設計書165: テーマ別バッジのスポットは既存レベル進行の集計から除外する
+    totalByLevel[s.level] = (totalByLevel[s.level] || 0) + 1;
+    if (checkedSet.has(s.id)) countByLevel[s.level] = (countByLevel[s.level] || 0) + 1;
+  }
+  // ... 以下無変更
+```
+
+**この1行がないと、新規9件（すべて`level:"standard"`）が「見習い」レベルの総数に加算され、既存20件+9件=29件となり、design 142の「そのレベルの半数チェックインで次レベル解禁」の閾値が10→15に変わってしまう重大な回帰バグになる。必ず対応すること。**
+
+### 4-2. `GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`
+
+いずれも`computeUnlockedLevels(allSpots, ...)`を呼ぶだけの既存コードのため、上記4-1の修正が入れば自動的に正しく動作する。**追加のコード変更は不要**（既存のシグネチャ・呼び出し箇所は無変更のまま）。
+
+チェックインAPI自体（`POST /api/stamp-progress/checkin`）はテーマ別バッジ用スポットに対しても既存のGPS距離検証（design 87）・`checkedInSpotIds`への追加処理をそのまま使う。新規分岐は不要。
+
+## 5. クライアント側の変更（`public/app.js`・`public/index.html`・`public/app.css`）
+
+### 5-1. カテゴリーメタ定数
+
+```js
+const STAMP_CATEGORY_META = {
+  kopi:        { label: 'Kopi巡り',       labelEn: 'Kopi Trail',         emoji: '☕', color: '#8B5A2B' },
+  bkt:         { label: 'バクテー巡り',    labelEn: 'Bak Kut Teh Trail',  emoji: '🍲', color: '#A0522D' },
+  chickenrice: { label: 'チキンライス巡り', labelEn: 'Chicken Rice Trail', emoji: '🍗', color: '#C8804A' },
+};
+const STAMP_CATEGORY_ORDER = ['kopi', 'bkt', 'chickenrice'];
+```
+
+### 5-2. 既存レベルリスト描画からの除外（重複表示防止の必須対応）
+
+`_renderStampCollectionList()`内、`_stampSpots.filter(s => s.level === level)`を`_stampSpots.filter(s => s.level === level && !s.categoryId)`に変更する（`grep -n "s.level === level"`で該当箇所を特定）。**この変更を忘れると、新規9件が「見習い」レベルの横長カード一覧に紛れ込み、テーマ別バッジのグリッドとカードリストの両方に同じスポットが二重表示される。**
+
+### 5-3. 新規関数`_computeStampThemeBadgeProgress()`
+
+```js
+function _computeStampThemeBadgeProgress() {
+  return STAMP_CATEGORY_ORDER.map(catId => {
+    const spots = _stampSpots.filter(s => s.categoryId === catId);
+    const total = spots.length;
+    const checked = spots.filter(s => _stampSpotIsChecked(s.id)).length;
+    return { catId, meta: STAMP_CATEGORY_META[catId], spots, total, checked, achieved: total > 0 && checked === total };
+  });
+}
+```
+
+### 5-4. 新規関数`_renderStampThemeBadges()`（案2グリッド型）
+
+新規セクション`#stamp-theme-badges`（`_renderStampCollectionList()`内、レベル別セクション一覧の**手前**に配置。「テーマ別バッジ」を先に見せてから在住期間ベースの進行を見せる構成）。
+
+```js
+function _renderStampThemeBadges() {
+  const el = document.getElementById('stamp-theme-badges');
+  if (!el) return;
+  const progress = _computeStampThemeBadgeProgress();
+  el.innerHTML = progress.map(({ catId, meta, total, checked, achieved }) => {
+    const lang = getLang();
+    const label = lang === 'ja' ? meta.label : meta.labelEn;
+    return `<div class="stamp-theme-badge ${achieved ? 'stamp-theme-badge--done' : ''}" onclick="_toggleStampThemeBadgeSpots('${catId}')">
+      <div class="stamp-theme-badge-circle ${achieved ? 'stamp-theme-badge-circle--done' : 'stamp-theme-badge-circle--locked'}">${meta.emoji}</div>
+      <div class="stamp-theme-badge-label">${label}</div>
+      <div class="stamp-theme-badge-count ${achieved ? '' : 'stamp-theme-badge-count--locked'}">${checked}/${total}</div>
+    </div>`;
+  }).join('');
+}
+```
+
+**onclickにタッチガード〈`if(!_touchCapableDetected)`〉は付けないこと**（このプロジェクトで繰り返し発生している既知アンチパターン、design 84・99・130を踏まえた必須の注意）。
+
+### 5-5. 新規関数`_toggleStampThemeBadgeSpots(catId)`
+
+バッジタップで、そのカテゴリーのスポット一覧（`.stamp-card`と同じマークアップ・スタイルを再利用可能、サムネイル＋名前＋エリア＋チェックイン日付）を開閉トグル表示する。design 108の`_toggleStampCompleteList(listId)`（全制覇バッジの展開カード一覧、開閉トグルパターン）と同じ実装方針を踏襲する（新規に car設計するのではなく、既存の確立されたトグルパターンをコピーして`catId`ベースに書き換える）。
+
+### 5-6. HTML（`public/index.html`）
+
+`#stamp-collection-list`の直前、またはコレクション一覧の最上部に新規:
+```html
+<div id="stamp-theme-badges-section">
+  <div class="stamp-level-section-title">
+    <span class="stamp-level-title-main">🏅 <span data-i18n="stampThemeBadgesTitle">テーマ別バッジ</span></span>
+  </div>
+  <div id="stamp-theme-badges" class="stamp-theme-badges-grid"></div>
+</div>
+```
+
+### 5-7. CSS（`public/app.css`）
+
+モック`/tmp/claude-1000/-home-masahiko-sg-weekend-app/cf2492da-07b2-4426-a6e8-f71385083029/scratchpad/mock-theme-badges.html`の「案2」（`.grid2`/`.badge2`系クラス）をベースに、既存の色変数（`--sand`/`--caramel`/`--caramel-pale`/`--midnight`/`--warm-gray`/`--warm-white`/`--sand-dark`）を使って実装する。3列グリッド、制覇済みは`var(--caramel-pale)`背景＋`var(--caramel)`塗りつぶし丸、未制覇は`var(--sand)`背景＋点線グレーアウト丸。
+
+### 5-8. 呼び出し箇所への追加
+
+`_renderStampCollectionList()`内、既存の描画呼び出しの前後どこかに`_renderStampThemeBadges();`を追加する（`initStampMapTab()`・`doStampCheckin()`からの再描画フローに自動的に乗る、design 77・83で確立済みの「呼び出し漏れ防止」原則を踏襲し、既存の描画関数呼び出し列に追加すること）。
+
+## 6. i18n
+
+新規キー`stampThemeBadgesTitle`（ja「テーマ別バッジ」/en「Theme Badges」）をja/en同時追加。カテゴリーラベル自体（Kopi巡り等）は`STAMP_CATEGORY_META`内に直接ja/en両方持たせる設計のため、STRINGS.ja/enへの追加は不要（`_stampLevelYearRange`等とは異なるパターンだが、既存の`CITY_COURSE_AREAS`定数〈エリア名を直接オブジェクトに埋め込む既存パターン〉と同様の考え方）。
+
+## 7. スコープ外
+
+- エリア別バッジ（design 77、現在非表示中）との統合・関連付けは行わない
+- テーマ別バッジ達成時の専用演出（紙吹雪・解禁モーダル等）は今回スコープ外。進捗表示の視覚変化のみ
+- 卒業アルバム画面（design 152）・シェアカード（design 163・164）へのテーマ別バッジ表示統合は今回スコープ外（将来的な拡張候補として記録のみ）
+- 4つ目以降の追加カテゴリー（ロティプラタ・ラクサ・ドリアン等）は今回追加しない
+- `data/sg/stamp-spots.json`は`.gitignore`対象のためVPS上で直接編集する既存運用方針を踏襲（コード変更〈server.js・public/配下〉はコミット対象だが、スポットデータ追加自体はgit管理外）
+
+## 8. 承認状況
+2026-07-26 ユーザーとの会話で段階的に確定。カテゴリー: Kopi巡り／バクテー巡り／チキンライス巡り（各3スポット）。UI: 案2グリッド型トロフィーケース。カテゴリー名「Kopi」表記（日本語「コピー」との混同回避）。スポット9件はWeb検索で実在・現行住所確認済み。**承認済み**。
+
+## 9. 追記（2026-07-26）: スポット名は英語表記で統一
+
+ユーザー追加指示「スポット名も英語で統一しようかな」を受け、§3のデータモデルを訂正する。`nameJa`フィールドはカタカナ音訳せず、`name`と同じ英語表記をそのまま設定する（`nameJa: "ヤクン・カヤトースト（本店）"`のような音訳は行わない）。
+
+```json
+{
+  "id": "kopi-ya-kun",
+  "name": "Ya Kun Kaya Toast (Far East Square)",
+  "nameJa": "Ya Kun Kaya Toast (Far East Square)",
+  "lat": 1.2836, "lng": 103.8482,
+  "level": "standard",
+  "area": "Central",
+  "category": "gourmet",
+  "categoryId": "kopi",
+  "checkinRadiusM": 200,
+  "active": true,
+  "description": "1944年創業、シンガポールのカヤトースト文化発祥の老舗。",
+  "imageUrl": ""
+}
+```
+
+9件全てについて`name`と`nameJa`を同一の英語表記にする（`description`〈説明文〉は既存の日本語表記の慣習をそのまま踏襲、変更しない）。既存スポット（23件）の`nameJa`は無変更。

@@ -2019,6 +2019,7 @@ function computeUnlockedLevels(allSpots, checkedInSpotIds) {
   const countByLevel = {};
   const totalByLevel = {};
   for (const s of allSpots) {
+    if (s.categoryId) continue; // 設計書165: テーマ別バッジのスポットは既存レベル進行の集計から除外する
     totalByLevel[s.level] = (totalByLevel[s.level] || 0) + 1;
     if (checkedSet.has(s.id)) countByLevel[s.level] = (countByLevel[s.level] || 0) + 1;
   }
