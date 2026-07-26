@@ -5321,10 +5321,103 @@
       sandDark: '#E2D0B8',
       caramel: '#C8804A',
       caramelLight: '#E0A878',
+      caramelPale: '#FDF0E6',
       midnight: '#2C2420',
       warmGray: '#6B5E52',
       warmWhite: '#FFFDF9',
     };
+
+    // ─── 「卒業アルバムの1ページ風」共通装飾ヘルパー（設計書164 §2、モック案2準拠） ───
+
+    // 右上の紙のリボン/しおり風の三角形カットアウト装飾を描画する。
+    // モックのCSS: position:absolute; top:0; right:24px; width:26px; height:70px;
+    //   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+    // canvasは1080x1350（モックの300x375の3.6倍）のためスケール係数SCALE=3.6を掛けて配置・寸法を換算する。
+    function _drawShareCardRibbon(ctx, canvasW) {
+      const SCALE = 3.6; // 1080/300
+      const w = 26 * SCALE, h = 70 * SCALE;
+      const right = 24 * SCALE;
+      const x0 = canvasW - right - w; // clip-pathのleft基準x（リボン左端）
+      const x1 = canvasW - right;      // リボン右端
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.15)';
+      ctx.shadowBlur = 4 * SCALE * 0.5;
+      ctx.shadowOffsetX = 1 * SCALE * 0.5;
+      ctx.shadowOffsetY = 2 * SCALE * 0.5;
+      ctx.fillStyle = SHARE_CARD_COLORS.caramel;
+      ctx.beginPath();
+      ctx.moveTo(x0, 0);
+      ctx.lineTo(x1, 0);
+      ctx.lineTo(x1, h);
+      ctx.lineTo(x0 + w / 2, h * 0.8);
+      ctx.lineTo(x0, h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 手書き風メッセージボックス（角丸背景 + 左上に装飾的な引用符「"」+ 中央寄せの複数行テキスト）を描画する。
+    // 戻り値は描画後のyオフセット（次の要素の開始位置）。
+    function _drawShareCardMessageBox(ctx, text, W, y, opts) {
+      opts = opts || {};
+      const C = SHARE_CARD_COLORS;
+      const paddingX = opts.paddingX != null ? opts.paddingX : 90;
+      const paddingY = opts.paddingY != null ? opts.paddingY : 46;
+      const boxW = W - 140;
+      const boxX = (W - boxW) / 2;
+      const fontSize = opts.fontSize || 32;
+      const lineHeight = opts.lineHeight || (fontSize * 1.55);
+      const maxLines = opts.maxLines || 3;
+
+      ctx.font = `400 ${fontSize}px "Noto Sans JP", sans-serif`;
+      ctx.textAlign = 'center';
+      const lines = _wrapShareCardText(ctx, text, boxW - paddingX).slice(0, maxLines);
+      const boxH = paddingY * 2 + lines.length * lineHeight;
+
+      ctx.save();
+      ctx.fillStyle = C.caramelPale;
+      _shareCardRoundRectPath(ctx, boxX, y, boxW, boxH, 34);
+      ctx.fill();
+      ctx.restore();
+
+      // 装飾的な引用符「"」（左上、Georgia風セリフ体、caramelLight）
+      ctx.save();
+      ctx.fillStyle = C.caramelLight;
+      ctx.font = '700 84px Georgia, serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('"', boxX + 30, y + 60);
+      ctx.restore();
+
+      // 本文
+      ctx.fillStyle = C.midnight;
+      ctx.font = `400 ${fontSize}px "Noto Sans JP", sans-serif`;
+      ctx.textAlign = 'center';
+      let ty = y + paddingY + fontSize * 0.85;
+      lines.forEach((line) => { ctx.fillText(line, W / 2, ty); ty += lineHeight; });
+
+      return y + boxH;
+    }
+
+    // eyebrow文言（小さく・レタースペース広め・warmGray）を描画する
+    function _drawShareCardEyebrow(ctx, text, W, y) {
+      ctx.save();
+      ctx.fillStyle = SHARE_CARD_COLORS.warmGray;
+      ctx.font = '400 26px "Noto Sans JP", sans-serif';
+      ctx.textAlign = 'center';
+      // レタースペース広めの表現: 1文字ずつ描画してスペーシングを加える
+      const letterSpacing = 6;
+      const chars = text.split('');
+      let totalWidth = 0;
+      chars.forEach((ch) => { totalWidth += ctx.measureText(ch).width + letterSpacing; });
+      totalWidth -= letterSpacing;
+      let x = W / 2 - totalWidth / 2;
+      ctx.textAlign = 'left';
+      chars.forEach((ch) => {
+        ctx.fillText(ch, x, y);
+        x += ctx.measureText(ch).width + letterSpacing;
+      });
+      ctx.restore();
+    }
 
     // Canvas上でWebフォント（Kaisei Opti）を使うため、描画前に必ずdocument.fonts.readyを待つ。
     // 未対応環境（フォント読み込み失敗）でもフォールバックフォントで描画は継続する（例外を投げない）。
@@ -5418,7 +5511,7 @@
       return lines;
     }
 
-    // ─── 3-1. 全制覇シェアカード（設計書163 §3-1、モック mock-share-card.html 準拠） ───
+    // ─── 3-1. 全制覇シェアカード（設計書164 §2-1、卒業アルバムの1ページ風＝モック案2準拠） ───
     async function _buildStampCompleteShareCardBlob(completedLevel) {
       await _ensureShareCardFontsReady();
       const W = 1080, H = 1350;
@@ -5427,80 +5520,70 @@
       const ctx = canvas.getContext('2d');
       const C = SHARE_CARD_COLORS;
 
-      // 背景グラデーション（cream→sand、160deg相当）
-      const grad = ctx.createLinearGradient(0, 0, W * 0.34, H);
-      grad.addColorStop(0, C.cream);
-      grad.addColorStop(1, C.sand);
-      ctx.fillStyle = grad;
+      // 背景: 単色warmWhite（design163のグラデーションから変更）
+      ctx.fillStyle = C.warmWhite;
       ctx.fillRect(0, 0, W, H);
+
+      // 右上のリボン装飾
+      _drawShareCardRibbon(ctx, W);
 
       const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
       const total = _stampSpots.filter(s => s.level === completedLevel).length;
 
       ctx.textAlign = 'center';
 
-      // ブランド
-      ctx.fillStyle = C.caramel;
-      ctx.font = '700 30px "Noto Sans JP", sans-serif';
-      ctx.fillText('おでかけNavi', W / 2, 130);
-      ctx.fillStyle = C.warmGray;
-      ctx.font = '400 27px "Noto Sans JP", sans-serif';
-      ctx.fillText('シンガポール探訪の記録', W / 2, 175);
+      // eyebrow
+      let y = 100;
+      _drawShareCardEyebrow(ctx, 'GRADUATION ALBUM PAGE', W, y);
+      y += 90;
 
-      // バッジ画像（同一オリジンPNG想定、失敗時は円のプレースホルダーで代替しフローを止めない）
+      // バッジ画像（円形、box-shadow相当。同一オリジンPNG想定、失敗時は円のプレースホルダーで代替しフローを止めない）
       const badgeSize = 400;
-      const badgeY = 230;
+      const badgeY = y;
       try {
         const badgeImg = await _loadSafeImageForShareCard(meta.img);
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.15)';
+        ctx.shadowBlur = 36;
+        ctx.shadowOffsetY = 14;
+        ctx.beginPath();
+        ctx.arc(W / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+        ctx.fillStyle = C.sandDark;
+        ctx.fill();
+        ctx.restore();
         if (badgeImg) {
           ctx.save();
-          ctx.shadowColor = 'rgba(44,36,32,0.25)';
-          ctx.shadowBlur = 30;
-          ctx.shadowOffsetY = 16;
-          ctx.drawImage(badgeImg, (W - badgeSize) / 2, badgeY, badgeSize, badgeSize);
-          ctx.restore();
-        } else {
-          ctx.fillStyle = C.sandDark;
           ctx.beginPath();
           ctx.arc(W / 2, badgeY + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.clip();
+          ctx.drawImage(badgeImg, (W - badgeSize) / 2, badgeY, badgeSize, badgeSize);
+          ctx.restore();
         }
       } catch (_) {}
 
-      let y = badgeY + badgeSize + 90;
+      y = badgeY + badgeSize + 80;
 
-      // レベル名
+      // タイトル（レベル名）
       ctx.fillStyle = C.midnight;
-      ctx.font = '700 58px "Kaisei Opti", serif';
+      ctx.font = '700 66px "Kaisei Opti", serif';
       ctx.fillText(`${meta.emoji} ${t(meta.labelKey)}`, W / 2, y);
-      y += 80;
+      y += 76;
 
-      // 「制覇！」
+      // サブ「制覇しました」（設計書164 §2-1で指定の固定文言。既存i18nキーstampLevelCompleteLabel「制覇！」とは別表現のため直書き）
       ctx.fillStyle = C.caramel;
-      ctx.font = '700 72px "Kaisei Opti", serif';
-      ctx.fillText(t('stampLevelCompleteLabel'), W / 2, y);
+      ctx.font = '700 46px "Kaisei Opti", serif';
+      ctx.fillText(getLang() === 'ja' ? '制覇しました' : 'Conquered!', W / 2, y);
       y += 70;
 
-      // 件数ピル
-      const countText = `${total} / ${total} ${t('stampLevelCompleteSpotsLabel')}`;
-      ctx.font = '700 34px "Noto Sans JP", sans-serif';
-      const pillPaddingX = 44, pillH = 74;
-      const pillW = ctx.measureText(countText).width + pillPaddingX * 2;
-      const pillX = (W - pillW) / 2, pillY = y;
-      ctx.save();
-      ctx.fillStyle = C.warmWhite;
-      ctx.strokeStyle = C.sandDark;
-      ctx.lineWidth = 2;
-      _shareCardRoundRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-      ctx.fillStyle = C.warmGray;
-      ctx.textBaseline = 'middle';
-      ctx.fillText(countText, W / 2, pillY + pillH / 2 + 2);
-      ctx.textBaseline = 'alphabetic';
+      // メッセージボックス
+      const msgText = getLang() === 'ja'
+        ? `シンガポールの暮らし、${total}スポットを歩きました。`
+        : `I've explored ${total} spots of life in Singapore.`;
+      y = _drawShareCardMessageBox(ctx, msgText, W, y, { fontSize: 32, maxLines: 3 });
+      y += 50;
 
-      // フッター: 在住歴（設定されている場合のみ）
+      // 下部メタ情報: 件数・在住歴
+      let metaText = `${total} / ${total} ${t('stampLevelCompleteSpotsLabel')}`;
       const arrivalStr = localStorage.getItem('app_arrival_date');
       if (arrivalStr) {
         const arrival = new Date(arrivalStr + 'T00:00:00');
@@ -5508,26 +5591,22 @@
           const today = new Date();
           const arrivalMid = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
           const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          const days = Math.max(0, Math.round((todayMid - arrivalMid) / 86400000));
           let years = todayMid.getFullYear() - arrivalMid.getFullYear();
           let months = todayMid.getMonth() - arrivalMid.getMonth();
           if (todayMid.getDate() < arrivalMid.getDate()) months--;
           if (months < 0) { years--; months += 12; }
           const ym = _formatResidencyYM(years, months, getLang());
-          const footerY = H - 90;
-          ctx.fillStyle = C.warmGray;
-          ctx.font = '400 26px "Noto Sans JP", sans-serif';
-          ctx.fillText(getLang() === 'ja' ? '在住歴' : 'Residency', W / 2, footerY);
-          ctx.fillStyle = C.caramel;
-          ctx.font = '700 32px "Noto Sans JP", sans-serif';
-          ctx.fillText(getLang() === 'ja' ? `${ym}（${days}日）` : `${ym} (${days} days)`, W / 2, footerY + 42);
+          metaText += getLang() === 'ja' ? `・在住歴${ym}` : ` · ${ym} in Singapore`;
         }
       }
+      ctx.fillStyle = C.warmGray;
+      ctx.font = '400 28px "Noto Sans JP", sans-serif';
+      ctx.fillText(metaText, W / 2, H - 90);
 
       return _shareCardCanvasToBlob(canvas);
     }
 
-    // ─── 3-2. スポットチェックインシェアカード（設計書163 §3-2、モック mock-share-card-checkin.html 準拠） ───
+    // ─── 3-2. スポットチェックインシェアカード（設計書164 §2-2、卒業アルバムの1ページ風＝モック案2準拠） ───
     async function _buildStampCheckinShareCardBlob(spot) {
       await _ensureShareCardFontsReady();
       const W = 1080, H = 1350;
@@ -5536,99 +5615,98 @@
       const ctx = canvas.getContext('2d');
       const C = SHARE_CARD_COLORS;
 
-      // 背景（カード全体）
-      ctx.fillStyle = C.cream;
+      // 背景: 単色warmWhite
+      ctx.fillStyle = C.warmWhite;
       ctx.fillRect(0, 0, W, H);
+
+      // 右上のリボン装飾
+      _drawShareCardRibbon(ctx, W);
 
       const lang = getLang();
       const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
 
-      // 写真エリア（個人の思い出写真があれば優先、無ければ公式画像。両方無ければ省略しレイアウトを詰める）
+      ctx.textAlign = 'center';
+
+      // eyebrow
+      let y = 100;
+      _drawShareCardEyebrow(ctx, 'GRADUATION ALBUM PAGE', W, y);
+      y += 60;
+
+      // 写真エリア（個人の思い出写真があれば優先、無ければ公式画像。両方無ければ写真エリア自体を省略しレイアウトを詰める）
       // 個人の思い出写真はIndexedDB由来のBlobから生成したobjectURL（同一オリジン相当）のためCORS問題は起きないが、
       // spot.imageUrl（外部Unsplash画像等）はCORS制約でtainted canvasになりうるため、いずれも安全版ローダーで統一する
       // （個人写真はtainted判定コストがわずかに増えるだけで実害はない）。
+      // design164: 円形バッジの代わりに角丸の横長写真（design121のポラロイド演出と統一感のあるアスペクト比）を使う。
       const photoUrls = _stampMemoryPhotoUrlCache[spot.id] || [];
       const photoSrc = photoUrls[0] || spot.imageUrl || '';
-      const photoH = 866; // 260/405 * 1350 相当
+      const photoW = W - 160, photoH = 460, photoX = 80, photoY = y;
       let hasPhoto = false;
       if (photoSrc) {
         try {
           const img = await _loadSafeImageForShareCard(photoSrc);
           if (img) {
             hasPhoto = true;
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.15)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetY = 8;
+            _shareCardRoundRectPath(ctx, photoX, photoY, photoW, photoH, 24);
+            ctx.fillStyle = C.sandDark;
+            ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            _shareCardRoundRectPath(ctx, photoX, photoY, photoW, photoH, 24);
+            ctx.clip();
             // object-fit: cover 相当（中央クロップ）
             const srcRatio = img.width / img.height;
-            const dstRatio = W / photoH;
+            const dstRatio = photoW / photoH;
             let sx, sy, sw, sh;
             if (srcRatio > dstRatio) {
               sh = img.height; sw = sh * dstRatio; sx = (img.width - sw) / 2; sy = 0;
             } else {
               sw = img.width; sh = sw / dstRatio; sx = 0; sy = (img.height - sh) / 2;
             }
-            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, photoH);
+            ctx.drawImage(img, sx, sy, sw, sh, photoX, photoY, photoW, photoH);
+            ctx.restore();
           }
         } catch (_) {
           hasPhoto = false;
         }
       }
 
-      let bodyTop = hasPhoto ? photoH : 60;
+      // 写真が無い場合、タイトルがリボン（y:0〜252付近）と重ならないよう十分な余白を確保する
+      y = hasPhoto ? (photoY + photoH + 60) : Math.max(y + 20, 300);
 
-      // 「✓ 訪問済み」回転スタンプ（写真がある場合のみ、写真右上に重ねる）
-      if (hasPhoto) {
-        ctx.save();
-        const stampCx = W - 130, stampCy = 130, stampR = 90;
-        ctx.translate(stampCx, stampCy);
-        ctx.rotate(-10 * Math.PI / 180);
-        ctx.beginPath();
-        ctx.arc(0, 0, stampR, 0, Math.PI * 2);
-        ctx.fillStyle = C.caramel;
-        ctx.shadowColor = 'rgba(44,36,32,0.3)';
-        ctx.shadowBlur = 14;
-        ctx.shadowOffsetY = 5;
-        ctx.fill();
-        ctx.shadowColor = 'transparent';
-        ctx.lineWidth = 8;
-        ctx.strokeStyle = C.cream;
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = '700 34px "Noto Sans JP", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('✓', 0, -6);
-        ctx.font = '700 24px "Noto Sans JP", sans-serif';
-        ctx.fillText(t('stampCheckedInBadge').replace('✓ ', ''), 0, 30);
-        ctx.restore();
+      // タイトル（スポット名）
+      ctx.fillStyle = C.midnight;
+      ctx.font = '700 58px "Kaisei Opti", serif';
+      const nameLines = _wrapShareCardText(ctx, name, W - 140).slice(0, 2);
+      nameLines.forEach((line) => { ctx.fillText(line, W / 2, y); y += 66; });
+      y += 4;
+
+      // サブ「訪問しました」
+      ctx.fillStyle = C.caramel;
+      ctx.font = '700 40px "Kaisei Opti", serif';
+      ctx.fillText(getLang() === 'ja' ? '訪問しました' : 'Visited!', W / 2, y);
+      y += 66;
+
+      // メッセージボックス: 思い出メモがあれば引用表示、無ければ省略
+      const memo = _getStampMemos()[spot.id];
+      if (memo && memo.text) {
+        const memoText = memo.text.length > 80 ? memo.text.slice(0, 80) + '…' : memo.text;
+        y = _drawShareCardMessageBox(ctx, memoText, W, y, { fontSize: 30, maxLines: 4 });
+        y += 50;
+      } else {
+        y += 20;
       }
 
-      // 本文（ブランド・スポット名・訪問日・メモ）
-      ctx.textAlign = 'center';
-      let y = bodyTop + 70;
-      ctx.fillStyle = C.caramel;
-      ctx.font = '700 24px "Noto Sans JP", sans-serif';
-      ctx.fillText(getLang() === 'ja' ? 'おでかけNavi・シンガポール探訪' : 'Odekake Navi · Explore Singapore', W / 2, y);
-      y += 60;
-
-      ctx.fillStyle = C.midnight;
-      ctx.font = '700 52px "Kaisei Opti", serif';
-      const nameLines = _wrapShareCardText(ctx, name, W - 140).slice(0, 2);
-      nameLines.forEach((line) => { ctx.fillText(line, W / 2, y); y += 62; });
-      y += 6;
-
+      // 下部メタ情報: 訪問日
       const checkinDateFull = _stampCheckinDateFullFor(spot.id);
       if (checkinDateFull) {
         ctx.fillStyle = C.warmGray;
         ctx.font = '400 28px "Noto Sans JP", sans-serif';
-        ctx.fillText(checkinDateFull, W / 2, y);
-        y += 60;
-      }
-
-      const memo = _getStampMemos()[spot.id];
-      if (memo && memo.text) {
-        ctx.fillStyle = C.midnight;
-        ctx.font = 'italic 400 30px "Noto Sans JP", sans-serif';
-        const memoText = memo.text.length > 80 ? memo.text.slice(0, 80) + '…' : memo.text;
-        const memoLines = _wrapShareCardText(ctx, memoText, W - 160).slice(0, 4);
-        memoLines.forEach((line) => { ctx.fillText(line, W / 2, y); y += 44; });
+        ctx.fillText(checkinDateFull, W / 2, H - 90);
       }
 
       return _shareCardCanvasToBlob(canvas);
@@ -5646,34 +5724,48 @@
       return `Visited ${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
     }
 
-    // ─── 3-3. 進捗スナップショットシェアカード（設計書163 §3-3、モック mock-share-card-progress.html 準拠） ───
+    // ─── 3-3. 進捗スナップショットシェアカード（設計書164 §2-3、卒業アルバムの1ページ風＝モック案2準拠） ───
     // ⚠️ 未解禁レベルはラベル名・絵文字とも「？？？」でマスクする（design 105のマスキング方針を踏襲、
-    // モック時点ではラベル名を表示したまま件数のみ伏せていたが、ユーザー指摘により実装ではラベル名も伏せる）。
+    // design163のマスキングロジック自体は一切変更していない）。
     async function _buildStampProgressShareCardBlob() {
       await _ensureShareCardFontsReady();
       const W = 1080, H = 1350;
       const canvas = document.createElement('canvas');
       canvas.width = W; canvas.height = H;
       const ctx = canvas.getContext('2d');
+      const C = SHARE_CARD_COLORS;
 
-      // ダーク背景グラデーション（160deg、#2C2420→#4a3c32相当）
-      const grad = ctx.createLinearGradient(0, 0, W * 0.34, H);
-      grad.addColorStop(0, '#2C2420');
-      grad.addColorStop(1, '#4a3c32');
-      ctx.fillStyle = grad;
+      // 背景: 単色warmWhite（design163のダーク背景グラデーションから変更）
+      ctx.fillStyle = C.warmWhite;
       ctx.fillRect(0, 0, W, H);
 
-      const caramelLight = SHARE_CARD_COLORS.caramelLight;
-      const lang = getLang();
+      // 右上のリボン装飾
+      _drawShareCardRibbon(ctx, W);
 
       ctx.textAlign = 'center';
 
-      // ブランド
-      ctx.fillStyle = caramelLight;
-      ctx.font = '700 28px "Noto Sans JP", sans-serif';
-      ctx.fillText(getLang() === 'ja' ? 'おでかけNavi・シンガポール探訪' : 'Odekake Navi · Explore Singapore', W / 2, 110);
+      // eyebrow
+      let y = 100;
+      _drawShareCardEyebrow(ctx, 'GRADUATION ALBUM PAGE', W, y);
+      y += 60;
 
-      // 在住日数・年月
+      // タイトル: 「探訪の記録」等の固定文言（特定レベルではなく全体スナップショットのため）
+      // リボン装飾（右上、y:0〜252付近、左端x=900付近）と重ならないよう、中心から左右対称に測って
+      // リボン左端の内側に収まる幅までフォントサイズを縮小する（中央寄せテキストのため半幅×2で判定）
+      ctx.fillStyle = C.midnight;
+      const titleText = getLang() === 'ja' ? '探訪の記録' : 'My Exploration Record';
+      let titleFontSize = 60;
+      const ribbonLeftX = W - 24 * 3.6 - 26 * 3.6; // _drawShareCardRibbon()のx0と同じ計算
+      const maxTitleWidth = (ribbonLeftX - W / 2 - 20) * 2; // 20pxの安全マージン
+      ctx.font = `700 ${titleFontSize}px "Kaisei Opti", serif`;
+      while (ctx.measureText(titleText).width > maxTitleWidth && titleFontSize > 32) {
+        titleFontSize -= 4;
+        ctx.font = `700 ${titleFontSize}px "Kaisei Opti", serif`;
+      }
+      ctx.fillText(titleText, W / 2, y);
+      y += 70;
+
+      // 在住日数の大きな数字
       const arrivalStr = localStorage.getItem('app_arrival_date');
       let days = 0, ym = '';
       if (arrivalStr) {
@@ -5690,20 +5782,24 @@
           ym = _formatResidencyYM(years, months, getLang());
         }
       }
-      let y = 240;
-      ctx.fillStyle = caramelLight;
-      ctx.font = '700 130px "Kaisei Opti", serif';
+      ctx.fillStyle = C.caramel;
+      ctx.font = '700 120px "Kaisei Opti", serif';
       const daysLabel = getLang() === 'ja' ? '日' : ' days';
-      ctx.fillText(`${days}${daysLabel}`, W / 2, y);
-      y += 50;
-      ctx.fillStyle = '#d8cfc4';
+      ctx.fillText(`${days}${daysLabel}`, W / 2, y + 90);
+      y += 140;
+      ctx.fillStyle = C.warmGray;
       ctx.font = '400 30px "Noto Sans JP", sans-serif';
       ctx.fillText(arrivalStr ? (getLang() === 'ja' ? `在住歴 ${ym}` : `${ym} in Singapore`) : t('genreStatusUnset'), W / 2, y);
-      y += 70;
+      y += 60;
 
-      // レベルごとの進捗バー
-      const rowH = 92;
-      const trackX = 340, trackW = 520;
+      // メッセージボックス
+      const msgText = getLang() === 'ja' ? 'シンガポール探訪、続けています。' : 'Still exploring Singapore.';
+      y = _drawShareCardMessageBox(ctx, msgText, W, y, { fontSize: 30, maxLines: 2 });
+      y += 40;
+
+      // レベルごとの進捗（進捗バーのトラック色は視認性のためsandを維持）
+      const rowH = 84;
+      const trackX = 340, trackW = 480;
       ctx.textAlign = 'left';
       STAMP_LEVEL_ORDER_CLIENT.forEach((level) => {
         const meta = STAMP_LEVEL_META[level];
@@ -5717,46 +5813,39 @@
         ctx.save();
         if (isMasked) ctx.globalAlpha = 0.45;
 
-        const rowCy = y + rowH / 2 - 20;
+        const rowCy = y + rowH / 2 - 14;
 
         // 絵文字（マスク時は🔒に差し替え）
-        ctx.font = '400 34px "Noto Sans JP", sans-serif';
+        ctx.font = '400 32px "Noto Sans JP", sans-serif';
         ctx.textBaseline = 'middle';
         ctx.fillText(isMasked ? '🔒' : meta.emoji, 90, rowCy);
 
         // ラベル（マスク時はレベル名自体も「？？？」。日本語4〜5文字のレベル名を想定し22pxで詰めて表示崩れを防ぐ）
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = C.midnight;
         ctx.font = '700 22px "Noto Sans JP", sans-serif';
         ctx.fillText(isMasked ? '？？？' : t(meta.labelKey), 160, rowCy);
 
         // 進捗バー
         const pct = (!isMasked && total > 0) ? (checked / total) : 0;
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        _shareCardRoundRectPath(ctx, trackX, rowCy - 14, trackW, 28, 14);
+        ctx.fillStyle = C.sand;
+        _shareCardRoundRectPath(ctx, trackX, rowCy - 13, trackW, 26, 13);
         ctx.fill();
         if (pct > 0) {
-          ctx.fillStyle = caramelLight;
-          _shareCardRoundRectPath(ctx, trackX, rowCy - 14, Math.max(28, trackW * pct), 28, 14);
+          ctx.fillStyle = C.caramel;
+          _shareCardRoundRectPath(ctx, trackX, rowCy - 13, Math.max(26, trackW * pct), 26, 13);
           ctx.fill();
         }
 
         // 件数（マスク時は「？？？」、非マスクかつtotal=0＝special未解禁等も「？？？」扱いにする）
-        ctx.fillStyle = '#d8cfc4';
+        ctx.fillStyle = C.warmGray;
         ctx.font = '400 24px "Noto Sans JP", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(isMasked ? '？？？' : `${checked}/${total}`, trackX + trackW + 110, rowCy);
+        ctx.fillText(isMasked ? '？？？' : `${checked}/${total}`, trackX + trackW + 100, rowCy);
         ctx.textAlign = 'left';
 
         ctx.restore();
         y += rowH;
       });
-
-      // フッター
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = '#c9beb2';
-      ctx.font = '400 26px "Noto Sans JP", sans-serif';
-      ctx.fillText(getLang() === 'ja' ? 'シンガポール探訪、続けています。' : 'Still exploring Singapore.', W / 2, H - 70);
 
       return _shareCardCanvasToBlob(canvas);
     }
