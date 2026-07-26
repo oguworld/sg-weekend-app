@@ -2320,7 +2320,7 @@
 
     /* ─── 探訪の記録（設計書166、レベル別バッジ。design 165と同じ構造の姉妹CSS） ─── */
     .stamp-level-badges-grid {
-      grid-template-columns: repeat(4, 1fr); /* stamp-theme-badges-grid の3列指定を上書き */
+      grid-template-columns: repeat(3, 1fr); /* 4列→3列（設計書167）。4つ目（極めし者）はCSS Gridの標準折り返しで次の行に自動配置される */
     }
     .stamp-level-badge {
       display: flex; flex-direction: column; align-items: center;
