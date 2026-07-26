@@ -16326,3 +16326,200 @@ function _renderStampThemeBadges() {
 ```
 
 9件全てについて`name`と`nameJa`を同一の英語表記にする（`description`〈説明文〉は既存の日本語表記の慣習をそのまま踏襲、変更しない）。既存スポット（23件）の`nameJa`は無変更。
+
+# 設計書166 — 探訪レベル（見習い〜極めし者）もテーマ別バッジと同じ折り畳みバッジ形式に統一
+
+（2026-07-26 design 165〈テーマ別バッジ〉の実装を見たユーザーが「見習いとかそっちの方もこんな感じの折り畳みバッジ的な感じで作れない」と要望。モック提示・見出し文言のブレストを経て確定）
+
+## 1. 背景・確定事項
+
+design 83以来、レベル別セクション（見習い/定住レベル/シンガポール通/極めし者）は「ロック中=1行のみ」「解禁中未全制覇=見出し+進捗バー+横長カード常時表示」「全制覇=大きな祝賀バッジ+開閉トグル」という3状態バラバラの表示だった。design 165で新設したテーマ別バッジ（グリッド型トロフィーケース、タップで開閉）に見た目を統一する。
+
+- 見出し文言: 「🏅 探訪の記録」（design 152の卒業アルバム実績セクションと同じ言葉遣いで統一。当初「探訪レベル」で検討したがユーザーが「探訪の記録」を選択）
+- ロック中の表現は🔒アイコンのみのシンプル表示に簡略化（`special`のみ既存のdesign 105マスキング方針〈ラベル・件数とも「？？？」〉を維持）
+- 既存の進捗バー（🔓/🏆アイコン、design 146〜151）は**廃止**し、バッジのX/Y表示に一本化する
+- 全制覇時の大きな祝賀バッジ（150pxのバッジ画像＋大きなタイトル、design 108・109・135）も**通常サイズのバッジタイルに統一**する（celebratory感は縮小するトレードオフをユーザー承認済み）
+
+## 2. 確定仕様
+
+### 2-1. 新規関数`_renderStampLevelBadges()`（`_renderStampThemeBadges()`と同じ構造で実装）
+
+`STAMP_LEVEL_ORDER_CLIENT`の4レベルをグリッド表示する。design 165の`_renderStampThemeBadges()`（`public/app.js` 4678-4699行目）を強く参考にし、以下の差分を持たせる:
+
+```js
+function _renderStampLevelBadges() {
+  const el = document.getElementById('stamp-level-badges');
+  if (!el) return;
+  const lang = getLang();
+  el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
+    const meta = STAMP_LEVEL_META[level];
+    const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
+    const unlocked = _stampProgress.unlockedLevels.includes(level);
+    // special未解禁時、GET /api/stamp-spots はスポット自体を返さないため spotsInLevel.length===0 になる（design 69既存仕様）
+    const isSpecialHiddenLocked = level === 'special' && spotsInLevel.length === 0 && !unlocked;
+    const total = isSpecialHiddenLocked ? null : spotsInLevel.length;
+    const checked = isSpecialHiddenLocked ? null : spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+    const state = !unlocked ? 'locked' : (checked < total ? 'inProgress' : 'complete');
+
+    const hideLabel = isSpecialHiddenLocked; // design 105のマスキング方針を維持（specialのみラベルごと伏せる）
+    const labelHtml = hideLabel ? '？？？' : `${t(meta.labelKey)}`;
+    const countHtml = (total === null) ? '？？？' : `${checked}/${total}`;
+    const circleContent = state === 'locked' ? '🔒' : meta.emoji;
+    const circleClass = state === 'complete' ? 'stamp-level-badge-circle--done'
+      : state === 'inProgress' ? 'stamp-level-badge-circle--progress'
+      : 'stamp-level-badge-circle--locked';
+    const tileClass = state === 'complete' ? 'stamp-level-badge--done' : (state === 'inProgress' ? 'stamp-level-badge--progress' : '');
+    const clickable = state !== 'locked';
+    const onclickAttr = clickable ? ` onclick="_toggleStampLevelBadgeSpots('${level}')"` : '';
+
+    return `<div class="stamp-level-badge ${tileClass}"${onclickAttr}>
+      <div class="stamp-level-badge-circle ${circleClass}">${circleContent}</div>
+      <div class="stamp-level-badge-label">${labelHtml}</div>
+      <div class="stamp-level-badge-count ${state === 'locked' ? 'stamp-level-badge-count--locked' : ''}">${countHtml}</div>
+    </div>`;
+  }).join('');
+  // 既存の展開状態を維持（design 165の _renderStampThemeBadges() と同じ再描画パターン）
+  STAMP_LEVEL_ORDER_CLIENT.forEach(level => {
+    const listEl = document.getElementById(`stamp-level-spot-list-${level}`);
+    if (listEl && listEl.dataset.wasOpen === '1') {
+      _renderStampLevelBadgeSpotList(level);
+      listEl.style.display = 'flex';
+    }
+  });
+}
+```
+
+### 2-2. 新規関数`_renderStampLevelBadgeSpotList(level)`・`_toggleStampLevelBadgeSpots(level)`
+
+design 165の`_renderStampThemeBadgeSpotList(catId)`/`_toggleStampThemeBadgeSpots(catId)`（`public/app.js` 4702-4752行目）と全く同じ構造で、`catId`を`level`に置き換えて実装する。**カードの違い**: レベル版は既存の「次はここ！」タグ機能（`_computeStampNextTarget()`との連携、design 70・83のコア機能）を維持すること。design 165のテーマ版カードリストにはこのタグが無いが、レベル版では`_renderStampLevelRowInProgress()`（現4817-4876行目）のカード生成ロジック内にある`isNext`判定・`stamp-card-next-tag`表示をそのまま移植すること。
+
+```js
+function _renderStampLevelBadgeSpotList(level) {
+  const listEl = document.getElementById(`stamp-level-spot-list-${level}`);
+  if (!listEl) return;
+  const lang = getLang();
+  const meta = STAMP_LEVEL_META[level];
+  const nextTarget = _computeStampNextTarget();
+  const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
+  const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  listEl.innerHTML = sorted.map(spot => {
+    const checked = _stampSpotIsChecked(spot.id);
+    const isNext = !!nextTarget && nextTarget.id === spot.id;
+    const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+    const thumbSrc = spot.imageUrl || '';
+    const thumbInner = thumbSrc
+      ? `<img src="${thumbSrc}" alt="${name}" class="stamp-card-thumb-img">`
+      : `<div class="stamp-card-thumb-placeholder">📍</div>`;
+    const doneStampHtml = checked
+      ? `<div class="stamp-card-done-mark" style="background:${meta.color};">${t('stampCardDoneMark')}</div>`
+      : '';
+    const thumbHtml = `<div class="stamp-card-thumb">${thumbInner}${doneStampHtml}</div>`;
+    const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
+    return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
+      ${thumbHtml}
+      <div class="stamp-card-body">
+        <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
+        ${checkinDate ? `<div class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</div>` : ''}
+      </div>
+      <span class="stamp-card-area-right">${spot.area || ''}</span>
+    </div>`;
+  }).join('');
+}
+
+function _toggleStampLevelBadgeSpots(level) {
+  let listEl = document.getElementById(`stamp-level-spot-list-${level}`);
+  const containerEl = document.getElementById('stamp-level-badge-spot-lists');
+  if (!listEl) {
+    if (!containerEl) return;
+    listEl = document.createElement('div');
+    listEl.id = `stamp-level-spot-list-${level}`;
+    listEl.className = 'stamp-card-list stamp-level-badge-spot-list';
+    listEl.style.display = 'none';
+    containerEl.appendChild(listEl);
+  }
+  const isOpen = listEl.style.display !== 'none';
+  if (isOpen) {
+    listEl.style.display = 'none';
+    listEl.dataset.wasOpen = '0';
+  } else {
+    _renderStampLevelBadgeSpotList(level);
+    listEl.style.display = 'flex';
+    listEl.dataset.wasOpen = '1';
+  }
+}
+```
+
+**onclickにタッチガードを付けないこと**（design 84・99・130の既知アンチパターン回避、既に確立した`_toggleStampThemeBadgeSpots`と同じ方針）。
+
+### 2-3. `_renderStampCollectionList()`の置き換え
+
+現在（design 165時点）の`_renderStampCollectionList()`（4758-4801行目）は、`STAMP_LEVEL_ORDER_CLIENT.map(level => {...})`で`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`を呼び分け`#stamp-collection-list`のinnerHTMLを組み立てていた。この処理を`_renderStampLevelBadges()`の呼び出しに置き換える。
+
+```js
+function _renderStampCollectionList() {
+  _renderStampThemeBadges(); // design 165
+  _renderStampLevelBadges(); // design 166
+}
+```
+
+**`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`は削除せず残置してよい**（呼び出し元がなくなるだけ、他機能への影響がないため。既存の「使わなくなった関数は残置」方針を踏襲）。
+
+### 2-4. HTML（`public/index.html`）
+
+`#stamp-theme-badges-section`（design 165）の**直前**に新規セクションを追加する（見出し順は「探訪の記録」が上、「テーマ別バッジ」が下）:
+
+```html
+<div id="stamp-level-badges-section">
+  <div class="stamp-level-section-title">
+    <span class="stamp-level-title-main">🏅 <span data-i18n="stampLevelBadgesTitle">探訪の記録</span></span>
+  </div>
+  <div id="stamp-level-badges" class="stamp-theme-badges-grid stamp-level-badges-grid"></div>
+  <div id="stamp-level-badge-spot-lists"></div>
+</div>
+```
+
+**`#stamp-collection-list`要素自体（既存のコンテナ）は、design 165時点で`_renderStampThemeBadges()`が直接`#stamp-theme-badges`に描画する形に変わっているため、実質的にレイアウト用の空コンテナとして残っているだけの可能性がある。builderは`grep -n "stamp-collection-list"`で現況を確認し、`#stamp-level-badges-section`/`#stamp-theme-badges-section`の親要素として適切に配置すること。**
+
+### 2-5. CSS（`public/app.css`）
+
+`.stamp-theme-badge`系（design 165実装済み）とほぼ同一のスタイルだが、グリッドが4列になる点と3状態（locked/inProgress/complete）の色分けが必要な点が異なる。新規クラス:
+
+```css
+.stamp-level-badges-grid {
+  grid-template-columns: repeat(4, 1fr); /* stamp-theme-badges-grid の3列指定を上書き */
+}
+.stamp-level-badge {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--sand); border-radius: 14px; padding: 12px 4px;
+  cursor: pointer;
+}
+.stamp-level-badge--done { background: var(--caramel-pale); }
+.stamp-level-badge--progress { background: var(--caramel-pale); }
+.stamp-level-badge-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; margin-bottom: 6px;
+}
+.stamp-level-badge-circle--done { background: var(--caramel); box-shadow: 0 3px 8px rgba(200,128,74,0.4); }
+.stamp-level-badge-circle--progress { background: var(--caramel-light); box-shadow: 0 2px 6px rgba(200,128,74,0.3); }
+.stamp-level-badge-circle--locked { background: var(--warm-white); border: 1.5px dashed var(--sand-dark); }
+.stamp-level-badge-label { font-size: 9.5px; font-weight: 700; color: var(--midnight); text-align: center; line-height: 1.25; }
+.stamp-level-badge-count { font-size: 8.5px; color: var(--caramel); font-weight: 700; margin-top: 2px; }
+.stamp-level-badge-count--locked { color: var(--warm-gray); }
+```
+
+`.stamp-theme-badges-grid`（design 165、3列グリッドのベーススタイル。padding/gap等）は共通利用し、`.stamp-level-badges-grid`で`grid-template-columns`のみ4列に上書きする。
+
+### 2-6. 廃止するCSS（削除してよい、他に参照がないことを確認の上）
+
+design 145〜151の進捗バー関連（`.stamp-level-progress-track-wrap`/`.stamp-level-progress-track`/`.stamp-level-progress-fill`/`.stamp-level-progress-icon`/`.stamp-level-progress-icon--end`/`.stamp-level-progress-count`）、design 108・109・135の全制覇バッジ関連（`.stamp-level-complete-badge`/`.stamp-level-complete-badge-img`/`.stamp-level-complete-badge-body`/`.stamp-level-complete-badge-title`/`.stamp-level-complete-badge-count`）、design 153の見出しスタイル（`.stamp-level-section-title`は新セクション見出しでも再利用するため**削除しない**）、`.stamp-level-row`/`.stamp-level-row-icon`/`.stamp-level-row-label`/`.stamp-level-row-count`（design 83の状態A用）。**削除前に`grep`で他の参照箇所が本当にないことを確認すること**（`.stamp-complete-toggle-btn`/`.stamp-complete-card-list`等、design 108関連は`_renderStampLevelRowComplete()`が削除されず残置されるため、これらのCSSも一緒に削除しないよう注意）。
+
+## 3. i18n
+
+新規キー`stampLevelBadgesTitle`（ja「探訪の記録」/en「Exploration Record」）をja/en同時追加。
+
+## 4. スコープ外
+全制覇時の紙吹雪演出モーダル（`openStampLevelCompleteModal()`、design 143）は無変更（バッジタイル化とは別物、チェックイン時に一度だけ表示されるポップアップ演出のため）。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 5. 承認状況
+2026-07-26 モック提示、ユーザー承認（見出し文言は「探訪の記録」で確定）。**承認済み**。

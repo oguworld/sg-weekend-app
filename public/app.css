@@ -2318,6 +2318,32 @@
       margin: 10px 2px 4px;
     }
 
+    /* ─── 探訪の記録（設計書166、レベル別バッジ。design 165と同じ構造の姉妹CSS） ─── */
+    .stamp-level-badges-grid {
+      grid-template-columns: repeat(4, 1fr); /* stamp-theme-badges-grid の3列指定を上書き */
+    }
+    .stamp-level-badge {
+      display: flex; flex-direction: column; align-items: center;
+      background: var(--sand); border-radius: 14px; padding: 12px 4px;
+      cursor: pointer;
+    }
+    .stamp-level-badge--done { background: var(--caramel-pale); }
+    .stamp-level-badge--progress { background: var(--caramel-pale); }
+    .stamp-level-badge-circle {
+      width: 44px; height: 44px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin-bottom: 6px;
+    }
+    .stamp-level-badge-circle--done { background: var(--caramel); box-shadow: 0 3px 8px rgba(200,128,74,0.4); }
+    .stamp-level-badge-circle--progress { background: var(--caramel-light); box-shadow: 0 2px 6px rgba(200,128,74,0.3); }
+    .stamp-level-badge-circle--locked { background: var(--warm-white); border: 1.5px dashed var(--sand-dark); }
+    .stamp-level-badge-label { font-size: 9.5px; font-weight: 700; color: var(--midnight); text-align: center; line-height: 1.25; }
+    .stamp-level-badge-count { font-size: 8.5px; color: var(--caramel); font-weight: 700; margin-top: 2px; }
+    .stamp-level-badge-count--locked { color: var(--warm-gray); }
+    .stamp-level-badge-spot-list {
+      margin: 10px 2px 4px;
+    }
+
     /* ─── 「思い出」機能: チェックイン後ミニシート（設計書121） ─── */
     /* 旧・単一ボックス版（design 121）。design 144で#stamp-memory-photo-slotsに置き換え、参照元がなくなったため
        実質死にクラス化しているが実害がないため削除せず残置。 */

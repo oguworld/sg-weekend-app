@@ -1229,6 +1229,24 @@ design 163実装後、ユーザーがカードデザインに「なんか違う�
 - `data/sg/stamp-spots.json`は`.gitignore`対象のためVPS上で直接編集する既存運用方針を踏襲（今回のスポットデータ9件追加はユーザーが直接編集済み、git管理外）。`server.js`の変更を伴うため`pm2 restart`実施済み。キャッシュバスティング: `index.html` app.css `?v=20260724q`→`20260726b`、app.js `?v=20260726a`→`20260726b`、`sw.js` CACHE_NAME=`sg-weekend-v715`→`v716`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのグリッド型トロフィーケースの見た目・タップ時の開閉トグル動作・達成時の色付き丸表現は2026-07-26時点でcurl・Node単体テストによるロジック検証のみ完了、実ブラウザ・実機とも未確認。design 69〜164自体もまだTestFlightビルド未実施のため、本追加も含めて次回一括リリースの想定
 
+### 探訪レベル（見習い〜極めし者）もテーマ別バッジと同じ折り畳みバッジ形式に統一（2026-07-26実装、設計書166）
+design 165で新設したテーマ別バッジ（グリッド型トロフィーケース、タップで開閉）の見た目をユーザーが気に入り、既存のレベル別セクション（見習い/定住レベル/シンガポール通/極めし者）にも同じ見た目を適用した。design 83以来の3状態バラバラの表示（ロック中=1行のみ／解禁中未全制覇=見出し+進捗バー+横長カード常時表示／全制覇=大きな祝賀バッジ+開閉トグル）を、design 165と同じグリッド型バッジ＋タップ開閉のカード一覧に統一した「姉妹実装」。
+
+- 見出し文言は「🏅 探訪の記録」（design 152の卒業アルバム実績セクションと同じ言葉遣いで統一）
+- ロック中の表現は🔒アイコンのみのシンプル表示に簡略化（`special`のみ既存のdesign 105マスキング方針〈ラベル・件数とも「？？？」〉を維持）
+- 既存の進捗バー（🔓/🏆アイコン、design 146〜151）・全制覇時の大きな祝賀バッジ（150pxのバッジ画像＋大きなタイトル、design 108・109・135）は、通常サイズのバッジタイル1つに一本化された（celebratory感は縮小するトレードオフをユーザー承認済み）
+- **新規関数3つ**（`public/app.js`）: `_renderStampLevelBadges()`・`_renderStampLevelBadgeSpotList(level)`・`_toggleStampLevelBadgeSpots(level)`。design 165の`_renderStampThemeBadges()`/`_renderStampThemeBadgeSpotList()`/`_toggleStampThemeBadgeSpots()`と全く同じ構造の姉妹実装（`catId`→`level`に置き換え）。**レベル版は既存の「次はここ！」タグ機能（`_computeStampNextTarget()`との連携、design 70・83のコア機能）を`_renderStampLevelBadgeSpotList()`内に維持している点がテーマ版との唯一の差分**（design 165のテーマ版カードリストにはこのタグが無い）
+- **`_renderStampCollectionList()`を`_renderStampThemeBadges(); _renderStampLevelBadges();`の2行に置き換え**。旧`STAMP_LEVEL_ORDER_CLIENT.map(level => {...})`による状態A/B/C（`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`）の呼び分けロジックは削除。**`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`関数自体は削除せず残置**（呼び出し元がなくなるだけ、既存の「使わなくなった関数は残置」方針を踏襲）
+- **HTML**（`public/index.html`）: `#stamp-theme-badges-section`（design 165）の直前に新規`#stamp-level-badges-section`（見出し「🏅 探訪の記録」＋`#stamp-level-badges`グリッド＋`#stamp-level-badge-spot-lists`展開コンテナ）を追加。既存`#stamp-collection-list`（design 165時点で`_renderStampThemeBadges()`が直接別要素へ描画する形になったため実質空のレイアウトコンテナ化していた）はそのまま残置、新セクションとは独立配置のまま
+- **CSS**（`public/app.css`）: `.stamp-theme-badges-grid`（design 165、3列グリッドのベーススタイル）を共通利用しつつ、新規`.stamp-level-badges-grid`で`grid-template-columns`のみ4列に上書き。新規`.stamp-level-badge`/`--done`/`--progress`・`.stamp-level-badge-circle`/`--done`/`--progress`/`--locked`・`.stamp-level-badge-label`・`.stamp-level-badge-count`/`--locked`・`.stamp-level-badge-spot-list`を追加（3状態locked/inProgress/completeの色分けがテーマ版〈2状態のみ〉との差分）
+- **⚠️ 設計書§2-6の廃止対象CSS（進捗バー関連design 145-151、全制覇バッジ関連design 108・109・135）は削除しなかった**: 設計書は「削除してよい、他に参照がないことを確認の上」としていたが、実際にgrepしたところ、いずれも残置される`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`（design 166 §2-3で明示的に「削除せず残置」と指定）から現役で参照されていた。これらの関数を残置する以上、対応するCSSを削除すると出力HTMLのスタイルが壊れるため、矛盾を避け安全側に倒して残置と判断（実害のない死にCSSとして残る。既存の「使わなくなった導線は残置」方針とも整合）。design 153の見出しスタイル（`.stamp-level-section-title`）は元々「削除しない」指定であり新セクション見出しでも再利用している
+- **i18n**: 新規キー`stampLevelBadgesTitle`（ja「探訪の記録」/en「Exploration Record」）をja/en同時追加
+- 新規onclickにタッチガード（`if(!_touchCapableDetected)`）は付けていない（design 84・99・130の既知アンチパターンを踏まえた意図的な判断、design 165と同じ方針）
+- **検証**: `node --check public/app.js`OK。実サーバーの`GET /api/stamp-spots`レスポンス（未ログイン状態、`unlockedLevels:['standard']`）をNode.js上でクライアント側ロジックと同じ計算式で再現し、`standard`=inProgress（`categoryId`持ち9件除外後20件）、`local`/`niche`=locked（件数は表示）、`special`=locked かつ `hideLabel:true`（design 105マスキング方針通り「？？？」表示）という想定通りの状態遷移を確認。サンドボックス環境に`libatk-1.0.so.0`等の共有ライブラリが無くPlaywrightでの実ブラウザ起動ができなかったため、静的解析・grep横断確認・Node.js上でのロジック再現・実APIレスポンスとの突き合わせで代替検証した
+- `server.js`・`data/`配下は無変更（`pm2 restart`不要）。全制覇時の紙吹雪演出モーダル（`openStampLevelCompleteModal()`、design 143）はバッジタイル化とは別物のチェックイン時ポップアップ演出のため無変更のまま
+- キャッシュバスティング: `index.html` app.css `?v=20260726b`→`20260726c`、app.js `?v=20260726b`→`20260726c`、`sw.js` CACHE_NAME=`sg-weekend-v716`→`v717`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での4列グリッドバッジの見た目・タップ時の開閉トグル動作・「次はここ！」タグの表示・3状態（locked/inProgress/complete）の色分け表現は2026-07-26時点でNode.jsによるロジック検証のみ完了、実ブラウザ・実機とも未確認。design 69〜165自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
+
 ### ⚠️ 設定画面セクション構成の変更（2026-07-19実装、設計書64、上記の`secBackup`/`secLogin`関連記述は歴史的経緯として一部実態と乖離）
 設定画面が「プロフィール→ログイン→予定表のバックアップ（HTMLコメント上「2.5」）→アプリ設定→その他」という5セクション構成になっていたのを、「プロフィール→**アカウント**（ログイン+バックアップ統合）→アプリ設定→**サポート・情報**→**フィードバック**」の5セクションに再編成した（機能・ロジック変更は一切なし、`.settings-item`内部のid/onclick/classは無変更、見た目上の再編成のみ）。
 - **旧「ログイン」セクション（見出しキー`secLogin`）と旧「予定表のバックアップ」セクション（見出しキー`secBackup`）を1つの`.settings-section`に統合**し、見出しを新規キー`secAccount`（ja「アカウント」/en「Account」）に変更。`secLogin`/`secBackup`キー自体はHTML上で無参照になったため`STRINGS.ja`/`STRINGS.en`から削除済み（他機能からの参照なしを`grep`で確認済み）

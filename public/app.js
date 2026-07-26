@@ -467,6 +467,7 @@
         stampLevelUnlockModalClose: '閉じる',
         stampAreaBadgesTitle: 'エリア制覇バッジ',
         stampThemeBadgesTitle: 'テーマ別バッジ',
+        stampLevelBadgesTitle: '探訪の記録',
         stampCardDoneMark: '済',
         stampCardVisitDateLabel: '訪問日: ',
         stampDetailMapLink: '📍 地図で見る',
@@ -767,6 +768,7 @@
         stampLevelUnlockModalClose: 'Close',
         stampAreaBadgesTitle: 'Area Badges',
         stampThemeBadgesTitle: 'Theme Badges',
+        stampLevelBadgesTitle: 'Exploration Record',
         stampCardDoneMark: '✓',
         stampCardVisitDateLabel: 'Visited: ',
         stampDetailMapLink: '📍 View on map',
@@ -4751,53 +4753,110 @@
       }
     }
 
-    // ─── コレクション一覧ビュー（設計書70改善1・2 → 設計書83で横長カード一覧＋レベル別3状態表示に全面リデザイン） ───
-    // レベルごとに「ロック中」「解禁中・未全制覇」「解禁中・全制覇済み」の3状態いずれかに分類して描画する。
-    // special レベルは既存サーバー仕様（未解禁時は GET /api/stamp-spots のレスポンス自体から除外）をそのまま踏襲するため、
-    // spotsInLevel.length === 0 のガードにより行自体が描画されない（既存仕様と整合、設計書83 §7-3-1）。
+    // ─── コレクション一覧ビュー（設計書70改善1・2 → 設計書83で横長カード一覧＋レベル別3状態表示に全面リデザイン
+    //      → 設計書166でレベル別セクションも折り畳みバッジ形式（_renderStampLevelBadges）に統一） ───
     function _renderStampCollectionList() {
-      const el = document.getElementById('stamp-collection-list');
+      _renderStampThemeBadges(); // 設計書165: テーマ別バッジ
+      _renderStampLevelBadges(); // 設計書166: 探訪の記録（レベル別バッジ）
+    }
+
+    // ─── 探訪の記録（設計書166、レベル別バッジ。design 165の _renderStampThemeBadges() と同じ構造の姉妹実装） ───
+    function _renderStampLevelBadges() {
+      const el = document.getElementById('stamp-level-badges');
       if (!el) return;
-      _renderStampThemeBadges(); // 設計書165: テーマ別バッジ（呼び出し漏れ防止のため既存の描画呼び出し列に追加）
-      const nextTarget = _computeStampNextTarget();
       const lang = getLang();
-
       el.innerHTML = STAMP_LEVEL_ORDER_CLIENT.map(level => {
-        // 設計書165: テーマ別バッジのスポット（categoryId持ち）は既存のレベル別カードリストから除外する
-        // （重複表示防止。テーマ別バッジ自体は _renderStampThemeBadges() が別セクションで描画する）
-        const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
-        if (spotsInLevel.length === 0) {
-          // special未解禁時等、該当レベルのスポットが1件もない場合。
-          // special はサーバーが件数・存在自体を意図的に隠す設計（設計書69）のため、
-          // 未解禁の special のみ「？？？」の伏せ字ロック行を表示し、それ以外は行自体を描画しない（設計書100）。
-          if (level === 'special' && !_stampProgress.unlockedLevels.includes('special')) {
-            return _renderStampLevelRowLocked(STAMP_LEVEL_META[level], null, null, true);
-          }
-          return '';
-        }
-
         const meta = STAMP_LEVEL_META[level];
+        const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
         const unlocked = _stampProgress.unlockedLevels.includes(level);
-        const totalCount = spotsInLevel.length;
-        const checkedCount = spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+        // special未解禁時、GET /api/stamp-spots はスポット自体を返さないため spotsInLevel.length===0 になる（design 69既存仕様）
+        const isSpecialHiddenLocked = level === 'special' && spotsInLevel.length === 0 && !unlocked;
+        const total = isSpecialHiddenLocked ? null : spotsInLevel.length;
+        const checked = isSpecialHiddenLocked ? null : spotsInLevel.filter(s => _stampSpotIsChecked(s.id)).length;
+        const state = !unlocked ? 'locked' : (checked < total ? 'inProgress' : 'complete');
 
-        let state;
-        if (!unlocked) {
-          state = 'locked';
-        } else if (checkedCount < totalCount) {
-          state = 'inProgress';
-        } else {
-          state = 'complete';
-        }
+        const hideLabel = isSpecialHiddenLocked; // design 105のマスキング方針を維持（specialのみラベルごと伏せる）
+        const labelHtml = hideLabel ? '？？？' : `${t(meta.labelKey)}`;
+        const countHtml = (total === null) ? '？？？' : `${checked}/${total}`;
+        const circleContent = state === 'locked' ? '🔒' : meta.emoji;
+        const circleClass = state === 'complete' ? 'stamp-level-badge-circle--done'
+          : state === 'inProgress' ? 'stamp-level-badge-circle--progress'
+          : 'stamp-level-badge-circle--locked';
+        const tileClass = state === 'complete' ? 'stamp-level-badge--done' : (state === 'inProgress' ? 'stamp-level-badge--progress' : '');
+        const clickable = state !== 'locked';
+        const onclickAttr = clickable ? ` onclick="_toggleStampLevelBadgeSpots('${level}')"` : '';
 
-        if (state === 'locked') {
-          return _renderStampLevelRowLocked(meta, checkedCount, totalCount);
-        } else if (state === 'inProgress') {
-          return _renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount, level);
-        } else {
-          return _renderStampLevelRowComplete(meta, spotsInLevel, totalCount, level, lang);
-        }
+        return `<div class="stamp-level-badge ${tileClass}"${onclickAttr}>
+          <div class="stamp-level-badge-circle ${circleClass}">${circleContent}</div>
+          <div class="stamp-level-badge-label">${labelHtml}</div>
+          <div class="stamp-level-badge-count ${state === 'locked' ? 'stamp-level-badge-count--locked' : ''}">${countHtml}</div>
+        </div>`;
       }).join('');
+      // 既存の展開状態を維持（design 165の _renderStampThemeBadges() と同じ再描画パターン）
+      STAMP_LEVEL_ORDER_CLIENT.forEach(level => {
+        const listEl = document.getElementById(`stamp-level-spot-list-${level}`);
+        if (listEl && listEl.dataset.wasOpen === '1') {
+          _renderStampLevelBadgeSpotList(level);
+          listEl.style.display = 'flex';
+        }
+      });
+    }
+
+    // レベル内のスポット一覧カードHTMLを生成し、展開コンテナに描画する（design 165の _renderStampThemeBadgeSpotList と同じ構造だが、
+    // 「次はここ！」タグ機能〈design 70・83のコア機能〉を維持する点が差分）
+    function _renderStampLevelBadgeSpotList(level) {
+      const listEl = document.getElementById(`stamp-level-spot-list-${level}`);
+      if (!listEl) return;
+      const lang = getLang();
+      const meta = STAMP_LEVEL_META[level];
+      const nextTarget = _computeStampNextTarget();
+      const spotsInLevel = _stampSpots.filter(s => s.level === level && !s.categoryId);
+      const sorted = [...spotsInLevel].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      listEl.innerHTML = sorted.map(spot => {
+        const checked = _stampSpotIsChecked(spot.id);
+        const isNext = !!nextTarget && nextTarget.id === spot.id;
+        const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
+        const thumbSrc = spot.imageUrl || '';
+        const thumbInner = thumbSrc
+          ? `<img src="${thumbSrc}" alt="${name}" class="stamp-card-thumb-img">`
+          : `<div class="stamp-card-thumb-placeholder">📍</div>`;
+        const doneStampHtml = checked
+          ? `<div class="stamp-card-done-mark" style="background:${meta.color};">${t('stampCardDoneMark')}</div>`
+          : '';
+        const thumbHtml = `<div class="stamp-card-thumb">${thumbInner}${doneStampHtml}</div>`;
+        const checkinDate = checked ? _stampCheckinDateFor(spot.id) : '';
+        return `<div class="stamp-card ${checked ? 'stamp-card--checked' : ''}" onclick="openStampSpotDetail('${spot.id}')">
+          ${thumbHtml}
+          <div class="stamp-card-body">
+            <div class="stamp-card-name">${name}${isNext ? `<span class="stamp-card-next-tag">${t('stampNextTargetLabel')}</span>` : ''}</div>
+            ${checkinDate ? `<div class="stamp-card-date">${t('stampCardVisitDateLabel')}${checkinDate}</div>` : ''}
+          </div>
+          <span class="stamp-card-area-right">${spot.area || ''}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // レベルバッジタップで、そのレベルのスポット一覧を開閉トグルする（design 165 _toggleStampThemeBadgeSpots と同じパターン）
+    function _toggleStampLevelBadgeSpots(level) {
+      let listEl = document.getElementById(`stamp-level-spot-list-${level}`);
+      const containerEl = document.getElementById('stamp-level-badge-spot-lists');
+      if (!listEl) {
+        if (!containerEl) return;
+        listEl = document.createElement('div');
+        listEl.id = `stamp-level-spot-list-${level}`;
+        listEl.className = 'stamp-card-list stamp-level-badge-spot-list';
+        listEl.style.display = 'none';
+        containerEl.appendChild(listEl);
+      }
+      const isOpen = listEl.style.display !== 'none';
+      if (isOpen) {
+        listEl.style.display = 'none';
+        listEl.dataset.wasOpen = '0';
+      } else {
+        _renderStampLevelBadgeSpotList(level);
+        listEl.style.display = 'flex';
+        listEl.dataset.wasOpen = '1';
+      }
     }
 
     // 状態A: ロック中 — 個別スポットは表示せず「レベル名＋🔒＋件数」の1行のみ
