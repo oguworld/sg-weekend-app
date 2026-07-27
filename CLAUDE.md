@@ -1568,6 +1568,12 @@ Alvinology（RSSソース）由来のイベントで、CDNオフロードプラ�
 - スコープ外: 取得元（Instagram/RSS）の投稿数自体の変動要因調査、過去に誤って破棄された候補イベントの復元（ログにも本文は残っていないため復元不可）
 - `scripts/filter-events.js`のみの変更、`server.js`・`public/`配下は無関係。cron実行のバッチスクリプトのため`pm2 restart`不要。次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）から効果を確認できる
 
+### `scripts/filter-events.js` filterBatch()のmax_tokensを4000→6000に追加引き上げ（2026-07-28実装、設計書169）
+設計書168実装後の初回cron実行結果、9バッチ中1バッチが依然としてJSON解析エラー（リトライも失敗）になっていた。4/6→1/9件と大幅改善したが完全解消ではなかったため、ユーザー「少しだけ引き上げしておいて」との指示を受け対応した。
+- `filterBatch()`内のHaiku API呼び出し（233行目）の`max_tokens`を`4000`→`6000`に変更（`enrichBatch()`側の`max_tokens: 6000`、301行目と同値に統一）
+- スコープ外: リトライロジック（設計書168で追加済み）・`enrichBatch()`自体（既に6000）は変更していない
+- `scripts/filter-events.js`のみの変更、`server.js`・`public/`配下は無関係。cron実行のバッチスクリプトのため`pm2 restart`不要。次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）から効果を確認できる
+
 ## 環境構成と注意事項（2026-07-07）
 
 ### Web版 = テスト環境 / iOS App Store版 = 本番環境

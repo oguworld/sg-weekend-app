@@ -230,7 +230,7 @@ JSON配列のみ返すこと（前置き・説明・コードブロック不要�
 
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4000,
+    max_tokens: 6000,
     system: [
       {
         type: 'text',
