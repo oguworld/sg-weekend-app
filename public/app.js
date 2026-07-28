@@ -461,6 +461,7 @@
         stampNextTargetLabel: '次はここ！',
         stampLevelCompleteLabel: '制覇！',
         stampLevelCompleteSpotsLabel: 'スポット達成',
+        stampThemeBadgeCompleteLabel: '制覇！',
         stampLevelUnlockModalTitle: '🔓 新しいレベルが解禁されました！',
         stampLevelCompleteModalTitle: '🎉 全制覇！',
         stampLevelUnlockSubtext: '🔓 {level}のロックが解除されました',
@@ -762,6 +763,7 @@
         stampNextTargetLabel: 'Next up!',
         stampLevelCompleteLabel: 'Complete!',
         stampLevelCompleteSpotsLabel: 'spots collected',
+        stampThemeBadgeCompleteLabel: 'Complete!',
         stampLevelUnlockModalTitle: '🔓 New Level Unlocked!',
         stampLevelCompleteModalTitle: '🎉 Fully Conquered!',
         stampLevelUnlockSubtext: '🔓 {level} unlocked!',
@@ -5167,7 +5169,20 @@
           return sp && sp.level === spot.level;
         }).length;
         const justCompletedLevel = (totalForSpotLevel > 0 && checkedForSpotLevel === totalForSpotLevel) ? spot.level : null;
+        // 設計書170: チェックインしたスポットがテーマ別バッジのスポットの場合、今回のチェックインで
+        // カテゴリーが100%達成になったかを判定する（design 143のjustCompletedLevelと同じ考え方）
+        let justCompletedCategory = null;
+        if (spot.categoryId) {
+          const spotsInCategory = _stampSpots.filter(s => s.categoryId === spot.categoryId);
+          const checkedInCategory = spotsInCategory.filter(s => _stampProgress.checkedInSpotIds.includes(s.id)).length;
+          if (spotsInCategory.length > 0 && checkedInCategory === spotsInCategory.length) {
+            justCompletedCategory = spot.categoryId;
+          }
+        }
         showToast(t('toastStampCheckinSuccess'));
+        if (justCompletedCategory) {
+          setTimeout(() => _showStampThemeBadgeCompleteToast(justCompletedCategory), 1200);
+        }
         // 設計書121: 常に900ms後に「思い出を残す」シートを開く（newlyUnlockedLevelはnullの場合あり）。
         // レベル解禁演出・コンプリート演出は、このシートを閉じた後に_closeStampMemorySheetInternal()内でチェーンして開かれる
         // （旧: 新規解禁レベルがある場合のみ1600ms後にopenStampLevelUnlockModal()を直接呼ぶ実装だった）。
@@ -5189,6 +5204,35 @@
         showToast(t('toastStampCheckinError'));
         if (btn) btn.disabled = false;
       }
+    }
+
+    // 設計書170: テーマ別バッジ（Kopi巡り等）制覇時の軽量トースト演出。既存の汎用showToast()とは別の専用実装。
+    function _showStampThemeBadgeCompleteToast(catId) {
+      const meta = STAMP_CATEGORY_META[catId];
+      if (!meta) return;
+      const lang = getLang();
+      const label = lang === 'ja' ? meta.label : meta.labelEn;
+      const total = _stampSpots.filter(s => s.categoryId === catId).length;
+
+      const existing = document.getElementById('stamp-theme-badge-toast');
+      if (existing) existing.remove(); // 前回分が残っていれば除去してから再生成
+
+      const el = document.createElement('div');
+      el.id = 'stamp-theme-badge-toast';
+      el.className = 'stamp-theme-badge-toast';
+      el.innerHTML = `
+        <div class="stamp-theme-badge-toast-emoji">${meta.emoji}</div>
+        <div class="stamp-theme-badge-toast-body">
+          <div class="stamp-theme-badge-toast-title">🎉 ${label} ${t('stampThemeBadgeCompleteLabel')}</div>
+          <div class="stamp-theme-badge-toast-sub">${total}/${total} ${t('stampLevelCompleteSpotsLabel')}</div>
+        </div>
+      `;
+      document.body.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('visible'));
+      setTimeout(() => {
+        el.classList.remove('visible');
+        setTimeout(() => el.remove(), 300); // フェードアウト分の猶予後にDOMから除去
+      }, 3200);
     }
 
     // 紙吹雪バースト演出（設計書107）。外部ライブラリ不使用、CSS @keyframes + JS動的生成の軽量実装。

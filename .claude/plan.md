@@ -16620,3 +16620,123 @@ try {
 
 ## 3. 承認状況
 2026-07-28 ユーザー「少し様子見ましょう。一応少しだけ引き上げしておいて。」**承認済み**。
+
+# 設計書170 — テーマ別バッジ制覇時の軽量トースト演出を追加
+
+（2026-07-29 ユーザーがスクリーンショットで「テーマ別バッジを獲得するとどうなるの？」と質問。design 165時点ではバッジタイルの色が変わるだけで演出が一切なかったことが判明。モック2案〈紙吹雪モーダル／軽量トースト〉を提示し、ユーザーが案2「軽量トースト」を選択）
+
+## 1. 背景
+
+design 165で追加したテーマ別バッジ（Kopi巡り／バクテー巡り／チキンライス巡り）は、3/3達成しても`achieved`フラグによるタイルの色変化（グレー→カラー）のみで、既存レベル制（見習い等）の`openStampLevelCompleteModal()`〈紙吹雪＋大きなバッジ表示〉のような演出が一切なかった。ユーザーへ2案（既存モーダル流用／軽量トースト）を提示し、軽量トーストを選択。
+
+## 2. 確定仕様
+
+### 2-1. チェックイン時の判定ロジック（`doStampCheckin()`への追加）
+
+`public/app.js`の`doStampCheckin()`（現5125-5192行目）内、既存の`justCompletedLevel`判定（5163-5169行目）と同じ考え方で、チェックインしたスポットが`categoryId`を持つ場合、そのカテゴリーが今回のチェックインで100%達成になったかを判定する:
+
+```js
+// 設計書170: チェックインしたスポットがテーマ別バッジのスポットの場合、今回のチェックインで
+// カテゴリーが100%達成になったかを判定する（design 143のjustCompletedLevelと同じ考え方）
+let justCompletedCategory = null;
+if (spot.categoryId) {
+  const spotsInCategory = _stampSpots.filter(s => s.categoryId === spot.categoryId);
+  const checkedInCategory = spotsInCategory.filter(s => _stampProgress.checkedInSpotIds.includes(s.id)).length;
+  if (spotsInCategory.length > 0 && checkedInCategory === spotsInCategory.length) {
+    justCompletedCategory = spot.categoryId;
+  }
+}
+```
+
+この判定は`_stampProgress`更新後（現5158-5162行目の直後）に行う。
+
+### 2-2. トースト表示関数
+
+新規関数`_showStampThemeBadgeCompleteToast(catId)`（既存の`showToast()`汎用トーストとは別の専用実装、絵文字＋2行テキストを表示するため）:
+
+```js
+function _showStampThemeBadgeCompleteToast(catId) {
+  const meta = STAMP_CATEGORY_META[catId];
+  if (!meta) return;
+  const lang = getLang();
+  const label = lang === 'ja' ? meta.label : meta.labelEn;
+  const total = _stampSpots.filter(s => s.categoryId === catId).length;
+
+  const existing = document.getElementById('stamp-theme-badge-toast');
+  if (existing) existing.remove(); // 前回分が残っていれば除去してから再生成
+
+  const el = document.createElement('div');
+  el.id = 'stamp-theme-badge-toast';
+  el.className = 'stamp-theme-badge-toast';
+  el.innerHTML = `
+    <div class="stamp-theme-badge-toast-emoji">${meta.emoji}</div>
+    <div class="stamp-theme-badge-toast-body">
+      <div class="stamp-theme-badge-toast-title">🎉 ${label} ${t('stampThemeBadgeCompleteLabel')}</div>
+      <div class="stamp-theme-badge-toast-sub">${total}/${total} ${t('stampLevelCompleteSpotsLabel')}</div>
+    </div>
+  `;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('visible'));
+  setTimeout(() => {
+    el.classList.remove('visible');
+    setTimeout(() => el.remove(), 300); // フェードアウト分の猶予後にDOMから除去
+  }, 3200);
+}
+```
+
+`stampLevelCompleteSpotsLabel`（既存キー、design 83「スポット達成」/「spots collected」）をそのまま再利用する。
+
+### 2-3. `doStampCheckin()`からの呼び出し
+
+既存の`showToast(t('toastStampCheckinSuccess'));`（現5170行目）の直後に追加:
+
+```js
+if (justCompletedCategory) {
+  setTimeout(() => _showStampThemeBadgeCompleteToast(justCompletedCategory), 1200);
+}
+```
+
+**既存の「思い出を残す」シート（900ms後に開く、design 121・143）とタイミングが重ならないよう1200ms後に設定する**（既存のチェックイン成功トースト表示直後〜思い出シート表示の間の隙間を使う）。既存の`justCompletedLevel`〈レベル制の全制覇判定〉とは完全に独立した判定・表示のため、同時に発生しても互いのタイミングを妨げない（レベル制の演出は「思い出を残す」シートを閉じた後にチェーンされる別経路のため）。
+
+### 2-4. CSS（`public/app.css`）
+
+```css
+.stamp-theme-badge-toast {
+  position: fixed;
+  left: 20px; right: 20px;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  background: var(--midnight);
+  color: white;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+  z-index: 3740; /* 既存の探訪関連モーダル群3700〜3730番台の直後、bottom-nav(9999)未満 */
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+.stamp-theme-badge-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.stamp-theme-badge-toast-emoji { font-size: 28px; flex-shrink: 0; }
+.stamp-theme-badge-toast-body { flex: 1; min-width: 0; }
+.stamp-theme-badge-toast-title { font-size: 13px; font-weight: 700; }
+.stamp-theme-badge-toast-sub { font-size: 11px; color: #c9beb2; margin-top: 2px; }
+```
+
+`bottom: calc(84px + ...)`はbottom-navの高さを避けるための既存の確立済みパターン（`.plan-modal-body`等と同じ考え方）を踏襲する。
+
+## 3. i18n
+
+新規キー`stampThemeBadgeCompleteLabel`（ja「制覇！」/en「Complete!」）をja/en同時追加。
+
+## 4. スコープ外
+既存のレベル制完了演出（`openStampLevelCompleteModal()`、紙吹雪＋モーダル）は変更しない。テーマ別バッジのシェア機能（design 163）との統合は今回スコープ外。`server.js`・データファイルは無変更（`pm2 restart`不要）。
+
+## 5. 承認状況
+2026-07-29 モック2案提示、ユーザー「案2は？」で軽量トーストを選択。**承認済み**。

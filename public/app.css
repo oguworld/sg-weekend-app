@@ -3697,3 +3697,31 @@
     .sec-closing-brand b { color: var(--caramel); }
 
     .ga-section-title { font-size: 12px; font-weight: 700; color: var(--warm-gray); margin-bottom: 10px; padding-left: 2px; }
+
+    /* 設計書170: テーマ別バッジ制覇時の軽量トースト演出 */
+    .stamp-theme-badge-toast {
+      position: fixed;
+      left: 20px; right: 20px;
+      bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+      background: var(--midnight);
+      color: white;
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+      z-index: 3740; /* 既存の探訪関連モーダル群3700〜3730番台の直後、bottom-nav(9999)未満 */
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: none;
+    }
+    .stamp-theme-badge-toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .stamp-theme-badge-toast-emoji { font-size: 28px; flex-shrink: 0; }
+    .stamp-theme-badge-toast-body { flex: 1; min-width: 0; }
+    .stamp-theme-badge-toast-title { font-size: 13px; font-weight: 700; }
+    .stamp-theme-badge-toast-sub { font-size: 11px; color: #c9beb2; margin-top: 2px; }

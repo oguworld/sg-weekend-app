@@ -1574,6 +1574,18 @@ Alvinology（RSSソース）由来のイベントで、CDNオフロードプラ�
 - スコープ外: リトライロジック（設計書168で追加済み）・`enrichBatch()`自体（既に6000）は変更していない
 - `scripts/filter-events.js`のみの変更、`server.js`・`public/`配下は無関係。cron実行のバッチスクリプトのため`pm2 restart`不要。次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）から効果を確認できる
 
+### テーマ別バッジ制覇時の軽量トースト演出を追加（2026-07-29実装、設計書170）
+design 165で追加したテーマ別バッジ（Kopi巡り／バクテー巡り／チキンライス巡り）は、3/3達成してもタイルの色が変わるだけで演出が一切なかった。ユーザーに2案（既存モーダル流用／軽量トースト）を提示し、軽量トースト案を選択して実装した。
+
+- `doStampCheckin()`（`public/app.js`）内、`_stampProgress`更新直後・既存の`justCompletedLevel`判定（design 143）と並行する形で、新規`justCompletedCategory`判定を追加。チェックインしたスポットが`categoryId`を持ち、そのカテゴリーが今回のチェックインで100%達成になった場合のみ値がセットされる（`categoryId`を持たない通常のレベル制スポットには一切影響しない）
+- 新規関数`_showStampThemeBadgeCompleteToast(catId)`: `STAMP_CATEGORY_META`（design 165）からラベル・絵文字を取得し、画面下部（bottom-navの直上、`bottom: calc(84px + safe-area)`）に絵文字＋2行テキストのトーストを表示する専用実装（既存の汎用`showToast()`とは別）。3.2秒表示後フェードアウトして300ms後にDOM除去。前回分が残っていれば除去してから再生成する防御的処理あり
+- `doStampCheckin()`内、既存の`showToast(t('toastStampCheckinSuccess'));`直後に`justCompletedCategory`があれば1200ms後にトーストを表示するトリガーを追加。**既存の「思い出を残す」シート（900ms後、design 121・143）とタイミングが重ならないよう意図的に1200msに設定**。レベル制の完了演出（`openStampLevelCompleteModal()`、思い出シートを閉じた後にチェーンされる別経路）とは完全に独立しており、双方が同時に発生しても互いのタイミングを妨げない
+- CSS新規クラス`.stamp-theme-badge-toast`系（`public/app.css`）: z-index 3740（既存の探訪関連モーダル群3700〜3730番台の直後、bottom-nav(9999)未満）
+- i18n新規キー`stampThemeBadgeCompleteLabel`（ja「制覇！」/en「Complete!」）をja/en同時追加。既存キー`stampLevelCompleteSpotsLabel`（design 83「スポット達成」/「spots collected」）はサブテキストにそのまま再利用（新規追加不要）
+- スコープ外（design 170 §4で明記）: 既存のレベル制完了演出（`openStampLevelCompleteModal()`、紙吹雪＋モーダル）は無変更。テーマ別バッジのシェア機能（design 163）との統合は今回スコープ外
+- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css/app.js `?v=20260726d`/`20260726c`→`20260729a`、`sw.js` CACHE_NAME=`sg-weekend-v718`→`v719`
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのトースト表示タイミング・見た目（絵文字サイズ・2行テキストの折り返し）、思い出シートとの表示順序が意図通り重ならないことは2026-07-29時点でコード確認・curlによる配信反映確認・`node --check`のみ完了、実ブラウザ・実機とも未確認
+
 ## 環境構成と注意事項（2026-07-07）
 
 ### Web版 = テスト環境 / iOS App Store版 = 本番環境
