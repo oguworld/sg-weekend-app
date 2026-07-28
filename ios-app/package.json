@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.6",
+  "version": "1.7",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
