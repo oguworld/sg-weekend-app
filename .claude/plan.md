@@ -16740,3 +16740,147 @@ if (justCompletedCategory) {
 
 ## 5. 承認状況
 2026-07-29 モック2案提示、ユーザー「案2は？」で軽量トーストを選択。**承認済み**。
+
+# 設計書171 — コミュニティコースの重複データ削除＋`isSimilarToExisting()`の重複検知精度改善
+
+（2026-08-12 ユーザーが`data/sg/community-courses.json`〈33件〉を確認し、タイトル・スポットがほぼ同一の3ペアを発見。既存の重複防止ロジック〈`scripts/refresh-courses.js`の`isSimilarToExisting()`〉がなぜすり抜けたかを調査し、原因を特定。データ削除と再発防止の両方をユーザー承認済み）
+
+## 1. 背景
+
+`scripts/refresh-courses.js`は水・日曜日にcronで自動実行され、いいねの少ないシステムコース（`authorName === 'おでかけNavi'`）2件を削除→新規3件をSonnet API（`POST /api/courses/generate`）で生成・`POST /api/courses/publish`で公開する仕組み（`refreshCity()` → `addSystemCourses()`）。公開前に`isSimilarToExisting(course, existing)`（現150-170行目）で類似コースの有無をチェックし、類似と判定されればスキップする重複防止ロジックが既に存在する。
+
+しかし`data/sg/community-courses.json`（33件）を全件確認した結果、以下3ペアが実質同一コースであるにもかかわらず両方とも公開されてしまっていたことが判明した。
+
+### 1-1. 判明した原因
+
+`isSimilarToExisting()`は2つの判定を行い、いずれかが真なら類似と判定する:
+
+1. **スポット名の一致件数が2件以上** → `newSpots.filter(s => existSpots.includes(s)).length >= 2`。`Array.prototype.includes()`による**完全一致**判定。
+2. **タイトルキーワードの一致語数が2語以上** → 正規表現`/[぀-龯゠-ヿ]{2,}|[A-Za-z]{4,}/g`で抽出したタイトル中の単語（3文字以上）の一致数。
+
+これが機能しなかった理由は2つ:
+
+- **問題点1（スポット名の完全一致判定が甘い）**: AIが記事生成のたびに同じ場所を異なる書き方で表現する（例: `"328 Katong Laksa"`単体 vs `"Peranakan Museum (Katong) / 328 Katong Laksa"`という複合スポット名、`"Seletar Reservoir Park"` vs `"Lower Seletar Reservoir Park"`という接頭辞の有無、`"Yishun Park Hawker Centre"` vs `"Nee Soon (Yishun) Hawker Centre"`という言い回しの違い）。文字列としては一致せず、`Array.includes()`による完全一致検索では拾えない。
+- **問題点2（タイトルキーワード抽出が日本語に対して機能していない）**: 正規表現`[぀-龯゠-ヿ]{2,}`はひらがな・カタカナ・漢字をまとめて1つの文字クラスとして扱うため、読点等の区切り文字がない限り長い日本語の句をまるごと1トークンとして抽出してしまい、単語単位で分割できていない。結果として英語の地名（"Gillman"等）1語程度しか拾えず、閾値の2語に届かない。
+
+実際に3ペアを検証した結果、いずれも`spotOverlap`（一致スポット数）・`keywordOverlap`（一致キーワード数）とも1以下にとどまり、チェックをすり抜けて公開されていた（下記2-2で詳細な検証結果を記載）。
+
+## 2. 変更A: データ削除（`data/sg/community-courses.json`）
+
+以下3件を配列から削除する。33件 → 30件になる。`server.js`のコード変更は不要（`data/`配下は`fs.readFileSync`による都度読み込み方式のため）。`pm2 restart`不要。
+
+### 2-1. 削除対象1: Katongペア
+
+- **削除する**: `id: "course_sg_1785628823047"`（title: "Katong、ひとりのアート食べ歩き午後"、createdAt: `2026-08-02T00:00:23.048Z`）
+- **残す**: `id: "course_sg_1783204650328"`（title: "Katongで知る、知られざるプラナカンの色彩"、createdAt: `2026-07-04T22:37:30.328Z`）
+- 理由: 両者とも4スポット構成で、Peranakan Museum関連／328 Katong Laksa／Joo Chiat・Katong街歩き／i12 Katong、という実質同じ4カ所を指している。
+
+### 2-2. 削除対象2: Seletar/Khatibペア
+
+- **削除する**: `id: "course_sg_1786492845387"`（title: "Lower Seletar Reservoir、緑と夕暮れ家族時間"、createdAt: `2026-08-12T00:00:45.387Z`）
+- **残す**: `id: "course_sg_1784073619994"`（title: "Khatib、北の朝フォト家族さんぽ"、createdAt: `2026-07-15T00:00:19.995Z`）
+- 理由: どちらもLower Seletar Reservoir Park（表記ゆれあり）が起点、Yishunエリアのホーカーセンターも共通。
+
+### 2-3. 削除対象3: Gillmanペア
+
+- **削除する**: `id: "course_sg_1784073661423"`（title: "Gillman Barracks、家族で巡る現代アートの朝"、createdAt: `2026-07-15T00:01:01.423Z`）
+- **残す**: `id: "course_sg_1782614507916"`（title: "Gillmanで現代アート、Labrador Parkで夕日"、createdAt: `2026-06-28T02:41:47.916Z`）
+- 理由: 起点（Gillman Barracks）とテーマ（現代アート）が共通。後半スポットは異なるが、ユーザー判断でこのペアも削除対象に含める。
+
+### 2-4. 実施方法
+
+`data/sg/community-courses.json`はJSON配列（トップレベル`[...]`）。上記3件の`id`に一致するオブジェクト要素を、`id`一致によるフィルタ処理（例: `courses.filter(c => !deleteIds.has(c.id))`、`trimSystemCourses()`が既に使っている手法と同じ）で配列から取り除き、残る30件でファイルを整形保存（`JSON.stringify(remaining, null, 2)`、既存`trimSystemCourses()`と同じインデント2スペースのフォーマットに揃える）。他の27件・残す3件を含めた30件全体の内容・順序は変更しない。
+
+## 3. 変更B: `isSimilarToExisting()`の重複検知精度改善
+
+### 3-1. 方針
+
+**スポット名の比較方法を「完全一致」から「正規化＋トークン集合の共通語数」に変更する。** タイトルキーワード側（`titleKeywords`/`keywordOverlap`）は今回変更しない。
+
+単純な「一方が他方を含む部分文字列かどうか」だけでは不十分（例:`"Ya Kun Kaya Toast (Katong i12 Branch)"`と`"i12 Katong Mall (Bengawan Solo / Cafe Break)"`は同じ「i12 Katong」を指しているが語順が異なるため部分文字列関係にならない）。そのため「正規化した上で単語（トークン）に分割し、共通するトークンの数」で比較する方式を採用する。
+
+### 3-2. 正規化ルールの仕様
+
+スポット名の比較に使う正規化関数（例: `normalizeSpotName(name)`）を新設し、以下の処理を順に適用する:
+
+1. 小文字化（`toLowerCase()`）
+2. 記号の除去・スペース置換: 括弧（`(` `)` `（` `）`）、スラッシュ（`/`）、矢印（`→` `->`）、アンパサンド（`&`）、カンマ・読点（`,` `、`）、ハイフン・ダッシュ（`-` `–`）などをスペース1個に置換する。除去ではなく**スペースへの置換**にすること（`"Katong(i12)"`のように記号の前後に語が密着しているケースで、除去だけだと`"katongi12"`のように単語同士が結合してしまい、正しくトークン分割できなくなるため）
+3. 連続する空白を1個に圧縮し、前後の空白をトリムする
+
+### 3-3. トークン化とスポットペア一致判定の仕様
+
+1. 正規化後の文字列を空白で分割し、トークン配列を得る
+2. 1文字のトークン（ノイズになりやすい助詞的な断片）は除外する。2文字以上のトークン（`"i12"`のような英数字混在も含む）は残す
+3. 新規コースの各スポットと、既存コースの各スポットの**全組み合わせ**についてトークン集合の共通語数を求める
+4. **共通語数が2語以上のスポットペアを「一致したスポット」1件としてカウントする**（1つの新規スポットが複数の既存スポットと同時に「一致」判定されるケースを想定し、新規スポット側は最初に一致した時点でそのスポットを「一致済み」として扱い、以降の既存スポットとの比較では重複カウントしない。逆方向〈既存スポット側の重複カウント防止〉までは厳密に実装しなくてよい。今回のデータ規模〈1コースあたり3〜4スポット程度〉であれば実害は極めて小さいため）
+5. 「一致したスポット」の件数が既存の閾値通り**2件以上**なら類似と判定する（`spotOverlap >= 2`という既存の閾値ロジック自体は変更しない）
+
+### 3-4. 閾値についての設計判断（現状維持で問題ない理由）
+
+- **スポット一致件数の閾値（2件以上）は現状維持を推奨する。** 緩めすぎる（1件で類似判定）と、シンガポールという狭いエリアで人気スポット（Gardens by the Bay等）を1つ共有するだけの正当な別ルート提案まで誤ってブロックしてしまうリスクがある。実際に「Gillmanペア」は共通スポットが"Gillman Barracks"（完全一致）1件のみのため、この閾値のままでは検知されない。これは意図的に許容してよい（1つの人気スポットを起点に別ルートへ展開する提案まで弾きたくないため）。
+- **トークン共通語数の閾値（2語以上でスポットペア一致とみなす）は、既存の3ペアの実データに基づき決定した値。** 手動でのシミュレーション検証（下記）により、この閾値でKatong・Seletar/Khatibペアの重複が正しく検知でき、かつGillmanペアは（意図通り）検知されないことを確認済み。
+
+### 3-5. シミュレーション検証結果（設計段階での手動検証、実装時の参考情報）
+
+**Katongペア**（削除対象`1785628823047` vs 残す`1783204650328`）:
+- `"Peranakan Museum (Katong) / 328 Katong Laksa"` 正規化後トークン `{peranakan, museum, katong, 328, katong, laksa}` vs `"328 Katong Laksa"` トークン `{328, katong, laksa}` → 共通3語 → 一致
+- `"Joo Chiat Road Shophouse Street Art Walk"` vs `"Joo Chiat / Katong Shophouses & Mural Walk"` → 共通トークン `{joo, chiat, walk}` の3語 → 一致
+- `"Ya Kun Kaya Toast (Katong i12 Branch)"` vs `"i12 Katong Mall (Bengawan Solo / Cafe Break)"` → 共通トークン `{katong, i12}` の2語 → 一致
+- 結果: 一致スポット3件（閾値2件を超過）→ **類似判定される**（意図通り）
+
+**Seletar/Khatibペア**（削除対象`1786492845387` vs 残す`1784073619994`）:
+- `"Seletar Reservoir Park"` vs `"Lower Seletar Reservoir Park"` → 共通トークン `{seletar, reservoir, park}` の3語 → 一致
+- `"Yishun Park Hawker Centre"` vs `"Nee Soon (Yishun) Hawker Centre"` → 共通トークン `{yishun, hawker, centre}` の3語 → 一致
+- `"Northpoint City"` vs `"Khatib Pasar Malam"` → 共通トークンなし → 不一致
+- 結果: 一致スポット2件（閾値2件ちょうど）→ **類似判定される**（意図通り）
+
+**Gillmanペア**（削除対象`1784073661423` vs 残す`1782614507916`、参考: 削除確定済みだが再発防止チェックの精度確認用）:
+- `"Gillman Barracks"` vs `"Gillman Barracks"` → 完全一致 → 一致（1件）
+- `"Singapore Art Museum (SAM at Tanjong Pagar Distripark)"` vs `"Labrador Nature Reserve (Labrador Coast)"` / `"VivoCity Food Republic"` → 共通トークンなし → 不一致
+- `"Tanjong Pagar Plaza Market & Food Centre"` vs 上記2つ → 共通トークンなし（"Food"1語のみでは閾値2語未満）→ 不一致
+- 結果: 一致スポット1件（閾値2件未満）→ **類似と判定されない**（意図通り。設計書の方針通り許容する）
+
+### 3-6. タイトルキーワード側（`titleKeywords`/`keywordOverlap`）は変更しない
+
+日本語の単語分割改善（形態素解析ライブラリの導入等）は、依存パッケージの追加・既存の英語地名抽出ロジックへの影響範囲確認など、変更リスクの割に得られる効果が小さいと判断し、今回は見送る。理由:
+
+- 上記3-5の検証の通り、スポット名側の改善だけで3ペア中2ペアの検知（Katong・Seletar/Khatib）に成功しており、タイトルキーワード側を直さなくても目的を達成できる
+- タイトルキーワード比較は「スポット名が一致しない場合の予備的な判定」という位置づけであり、主判定はスポット名比較。スポット名比較を改善すれば大半のケースをカバーできる
+- 日本語の分かち書き（単語単位分割）を正規表現だけで正確に行うのは困難で、外部ライブラリ（`kuromoji`等）の導入が必要になる可能性が高く、スコープが今回の目的に対して過大
+
+### 3-7. 変更対象コード範囲
+
+`scripts/refresh-courses.js`の`isSimilarToExisting()`関数（現150-170行目）**のみ**を変更する。具体的には:
+
+- 新規ヘルパー関数`normalizeSpotName(name)`（正規化、上記3-2）を追加
+- 新規ヘルパー関数（例: `countMatchingSpots(newSpots, existSpots)`）でトークン化・共通語数判定・一致スポット件数カウント（上記3-3）を行う
+- `isSimilarToExisting()`内の`spotOverlap`計算部分を、上記の新しいロジックに置き換える
+- `keywordOverlap`（タイトルキーワード）計算部分・`titleKeywords`抽出の正規表現は変更しない
+- 呼び出し元（`addSystemCourses()`内、現202行目 `if (isSimilarToExisting(course, existing))`）は変更不要。関数シグネチャ（引数・戻り値の型）は変更しないため、呼び出し側への影響はない
+
+## 4. 検証方法
+
+1. `node --check scripts/refresh-courses.js`で構文エラーがないことを確認する
+2. 修正後の`isSimilarToExisting()`（および内部で使う正規化・トークン比較ロジック）を、`data/sg/community-courses.json`から抽出した実データ（削除前の3ペア、計6件分の`spots`配列）を使い、Node.js上で直接呼び出して検証する。Katongペア・Seletar/Khatibペアが「類似」と判定され、Gillmanペアが意図的に「類似と判定されない」ことを確認する
+3. 上記検証には削除前の3ペア分データが必要なため、**変更B（コード修正）を変更A（データ削除）より先に実施し、削除前の状態で検証してから変更Aのデータ削除を行う**（builderへの実装順序指示）
+4. 変更A実施後、`data/sg/community-courses.json`が有効なJSON（`JSON.parse()`が通ること）であること、要素数が30件になっていること、削除した3件の`id`がもう存在しないこと、残す3件の`id`は変更前と同じ内容のまま存在することを確認する
+5. 削除後に残る30件同士で新たに誤検知（本来別物のコースが類似と判定されてしまう）が発生しないか、`isSimilarToExisting()`のロジックをコード上で目視レビューする（全件総当たりの自動テストまでは必須としない）
+
+## 5. スコープ外
+
+- `trimSystemCourses()`（いいねの少ないシステムコースを削除する既存ロジック、現114-142行目）は変更しない。今回の重複は「いいね数」とは無関係の別問題であり、対象外。
+- `addSystemCourses()`の呼び出し構造・`refreshCity()`・cron実行タイミング自体は変更しない。
+- bkk/syd都市への影響: `isSimilarToExisting()`は`scripts/refresh-courses.js`内で都市を問わず共通利用される関数のため、修正すれば自動的にbkk/sydにも適用される。ただしbkk/sydは現在「一時停止中」（`run-fetch-all.sh`等でcron実行対象から除外済み）のため、当面`refresh-courses.js`自体が呼ばれる機会がなく実害はない。将来bkk/syd運用を再開した際に自動的に恩恵を受ける形になる。
+- `data/bkk/community-courses.json`・`data/syd/community-courses.json`の中身は今回調査・変更していない。
+- 過去に公開されてしまった他の潜在的な重複（今回の3ペア以外）の全件洗い出しは今回のスコープ外（ユーザーが目視確認して発見した3ペアのみを対象とする）。
+- `server.js`は無変更（`community-courses.json`の読み込みは既存の`fs.readFileSync`都度読み込み方式のため、データ削除・スクリプト修正いずれも`pm2 restart`不要）。
+
+## 6. 影響範囲
+
+- **変更A**: `data/sg/community-courses.json`のみ（33件→30件）。`.gitignore`対象のためgit管理外、コミット不要。Web版・iOS App Store版は両方とも同一ファイルを参照するため、削除は即座に両環境に反映される（サーバー再起動不要）。
+- **変更B**: `scripts/refresh-courses.js`のみ（cron専用スクリプト、`server.js`・`public/`配下とは無関係）。次回のcron実行（水・日 8:00 SGT）から効果を確認できる。
+
+## 7. 承認状況
+2026-08-12 ユーザーより3ペアの削除方針・再発防止の実装方針検討を依頼。**設計書としてこの内容をまとめ、ユーザーの承認待ち**。
+
+**2026-08-12追記**: 変更A（データ削除）のみユーザー承認済み・実装完了。`data/sg/community-courses.json`から`course_sg_1785628823047`（Katong、ひとりのアート食べ歩き午後）・`course_sg_1786492845387`（Lower Seletar Reservoir、緑と夕暮れ家族時間）・`course_sg_1784073661423`（Gillman Barracks、家族で巡る現代アートの朝）の3件を削除し33件→30件になった。削除しなかった30件（残す3件含む）の内容・順序は変更前と一致していることを確認済み（削除前バックアップとの`JSON.stringify`比較で検証）。`GET /api/courses?city=sg&tab=community`のレスポンスでも30件に反映されていることをcurlで確認済み（`server.js`は無変更のため`pm2 restart`不要、実際に再起動なしで反映された）。**変更B（`scripts/refresh-courses.js`の`isSimilarToExisting()`重複検知精度改善）は未承認・未実装のまま**。
