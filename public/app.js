@@ -1529,6 +1529,16 @@
         : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
+    // 新着リボン（3日以内に登録、イベントカードの newRibbon ロジックと同一基準）
+    function _lifeInfoNewRibbonHtml(item) {
+      if (!item.fetched_at) return '';
+      const fetched = new Date(item.fetched_at + 'T00:00:00');
+      const now = new Date(); now.setHours(0,0,0,0);
+      const days = Math.round((now - fetched) / 86400000);
+      if (days <= 3) return `<div class="card-new-ribbon card-new-ribbon--today">New</div>`;
+      return '';
+    }
+
     function _lifeInfoCardHtml(item) {
       const lang = getLang();
       const title = (lang === 'ja' ? item.title : item.title_en) || item.title || '';
@@ -1537,14 +1547,16 @@
       const catKey = LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || '';
       const catLabel = catKey ? t(catKey) : '';
       const url = (item.sourceUrl || '').replace(/'/g, '&#39;');
+      const newRibbon = _lifeInfoNewRibbonHtml(item);
       return `<div class="spot-card" style="padding:14px;cursor:pointer;" onclick="openLifeInfoLink('${url}')">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--warm-gray);">
+        ${newRibbon}
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:var(--warm-gray);">
           ${catLabel ? `<span style="background:var(--sand);border-radius:20px;padding:2px 8px;font-weight:700;color:var(--caramel);">${catLabel}</span>` : ''}
           <span>${item.source || ''}</span>
           <span>${dateStr}</span>
         </div>
-        <div style="font-size:15px;font-weight:700;color:var(--midnight);margin-bottom:4px;line-height:1.4;">${title}</div>
-        <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;">${summary}</div>
+        <div style="font-size:16px;font-weight:700;color:var(--midnight);margin-bottom:10px;line-height:1.35;">${title}</div>
+        <div style="font-size:15px;color:var(--warm-gray);line-height:1.65;">${summary}</div>
       </div>`;
     }
 
