@@ -1586,6 +1586,21 @@ design 165で追加したテーマ別バッジ（Kopi巡り／バクテー巡り
 - `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css/app.js `?v=20260726d`/`20260726c`→`20260729a`、`sw.js` CACHE_NAME=`sg-weekend-v718`→`v719`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのトースト表示タイミング・見た目（絵文字サイズ・2行テキストの折り返し）、思い出シートとの表示順序が意図通り重ならないことは2026-07-29時点でコード確認・curlによる配信反映確認・`node --check`のみ完了、実ブラウザ・実機とも未確認
 
+## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172）
+既存の「週末おでかけイベント」取り込みパイプライン（`fetch-events.js`/`filter-events.js`、上記「イベント取り込みパイプライン構成」参照）とはデータ・API・UIとも完全に独立した新機能。行政・ビザ手続き（admin）/天候・災害（weather）/交通・MRT（transport）/日本人コミュニティ（community）の4カテゴリをキュレーション表示する。
+
+- **データ取得パイプライン**: 新規`scripts/fetch-life-info.js`。取得元RSS3件（CNA `https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10416`／Mothership.sg `https://mothership.sg/feed/`／JCCI `https://www.jcci.org.sg/feed/`）を`rss-parser`で取得。ハイウォーターマーク方式（新規`data/life-info-fetch-state.json`、既存の`data/source-fetch-state.json`＝イベント用とは分離）で新着記事のみ抽出。フィード取得自体が失敗したソースは状態を更新せず次回また試行する（既存`fetch-events.js`と同じフォールトトレランス設計）。Haiku（`claude-haiku-4-5-20251001`）で「シンガポール在住日本人の生活に関係あるか」を判定し`category`（admin/weather/transport/community）を付与、スポーツ・芸能・単純な事件事故等の無関係記事は却下。採用記事はSonnet（`claude-sonnet-4-6`）で日本語要約＋英語要約（`title`/`title_en`/`summary`/`summary_en`）を生成し、新規`data/sg/life-info.json`（配列、gitignore対象）に追記保存。フィールドは`id`/`category`/`title`/`title_en`/`summary`/`summary_en`/`source`（"CNA"/"Mothership"/"JCCI"）/`sourceUrl`/`publishedAt`/`fetched_at`（`severity`フィールドは、報道記事ベースで構造化された警報データでないため見送り）。`--dry-run`オプション対応
+- **cron**: 新規エントリを追加、毎日7:15 SGT（1:15 CEST）に`node scripts/fetch-life-info.js --city=sg`を実行。既存の6:30 SGT（`run-fetch-all.sh`）・7:00/18:00 SGT（`post-to-x.js --to-line`）・水日7:30 SGT（`run-source-analysis.sh`）のいずれとも時刻が衝突しない。ログは`logs/fetch-life-info.log`
+- **API**: 新規`GET /api/life-info?city=sg&category=admin|weather|transport|community`（`server.js`、`GET /api/events`の直後に配置）。既存`GET /api/events`と同じ`fs.readFileSync`都度読み込みパターン（DBなし、メモリキャッシュなし）。ファイル不存在時・不正な`category`値は空配列またはフィルタなしの全件を返す（エラーにしない）。既存`GET /api/events`・`GET /api/sales`のレスポンス構造・後方互換性には一切影響を与えていない（`server.js`全体で削除行数0の追加のみの変更）
+- **フロントエンド（ボトムナビ新規5つ目のタブ）**: `public/index.html`のボトムナビに`#nav-news`（📰「ニュース」）を`#nav-course`（非表示中）と`#nav-plan`の間に追加。DOM順のまま`#nav-course`が非表示のため、実際の表示順は「ホーム→ニュース→予定表→設定」になる。新規`#screen-news`（カテゴリチップ5種＝すべて/行政/天候・災害/交通/コミュニティ＋カード一覧＋空状態）を新設。`public/app.js`の`switchNav()`に`'news'`ケースを追加。**ニュース画面には既存の「探訪」「予定表」で使われているアカウント連携必須ゲート（`_applyScreenAuthGate`、設計書116）を適用していない**（未ログインでも閲覧可能な設計）
+- **フロントエンド（ホーム画面プレビュー）**: `#filter-row-category`（カテゴリチップ行）の手前に`#life-info-preview-section`を新設。`GET /api/life-info`から直近3件（公開日新しい順、レスポンス自体がAPI側で降順ソート済み）を軽量カードで表示、タップで元記事URLを直接開く（ニュース画面を経由しない）。「もっと見る ›」リンクで`switchNav('news')`。生活情報が0件の場合はセクション自体を`display:none`にする。**`loadEventData()`（`GET /api/events`）とは独立して`loadLifeInfoPreview()`を起動時に呼び出し、それぞれ個別の`try/catch`でエラーハンドリングするため片方の失敗がもう片方に影響しない**
+- **外部リンクの開き方**: 新規`openLifeInfoLink(url)`が既存`openSponsoredCardLink()`と同じ分岐パターンを踏襲（Capacitor環境は`Browser.open()`、Web環境は`window.open()`）
+- **i18n**: `navNews`/`newsScreenTitle`/`newsCatAll`/`newsCatAdmin`/`newsCatWeather`/`newsCatTransport`/`newsCatCommunity`/`newsEmptyDesc`/`lifeInfoPreviewTitle`/`lifeInfoPreviewMoreLink`の10キーをja/en同時追加
+- 生活情報カードは既存`.spot-card`クラスを再利用（fadeUpアニメーションが自動適用される副次効果あり、意図しない不具合ではなく無害な見た目上の恩恵）
+- `server.js`の変更を伴うため`pm2 restart`実施済み。キャッシュバスティング: `index.html` app.js `?v=20260827a`→`20260828a`、`sw.js` CACHE_NAME=`sg-weekend-v720`→`v721`（`app.css`は変更なしのため据え置き）
+- スコープ外（設計時点で明示）: プッシュ通知連携（緊急情報の即時配信）、ICA/MOM/NEA/LTA等の非公式スクレイピング実装、多言語ソースの機械翻訳精度保証、ユーザーからの情報投稿・コメント機能、カテゴリごとの通知オンオフ設定UI、BKK/SYD対応、iOSアプリのビルド・push（Web版への反映のみ、iOS版は次回TestFlightビルドで反映）
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのニュースタブ・ホーム画面プレビューセクションの表示、タップ後の外部リンク遷移（`Browser.open()`）の実際の動作は2026-08-28時点でWeb版での確認（curl・ロジック検証・実データでのパイプライン完走確認）のみ完了、実機未確認
+
 ## 環境構成と注意事項（2026-07-07）
 
 ### Web版 = テスト環境 / iOS App Store版 = 本番環境

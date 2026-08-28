@@ -433,6 +433,16 @@
         scheduleNoPlans: '予定なし',
         customPlanTitlePlaceholder: 'タイトルを入力',
         navCourse: '探訪',
+        navNews: 'ニュース',
+        newsScreenTitle: '生活情報・ニュース',
+        newsCatAll: 'すべて',
+        newsCatAdmin: '行政',
+        newsCatWeather: '天候・災害',
+        newsCatTransport: '交通',
+        newsCatCommunity: 'コミュニティ',
+        newsEmptyDesc: '現在表示できる情報がありません。<br>また後で確認してください。',
+        lifeInfoPreviewTitle: '📰 シンガポール生活情報',
+        lifeInfoPreviewMoreLink: 'もっと見る ›',
         courseScreenTitle: 'シンガポール探訪',
         courseTabEveryone: 'モデルコース',
         courseTabMylist: 'マイコース',
@@ -735,6 +745,16 @@
         scheduleNoPlans: 'No plans',
         customPlanTitlePlaceholder: 'Enter title',
         navCourse: 'Explore',
+        navNews: 'News',
+        newsScreenTitle: 'Life Info & News',
+        newsCatAll: 'All',
+        newsCatAdmin: 'Admin',
+        newsCatWeather: 'Weather',
+        newsCatTransport: 'Transport',
+        newsCatCommunity: 'Community',
+        newsEmptyDesc: 'No information available right now.<br>Please check back later.',
+        lifeInfoPreviewTitle: '📰 Singapore Life Info',
+        lifeInfoPreviewMoreLink: 'More ›',
         courseScreenTitle: 'Explore Singapore',
         courseTabEveryone: 'Model Courses',
         courseTabMylist: 'My Courses',
@@ -1473,6 +1493,120 @@
             </div>
           </div>
         </article>`;
+    }
+
+    // ─── 生活情報・ニュースのキュレーション（設計書172） ───
+    // GET /api/life-info は既存 GET /api/events とは完全に独立したエンドポイント。
+    // 片方の取得失敗がもう片方の表示に影響しないよう、呼び出し元でも個別に try/catch する。
+
+    let LIFE_INFO_DATA = [];
+    let _newsCategory = ''; // '' = すべて
+
+    const LIFE_INFO_CATEGORY_LABEL_KEYS = {
+      admin:     'newsCatAdmin',
+      weather:   'newsCatWeather',
+      transport: 'newsCatTransport',
+      community: 'newsCatCommunity',
+    };
+
+    // 生活情報記事の元記事URLを開く（既存 openSponsoredCardLink() と同じ分岐パターン）
+    function openLifeInfoLink(url) {
+      if (!url) return;
+      if (_isCapacitorApp && window.Capacitor?.Plugins?.Browser) {
+        window.Capacitor.Plugins.Browser.open({ url });
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+    }
+
+    function _formatLifeInfoDate(publishedAt) {
+      if (!publishedAt) return '';
+      const d = new Date(publishedAt);
+      if (isNaN(d.getTime())) return '';
+      const lang = getLang();
+      return lang === 'ja'
+        ? `${d.getMonth() + 1}/${d.getDate()}`
+        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function _lifeInfoCardHtml(item) {
+      const lang = getLang();
+      const title = (lang === 'ja' ? item.title : item.title_en) || item.title || '';
+      const summary = (lang === 'ja' ? item.summary : item.summary_en) || item.summary || '';
+      const dateStr = _formatLifeInfoDate(item.publishedAt);
+      const catKey = LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || '';
+      const catLabel = catKey ? t(catKey) : '';
+      const url = (item.sourceUrl || '').replace(/'/g, '&#39;');
+      return `<div class="spot-card" style="padding:14px;cursor:pointer;" onclick="openLifeInfoLink('${url}')">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--warm-gray);">
+          ${catLabel ? `<span style="background:var(--sand);border-radius:20px;padding:2px 8px;font-weight:700;color:var(--caramel);">${catLabel}</span>` : ''}
+          <span>${item.source || ''}</span>
+          <span>${dateStr}</span>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:var(--midnight);margin-bottom:4px;line-height:1.4;">${title}</div>
+        <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;">${summary}</div>
+      </div>`;
+    }
+
+    // ホーム画面: 生活情報プレビュー（直近2〜3件、公開日新しい順）
+    async function loadLifeInfoPreview() {
+      const section = document.getElementById('life-info-preview-section');
+      const list = document.getElementById('life-info-preview-list');
+      if (!section || !list) return;
+      try {
+        const res = await fetch(API_BASE + `/api/life-info?city=${getCity()}`);
+        const items = res.ok ? await res.json() : [];
+        if (!Array.isArray(items) || items.length === 0) {
+          section.style.display = 'none';
+          return;
+        }
+        const preview = items.slice(0, 3);
+        list.innerHTML = preview.map(_lifeInfoCardHtml).join('');
+        section.style.display = 'block';
+      } catch (e) {
+        // GET /api/events の成否とは無関係に失敗させる（ホーム画面全体には影響させない）
+        section.style.display = 'none';
+      }
+    }
+
+    // ニュース画面: カテゴリ絞り込み込みの一覧表示
+    function setNewsCategory(cat) {
+      _newsCategory = cat;
+      document.querySelectorAll('#news-filter-row .filter-chip').forEach(chip => {
+        chip.classList.toggle('active', (chip.dataset.newsCat || '') === cat);
+      });
+      renderNewsList();
+    }
+
+    function renderNewsList() {
+      const list = document.getElementById('news-list');
+      const empty = document.getElementById('news-empty-state');
+      if (!list) return;
+      const filtered = _newsCategory
+        ? LIFE_INFO_DATA.filter(item => item.category === _newsCategory)
+        : LIFE_INFO_DATA;
+      if (filtered.length === 0) {
+        list.innerHTML = '';
+        if (empty) empty.style.display = 'block';
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+      list.innerHTML = filtered.map(_lifeInfoCardHtml).join('');
+    }
+
+    async function loadLifeInfoNewsScreen() {
+      const list = document.getElementById('news-list');
+      if (list) list.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
+        <div style="font-size:24px;margin-bottom:8px;">⏳</div>
+        <div style="font-size:14px;">${t('loadingEvents')}</div>
+      </div>`;
+      try {
+        const res = await fetch(API_BASE + `/api/life-info?city=${getCity()}`);
+        LIFE_INFO_DATA = res.ok ? await res.json() : [];
+      } catch (e) {
+        LIFE_INFO_DATA = [];
+      }
+      renderNewsList();
     }
 
     // ─── PRカード（スポンサー広告枠、設計書29） ───
@@ -2321,6 +2455,7 @@
     const ARRIVAL_ANNIVERSARY_YEARS_AHEAD = 10;
 
     loadEventData();
+    loadLifeInfoPreview(); // GET /api/events とは独立した呼び出し。互いのエラーが影響しない（設計書172）
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
@@ -3650,7 +3785,7 @@
         document.activeElement.blur();
       }
       closeAllPopups();
-      ['home','course','plan','settings'].forEach(s => {
+      ['home','course','news','plan','settings'].forEach(s => {
         document.getElementById('nav-' + s).classList.remove('active');
         const el = document.getElementById('screen-' + s);
         if (el) {
@@ -3714,6 +3849,9 @@
           initSettingsGenres();
           renderBackupSection();
           checkExistingBackupOnOpen();
+        }
+        if (screen === 'news') {
+          loadLifeInfoNewsScreen();
         }
       }
     }

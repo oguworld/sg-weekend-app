@@ -628,6 +628,30 @@ app.get('/api/events', (req, res) => {
   }
 });
 
+// GET /api/life-info — シンガポール在住日本人向け生活情報・ニュース一覧（設計書172）
+// data/{city}/life-info.json が存在しない場合は空配列を返す（エラーにしない）
+app.get('/api/life-info', (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const p = path.join(__dirname, 'data', city, 'life-info.json');
+    if (!fs.existsSync(p)) return res.json([]);
+    let items = JSON.parse(fs.readFileSync(p, 'utf8'));
+    if (!Array.isArray(items)) items = [];
+
+    const category = (req.query.category || '').toLowerCase();
+    const VALID_CATEGORIES = ['admin', 'weather', 'transport', 'community'];
+    if (VALID_CATEGORIES.includes(category)) {
+      items = items.filter(item => item.category === category);
+    }
+
+    items.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+
+    res.json(items);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/sponsored-cards — PRカード（スポンサー広告枠）一覧（設計書23フェーズ2・設計書29）
 // data/{city}/sponsored-cards.json が存在しない場合は空配列を返す（エラーにしない）
 app.get('/api/sponsored-cards', (req, res) => {
