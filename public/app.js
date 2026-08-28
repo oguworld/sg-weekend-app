@@ -2260,6 +2260,12 @@
       toggleNewsFilterNew();
     }, { passive: false });
 
+    // ─── ニュース画面「更新」ボタン 即時タップ対応 ───
+    document.getElementById('news-refresh-btn')?.addEventListener('touchend', e => {
+      e.preventDefault();
+      loadLifeInfoNewsScreen();
+    }, { passive: false });
+
     // ─── カード領域スワイプでタブ切り替え ───
     // _swipeStartX/_swipeStartY/_swipeIntent はPTR（設計書19）からも参照するため、
     // このブロック内に閉じずモジュールスコープの let にしている（2026-07-12）。
