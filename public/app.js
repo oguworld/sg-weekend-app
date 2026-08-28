@@ -440,10 +440,11 @@
         newsScreenTitle: 'ニュース・生活情報',
         newsCatAll: 'すべて',
         newsCatAdmin: '行政',
-        newsCatWeather: '天候・災害',
         newsCatTransport: '交通',
+        newsCatHealth: '医療・健康',
+        newsCatEducation: '教育・子育て',
+        newsCatWeather: '天候・災害',
         newsCatCommunity: 'コミュニティ',
-        newsCatBusiness: 'ビジネス',
         newsEmptyDesc: '現在表示できる情報がありません。<br>また後で確認してください。',
         lifeInfoPreviewTitle: '📰 シンガポール生活情報',
         lifeInfoPreviewMoreLink: 'もっと見る ›',
@@ -753,10 +754,11 @@
         newsScreenTitle: 'News & Life Info',
         newsCatAll: 'All',
         newsCatAdmin: 'Admin',
-        newsCatWeather: 'Weather',
         newsCatTransport: 'Transport',
+        newsCatHealth: 'Health',
+        newsCatEducation: 'Education',
+        newsCatWeather: 'Weather',
         newsCatCommunity: 'Community',
-        newsCatBusiness: 'Business',
         newsEmptyDesc: 'No information available right now.<br>Please check back later.',
         lifeInfoPreviewTitle: '📰 Singapore Life Info',
         lifeInfoPreviewMoreLink: 'More ›',
@@ -1510,11 +1512,26 @@
 
     const LIFE_INFO_CATEGORY_LABEL_KEYS = {
       admin:     'newsCatAdmin',
-      weather:   'newsCatWeather',
       transport: 'newsCatTransport',
+      health:    'newsCatHealth',
+      education: 'newsCatEducation',
+      weather:   'newsCatWeather',
       community: 'newsCatCommunity',
-      business:  'newsCatBusiness',
     };
+
+    // カテゴリごとのタグ配色（アプリ既存のカラーパレット内の色を流用、見た目のトーンを崩さない範囲で区別）
+    const LIFE_INFO_CATEGORY_COLORS = {
+      admin:     { bg: 'rgba(192,144,58,0.16)',  color: 'var(--gold)' },
+      transport: { bg: 'rgba(110,158,136,0.18)', color: 'var(--sage)' },
+      health:    { bg: 'rgba(224,154,136,0.20)', color: 'var(--terracotta-light)' },
+      education: { bg: 'var(--sand)',            color: 'var(--caramel)' },
+      weather:   { bg: 'rgba(122,173,204,0.18)', color: 'var(--sky)' },
+      community: { bg: 'rgba(196,112,90,0.16)',  color: 'var(--terracotta)' },
+    };
+    function _lifeInfoCategoryTagStyle(category) {
+      const c = LIFE_INFO_CATEGORY_COLORS[category] || LIFE_INFO_CATEGORY_COLORS.education;
+      return `background:${c.bg};color:${c.color};`;
+    }
 
     // 生活情報記事の元記事URLを開く（既存 openSponsoredCardLink() と同じ分岐パターン）
     function openLifeInfoLink(url) {
@@ -1553,7 +1570,7 @@
       return `<div class="spot-card" style="padding:14px;">
         ${newRibbon}
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:var(--warm-gray);">
-          ${catLabel ? `<span style="background:var(--sand);border-radius:20px;padding:2px 8px;font-weight:700;color:var(--caramel);">${catLabel}</span>` : ''}
+          ${catLabel ? `<span style="${_lifeInfoCategoryTagStyle(item.category)}border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
           <span>${item.source || ''}</span>
           <span>${dateStr}</span>
         </div>
@@ -1574,7 +1591,7 @@
       const url = (item.sourceUrl || '').replace(/'/g, '&#39;');
       return `<div style="flex:0 0 auto;width:180px;background:var(--warm-white);border-radius:12px;padding:10px 12px;cursor:pointer;" onclick="openLifeInfoLink('${url}')">
         <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px;font-size:10px;color:var(--warm-gray);">
-          ${catLabel ? `<span style="background:var(--sand);border-radius:20px;padding:1px 7px;font-weight:700;color:var(--caramel);">${catLabel}</span>` : ''}
+          ${catLabel ? `<span style="${_lifeInfoCategoryTagStyle(item.category)}border-radius:20px;padding:1px 7px;font-weight:700;">${catLabel}</span>` : ''}
           <span>${item.source || ''}</span>
         </div>
         <div style="font-size:12px;font-weight:700;color:var(--midnight);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${title}</div>

@@ -239,10 +239,11 @@
     <div id="news-filter-row" style="display:flex;gap:8px;overflow-x:auto;padding:8px 20px 12px;flex-shrink:0;">
       <button class="filter-chip active" data-news-cat="" onclick="if(!_touchCapableDetected) setNewsCategory('')" data-i18n="newsCatAll">すべて</button>
       <button class="filter-chip" data-news-cat="admin" onclick="if(!_touchCapableDetected) setNewsCategory('admin')" data-i18n="newsCatAdmin">行政</button>
-      <button class="filter-chip" data-news-cat="weather" onclick="if(!_touchCapableDetected) setNewsCategory('weather')" data-i18n="newsCatWeather">天候・災害</button>
       <button class="filter-chip" data-news-cat="transport" onclick="if(!_touchCapableDetected) setNewsCategory('transport')" data-i18n="newsCatTransport">交通</button>
+      <button class="filter-chip" data-news-cat="health" onclick="if(!_touchCapableDetected) setNewsCategory('health')" data-i18n="newsCatHealth">医療・健康</button>
+      <button class="filter-chip" data-news-cat="education" onclick="if(!_touchCapableDetected) setNewsCategory('education')" data-i18n="newsCatEducation">教育・子育て</button>
+      <button class="filter-chip" data-news-cat="weather" onclick="if(!_touchCapableDetected) setNewsCategory('weather')" data-i18n="newsCatWeather">天候・災害</button>
       <button class="filter-chip" data-news-cat="community" onclick="if(!_touchCapableDetected) setNewsCategory('community')" data-i18n="newsCatCommunity">コミュニティ</button>
-      <button class="filter-chip" data-news-cat="business" onclick="if(!_touchCapableDetected) setNewsCategory('business')" data-i18n="newsCatBusiness">ビジネス</button>
     </div>
     <div class="screen-scroll-content">
       <div id="news-list" style="padding:0 0 40px;display:flex;flex-direction:column;gap:12px;"></div>
@@ -1275,7 +1276,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260828k"></script>
+  <script src="/app.js?v=20260829a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
