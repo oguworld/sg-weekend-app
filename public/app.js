@@ -30,7 +30,7 @@
       } catch (_) {}
     }
 
-    // ─── CAPACITOR: GA4スキップ・外部リンク制御 ───
+    // ─── CAPACITOR: GA4スキップ・外部リンク制御・overscroll防止 ───
     if (_isCapacitorApp) {
       window.gtag = function() {};
       document.addEventListener('click', e => {
@@ -41,35 +41,36 @@
           window.Capacitor.Plugins.Browser.open({ url: anchor.href });
         }
       });
-    }
-
-    // ─── ゴムバンドスクロール防止（ナビバー・ヘッダーのずれ防止）───
-    // 元々はCapacitor(WKWebView)限定だったが、Web版(Safari)でもニュース画面の内部スクロールが
-    // 境界に達した際にbody全体へスクロールが連鎖し、固定のはずのヘッダー/ボトムナビが
-    // 一緒にずれる不具合が確認されたため、2026-08-28にWeb版にも適用範囲を拡大した。
-    let _overscrollTouchStartY = 0;
-    document.addEventListener('touchstart', e => {
-      _overscrollTouchStartY = e.touches[0].clientY;
-    }, { passive: true });
-    document.addEventListener('touchmove', e => {
-      const dy = e.touches[0].clientY - _overscrollTouchStartY;
-      let el = e.target;
-      while (el && el !== document.documentElement) {
-        const ov = window.getComputedStyle(el).overflowY;
-        if (ov === 'auto' || ov === 'scroll') {
-          // 実際に縦スクロール可能な要素のみ対象（overflow-x:autoの副作用でoverflow-y:autoになる要素を除外）
-          if (el.scrollHeight > el.clientHeight) {
-            const atTop    = el.scrollTop <= 0;
-            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-            if (dy > 0 && atTop)    { e.preventDefault(); return; }
-            if (dy < 0 && atBottom) { e.preventDefault(); return; }
-            return; // スクロール余地あり → 許可
+      // WKWebViewのゴムバンドスクロールを上下両方向で禁止（ナビバーのずれ防止）
+      // ⚠️ 2026-08-28に一度Web版にも適用範囲を拡大したが、Web版の設定画面（一緒に行く人 等、
+      // onclick属性のみでtouchendデリゲーションを持たない要素）でタップが効かなくなる新規回帰を
+      // 引き起こしたため、2026-08-29にCapacitor限定へ差し戻した。News画面のbody連鎖スクロール問題は
+      // 根本原因（#screen-newsのflex-direction指定漏れ、CSS側で修正済み）が解消済みのため、
+      // この処理をWeb版に適用しなくても再発しないはず。
+      let _capTouchStartY = 0;
+      document.addEventListener('touchstart', e => {
+        _capTouchStartY = e.touches[0].clientY;
+      }, { passive: true });
+      document.addEventListener('touchmove', e => {
+        const dy = e.touches[0].clientY - _capTouchStartY;
+        let el = e.target;
+        while (el && el !== document.documentElement) {
+          const ov = window.getComputedStyle(el).overflowY;
+          if (ov === 'auto' || ov === 'scroll') {
+            // 実際に縦スクロール可能な要素のみ対象（overflow-x:autoの副作用でoverflow-y:autoになる要素を除外）
+            if (el.scrollHeight > el.clientHeight) {
+              const atTop    = el.scrollTop <= 0;
+              const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+              if (dy > 0 && atTop)    { e.preventDefault(); return; }
+              if (dy < 0 && atBottom) { e.preventDefault(); return; }
+              return; // スクロール余地あり → 許可
+            }
           }
+          el = el.parentElement;
         }
-        el = el.parentElement;
-      }
-      e.preventDefault();
-    }, { passive: false });
+        e.preventDefault();
+      }, { passive: false });
+    }
 
     // ─── タッチ端末検出（onclick属性のゴーストクリックガードで使用）───
     let _touchCapableDetected = false;
