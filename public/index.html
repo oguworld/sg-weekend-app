@@ -619,7 +619,7 @@
       <span class="nav-icon">📰</span>
       <span class="nav-label" data-i18n="navNews">ニュース</span>
     </button>
-    <button class="nav-item" id="nav-plan" onclick="if(!_touchCapableDetected) switchNav('plan')">
+    <button class="nav-item" id="nav-plan" style="display:none;" onclick="if(!_touchCapableDetected) switchNav('plan')">
       <span class="nav-icon">📅</span>
       <span class="nav-label" data-i18n="navPlan">予定表</span>
     </button>
@@ -1270,7 +1270,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260828a"></script>
+  <script src="/app.js?v=20260828b"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
