@@ -16,6 +16,29 @@ const path      = require('path');
 const parser = new Parser({ timeout: 10000 });
 const client = new Anthropic();
 
+// ─── LINE通知（scripts/notify-fetch-summary.js と同じ最小実装） ───────
+async function pushToLine(text) {
+  const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const userId = process.env.LINE_USER_ID;
+  if (!token || !userId) {
+    console.warn('⚠️  LINE credentials未設定のため通知をスキップ');
+    return;
+  }
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('LINE通知エラー:', err.message || res.status);
+    }
+  } catch (e) {
+    console.error('LINE通知エラー:', e.message);
+  }
+}
+
 // ─── 都市設定 ────────────────────────────────────────────────────
 const CITY_CONFIG = {
   sg: {
@@ -161,17 +184,18 @@ async function filterBatch(batch, cityKey) {
 - "weather": 天候・災害・ヘイズ（PSI指数・洪水警報・大雨警報・気象関連ニュース）
 - "transport": 交通・MRT（運行情報・遅延・道路規制・LTA関連の発表）
 - "community": 日本人コミュニティ・近隣制度（日本人会・日本人学校・日系企業・近隣国との往来制度等）
+- "business": ビジネス・経済（現地の経済動向、企業ニュース、労働市場、税制など駐在員・ビジネスパーソンに関係する情報）
 
 【不採用とすべきもの】
 - スポーツ・芸能・エンタメ関連のニュース
 - 単純な事件・事故報道（生活への影響が薄いもの）
 - 政治的な論争・スキャンダル記事で生活情報としての実用性がないもの
 - 広告・PR記事
-- 上記4カテゴリのいずれにも明確に該当しないもの
+- 上記5カテゴリのいずれにも明確に該当しないもの
 
 各採用記事について以下のフィールドのみ返すこと：
 - index: 元の記事のインデックス番号（0始まり）
-- category: "admin" | "weather" | "transport" | "community"
+- category: "admin" | "weather" | "transport" | "community" | "business"
 
 JSON配列のみ返すこと（前置き・説明・コードブロック不要）。不採用は配列に含めない。
 
@@ -371,14 +395,30 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
     console.log(`  ⚠️ 要約生成に失敗したため${enrichFailedCount}件を除外しました`);
   }
 
+  // 保持期間: fetched_atが7日以上前の記事は削除する（生活情報は鮮度が命のため、events.jsonと異なり
+  // 蓄積し続けない方針。新規採用が0件の日も既存データの棚卸しのため必ず実行する）
+  const RETENTION_DAYS = 7;
+  const retentionCutoff = new Date();
+  retentionCutoff.setHours(0, 0, 0, 0);
+  retentionCutoff.setDate(retentionCutoff.getDate() - RETENTION_DAYS);
+
   if (dryRun) {
     console.log(`\n  🧪 --dry-run のため保存はスキップします（採用${newItems.length}件）`);
     console.log(JSON.stringify(newItems, null, 2));
-  } else if (newItems.length > 0) {
+  } else {
     const existing = fs.existsSync(lifeInfoPath) ? JSON.parse(fs.readFileSync(lifeInfoPath, 'utf8')) : [];
-    fs.mkdirSync(path.dirname(lifeInfoPath), { recursive: true });
-    fs.writeFileSync(lifeInfoPath, JSON.stringify([...existing, ...newItems], null, 2), 'utf8');
-    console.log(`\n  💾 ${lifeInfoPath} に ${newItems.length}件追記`);
+    const combined = [...existing, ...newItems];
+    const kept = combined.filter(item => {
+      if (!item.fetched_at) return true; // 日付不明は安全側で残す
+      const fetched = new Date(item.fetched_at + 'T00:00:00');
+      return !isNaN(fetched.getTime()) && fetched >= retentionCutoff;
+    });
+    const removedCount = combined.length - kept.length;
+    if (newItems.length > 0 || removedCount > 0) {
+      fs.mkdirSync(path.dirname(lifeInfoPath), { recursive: true });
+      fs.writeFileSync(lifeInfoPath, JSON.stringify(kept, null, 2), 'utf8');
+      console.log(`\n  💾 ${lifeInfoPath} に${newItems.length}件追記 / ${RETENTION_DAYS}日超過${removedCount}件削除（現在${kept.length}件）`);
+    }
   }
 
   console.log(`\n  📊 Claude API結果: ${totalAccepted + totalRejected}件送信 → 採用${totalAccepted}件 / 不採用${totalRejected}件`);
@@ -400,17 +440,30 @@ async function main() {
 
   if (rawItems.length === 0) {
     console.log('\n✅ 新着なし。終了します。\n');
+    if (!dryRun) await pushToLine(`📰 生活情報・ニュース取得（${conf.nameJa}）\nRSS新着なし`);
     return;
   }
 
   const uniqueItems = deduplicateItems(rawItems, conf.lifeInfoPath);
   if (uniqueItems.length === 0) {
     console.log('✅ 重複なし新着なし。終了します。\n');
+    if (!dryRun) await pushToLine(`📰 生活情報・ニュース取得（${conf.nameJa}）\n取得${rawItems.length}件 → 重複除外後0件`);
     return;
   }
 
   console.log('\n🤖 Claude APIでフィルタリング・要約生成開始...');
-  await filterAndSaveLifeInfo(uniqueItems, { lifeInfoPath: conf.lifeInfoPath, cityKey, dryRun });
+  const result = await filterAndSaveLifeInfo(uniqueItems, { lifeInfoPath: conf.lifeInfoPath, cityKey, dryRun });
+
+  if (!dryRun) {
+    const catCounts = {};
+    for (const item of result.newItems) catCounts[item.category] = (catCounts[item.category] || 0) + 1;
+    const catLine = Object.entries(catCounts).map(([k, v]) => `${k}:${v}`).join(' / ') || 'なし';
+    await pushToLine(
+      `📰 生活情報・ニュース取得（${conf.nameJa}）\n` +
+      `取得${rawItems.length}件 → 重複除外${uniqueItems.length}件 → 採用${result.accepted}件\n` +
+      `カテゴリ内訳: ${catLine}`
+    );
+  }
 
   console.log('\n🎉 fetch-life-info.js 完了\n');
 }

@@ -30,7 +30,7 @@
       } catch (_) {}
     }
 
-    // ─── CAPACITOR: GA4スキップ・外部リンク制御・overscroll防止 ───
+    // ─── CAPACITOR: GA4スキップ・外部リンク制御 ───
     if (_isCapacitorApp) {
       window.gtag = function() {};
       document.addEventListener('click', e => {
@@ -41,32 +41,35 @@
           window.Capacitor.Plugins.Browser.open({ url: anchor.href });
         }
       });
-      // WKWebViewのゴムバンドスクロールを上下両方向で禁止（ナビバーのずれ防止）
-      let _capTouchStartY = 0;
-      document.addEventListener('touchstart', e => {
-        _capTouchStartY = e.touches[0].clientY;
-      }, { passive: true });
-      document.addEventListener('touchmove', e => {
-        const dy = e.touches[0].clientY - _capTouchStartY;
-        let el = e.target;
-        while (el && el !== document.documentElement) {
-          const ov = window.getComputedStyle(el).overflowY;
-          if (ov === 'auto' || ov === 'scroll') {
-            // 実際に縦スクロール可能な要素のみ対象（overflow-x:autoの副作用でoverflow-y:autoになる要素を除外）
-            if (el.scrollHeight > el.clientHeight) {
-              const atTop    = el.scrollTop <= 0;
-              const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-              if (dy > 0 && atTop)    { e.preventDefault(); return; }
-              if (dy < 0 && atBottom) { e.preventDefault(); return; }
-              return; // スクロール余地あり → 許可
-            }
-          }
-          el = el.parentElement;
-        }
-        e.preventDefault();
-      }, { passive: false });
-
     }
+
+    // ─── ゴムバンドスクロール防止（ナビバー・ヘッダーのずれ防止）───
+    // 元々はCapacitor(WKWebView)限定だったが、Web版(Safari)でもニュース画面の内部スクロールが
+    // 境界に達した際にbody全体へスクロールが連鎖し、固定のはずのヘッダー/ボトムナビが
+    // 一緒にずれる不具合が確認されたため、2026-08-28にWeb版にも適用範囲を拡大した。
+    let _overscrollTouchStartY = 0;
+    document.addEventListener('touchstart', e => {
+      _overscrollTouchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchmove', e => {
+      const dy = e.touches[0].clientY - _overscrollTouchStartY;
+      let el = e.target;
+      while (el && el !== document.documentElement) {
+        const ov = window.getComputedStyle(el).overflowY;
+        if (ov === 'auto' || ov === 'scroll') {
+          // 実際に縦スクロール可能な要素のみ対象（overflow-x:autoの副作用でoverflow-y:autoになる要素を除外）
+          if (el.scrollHeight > el.clientHeight) {
+            const atTop    = el.scrollTop <= 0;
+            const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+            if (dy > 0 && atTop)    { e.preventDefault(); return; }
+            if (dy < 0 && atBottom) { e.preventDefault(); return; }
+            return; // スクロール余地あり → 許可
+          }
+        }
+        el = el.parentElement;
+      }
+      e.preventDefault();
+    }, { passive: false });
 
     // ─── タッチ端末検出（onclick属性のゴーストクリックガードで使用）───
     let _touchCapableDetected = false;
@@ -440,6 +443,7 @@
         newsCatWeather: '天候・災害',
         newsCatTransport: '交通',
         newsCatCommunity: 'コミュニティ',
+        newsCatBusiness: 'ビジネス',
         newsEmptyDesc: '現在表示できる情報がありません。<br>また後で確認してください。',
         lifeInfoPreviewTitle: '📰 シンガポール生活情報',
         lifeInfoPreviewMoreLink: 'もっと見る ›',
@@ -752,6 +756,7 @@
         newsCatWeather: 'Weather',
         newsCatTransport: 'Transport',
         newsCatCommunity: 'Community',
+        newsCatBusiness: 'Business',
         newsEmptyDesc: 'No information available right now.<br>Please check back later.',
         lifeInfoPreviewTitle: '📰 Singapore Life Info',
         lifeInfoPreviewMoreLink: 'More ›',
@@ -1396,14 +1401,14 @@
       const safeUrl = (e.url || '').replace(/'/g, "\\'");;
       const eAgeAttr = Array.isArray(e.age) ? e.age.join(',') : (e.age || 'all');
 
-      // 新着リボン（3日以内に登録）
+      // 新着リボン（1日以内に登録。毎日cron取り込みのため3日→1日に短縮、2026-08-28）
       const newRibbon = (() => {
         if (!e.fetched_at) return '';
         const fetched = new Date(e.fetched_at + 'T00:00:00');
         const now = new Date(); now.setHours(0,0,0,0);
         const days = Math.round((now - fetched) / 86400000);
         const isEn = getLang() === 'en';
-        if (days <= 3) return `<div class="card-new-ribbon card-new-ribbon--today">New</div>`;
+        if (days <= 1) return `<div class="card-new-ribbon card-new-ribbon--today">New</div>`;
         return '';
       })();
       const hasRibbon = newRibbon !== '';
@@ -1501,12 +1506,14 @@
 
     let LIFE_INFO_DATA = [];
     let _newsCategory = ''; // '' = すべて
+    let _newsFilterNew = false;
 
     const LIFE_INFO_CATEGORY_LABEL_KEYS = {
       admin:     'newsCatAdmin',
       weather:   'newsCatWeather',
       transport: 'newsCatTransport',
       community: 'newsCatCommunity',
+      business:  'newsCatBusiness',
     };
 
     // 生活情報記事の元記事URLを開く（既存 openSponsoredCardLink() と同じ分岐パターン）
@@ -1529,14 +1536,9 @@
         : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
-    // 新着リボン（3日以内に登録、イベントカードの newRibbon ロジックと同一基準）
+    // 新着リボン（1日以内に登録、イベントカードの newRibbon ロジックと同一基準）
     function _lifeInfoNewRibbonHtml(item) {
-      if (!item.fetched_at) return '';
-      const fetched = new Date(item.fetched_at + 'T00:00:00');
-      const now = new Date(); now.setHours(0,0,0,0);
-      const days = Math.round((now - fetched) / 86400000);
-      if (days <= 3) return `<div class="card-new-ribbon card-new-ribbon--today">New</div>`;
-      return '';
+      return _isLifeInfoItemNew(item) ? `<div class="card-new-ribbon card-new-ribbon--today">New</div>` : '';
     }
 
     function _lifeInfoCardHtml(item) {
@@ -1548,7 +1550,7 @@
       const catLabel = catKey ? t(catKey) : '';
       const url = (item.sourceUrl || '').replace(/'/g, '&#39;');
       const newRibbon = _lifeInfoNewRibbonHtml(item);
-      return `<div class="spot-card" style="padding:14px;cursor:pointer;" onclick="openLifeInfoLink('${url}')">
+      return `<div class="spot-card" style="padding:14px;">
         ${newRibbon}
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:var(--warm-gray);">
           ${catLabel ? `<span style="background:var(--sand);border-radius:20px;padding:2px 8px;font-weight:700;color:var(--caramel);">${catLabel}</span>` : ''}
@@ -1556,7 +1558,10 @@
           <span>${dateStr}</span>
         </div>
         <div style="font-size:16px;font-weight:700;color:var(--midnight);margin-bottom:10px;line-height:1.35;">${title}</div>
-        <div style="font-size:15px;color:var(--warm-gray);line-height:1.65;">${summary}</div>
+        <div style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${summary}</div>
+        <div style="display:flex;justify-content:flex-end;">
+          ${url ? `<a href="${url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
+        </div>
       </div>`;
     }
 
@@ -1606,13 +1611,28 @@
       renderNewsList();
     }
 
+    // 新着（1日以内）のみ表示（イベント画面の toggleNewFilter() と同じ基準・パターン）
+    function toggleNewsFilterNew() {
+      _newsFilterNew = !_newsFilterNew;
+      document.getElementById('news-new-filter-btn')?.classList.toggle('active', _newsFilterNew);
+      renderNewsList();
+    }
+
+    function _isLifeInfoItemNew(item) {
+      if (!item.fetched_at) return false;
+      const fetched = new Date(item.fetched_at + 'T00:00:00');
+      const now = new Date(); now.setHours(0,0,0,0);
+      return Math.round((now - fetched) / 86400000) <= 1;
+    }
+
     function renderNewsList() {
       const list = document.getElementById('news-list');
       const empty = document.getElementById('news-empty-state');
       if (!list) return;
-      const filtered = _newsCategory
+      let filtered = _newsCategory
         ? LIFE_INFO_DATA.filter(item => item.category === _newsCategory)
         : LIFE_INFO_DATA;
+      if (_newsFilterNew) filtered = filtered.filter(_isLifeInfoItemNew);
       const countEl = document.getElementById('news-result-count');
       if (countEl) countEl.textContent = getLang() === 'ja' ? `${filtered.length}件` : `${filtered.length}`;
       if (filtered.length === 0) {
@@ -2022,12 +2042,12 @@
         // 終了間近
         const endingMatch = !filterEnding || isEndingSoon(e);
 
-        // 新着（3日以内）
+        // 新着（1日以内。毎日cron取り込みのため3日→1日に短縮、2026-08-28）
         const newMatch = !filterNew || (() => {
           if (!e.fetched_at) return false;
           const fetched = new Date(e.fetched_at + 'T00:00:00');
           const now = new Date(); now.setHours(0,0,0,0);
-          return Math.round((now - fetched) / 86400000) <= 3;
+          return Math.round((now - fetched) / 86400000) <= 1;
         })();
 
         // キーワード
@@ -2221,6 +2241,12 @@
       }, { passive: false });
     }
 
+    // ─── ニュース画面「新着のみ」ボタン 即時タップ対応 ───
+    document.getElementById('news-new-filter-btn')?.addEventListener('touchend', e => {
+      e.preventDefault();
+      toggleNewsFilterNew();
+    }, { passive: false });
+
     // ─── カード領域スワイプでタブ切り替え ───
     // _swipeStartX/_swipeStartY/_swipeIntent はPTR（設計書19）からも参照するため、
     // このブロック内に閉じずモジュールスコープの let にしている（2026-07-12）。
@@ -2275,6 +2301,49 @@
         const dx = e.changedTouches[0].clientX - _swipeStartX;
         if (Math.abs(dx) < 50) return;
         _switchCatBySwipe(dx < 0 ? 1 : -1);
+      }, { passive: true });
+    }
+
+    // ─── ニュース画面スワイプでカテゴリ切り替え（ホーム画面と同じパターン、単独判定。設計書172） ───
+    {
+      let _newsSwipeStartX = 0, _newsSwipeStartY = 0, _newsSwipeIntent = null, _newsSwipeOnHeaderScroll = false;
+
+      function _newsVisibleCatOrder() {
+        return [...document.querySelectorAll('#news-filter-row .filter-chip')]
+          .filter(b => b.offsetParent !== null)
+          .map(b => b.dataset.newsCat || '');
+      }
+
+      function _switchNewsCatBySwipe(dir) {
+        const order = _newsVisibleCatOrder();
+        const idx = order.indexOf(_newsCategory);
+        const next = idx + dir;
+        if (idx === -1 || next < 0 || next >= order.length) return;
+        setNewsCategory(order[next]);
+        const chip = document.querySelector(`#news-filter-row .filter-chip[data-news-cat="${order[next]}"]`);
+        chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+
+      const newsScreenEl = document.getElementById('screen-news');
+      newsScreenEl?.addEventListener('touchstart', e => {
+        _newsSwipeOnHeaderScroll = !!e.target.closest('#news-filter-row');
+        _newsSwipeStartX = e.touches[0].clientX;
+        _newsSwipeStartY = e.touches[0].clientY;
+        _newsSwipeIntent = null;
+      }, { passive: true });
+
+      newsScreenEl?.addEventListener('touchmove', e => {
+        if (_newsSwipeOnHeaderScroll || _newsSwipeIntent) return;
+        const dx = Math.abs(e.touches[0].clientX - _newsSwipeStartX);
+        const dy = Math.abs(e.touches[0].clientY - _newsSwipeStartY);
+        if (dx > 6 || dy > 6) _newsSwipeIntent = dx > dy ? 'h' : 'v';
+      }, { passive: true });
+
+      newsScreenEl?.addEventListener('touchend', e => {
+        if (_newsSwipeOnHeaderScroll || _newsSwipeIntent !== 'h') return;
+        const dx = e.changedTouches[0].clientX - _newsSwipeStartX;
+        if (Math.abs(dx) < 50) return;
+        _switchNewsCatBySwipe(dx < 0 ? 1 : -1);
       }, { passive: true });
     }
 
@@ -2505,6 +2574,7 @@
     loadEventData();
     // loadLifeInfoPreview(); // イベント画面のプレビューは非表示化（ニュースタブに一本化、2026-08-28）
     loadLifeInfoNewsScreen(); // ニュースタブを初期表示画面にしたため起動時に直接読み込む（2026-08-28）
+    setTimeout(() => _debugLogScreenMetrics('news'), 500); // 診断: 初期表示時点のメトリクス（使い捨て）
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
@@ -3827,6 +3897,45 @@
       }, 100);
     }
 
+    // ─── 診断: News画面のbodyスクロール調査（使い捨て、原因特定後に削除すること。2026-08-28） ───
+    function _debugLogScreenMetrics(screen) {
+      try {
+        const el = screen === 'home' ? document.getElementById('screen-home') : document.getElementById('screen-' + screen);
+        const scrollEl = screen === 'home' ? document.getElementById('home-scroll-content') : el?.querySelector('.screen-scroll-content');
+        const cs = el ? window.getComputedStyle(el) : null;
+        _sendDebugLog('screen_metrics_debug', {
+          screen,
+          bodyScrollHeight: document.body.scrollHeight,
+          docScrollHeight: document.documentElement.scrollHeight,
+          innerHeight: window.innerHeight,
+          windowScrollY: window.scrollY,
+          elDisplay: cs?.display,
+          elFlexDirection: cs?.flexDirection,
+          elClassList: el?.className,
+          elOffsetHeight: el?.offsetHeight,
+          elBoundingHeight: el ? Math.round(el.getBoundingClientRect().height) : null,
+          scrollElScrollHeight: scrollEl?.scrollHeight,
+          scrollElClientHeight: scrollEl?.clientHeight,
+        });
+      } catch (err) {
+        _sendDebugLog('screen_metrics_debug_error', { screen, message: String(err) });
+      }
+    }
+    let _debugScrollDiagBound = false;
+    function _bindDebugScrollDiag() {
+      if (_debugScrollDiagBound) return;
+      _debugScrollDiagBound = true;
+      let lastY = window.scrollY;
+      window.addEventListener('scroll', () => {
+        const y = window.scrollY;
+        if (y === lastY) return;
+        lastY = y;
+        const activeNav = document.querySelector('.nav-item.active')?.id || '';
+        _sendDebugLog('window_scroll_debug', { scrollY: y, activeNav });
+      }, { passive: true });
+    }
+    _bindDebugScrollDiag();
+
     function switchNav(screen) {
       // 画面遷移直前にフォーカスが残っていれば無条件で外す（モーダル閉じ忘れ等でinput/textareaに
       // フォーカスが残ったまま遷移すると、iOS WKWebViewでボトムナビのタップが効かなくなる不具合の対策。2026-07-11）
@@ -3871,6 +3980,7 @@
         document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
         else { renderEventCards(); }
+        setTimeout(() => _debugLogScreenMetrics('home'), 300);
       } else {
         document.getElementById('screen-home').style.display = 'none';
         if (appHeader) appHeader.style.display = 'none';
@@ -3901,6 +4011,7 @@
         }
         if (screen === 'news') {
           loadLifeInfoNewsScreen();
+          setTimeout(() => _debugLogScreenMetrics('news'), 300);
         }
       }
     }
