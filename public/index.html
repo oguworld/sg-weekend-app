@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260829b">
+  <link rel="stylesheet" href="/app.css?v=20260829c">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -252,6 +252,24 @@
         <div style="font-size:32px;margin-bottom:10px;">📰</div>
         <div style="font-size:14px;line-height:1.7;" data-i18n="newsEmptyDesc">現在表示できる情報がありません。<br>また後で確認してください。</div>
       </div>
+    </div>
+  </div>
+
+  <!-- ─── PINS SCREEN（ピン留め一覧、シンプルな画面） ─── -->
+  <div class="screen" id="screen-pins">
+    <div class="plan-title-header">
+      <span class="screen-title" data-i18n="navPins">ピン留め</span>
+    </div>
+    <div class="screen-scroll-content">
+      <div class="section-title" data-i18n="pinSectionEvents" style="margin-bottom:10px;">イベント</div>
+      <div id="pin-list-content"></div>
+      <div class="section-divider" style="margin:24px 0;">
+        <div class="divider-line"></div>
+        <div class="divider-dot"></div>
+        <div class="divider-line"></div>
+      </div>
+      <div class="section-title" data-i18n="pinSectionNews" style="margin-bottom:10px;">ニュース</div>
+      <div id="news-pin-list-content" style="display:flex;flex-direction:column;gap:12px;"></div>
     </div>
   </div>
 
@@ -621,6 +639,10 @@
     <button class="nav-item" id="nav-home" onclick="if(!_touchCapableDetected) switchNav('home')">
       <span class="nav-icon">📍</span>
       <span class="nav-label" data-i18n="navHome">イベント情報</span>
+    </button>
+    <button class="nav-item" id="nav-pins" onclick="if(!_touchCapableDetected) switchNav('pins')">
+      <span class="nav-icon">📌</span>
+      <span class="nav-label" data-i18n="navPins">ピン留め</span>
     </button>
     <button class="nav-item" id="nav-course" style="display:none;" onclick="if(!_touchCapableDetected) switchNav('course')">
       <span class="nav-icon">🧭</span>
@@ -1277,7 +1299,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260829f"></script>
+  <script src="/app.js?v=20260829g"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

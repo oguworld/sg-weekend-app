@@ -865,20 +865,23 @@
     }
     #screen-plan,
     #screen-settings,
-    #screen-news {
+    #screen-news,
+    #screen-pins {
       padding: 0;
       padding-top: env(safe-area-inset-top, 0px);
       height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
     }
     #screen-plan.visible,
     #screen-settings.visible,
-    #screen-news.visible {
+    #screen-news.visible,
+    #screen-pins.visible {
       display: flex;
       flex-direction: column;
     }
     #screen-plan .plan-title-header,
     #screen-settings .plan-title-header,
-    #screen-news .plan-title-header {
+    #screen-news .plan-title-header,
+    #screen-pins .plan-title-header {
       flex-shrink: 0;
       padding: 20px 20px 0;
     }

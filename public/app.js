@@ -412,6 +412,10 @@
         countSuffix: '件',
         pinEmpty: 'まだピン留めがありません',
         pinEmptyDesc: '気になるスポットのカードから<br>📌ピン留めしてみましょう！',
+        navPins: 'ピン留め',
+        pinSectionEvents: 'イベント',
+        pinSectionNews: 'ニュース',
+        newsPinEmpty: 'まだピン留めしたニュースがありません',
         shareSettingsDesc: 'シンガポール在住の友達にこのアプリを紹介しよう！',
         shareSettingsBtn: '友達にシェアする',
         bannerToday: '⏰ 本日まで',
@@ -726,6 +730,10 @@
         countSuffix: '',
         pinEmpty: 'No pins yet',
         pinEmptyDesc: 'Tap 📌 on any card to pin it!',
+        navPins: 'Pinned',
+        pinSectionEvents: 'Events',
+        pinSectionNews: 'News',
+        newsPinEmpty: 'No pinned news articles yet',
         shareSettingsDesc: 'Share this app with your friends in Singapore!',
         shareSettingsBtn: 'Share with Friends',
         bannerToday: '⏰ Today only',
@@ -1488,8 +1496,10 @@
             ${displayContent ? `<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${displayContent}</p>` : ''}
             <div class="card-sub-row">
               ${tipsList}
-              ${pinLinkHtml}
-              ${e.url ? `<a href="${e.url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
+              <div style="display:flex;align-items:center;gap:14px;">
+                ${pinLinkHtml}
+                ${e.url ? `<a href="${e.url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
+              </div>
             </div>
             ${tipsContent}
           </div>
@@ -1525,6 +1535,31 @@
     function _lifeInfoCategoryTagStyle(category) {
       const c = LIFE_INFO_CATEGORY_COLORS[category] || LIFE_INFO_CATEGORY_COLORS.education;
       return `background:${c.bg};color:${c.color};`;
+    }
+
+    // ニュース記事のピン留め（イベントのgetPins()/savePins()とは別の独立ストレージ。
+    // イベント側はEVENT_REGISTRYから都度情報を引くが、ニュース記事はlife-info.jsonの
+    // 保持期間（7日）で消える可能性があるため、ピン留め時点の内容を丸ごとローカルに保存する）
+    function getNewsPins() {
+      try { return JSON.parse(localStorage.getItem('app_pinned_news') || '{}'); } catch { return {}; }
+    }
+    function saveNewsPins(pins) {
+      localStorage.setItem('app_pinned_news', JSON.stringify(pins));
+    }
+    function toggleNewsPinById(id) {
+      const pins = getNewsPins();
+      if (pins[id]) {
+        delete pins[id];
+        showToast(t('toastUnpinned'));
+      } else {
+        const item = LIFE_INFO_DATA.find(it => it.id === id);
+        if (!item) return;
+        pins[id] = item;
+        showToast(t('toastPinned'));
+      }
+      saveNewsPins(pins);
+      renderNewsList();
+      renderNewsPinList();
     }
 
     // 生活情報記事の元記事URLを開く（既存 openSponsoredCardLink() と同じ分岐パターン）
@@ -1570,7 +1605,8 @@
         </div>
         <div style="font-size:16px;font-weight:700;color:var(--midnight);margin-bottom:10px;line-height:1.35;">${title}</div>
         <div style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${summary}</div>
-        <div style="display:flex;justify-content:flex-end;">
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;">
+          <span class="card-detail-link card-pin-link${getNewsPins()[item.id] ? ' pinned' : ''}" style="cursor:pointer;" onclick="toggleNewsPinById('${item.id}')">📌 ${getNewsPins()[item.id] ? t('pinnedBtn') : t('pinBtn')}</span>
           ${url ? `<a href="${url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
         </div>
       </div>`;
@@ -2367,7 +2403,7 @@
     // ─── ボトムナビ 即時タップ対応（iOS Safari scroll-offset click mismatch 回避）───
     {
       let _navTouchStartX = 0, _navTouchStartY = 0;
-      ['home', 'course', 'news', 'plan', 'settings'].forEach(s => {
+      ['home', 'course', 'news', 'pins', 'plan', 'settings'].forEach(s => {
         const btn = document.getElementById('nav-' + s);
         if (!btn) return;
         btn.addEventListener('touchstart', e => {
@@ -2837,6 +2873,23 @@
           </div>
           <button class="pin-remove-btn" onclick="event.stopPropagation(); removePin('${p.id}'); renderPinList();">✕</button>
         </div>`).join('');
+    }
+
+    // ニュース記事のピン留め一覧（画面: #screen-pins、シンプルな一覧）
+    function renderNewsPinList() {
+      const container = document.getElementById('news-pin-list-content');
+      if (!container) return;
+      const pins = getNewsPins();
+      const entries = Object.values(pins);
+      if (entries.length === 0) {
+        container.innerHTML = `
+          <div class="pin-empty">
+            <div class="pin-empty-emoji">📰</div>
+            <div class="pin-empty-title">${t('newsPinEmpty')}</div>
+          </div>`;
+        return;
+      }
+      container.innerHTML = entries.map(_lifeInfoCardHtml).join('');
     }
 
     function openPinDetail(id) {
@@ -3957,7 +4010,7 @@
         document.activeElement.blur();
       }
       closeAllPopups();
-      ['home','course','news','plan','settings'].forEach(s => {
+      ['home','course','news','pins','plan','settings'].forEach(s => {
         document.getElementById('nav-' + s).classList.remove('active');
         const el = document.getElementById('screen-' + s);
         if (el) {
@@ -4026,6 +4079,10 @@
         if (screen === 'news') {
           loadLifeInfoNewsScreen();
           setTimeout(() => _debugLogScreenMetrics('news'), 300);
+        }
+        if (screen === 'pins') {
+          renderPinList();
+          renderNewsPinList();
         }
       }
     }
