@@ -1435,8 +1435,11 @@
             ${e.location ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📍 ${e.location}</span>` : ''}
             ${(e.period || e.hours) ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📅 ${e.period || e.hours}</span>` : ''}
           </div>` : '';
+      const pinOverlayBtnHtml = `<button class="card-pin-overlay-btn${pinned ? ' pinned' : ''}" id="pin-${e.id}" onclick="event.stopPropagation(); togglePinById('${e.id}')" aria-label="${pinned ? t('pinnedBtn') : t('pinBtn')}">📌</button>`;
+
       const heroOverlayContent = `
         <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.78) 100%);pointer-events:none;"></div>
+        ${pinOverlayBtnHtml}
         <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px 13px;">
           ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:4px;padding:2px 7px;margin-bottom:5px;">${bannerLabel}</div>` : ''}
           <h2 style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);">${e.store || e.title || ''}</h2>
@@ -1451,6 +1454,7 @@
             const igEmbedUrl = (e.url || '').replace(/\/$/, '') + '/?utm_source=ig_embed';
             const igMetaHtml = `
               <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.78) 100%);pointer-events:none;z-index:2;"></div>
+              ${pinOverlayBtnHtml}
               <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px 13px;pointer-events:none;z-index:3;">
                 ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:4px;padding:2px 7px;margin-bottom:5px;">${bannerLabel}</div>` : ''}
                 <h2 style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);${hasRibbon ? 'padding-right:44px;' : ''}">${e.store || e.title || ''}</h2>
@@ -1488,12 +1492,6 @@
               ${e.url ? `<a href="${e.url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
             </div>
             ${tipsContent}
-            <div class="card-action-row">
-              <button class="card-action-btn${pinned ? ' pinned' : ''}" style="flex:none;width:calc(33% - 4px);" id="pin-${e.id}" onclick="togglePinById('${e.id}')">
-                <span class="card-action-icon">📌</span>
-                <span id="pin-label-${e.id}">${pinned ? t('pinnedBtn') : t('pinBtn')}</span>
-              </button>
-            </div>
           </div>
         </article>`;
     }
@@ -2807,15 +2805,12 @@
       document.querySelectorAll('.spot-card').forEach(card => {
         const id = card.dataset.id;
         const btn = card.querySelector('#pin-' + id);
+        if (!btn) return;
         const label = card.querySelector('#pin-label-' + id);
-        if (!btn || !label) return;
-        if (pins[id]) {
-          btn.classList.add('pinned');
-          label.textContent = t('pinnedBtn');
-        } else {
-          btn.classList.remove('pinned');
-          label.textContent = t('pinBtn');
-        }
+        const isPinned = !!pins[id];
+        btn.classList.toggle('pinned', isPinned);
+        btn.setAttribute('aria-label', t(isPinned ? 'pinnedBtn' : 'pinBtn'));
+        if (label) label.textContent = t(isPinned ? 'pinnedBtn' : 'pinBtn');
       });
     }
 
