@@ -365,7 +365,7 @@
         secAbout: 'アプリ情報',
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
-        navHome: 'イベント',
+        navHome: 'イベント情報',
         navPlan: '予定表',
         navSettings: '設定',
         pinBtn: 'ピン留め',
