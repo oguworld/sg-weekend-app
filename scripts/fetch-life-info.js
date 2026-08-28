@@ -42,12 +42,13 @@ const CITY_CONFIG = {
     feeds: [
       { url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10416', name: 'CNA' },
       { url: 'https://mothership.sg/feed/',                                                          name: 'Mothership' },
+      { url: 'https://www.straitstimes.com/news/singapore/rss.xml',                                  name: 'Straits Times' },
       { url: 'https://www.jcci.org.sg/feed/',                                                         name: 'JCCI' },
     ],
   },
 };
 
-const CATEGORIES = ['admin', 'weather', 'transport', 'community'];
+const CATEGORIES = ['admin', 'transport', 'health', 'education', 'weather', 'community'];
 
 // ─── CLI引数解析 ─────────────────────────────────────────────────
 function parseArgs() {
@@ -80,7 +81,7 @@ function saveFetchState(state) {
 const DAYS_BACK = 7;
 const MAX_PER_FEED = 30;
 
-async function fetchNewItems(feeds, cityKey) {
+async function fetchNewItems(feeds, cityKey, dryRun) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - DAYS_BACK);
 
@@ -145,7 +146,9 @@ async function fetchNewItems(feeds, cityKey) {
     }
   }
 
-  saveFetchState(state);
+  // --dry-run時は状態を永続化しない（安全なテスト実行のため。GUIDを既読扱いにしてしまうと
+  // 本番実行時にそのまま「新着なし」として消えてしまう副作用があった、2026-08-29発覚・修正）
+  if (!dryRun) saveFetchState(state);
   return allItems;
 }
 
@@ -440,7 +443,7 @@ async function main() {
   console.log('━'.repeat(50));
 
   console.log('\n📡 RSSフィード取得中...');
-  const rawItems = await fetchNewItems(conf.feeds, cityKey);
+  const rawItems = await fetchNewItems(conf.feeds, cityKey, dryRun);
   console.log(`\n  合計取得: ${rawItems.length}件`);
 
   if (rawItems.length === 0) {
