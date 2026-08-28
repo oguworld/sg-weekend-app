@@ -297,11 +297,61 @@ JSON配列のみ返すこと（前置き・説明・コードブロック不要�
   return JSON.parse(match[0]);
 }
 
+// ─── 重複排除（意味的重複、最後に実施） ────────────────────────
+// 複数のニュースソースが同じ実際の出来事を別々の記事として報じているケースをHaikuで検出し、
+// 新規候補側から除外する（既存の掲載済み記事は削除しない）。直近3日分の既存記事のみを
+// 比較対象にする（重複は近い日付間でのみ起こるため、古い記事まで比較する必要はない）。
+async function filterOutDuplicateStories(newItems, existingItems) {
+  if (newItems.length === 0) return newItems;
+
+  const recentCutoff = new Date();
+  recentCutoff.setHours(0, 0, 0, 0);
+  recentCutoff.setDate(recentCutoff.getDate() - 3);
+  const recentExisting = existingItems.filter(it => {
+    if (!it.fetched_at) return false;
+    const d = new Date(it.fetched_at + 'T00:00:00');
+    return !isNaN(d.getTime()) && d >= recentCutoff;
+  });
+
+  const existingList = recentExisting.map((it, i) => `E${i}: ${it.title}`).join('\n') || '(なし)';
+  const candidateList = newItems.map((it, i) => `N${i}: ${it.title}`).join('\n');
+
+  const instructionText = `以下は生活情報ニュースアプリの記事タイトル一覧です。「既存記事」は既に掲載済み、「新規候補」はこれから掲載しようとしている記事です。
+異なる情報源が同じ実際の出来事・ニュースを報じているだけの重複（表現・切り口が違っても内容が同じもの）を検出してください。単に同じカテゴリ・似たテーマというだけでは重複としないこと。
+
+新規候補が既存記事と同じ内容の場合、または新規候補同士で同じ内容のものが複数ある場合は、後者（番号が大きい方）を重複として扱ってください。
+
+既存記事:
+${existingList}
+
+新規候補:
+${candidateList}
+
+重複と判定した新規候補のインデックス番号（"N0","N1"等）のみをJSON配列で返してください（例: ["N1","N3"]）。重複がなければ空配列 [] を返すこと。前置き・説明・コードブロックは不要です。`;
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: instructionText }],
+    });
+    const text = response.content[0].text.trim();
+    const clean = text.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+    const match = clean.match(/\[[\s\S]*\]/);
+    if (!match) return newItems;
+    const dupLabels = new Set(JSON.parse(match[0]));
+    return newItems.filter((_, i) => !dupLabels.has(`N${i}`));
+  } catch (e) {
+    console.error('  ⚠️ 重複チェックに失敗、そのまま続行:', e.message);
+    return newItems;
+  }
+}
+
 // ─── メイン関数：フィルタリング＆保存 ──────────────────────────
 async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
   let totalAccepted = 0;
   let totalRejected = 0;
-  const newItems = [];
+  let newItems = [];
 
   // ── Step1: Haikuで全件フィルタリング ──
   const filtered = []; // { filtered: {index,category}, original: item }
@@ -403,6 +453,17 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
     console.log(`  ⚠️ 要約生成に失敗したため${enrichFailedCount}件を除外しました`);
   }
 
+  // 重複排除（最後に実施）: 異なるソースが同じ実際の出来事を報じているだけの意味的重複を検出する。
+  // URLベースのdeduplicateItems()（取得直後）では検出できないケース（例: Mothership/Straits Times
+  // が同じ近隣トラブル調停制度のニュースを別々のURLで報じる）に対応する。既存記事側は削除せず、
+  // 新規候補側のみを重複として除外する（既に掲載済みの記事を後から消す方式は取らない）。
+  const existingForDedup = fs.existsSync(lifeInfoPath) ? JSON.parse(fs.readFileSync(lifeInfoPath, 'utf8')) : [];
+  const beforeDedupCount = newItems.length;
+  newItems = await filterOutDuplicateStories(newItems, existingForDedup);
+  if (newItems.length < beforeDedupCount) {
+    console.log(`  🔁 意味的重複と判定し${beforeDedupCount - newItems.length}件を除外しました`);
+  }
+
   // 保持期間: fetched_atが7日以上前の記事は削除する（生活情報は鮮度が命のため、events.jsonと異なり
   // 蓄積し続けない方針。新規採用が0件の日も既存データの棚卸しのため必ず実行する）
   const RETENTION_DAYS = 7;
@@ -414,7 +475,7 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
     console.log(`\n  🧪 --dry-run のため保存はスキップします（採用${newItems.length}件）`);
     console.log(JSON.stringify(newItems, null, 2));
   } else {
-    const existing = fs.existsSync(lifeInfoPath) ? JSON.parse(fs.readFileSync(lifeInfoPath, 'utf8')) : [];
+    const existing = existingForDedup;
     const combined = [...existing, ...newItems];
     const kept = combined.filter(item => {
       if (!item.fetched_at) return true; // 日付不明は安全側で残す
