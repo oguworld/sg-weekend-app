@@ -2249,7 +2249,7 @@
     // ─── ボトムナビ 即時タップ対応（iOS Safari scroll-offset click mismatch 回避）───
     {
       let _navTouchStartX = 0, _navTouchStartY = 0;
-      ['home', 'course', 'plan', 'settings'].forEach(s => {
+      ['home', 'course', 'news', 'plan', 'settings'].forEach(s => {
         const btn = document.getElementById('nav-' + s);
         if (!btn) return;
         btn.addEventListener('touchstart', e => {
