@@ -2471,7 +2471,8 @@
     const ARRIVAL_ANNIVERSARY_YEARS_AHEAD = 10;
 
     loadEventData();
-    loadLifeInfoPreview(); // GET /api/events とは独立した呼び出し。互いのエラーが影響しない（設計書172）
+    // loadLifeInfoPreview(); // イベント画面のプレビューは非表示化（ニュースタブに一本化、2026-08-28）
+    loadLifeInfoNewsScreen(); // ニュースタブを初期表示画面にしたため起動時に直接読み込む（2026-08-28）
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
