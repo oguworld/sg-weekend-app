@@ -1493,10 +1493,6 @@
                 <span class="card-action-icon">📌</span>
                 <span id="pin-label-${e.id}">${pinned ? t('pinnedBtn') : t('pinBtn')}</span>
               </button>
-              <button class="card-action-btn" style="flex:none;width:calc(33% - 4px);" onclick="openEventPlanModal('${e.id}')">
-                <span class="card-action-icon">📅</span>
-                <span>${t('addToPlanBtnShort')}</span>
-              </button>
             </div>
           </div>
         </article>`;
