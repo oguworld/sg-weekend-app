@@ -1548,6 +1548,22 @@
       </div>`;
     }
 
+    // ホーム画面プレビュー専用の軽量カード（タイトルのみ・横スクロール、要約文は含めない）
+    function _lifeInfoPreviewCardHtml(item) {
+      const lang = getLang();
+      const title = (lang === 'ja' ? item.title : item.title_en) || item.title || '';
+      const catKey = LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || '';
+      const catLabel = catKey ? t(catKey) : '';
+      const url = (item.sourceUrl || '').replace(/'/g, '&#39;');
+      return `<div style="flex:0 0 auto;width:180px;background:var(--warm-white);border-radius:12px;padding:10px 12px;cursor:pointer;" onclick="openLifeInfoLink('${url}')">
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px;font-size:10px;color:var(--warm-gray);">
+          ${catLabel ? `<span style="background:var(--sand);border-radius:20px;padding:1px 7px;font-weight:700;color:var(--caramel);">${catLabel}</span>` : ''}
+          <span>${item.source || ''}</span>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--midnight);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${title}</div>
+      </div>`;
+    }
+
     // ホーム画面: 生活情報プレビュー（直近2〜3件、公開日新しい順）
     async function loadLifeInfoPreview() {
       const section = document.getElementById('life-info-preview-section');
@@ -1561,7 +1577,7 @@
           return;
         }
         const preview = items.slice(0, 3);
-        list.innerHTML = preview.map(_lifeInfoCardHtml).join('');
+        list.innerHTML = preview.map(_lifeInfoPreviewCardHtml).join('');
         section.style.display = 'block';
       } catch (e) {
         // GET /api/events の成否とは無関係に失敗させる（ホーム画面全体には影響させない）

@@ -75,7 +75,7 @@
           <span style="font-size:12px;font-weight:700;color:var(--warm-gray);" data-i18n="lifeInfoPreviewTitle">📰 シンガポール生活情報</span>
           <span style="font-size:12px;font-weight:700;color:var(--caramel);cursor:pointer;" onclick="if(!_touchCapableDetected) switchNav('news')" data-i18n="lifeInfoPreviewMoreLink">もっと見る ›</span>
         </div>
-        <div id="life-info-preview-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div id="life-info-preview-list" style="display:flex;flex-direction:row;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;"></div>
       </div>
 
       <!-- Category Filter (new horizontal scroll) -->
@@ -1270,7 +1270,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260828b"></script>
+  <script src="/app.js?v=20260828c"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
