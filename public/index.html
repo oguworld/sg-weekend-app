@@ -230,17 +230,20 @@
   <!-- ─── NEWS SCREEN（設計書172、生活情報・ニュースのキュレーション） ─── -->
   <div class="screen visible" id="screen-news">
     <div class="plan-title-header">
-      <span class="screen-title" data-i18n="newsScreenTitle">生活情報・ニュース</span>
+      <span class="screen-title" data-i18n="newsScreenTitle">ニュース・生活情報</span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;padding:0 20px;flex-shrink:0;">
+      <div id="news-result-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
+    </div>
+    <div id="news-filter-row" style="display:flex;gap:8px;overflow-x:auto;padding:8px 20px 12px;flex-shrink:0;">
+      <button class="filter-chip active" data-news-cat="" onclick="if(!_touchCapableDetected) setNewsCategory('')" data-i18n="newsCatAll">すべて</button>
+      <button class="filter-chip" data-news-cat="admin" onclick="if(!_touchCapableDetected) setNewsCategory('admin')" data-i18n="newsCatAdmin">行政</button>
+      <button class="filter-chip" data-news-cat="weather" onclick="if(!_touchCapableDetected) setNewsCategory('weather')" data-i18n="newsCatWeather">天候・災害</button>
+      <button class="filter-chip" data-news-cat="transport" onclick="if(!_touchCapableDetected) setNewsCategory('transport')" data-i18n="newsCatTransport">交通</button>
+      <button class="filter-chip" data-news-cat="community" onclick="if(!_touchCapableDetected) setNewsCategory('community')" data-i18n="newsCatCommunity">コミュニティ</button>
     </div>
     <div class="screen-scroll-content">
-      <div id="news-filter-row" style="display:flex;gap:8px;overflow-x:auto;padding:12px 16px;">
-        <button class="filter-chip active" data-news-cat="" onclick="if(!_touchCapableDetected) setNewsCategory('')" data-i18n="newsCatAll">すべて</button>
-        <button class="filter-chip" data-news-cat="admin" onclick="if(!_touchCapableDetected) setNewsCategory('admin')" data-i18n="newsCatAdmin">行政</button>
-        <button class="filter-chip" data-news-cat="weather" onclick="if(!_touchCapableDetected) setNewsCategory('weather')" data-i18n="newsCatWeather">天候・災害</button>
-        <button class="filter-chip" data-news-cat="transport" onclick="if(!_touchCapableDetected) setNewsCategory('transport')" data-i18n="newsCatTransport">交通</button>
-        <button class="filter-chip" data-news-cat="community" onclick="if(!_touchCapableDetected) setNewsCategory('community')" data-i18n="newsCatCommunity">コミュニティ</button>
-      </div>
-      <div id="news-list" style="padding:0 16px 40px;display:flex;flex-direction:column;gap:12px;"></div>
+      <div id="news-list" style="padding:0 0 40px;display:flex;flex-direction:column;gap:12px;"></div>
       <div id="news-empty-state" style="display:none;text-align:center;padding:60px 24px;color:var(--warm-gray);">
         <div style="font-size:32px;margin-bottom:10px;">📰</div>
         <div style="font-size:14px;line-height:1.7;" data-i18n="newsEmptyDesc">現在表示できる情報がありません。<br>また後で確認してください。</div>
@@ -1270,7 +1273,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260828e"></script>
+  <script src="/app.js?v=20260828g"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

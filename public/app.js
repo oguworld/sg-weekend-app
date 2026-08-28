@@ -434,7 +434,7 @@
         customPlanTitlePlaceholder: 'タイトルを入力',
         navCourse: '探訪',
         navNews: 'ニュース',
-        newsScreenTitle: '生活情報・ニュース',
+        newsScreenTitle: 'ニュース・生活情報',
         newsCatAll: 'すべて',
         newsCatAdmin: '行政',
         newsCatWeather: '天候・災害',
@@ -746,7 +746,7 @@
         customPlanTitlePlaceholder: 'Enter title',
         navCourse: 'Explore',
         navNews: 'News',
-        newsScreenTitle: 'Life Info & News',
+        newsScreenTitle: 'News & Life Info',
         newsCatAll: 'All',
         newsCatAdmin: 'Admin',
         newsCatWeather: 'Weather',
@@ -1601,6 +1601,8 @@
       const filtered = _newsCategory
         ? LIFE_INFO_DATA.filter(item => item.category === _newsCategory)
         : LIFE_INFO_DATA;
+      const countEl = document.getElementById('news-result-count');
+      if (countEl) countEl.textContent = getLang() === 'ja' ? `${filtered.length}件` : `${filtered.length}`;
       if (filtered.length === 0) {
         list.innerHTML = '';
         if (empty) empty.style.display = 'block';
@@ -2186,6 +2188,24 @@
         if (dx > 8 || dy > 8) return;
         e.preventDefault();
         toggleCatFilter(chip.dataset.cat);
+      }, { passive: false });
+    }
+
+    // ─── ニュース画面カテゴリチップ 即時タップ対応（filter-row-categoryと同じパターン、設計書172） ───
+    {
+      let _newsCatTouchStartX = 0, _newsCatTouchStartY = 0;
+      document.getElementById('news-filter-row')?.addEventListener('touchstart', e => {
+        _newsCatTouchStartX = e.touches[0].clientX;
+        _newsCatTouchStartY = e.touches[0].clientY;
+      }, { passive: true });
+      document.getElementById('news-filter-row')?.addEventListener('touchend', e => {
+        const chip = e.target.closest('.filter-chip');
+        if (!chip) return;
+        const dx = Math.abs(e.changedTouches[0].clientX - _newsCatTouchStartX);
+        const dy = Math.abs(e.changedTouches[0].clientY - _newsCatTouchStartY);
+        if (dx > 8 || dy > 8) return;
+        e.preventDefault();
+        setNewsCategory(chip.dataset.newsCat || '');
       }, { passive: false });
     }
 
