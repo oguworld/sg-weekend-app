@@ -539,26 +539,8 @@
     .card-action-btn:active { background: var(--sand-dark); }
     .card-action-btn.pinned { background: var(--caramel-pale); color: var(--caramel); }
 
-    /* カード画像に重ねる丸型ピン留めボタン */
-    .card-pin-overlay-btn {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 5;
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: rgba(44,36,32,0.4);
-      border: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      cursor: pointer;
-      transition: background .15s, transform .15s;
-    }
-    .card-pin-overlay-btn:active { transform: scale(0.92); }
-    .card-pin-overlay-btn.pinned { background: var(--caramel); }
+    /* ひとことメモ⇔元記事を見るの間に表示するピン留めテキストリンク */
+    .card-pin-link.pinned { color: var(--terracotta); font-weight: 700; }
     .card-image-area {
       height: 170px;
       position: relative;
