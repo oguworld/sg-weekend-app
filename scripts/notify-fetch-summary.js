@@ -8,12 +8,15 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const fs   = require('fs');
 const path = require('path');
 
-const CITIES   = ['sg', 'bkk', 'syd'];
+// BKK/SYDは一時停止中で取得自体を行っていないため、通知対象からも除外する（2026-08-29）
+const CITIES   = ['sg'];
 const LOGS_DIR = path.join(__dirname, '../logs');
 
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
 const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
 const DISCOVER_RESULT_PATH = path.join(LOGS_DIR, 'discover-sources-result.json');
+const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json');
+const LIFE_INFO_CAT_LABELS = { admin: '行政', transport: '交通', health: '医療・健康', education: '教育・子育て', weather: '天候・災害', community: 'コミュニティ' };
 
 async function pushToLine(text) {
   const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -77,6 +80,28 @@ async function main() {
   }
 
   lines.push(`合計 ${totalAccepted}件採用`);
+
+  // 生活情報・ニュース（設計書172）セクションを追記（当日のJSONが存在する場合のみ）
+  try {
+    if (fs.existsSync(LIFE_INFO_SUMMARY_PATH)) {
+      const li = JSON.parse(fs.readFileSync(LIFE_INFO_SUMMARY_PATH, 'utf8'));
+      if (li.date === today) {
+        lines.push('');
+        lines.push('━━ 生活情報・ニュース ━━');
+        lines.push(`📰 ${li.accepted}件採用 / ${li.rawTotal}件取得`);
+        if (li.catCounts && Object.keys(li.catCounts).length > 0) {
+          const catLine = Object.entries(li.catCounts)
+            .map(([k, v]) => `${LIFE_INFO_CAT_LABELS[k] || k}:${v}`)
+            .join(' / ');
+          lines.push(`  ${catLine}`);
+        } else {
+          lines.push('  （新着なし）');
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('生活情報サマリーの読み込みに失敗:', e.message);
+  }
 
   // ソース分析セクションを追記（当日のJSONが存在する場合のみ）
   try {

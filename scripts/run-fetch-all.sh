@@ -16,6 +16,10 @@ $NODE $SCRIPTS/fetch-events.js --city=sg  || echo "[WARN] sg fetch failed"
 # コンテンツ整合性チェック（タイトルと説明の入れ替わり検出）
 $NODE $SCRIPTS/check-content-integrity.js --city=sg || echo "[WARN] コンテンツ重複を検出しました。events.jsonを確認してください。"
 
+# 生活情報・ニュースのキュレーション取得（設計書172。イベント通知とまとめて1通のLINE通知にするため
+# notify-fetch-summary.js より前に実行する。旧・独立cronエントリは廃止）
+$NODE $SCRIPTS/fetch-life-info.js --city=sg || echo "[WARN] life-info fetch failed"
+
 $NODE $SCRIPTS/notify-fetch-summary.js
 
 echo "[$(date)] run-fetch-all.sh 完了"

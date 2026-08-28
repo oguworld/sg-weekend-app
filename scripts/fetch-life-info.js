@@ -16,27 +16,22 @@ const path      = require('path');
 const parser = new Parser({ timeout: 10000 });
 const client = new Anthropic();
 
-// ─── LINE通知（scripts/notify-fetch-summary.js と同じ最小実装） ───────
-async function pushToLine(text) {
-  const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  const userId = process.env.LINE_USER_ID;
-  if (!token || !userId) {
-    console.warn('⚠️  LINE credentials未設定のため通知をスキップ');
-    return;
-  }
-  try {
-    const res = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error('LINE通知エラー:', err.message || res.status);
-    }
-  } catch (e) {
-    console.error('LINE通知エラー:', e.message);
-  }
+// ─── 取得結果をファイルに保存（notify-fetch-summary.jsがイベント通知と合算して通知する） ───
+function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems }) {
+  const summaryPath = path.join(__dirname, '..', 'logs', 'fetch-life-info-summary.json');
+  const catCounts = {};
+  for (const item of (newItems || [])) catCounts[item.category] = (catCounts[item.category] || 0) + 1;
+  const summary = {
+    rawTotal,
+    uniqueTotal,
+    accepted,
+    rejected,
+    catCounts,
+    date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' }),
+    updatedAt: new Date().toISOString(),
+  };
+  fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
+  fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
 }
 
 // ─── 都市設定 ────────────────────────────────────────────────────
@@ -450,14 +445,14 @@ async function main() {
 
   if (rawItems.length === 0) {
     console.log('\n✅ 新着なし。終了します。\n');
-    if (!dryRun) await pushToLine(`📰 生活情報・ニュース取得（${conf.nameJa}）\nRSS新着なし`);
+    if (!dryRun) saveFetchSummary({ rawTotal: 0, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
     return;
   }
 
   const uniqueItems = deduplicateItems(rawItems, conf.lifeInfoPath);
   if (uniqueItems.length === 0) {
     console.log('✅ 重複なし新着なし。終了します。\n');
-    if (!dryRun) await pushToLine(`📰 生活情報・ニュース取得（${conf.nameJa}）\n取得${rawItems.length}件 → 重複除外後0件`);
+    if (!dryRun) saveFetchSummary({ rawTotal: rawItems.length, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
     return;
   }
 
@@ -465,14 +460,13 @@ async function main() {
   const result = await filterAndSaveLifeInfo(uniqueItems, { lifeInfoPath: conf.lifeInfoPath, cityKey, dryRun });
 
   if (!dryRun) {
-    const catCounts = {};
-    for (const item of result.newItems) catCounts[item.category] = (catCounts[item.category] || 0) + 1;
-    const catLine = Object.entries(catCounts).map(([k, v]) => `${k}:${v}`).join(' / ') || 'なし';
-    await pushToLine(
-      `📰 生活情報・ニュース取得（${conf.nameJa}）\n` +
-      `取得${rawItems.length}件 → 重複除外${uniqueItems.length}件 → 採用${result.accepted}件\n` +
-      `カテゴリ内訳: ${catLine}`
-    );
+    saveFetchSummary({
+      rawTotal: rawItems.length,
+      uniqueTotal: uniqueItems.length,
+      accepted: result.accepted,
+      rejected: result.rejected,
+      newItems: result.newItems,
+    });
   }
 
   console.log('\n🎉 fetch-life-info.js 完了\n');
