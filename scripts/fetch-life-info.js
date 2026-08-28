@@ -96,7 +96,16 @@ async function fetchNewItems(feeds, cityKey) {
   for (const feed of feeds) {
     try {
       console.log(`\n  📡 取得中: ${feed.name}`);
-      const result = await parser.parseURL(feed.url);
+      // Mothership等、フィード側の生成不備でタイトル内の "&" が "&amp;" にエスケープされず
+      // 生のまま出力されているケースがあり、rss-parser内部のXMLパーサー（xml2js）が
+      // "Invalid character in entity name" で例外を投げていた。生テキストを取得し、
+      // 正規化された実体参照（&amp; &lt; &gt; &quot; &apos; &#数値; &#x16進;）以外の
+      // 素の "&" のみを "&amp;" に置換してから parseString() に渡すことで許容する。
+      const res = await fetch(feed.url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rawXml = await res.text();
+      const sanitizedXml = rawXml.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;');
+      const result = await parser.parseString(sanitizedXml);
       const raw = result.items || [];
 
       const prevState = cityState[feed.name];
