@@ -53,6 +53,11 @@ jobs:
           cd ios-app
           python3 ../scripts/ensure-privacy-manifests.py ios/App/Podfile
 
+      - name: (App Store審査対応) Ensure minimum iOS version is 15.0 (ITMS-90068)
+        run: |
+          cd ios-app
+          python3 ../scripts/ensure-min-ios-version.py ios
+
       - name: (App Store審査対応) Re-run pod install after Podfile patch
         run: |
           cd ios-app/ios/App
