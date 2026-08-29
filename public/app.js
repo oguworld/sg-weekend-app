@@ -2703,6 +2703,12 @@
       await loadEventData();
     }, true);
 
+    // Pull to Refresh（ニュース画面。iOS版のみ有効化。ニュース画面に横スワイプ機構はあるが
+    // 独立判定のためコース画面と同様 watchSwipeIntent=false）
+    _initPtr(document.getElementById('news-scroll-content'), 'ptr-indicator-news', async () => {
+      await loadLifeInfoNewsScreen();
+    }, false);
+
     // バージョン表示
     (async () => {
       const el = document.getElementById('app-version-label');

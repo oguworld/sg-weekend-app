@@ -246,7 +246,8 @@
       <button class="filter-chip" data-news-cat="weather" onclick="if(!_touchCapableDetected) setNewsCategory('weather')" data-i18n="newsCatWeather">天候・災害</button>
       <button class="filter-chip" data-news-cat="community" onclick="if(!_touchCapableDetected) setNewsCategory('community')" data-i18n="newsCatCommunity">コミュニティ</button>
     </div>
-    <div class="screen-scroll-content">
+    <div class="screen-scroll-content" id="news-scroll-content">
+      <div class="ptr-indicator" id="ptr-indicator-news"><div class="ptr-spinner"></div></div>
       <div id="news-list" style="padding:0 0 40px;display:flex;flex-direction:column;gap:12px;"></div>
       <div id="news-empty-state" style="display:none;text-align:center;padding:60px 24px;color:var(--warm-gray);">
         <div style="font-size:32px;margin-bottom:10px;">📰</div>
@@ -1299,7 +1300,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260829l"></script>
+  <script src="/app.js?v=20260829m"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
