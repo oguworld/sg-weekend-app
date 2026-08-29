@@ -1513,6 +1513,7 @@
     let LIFE_INFO_DATA = [];
     let _newsCategory = ''; // '' = すべて
     let _newsFilterNew = false;
+    let _newsDataLoaded = false; // 初回のみfetchし、以降のタブ切り替えではキャッシュを再描画するだけにする（おでかけ画面と同じ挙動）
 
     const LIFE_INFO_CATEGORY_LABEL_KEYS = {
       admin:     'newsCatAdmin',
@@ -1703,6 +1704,7 @@
       } catch (e) {
         LIFE_INFO_DATA = [];
       }
+      _newsDataLoaded = true;
       renderNewsList();
     }
 
@@ -4088,7 +4090,10 @@
           document.querySelectorAll('#news-filter-row .filter-chip').forEach(chip => {
             chip.classList.toggle('active', !(chip.dataset.newsCat || ''));
           });
-          loadLifeInfoNewsScreen();
+          // おでかけ画面と同じく、初回のみfetchし、以降はキャッシュ済みデータを再描画するだけにする
+          // （毎回ローディング表示が挟まると「更新が走っている」ように見えるため）
+          if (_newsDataLoaded) renderNewsList();
+          else loadLifeInfoNewsScreen();
           setTimeout(() => _debugLogScreenMetrics('news'), 300);
         }
         if (screen === 'pins') {
