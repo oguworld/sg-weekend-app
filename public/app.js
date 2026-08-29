@@ -410,7 +410,7 @@
         toastPushDenied: '⚙️ 設定アプリから通知を許可してください',
         toastPushError: '⚠️ 通知の設定に失敗しました',
         countSuffix: '件',
-        pinEmpty: 'まだピン留めがありません',
+        pinEmpty: 'まだピン留めしたイベントがありません',
         pinEmptyDesc: '気になるスポットのカードから<br>📌ピン留めしてみましょう！',
         navPins: 'ピン留め',
         pinSectionEvents: 'イベント',
@@ -728,7 +728,7 @@
         toastPushDenied: '⚙️ Please allow notifications in Settings',
         toastPushError: '⚠️ Failed to configure notifications',
         countSuffix: '',
-        pinEmpty: 'No pins yet',
+        pinEmpty: 'No pinned events yet',
         pinEmptyDesc: 'Tap 📌 on any card to pin it!',
         navPins: 'Pinned',
         pinSectionEvents: 'Events',
@@ -2860,7 +2860,6 @@
           <div class="pin-empty">
             <div class="pin-empty-emoji">📌</div>
             <div class="pin-empty-title">${t('pinEmpty')}</div>
-            <div class="pin-empty-desc">${t('pinEmptyDesc')}</div>
           </div>`;
         return;
       }
