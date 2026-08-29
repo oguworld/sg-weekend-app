@@ -337,13 +337,11 @@
     #filter-row-category {
       display: flex;
       background: transparent;
-      margin: 6px 0 0;
-      padding: 0 8px;
-      border-bottom: 2px solid var(--sand);
+      padding: 8px 20px 12px;
       overflow-x: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
-      gap: 2px;
+      gap: 8px;
       touch-action: pan-x;
     }
     #filter-row-category::-webkit-scrollbar { display: none; }
