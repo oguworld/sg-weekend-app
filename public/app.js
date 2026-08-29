@@ -2746,6 +2746,9 @@
       document.getElementById('home-scroll-content').addEventListener('scroll', () => {
         fab.classList.toggle('visible', document.getElementById('home-scroll-content').scrollTop > 300);
       }, { passive: true });
+      document.getElementById('news-scroll-content')?.addEventListener('scroll', () => {
+        fab.classList.toggle('visible', document.getElementById('news-scroll-content').scrollTop > 300);
+      }, { passive: true });
 
       const calFab = document.getElementById('cal-popup-fab');
       document.getElementById('cal-popup-events').addEventListener('scroll', () => {
@@ -2753,7 +2756,9 @@
       }, { passive: true });
     })();
     function fabScrollTop() {
-      document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'smooth' });
+      const targetId = document.getElementById('nav-news')?.classList.contains('active')
+        ? 'news-scroll-content' : 'home-scroll-content';
+      document.getElementById(targetId)?.scrollTo({ top: 0, behavior: 'smooth' });
     }
     function calPopupScrollTop() {
       document.getElementById('cal-popup-events').scrollTo({ top: 0, behavior: 'smooth' });
@@ -4057,6 +4062,8 @@
         // タブを叩くだけで毎回チップ再同期・スクロール位置リセット・再描画をやり直す必要はない。
         // ニュース画面の同種の「変化がなければ何もしない」対策と挙動を揃える（生活情報のちかつき対策と同じ考え方）。
         const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive;
+        // 縦スクロール位置は変化の有無に関わらず必ず一番上に戻す（生活情報画面と同じ挙動）
+        document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         if (!homeAlreadyDefault || cityChanged) {
           filterCats.clear();
           _recommendModeActive = false;
@@ -4065,8 +4072,6 @@
           // チップ行を左端にスクロール
           const chipRow = document.getElementById('filter-row-category');
           if (chipRow) chipRow.scrollLeft = 0;
-          // イベント一覧自体は#home-scroll-contentが内部スクロールしているため、window.scrollTo（上のline 2666）は効かない
-          document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
           if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
           else { renderEventCards(); }
         }
