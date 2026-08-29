@@ -4083,6 +4083,11 @@
           checkExistingBackupOnOpen();
         }
         if (screen === 'news') {
+          // ボトムナビからニュースタブを開くたびにカテゴリ絞り込みを「すべて」にリセットする
+          _newsCategory = '';
+          document.querySelectorAll('#news-filter-row .filter-chip').forEach(chip => {
+            chip.classList.toggle('active', !(chip.dataset.newsCat || ''));
+          });
           loadLifeInfoNewsScreen();
           setTimeout(() => _debugLogScreenMetrics('news'), 300);
         }
