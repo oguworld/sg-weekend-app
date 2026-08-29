@@ -2707,6 +2707,8 @@
     /* ─── 共有カレンダー ─── */
     .plan-title-header { display:flex;align-items:flex-start;margin-bottom:20px;min-height:52px; }
     .plan-title-header .screen-title { margin-bottom:0;flex:1; }
+    /* おでかけ画面の.header-top（margin-bottom:16px、min-heightなし）とカテゴリタブ位置を揃えるためのニュース画面限定オーバーライド */
+    #screen-news .plan-title-header { margin-bottom: 16px; min-height: 0; }
     .header-cal-sync-btn { display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:10px;transition:background 0.15s;-webkit-tap-highlight-color:transparent; }
     .header-cal-sync-btn:active { background:var(--sand); }
     .header-cal-sync-btn .sync-icon  { font-size:22px;line-height:1; }
