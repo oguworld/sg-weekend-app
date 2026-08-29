@@ -906,20 +906,22 @@
     /* ─── PIN LIST SCREEN ─── */
     .pin-empty {
       text-align: center;
-      padding: 60px 24px;
+      padding: 32px 24px;
     }
-    .pin-empty-emoji { font-size: 52px; margin-bottom: 14px; }
+    .pin-empty-emoji { font-size: 28px; margin-bottom: 8px; opacity: 0.6; }
     .pin-empty-title {
       font-family: 'Kaisei Opti', serif;
-      font-size: 20px;
-      color: var(--midnight);
-      margin-bottom: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--warm-gray);
+      margin-bottom: 6px;
     }
     .pin-empty-desc {
-      font-size: 15px;
+      font-size: 13px;
       color: var(--warm-gray);
       font-weight: 300;
-      line-height: 1.8;
+      line-height: 1.7;
+      opacity: 0.85;
     }
 
     .pin-card {
