@@ -52,11 +52,14 @@ function parseArgs() {
 // ─── 履歴管理 ─────────────────────────────────────────────────────
 function loadHistory() {
   try { return JSON.parse(fs.readFileSync(HISTORY_PATH, 'utf8')); }
-  catch { return { eventIds: [], lastType: 'event' }; }
+  catch { return { eventIds: [], newsIds: [], lastType: 'event' }; }
 }
 
 function resolveType(type, history) {
-  return 'event';
+  if (type !== 'auto') return type;
+  const types = ['event', 'life', 'news'];
+  const available = types.filter(t => t !== history.lastType);
+  return available[Math.floor(Math.random() * available.length)];
 }
 
 function saveHistory(history) {
@@ -91,6 +94,33 @@ function pickEvent(events, history) {
   const unseen = events.filter(e => !eventIds.includes(e.id) && !postedStores.includes(e.store));
   const pool = (unseen.length > 0 ? unseen : events.filter(e => !eventIds.includes(e.id)))
     .sort((a, b) => (b.major_score || 0) - (a.major_score || 0))
+    .slice(0, 15);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ─── 生活情報・ニュース取得（設計書172。events.jsonとは完全に独立したデータソース） ───
+const NEWS_CATEGORY_LABELS = {
+  admin: '政府', transport: '交通', health: '医療・健康',
+  education: '教育・子育て', weather: '天候・災害', community: 'コミュニティ',
+};
+
+function loadLifeInfoArticles(city) {
+  const cities = city === 'all' ? Object.keys(CITY_CONFIG) : [city];
+  const all = [];
+  for (const key of cities) {
+    const p = path.join(__dirname, `../data/${key}/life-info.json`);
+    if (fs.existsSync(p)) {
+      all.push(...JSON.parse(fs.readFileSync(p, 'utf8')).map(a => ({ ...a, city: key })));
+    }
+  }
+  return all;
+}
+
+function pickNewsArticle(articles, history) {
+  const { newsIds = [] } = history;
+  const unseen = articles.filter(a => !newsIds.includes(a.id));
+  const pool = (unseen.length > 0 ? unseen : articles)
+    .sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || ''))
     .slice(0, 15);
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -204,6 +234,43 @@ ${summary}
   return `${body}\n\n#海外生活 #海外在住日本人 #週末の過ごし方`;
 }
 
+async function generateNewsPost(article) {
+  const catLabel = NEWS_CATEGORY_LABELS[article.category] || '';
+
+  const res = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 300,
+    messages: [{
+      role: 'user',
+      content: `以下の人物として、このシンガポールの生活情報・ニュースを見かけてふと思ったことをX投稿として書いてください。
+
+${PERSONA}
+
+【ニュース・生活情報】
+${catLabel ? `カテゴリ: ${catLabel}` : ''}
+タイトル: ${article.title}
+概要: ${article.summary || ''}
+
+【要件】
+- 「〜だそうです」「知っておきたい」「要チェック」など告知・お知らせ調は禁止
+- 実際に確認した・体験したことのように書かない。ニュースとして見かけた・知った程度の距離感で書く
+- 「〜が好きだな」「〜っていいな」など、まとめるような感想で締めない
+- 一人称は使わない（「俺」「私」「僕」は書かない）
+- オチや気づきは不要。思ったことをそのまま書く
+- 深読みしない、分析しない、教えようとしない
+- 愚痴・不満・ネガティブな感想は絶対に書かない
+- 絵文字は0〜2個（国旗絵文字🇸🇬は使わない）
+- URLとハッシュタグは含めない（別途追加します）
+- 本文（ハッシュタグ除く）は日本語90文字以内に厳守
+- 日本語のみ。完成した投稿文のみ出力（前置き・説明不要）`,
+    }],
+  });
+
+  const body = res.content[0].text.trim();
+  const urlLine = article.sourceUrl ? `${article.sourceUrl}\n` : '';
+  return `${body}\n\n${urlLine}${buildHashtags(article.city)}`;
+}
+
 
 // ─── X投稿 ────────────────────────────────────────────────────────
 function buildOAuthHeader(method, url, credentials) {
@@ -292,6 +359,17 @@ async function main() {
     const sample = allEvents.sort(() => Math.random() - 0.5).slice(0, 5);
     console.log(`[post-to-x] 生活つぶやき参考: ${sample.map(e => e.store).join(' / ')}`);
     text = await generateLifePost(sample);
+
+  } else if (type === 'news') {
+    const articles = loadLifeInfoArticles(city);
+    if (articles.length === 0) {
+      console.log('[post-to-x] 生活情報・ニュースなし。終了します。');
+      return;
+    }
+    const article = pickNewsArticle(articles, history);
+    console.log(`[post-to-x] 選択記事: ${article.title} (${article.source || ''})`);
+    text = await generateNewsPost(article);
+    history.newsIds = [article.id, ...(history.newsIds || [])].slice(0, HISTORY_MAX);
 
   }
 
