@@ -2840,6 +2840,7 @@
       }
       savePins(pins);
       updatePinButtons();
+      renderPinList();
     }
 
     function updatePinButtons() {
