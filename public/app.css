@@ -349,6 +349,9 @@
       touch-action: pan-x;
     }
     #filter-row-category::-webkit-scrollbar { display: none; }
+    /* ニュース画面のカテゴリタブ行も同じくスクロールバーを非表示にする（おでかけ画面と見た目を統一） */
+    #news-filter-row { scrollbar-width: none; }
+    #news-filter-row::-webkit-scrollbar { display: none; }
     .filter-chip {
       flex-shrink: 0;
       padding: 14px 16px 13px;
