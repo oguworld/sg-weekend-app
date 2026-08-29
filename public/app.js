@@ -4108,6 +4108,8 @@
           // カテゴリタブ行を左端にスクロール（おでかけ画面のfilter-row-categoryと同じ挙動）
           const newsChipRow = document.getElementById('news-filter-row');
           if (newsChipRow) newsChipRow.scrollLeft = 0;
+          // 一覧の縦スクロール位置も一番上に戻す（おでかけ画面のhome-scroll-contentと同じ挙動）
+          document.getElementById('news-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
           // おでかけ画面と同じく、初回のみfetchし、以降はキャッシュ済みデータを再描画するだけにする
           // （毎回ローディング表示が挟まると「更新が走っている」ように見えるため）
           if (_newsDataLoaded) renderNewsList();
