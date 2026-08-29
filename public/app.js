@@ -1514,6 +1514,8 @@
     let _newsCategory = ''; // '' = すべて
     let _newsFilterNew = false;
     let _newsDataLoaded = false; // 初回のみfetchし、以降のタブ切り替えではキャッシュを再描画するだけにする（おでかけ画面と同じ挙動）
+    let _newsDataVersion = 0; // fetchのたびに加算。renderNewsList()の再描画要否判定に使う
+    let _newsListRenderedKey = null; // 直近にリストへ実際に描画した(カテゴリ,新着のみ,データ版)の組み合わせ
 
     const LIFE_INFO_CATEGORY_LABEL_KEYS = {
       admin:     'newsCatAdmin',
@@ -1559,6 +1561,7 @@
         showToast(t('toastPinned'));
       }
       saveNewsPins(pins);
+      _newsListRenderedKey = null; // ピン状態はrenderNewsList()の再描画スキップ判定キーに含まれないため強制再描画
       renderNewsList();
       renderNewsPinList();
     }
@@ -1677,6 +1680,11 @@
       const list = document.getElementById('news-list');
       const empty = document.getElementById('news-empty-state');
       if (!list) return;
+      // 同じ絞り込み条件・同じデータ版で既に描画済みなら何もしない
+      // （タブを行き来するたびにカードを丸ごと作り直してfadeUpが再生され「ちかっ」と光って見える問題の対策）
+      const key = _newsCategory + '|' + _newsFilterNew + '|' + _newsDataVersion;
+      if (key === _newsListRenderedKey) return;
+      _newsListRenderedKey = key;
       let filtered = _newsCategory
         ? LIFE_INFO_DATA.filter(item => item.category === _newsCategory)
         : LIFE_INFO_DATA;
@@ -1705,6 +1713,7 @@
         LIFE_INFO_DATA = [];
       }
       _newsDataLoaded = true;
+      _newsDataVersion++;
       renderNewsList();
     }
 
@@ -4044,17 +4053,23 @@
       if (screen === 'home') {
         document.getElementById('screen-home').style.display = 'flex';
         if (appHeader) appHeader.style.display = 'block';
-        filterCats.clear();
-        _recommendModeActive = false;
-        _syncCatChips();
-        _syncRecommendChip();
-        // チップ行を左端にスクロール
-        const chipRow = document.getElementById('filter-row-category');
-        if (chipRow) chipRow.scrollLeft = 0;
-        // イベント一覧自体は#home-scroll-contentが内部スクロールしているため、window.scrollTo（上のline 2666）は効かない
-        document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
-        if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
-        else { renderEventCards(); }
+        // 既に「すべて」表示済み（カテゴリ未選択・おすすめモードOFF）かつ都市も変わっていなければ、
+        // タブを叩くだけで毎回チップ再同期・スクロール位置リセット・再描画をやり直す必要はない。
+        // ニュース画面の同種の「変化がなければ何もしない」対策と挙動を揃える（生活情報のちかつき対策と同じ考え方）。
+        const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive;
+        if (!homeAlreadyDefault || cityChanged) {
+          filterCats.clear();
+          _recommendModeActive = false;
+          _syncCatChips();
+          _syncRecommendChip();
+          // チップ行を左端にスクロール
+          const chipRow = document.getElementById('filter-row-category');
+          if (chipRow) chipRow.scrollLeft = 0;
+          // イベント一覧自体は#home-scroll-contentが内部スクロールしているため、window.scrollTo（上のline 2666）は効かない
+          document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
+          if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
+          else { renderEventCards(); }
+        }
         setTimeout(() => _debugLogScreenMetrics('home'), 300);
       } else {
         document.getElementById('screen-home').style.display = 'none';
