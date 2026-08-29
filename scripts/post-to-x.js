@@ -57,7 +57,7 @@ function loadHistory() {
 
 function resolveType(type, history) {
   if (type !== 'auto') return type;
-  const types = ['event', 'life', 'news'];
+  const types = ['event', 'news'];
   const available = types.filter(t => t !== history.lastType);
   return available[Math.floor(Math.random() * available.length)];
 }
