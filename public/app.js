@@ -369,7 +369,7 @@
         secAbout: 'アプリ情報',
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
-        navHome: 'イベント情報',
+        navHome: 'おでかけ',
         navPlan: '予定表',
         navSettings: '設定',
         pinBtn: 'ピン留め',
@@ -444,7 +444,7 @@
         navNews: 'ニュース',
         newsScreenTitle: 'ニュース・生活情報',
         newsCatAll: 'すべて',
-        newsCatAdmin: '行政',
+        newsCatAdmin: '政府',
         newsCatTransport: '交通',
         newsCatHealth: '医療・健康',
         newsCatEducation: '教育・子育て',
@@ -687,7 +687,7 @@
         secAbout: 'About',
         aboutAppName: 'App',
         aboutVersion: 'Version',
-        navHome: 'Event',
+        navHome: 'Outings',
         navPlan: 'Schedule',
         navSettings: 'Settings',
         pinBtn: 'Pin',
@@ -2864,15 +2864,15 @@
           </div>`;
         return;
       }
-      container.innerHTML = entries.map((p, i) => `
-        <div class="pin-card" style="animation-delay:${i * 0.07}s; cursor:pointer;" onclick="openPinDetail('${p.id}')">
-          <div class="pin-card-emoji">${p.emoji}</div>
-          <div class="pin-card-info">
-            <div class="pin-card-title">${p.title}</div>
-            <div class="pin-card-meta">📍 ${p.location}　📅 ${p.hours}</div>
-          </div>
-          <button class="pin-remove-btn" onclick="event.stopPropagation(); removePin('${p.id}'); renderPinList();">✕</button>
-        </div>`).join('');
+      // 元のイベントカードをそのまま再利用する（EVENT_REGISTRYは毎回のloadEventData()で
+      // ピン留め済みだが現存しないイベントを自動的に間引いているため、ここに残る entries は
+      // 必ずEVENT_REGISTRYに存在する前提で良い）
+      container.innerHTML = entries
+        .map(p => EVENT_REGISTRY[p.id])
+        .filter(Boolean)
+        .map(e => renderEventCard(e))
+        .join('');
+      loadInstagramEmbeds();
     }
 
     // ニュース記事のピン留め一覧（画面: #screen-pins、シンプルな一覧）

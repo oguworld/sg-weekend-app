@@ -61,7 +61,7 @@
       <!-- Section Header (moved from main) -->
       <div class="section-header" style="padding:10px 16px 4px;margin-bottom:0;">
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-          <button id="pin-filter-btn" class="sort-btn" title="ピン留めした項目のみ表示">📌</button>
+          <button id="pin-filter-btn" class="sort-btn" style="display:none;" title="ピン留めした項目のみ表示">📌</button>
           <button id="ending-filter-btn" class="sort-btn" title="今週末が見納め・ラストチャンスのものを表示">⏰</button>
           <button id="new-filter-btn" class="sort-btn" title="新着（1日以内）のみ表示">🔔</button>
           <button id="event-filter-btn" class="sort-btn" onclick="openEventFilterSheet()" style="display:flex;align-items:center;gap:3px;" title="絞り込み">🔽<span id="event-filter-badge" style="display:none;background:var(--caramel);color:#fff;border-radius:10px;font-size:11px;padding:1px 5px;"></span></button>
@@ -233,13 +233,13 @@
       <span class="screen-title" data-i18n="newsScreenTitle">ニュース・生活情報</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;padding:0 20px;flex-shrink:0;">
-      <button id="news-refresh-btn" class="sort-btn" onclick="if(!_touchCapableDetected) loadLifeInfoNewsScreen()" title="更新">🔄</button>
-      <button id="news-new-filter-btn" class="sort-btn" onclick="if(!_touchCapableDetected) toggleNewsFilterNew()" title="新着（1日以内）のみ表示">🔔</button>
+      <button id="news-refresh-btn" class="sort-btn" style="display:none;" onclick="if(!_touchCapableDetected) loadLifeInfoNewsScreen()" title="更新">🔄</button>
+      <button id="news-new-filter-btn" class="sort-btn" style="display:none;" onclick="if(!_touchCapableDetected) toggleNewsFilterNew()" title="新着（1日以内）のみ表示">🔔</button>
       <div id="news-result-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
     </div>
     <div id="news-filter-row" style="display:flex;gap:8px;overflow-x:auto;padding:8px 20px 12px;flex-shrink:0;">
       <button class="filter-chip active" data-news-cat="" onclick="if(!_touchCapableDetected) setNewsCategory('')" data-i18n="newsCatAll">すべて</button>
-      <button class="filter-chip" data-news-cat="admin" onclick="if(!_touchCapableDetected) setNewsCategory('admin')" data-i18n="newsCatAdmin">行政</button>
+      <button class="filter-chip" data-news-cat="admin" onclick="if(!_touchCapableDetected) setNewsCategory('admin')" data-i18n="newsCatAdmin">政府</button>
       <button class="filter-chip" data-news-cat="transport" onclick="if(!_touchCapableDetected) setNewsCategory('transport')" data-i18n="newsCatTransport">交通</button>
       <button class="filter-chip" data-news-cat="health" onclick="if(!_touchCapableDetected) setNewsCategory('health')" data-i18n="newsCatHealth">医療・健康</button>
       <button class="filter-chip" data-news-cat="education" onclick="if(!_touchCapableDetected) setNewsCategory('education')" data-i18n="newsCatEducation">教育・子育て</button>
@@ -261,15 +261,15 @@
       <span class="screen-title" data-i18n="navPins">ピン留め</span>
     </div>
     <div class="screen-scroll-content">
-      <div class="section-title" data-i18n="pinSectionEvents" style="margin-bottom:10px;">イベント</div>
-      <div id="pin-list-content"></div>
+      <div class="section-title" data-i18n="pinSectionNews" style="margin-bottom:10px;">ニュース</div>
+      <div id="news-pin-list-content" style="display:flex;flex-direction:column;gap:12px;"></div>
       <div class="section-divider" style="margin:24px 0;">
         <div class="divider-line"></div>
         <div class="divider-dot"></div>
         <div class="divider-line"></div>
       </div>
-      <div class="section-title" data-i18n="pinSectionNews" style="margin-bottom:10px;">ニュース</div>
-      <div id="news-pin-list-content" style="display:flex;flex-direction:column;gap:12px;"></div>
+      <div class="section-title" data-i18n="pinSectionEvents" style="margin-bottom:10px;">イベント</div>
+      <div id="pin-list-content" class="cards-grid"></div>
     </div>
   </div>
 
@@ -386,7 +386,7 @@
       </div>
 
       <!-- おでかけスタイル（折りたたみ） -->
-      <div class="settings-item" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0;" onclick="toggleWhoPanel()">
+      <div class="settings-item" style="cursor:pointer;flex-direction:column;align-items:stretch;gap:0;display:none;" onclick="toggleWhoPanel()">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <span class="settings-item-label" data-i18n="labelWhoWith">一緒に行く人</span>
           <div style="display:flex;align-items:center;gap:6px;">
@@ -638,7 +638,7 @@
     </button>
     <button class="nav-item" id="nav-home" onclick="if(!_touchCapableDetected) switchNav('home')">
       <span class="nav-icon">📍</span>
-      <span class="nav-label" data-i18n="navHome">イベント情報</span>
+      <span class="nav-label" data-i18n="navHome">おでかけ</span>
     </button>
     <button class="nav-item" id="nav-pins" onclick="if(!_touchCapableDetected) switchNav('pins')">
       <span class="nav-icon">📌</span>
@@ -1299,7 +1299,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260829g"></script>
+  <script src="/app.js?v=20260829h"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
