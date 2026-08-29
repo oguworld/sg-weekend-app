@@ -1471,7 +1471,7 @@
                 </div>` : ''}
               </div>`;
             return `${newRibbon}<div class="card-body">
-              <div style="position:relative;margin:-18px -18px 12px;">
+              <div style="position:relative;margin:-14px -14px 12px;">
                 <div class="ig-embed-wrap">
                   <blockquote class="instagram-media"
                     data-instgrm-permalink="${igEmbedUrl}"

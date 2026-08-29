@@ -628,7 +628,8 @@
     .tag-age { background: rgba(255,255,255,0.28); color: white; border: 1px solid rgba(255,255,255,0.5); }
 
     .card-body {
-      padding: 18px;
+      /* ニュースカード(.spot-card直接padding:14px)と左右・下の余白を揃える */
+      padding: 14px;
     }
 
     .card-title {
