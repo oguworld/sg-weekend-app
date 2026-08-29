@@ -2628,7 +2628,6 @@
     // loadLifeInfoPreview(); // イベント画面のプレビューは非表示化（ニュースタブに一本化、2026-08-28）
     loadLifeInfoNewsScreen(); // ニュースタブを初期表示画面にしたため起動時に直接読み込む（2026-08-28）
     setTimeout(() => _debugLogScreenMetrics('news'), 500); // 診断: 初期表示時点のメトリクス（使い捨て）
-    setTimeout(() => _debugLogChipStyle('news-filter-row'), 500);
     initPushState();
     initSettingsProfile();
     initSettingsGenres();
@@ -3994,48 +3993,6 @@
         _sendDebugLog('screen_metrics_debug_error', { screen, message: String(err) });
       }
     }
-    // 診断: カテゴリタブ(.filter-chip)の実測比較（使い捨て、原因特定後に削除すること。2026-08-29）
-    function _debugLogChipStyle(rowId) {
-      try {
-        const row = document.getElementById(rowId);
-        if (!row) { _sendDebugLog('chip_style_debug_error', { rowId, message: 'row not found' }); return; }
-        const rowCs = window.getComputedStyle(row);
-        const chip = row.querySelector('.filter-chip');
-        const chipCs = chip ? window.getComputedStyle(chip) : null;
-        const rowRect = row.getBoundingClientRect();
-        const chipRect = chip ? chip.getBoundingClientRect() : null;
-        // 2番目のチップとの間隔も実測（gapの実効値確認用）
-        const chips = row.querySelectorAll('.filter-chip');
-        const chip2Rect = chips[1] ? chips[1].getBoundingClientRect() : null;
-        _sendDebugLog('chip_style_debug', {
-          rowId,
-          rowPadding: rowCs.padding,
-          rowMargin: rowCs.margin,
-          rowGap: rowCs.gap,
-          rowLeft: Math.round(rowRect.left),
-          rowTop: Math.round(rowRect.top),
-          rowWidth: Math.round(rowRect.width),
-          chipText: chip?.textContent,
-          chipFontSize: chipCs?.fontSize,
-          chipFontWeight: chipCs?.fontWeight,
-          chipFontFamily: chipCs?.fontFamily,
-          chipPadding: chipCs?.padding,
-          chipLineHeight: chipCs?.lineHeight,
-          chipLetterSpacing: chipCs?.letterSpacing,
-          chipLeft: chipRect ? Math.round(chipRect.left) : null,
-          chipTop: chipRect ? Math.round(chipRect.top) : null,
-          chipRight: chipRect ? Math.round(chipRect.right) : null,
-          chipHeight: chipRect ? Math.round(chipRect.height) : null,
-          chipWidth: chipRect ? Math.round(chipRect.width) : null,
-          chip2Text: chips[1]?.textContent,
-          chip2Left: chip2Rect ? Math.round(chip2Rect.left) : null,
-          gapBetweenChip1And2: (chipRect && chip2Rect) ? Math.round(chip2Rect.left - chipRect.right) : null,
-        });
-      } catch (err) {
-        _sendDebugLog('chip_style_debug_error', { rowId, message: String(err) });
-      }
-    }
-
     let _debugScrollDiagBound = false;
     function _bindDebugScrollDiag() {
       if (_debugScrollDiagBound) return;
@@ -4096,7 +4053,6 @@
         if (cityChanged) { _loadedCity = getCity(); loadEventData(); }
         else { renderEventCards(); }
         setTimeout(() => _debugLogScreenMetrics('home'), 300);
-        setTimeout(() => _debugLogChipStyle('filter-row-category'), 300);
       } else {
         document.getElementById('screen-home').style.display = 'none';
         if (appHeader) appHeader.style.display = 'none';
@@ -4128,7 +4084,6 @@
         if (screen === 'news') {
           loadLifeInfoNewsScreen();
           setTimeout(() => _debugLogScreenMetrics('news'), 300);
-          setTimeout(() => _debugLogChipStyle('news-filter-row'), 300);
         }
         if (screen === 'pins') {
           renderPinList();
