@@ -337,6 +337,10 @@
     #filter-row-category {
       display: flex;
       background: transparent;
+      /* .app-header 自体が既に左右20pxのpaddingを持つため、二重に加算しないよう
+         margin:-20pxで一旦相殺してから同じ20pxを内側paddingとして持たせる
+         （News画面の#news-filter-rowと同じ見た目・スクロール時の余白挙動にするため） */
+      margin: 0 -20px;
       padding: 8px 20px 12px;
       overflow-x: auto;
       scrollbar-width: none;
