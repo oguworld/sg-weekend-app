@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -30,5 +30,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "生活情報・ニュース機能を追加。行政・交通・医療など、シンガポール在住に役立つ最新情報をカテゴリ別にチェックできます。ピン留め・画面表示の細かい調整、不具合修正など。"
+  "releaseNotes": "「すべて」タブを「新着」に変更し、直近24時間の最新情報をすぐ確認できるようにしました。カテゴリタブが横にスクロールできない不具合を修正。画面表示の細かい調整など。"
 }
