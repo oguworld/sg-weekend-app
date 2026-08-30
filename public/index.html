@@ -475,7 +475,7 @@
         </button>
       </div>
 
-      <div class="settings-item" style="padding:14px 18px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;">
+      <div class="settings-item" style="padding:14px 18px;flex-direction:column;align-items:flex-start;gap:2px;display:none;">
         <div id="backup-section-content" style="width:100%;"></div>
       </div>
     </div>
@@ -492,7 +492,7 @@
         </button>
       </div>
 
-      <div class="settings-item" style="padding:12px 18px;">
+      <div class="settings-item" style="padding:12px 18px;display:none;">
         <span class="settings-item-label" data-i18n="labelLang">言語</span>
         <button id="lang-toggle-btn" onclick="if(!_touchCapableDetected) setLang(getLang()==='ja'?'en':'ja')"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
