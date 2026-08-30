@@ -1395,16 +1395,10 @@
         `<span class="star${idx < (e.major_score || 3) ? ' filled' : ''}">★</span>`
       ).join('');
 
-      // tipsリスト（初期非表示、トグル展開）
-      const tipsInner = Array.isArray(rawTips) && rawTips.length
-        ? `<ul class="tips-list">${rawTips.map(tip => `<li>${tip}</li>`).join('')}</ul>`
-        : e.tip ? `<ul class="tips-list"><li>${e.tip}</li></ul>` : '';
-      const tipsBtn = tipsInner
-        ? `<button class="tips-toggle-btn" onclick="toggleCardTips('${e.id}')" id="tips-btn-${e.id}">${t('tipsLabel')}<span class="tips-arrow">▽</span></button>`
-        : '';
-      const tipsContent = tipsInner
-        ? `<div class="tips-box tips-box--collapsible" id="tips-${e.id}" style="display:none;">${tipsInner}</div>`
-        : '';
+      // tipsリスト（「ひとことメモ」機能、イベントカードでは非表示化。toggleCardTips()等のロジックは残置）
+      const tipsInner = '';
+      const tipsBtn = '';
+      const tipsContent = '';
       const tipsList = tipsBtn;
 
       // プロフィールバッジ
