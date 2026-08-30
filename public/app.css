@@ -294,14 +294,14 @@
     }
     .sort-btn:hover { background: var(--caramel-light); color: white; }
     .sort-btn.active { background: rgba(196,112,90,0.12); color: var(--terracotta); border-color: var(--terracotta); }
-    #ending-filter-btn { background: transparent; color: var(--warm-gray); border-color: var(--light-gray); }
+    #ending-filter-btn { background: transparent; color: var(--warm-gray); border-color: var(--light-gray); position: relative; top: 2px; }
     #event-filter-btn { background: transparent; color: var(--warm-gray); border-color: var(--light-gray); }
     #event-filter-btn.active { background: var(--caramel-pale); color: var(--caramel); border-color: var(--caramel-light); }
-    #ending-filter-btn.active { background: rgba(46,160,100,0.12); color: #1a8c50; border-color: #1a8c50; }
+    #ending-filter-btn.active { background: var(--caramel-pale); color: var(--caramel); border-color: var(--caramel-light); }
     #pin-filter-btn { background: transparent; color: var(--warm-gray); border-color: var(--light-gray); }
-    #pin-filter-btn.active { background: rgba(46,160,100,0.12); color: #1a8c50; border-color: #1a8c50; }
+    #pin-filter-btn.active { background: var(--caramel-pale); color: var(--caramel); border-color: var(--caramel-light); }
     #new-filter-btn { background: transparent; color: var(--warm-gray); border-color: var(--light-gray); }
-    #new-filter-btn.active { background: rgba(46,160,100,0.12); color: #1a8c50; border-color: #1a8c50; }
+    #new-filter-btn.active { background: var(--caramel-pale); color: var(--caramel); border-color: var(--caramel-light); }
 
     /* ─── AGE FILTERS ─── */
     .section-header {
