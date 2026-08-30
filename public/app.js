@@ -3253,7 +3253,8 @@
         loggedOutEl.style.display = 'none';
         loggedInEl.style.display = '';
         if (deleteSectionEl) deleteSectionEl.style.display = '';
-        _checkMandatoryBackupSetup(); // fire-and-forget（設計書118）
+        // アカウント連携だけで完結させる方針に変更。バックアップパスフレーズの必須化は廃止
+        // （_checkMandatoryBackupSetup()本体は削除せず残置、設定画面から任意に設定可能なまま）
       } catch (e) {
         // 通信エラー・fetch自体の失敗ではトークンを消さず、楽観的に「連携中」を維持する（設計書48・課題2）
         _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
@@ -9527,7 +9528,8 @@
       if (isBackupEnabled()) {
         el.innerHTML = `
           <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupEnabledDesc">${t('backupEnabledDesc')}</p>
-          <button class="cal-sync-action secondary" data-backup-action="change">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>`;
+          <button class="cal-sync-action secondary" data-backup-action="change" style="margin-bottom:8px;">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>
+          <button class="cal-sync-action secondary" data-backup-action="disable">🚫 <span data-i18n="backupDisable">${t('backupDisable')}</span></button>`;
       } else {
         el.innerHTML = `
           <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 6px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
