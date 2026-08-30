@@ -400,7 +400,7 @@
         toastClearedPins: 'ピン留めをすべて削除しました',
         toastUrlCopied: '🔗 URLをコピーしました！',
         loadingEvents: 'おでかけ情報を読み込み中...',
-        labelPush: 'イベント更新の通知',
+        labelPush: '更新の通知',
         pushOn: 'ON',
         pushOff: 'OFF',
         pushDenied: '許可が必要',
