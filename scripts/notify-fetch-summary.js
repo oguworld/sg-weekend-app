@@ -17,6 +17,7 @@ const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
 const DISCOVER_RESULT_PATH = path.join(LOGS_DIR, 'discover-sources-result.json');
 const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json');
 const LIFE_INFO_CAT_LABELS = { admin: '行政', transport: '交通', health: '医療・健康', education: '教育・子育て', weather: '天候・災害', community: 'コミュニティ' };
+const EVENT_CAT_LABELS = { event: 'イベント', show: '展示・公演', gourmet: 'グルメ・フェア', sale: 'プロモ・お得', opening: '新規オープン' };
 
 async function pushToLine(text) {
   const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -63,13 +64,12 @@ async function main() {
 
     lines.push(`【${s.cityLabel}】${s.accepted}件採用 / ${s.rawTotal}件取得`);
 
-    // ソース別サマリー
-    if (s.sourceStats && Object.keys(s.sourceStats).length > 0) {
-      const srcParts = Object.entries(s.sourceStats)
-        .filter(([, v]) => v.sent > 0)
-        .sort((a, b) => b[1].sent - a[1].sent)
-        .map(([src, v]) => `${src}(${v.accepted}/${v.sent})`);
-      lines.push(`  📡 ${srcParts.join(' / ')}`);
+    // カテゴリ別サマリー（生活情報・ニュースセクションと表示スタイルを統一）
+    if (s.catCounts && Object.keys(s.catCounts).length > 0) {
+      const catLine = Object.entries(s.catCounts)
+        .map(([k, v]) => `${EVENT_CAT_LABELS[k] || k}:${v}`)
+        .join(' / ');
+      lines.push(`  ${catLine}`);
     }
 
     if (!s.newItems || s.newItems.length === 0) {

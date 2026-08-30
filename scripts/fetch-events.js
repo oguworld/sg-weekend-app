@@ -335,6 +335,8 @@ async function fetchInstagramPosts(accounts = []) {
 // ─── 取得結果をファイルに保存（8:00のサマリー通知で集計）────────
 function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, rawTotal, uniqueTotal, sourceStats }) {
   const summaryPath = path.join(__dirname, '..', 'logs', `fetch-summary-${cityKey}.json`);
+  const catCounts = {};
+  for (const item of (newItems || [])) catCounts[item.type] = (catCounts[item.type] || 0) + 1;
   const summary = {
     cityKey,
     cityLabel,
@@ -343,6 +345,7 @@ function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, ra
     rawTotal,
     uniqueTotal,
     sourceStats: sourceStats || {},
+    catCounts,
     newItems: (newItems || []).map(e => ({ emoji: e.emoji, store: e.store, period: e.period || e.start_date || '', source: e.source || '' })),
     date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' }),
     updatedAt: new Date().toISOString(),
