@@ -80,7 +80,7 @@
 
       <!-- Category Filter (new horizontal scroll) -->
       <div id="filter-row-category">
-        <button class="filter-chip active" data-cat="all" data-i18n="catAll" onclick="if(!_touchCapableDetected) toggleCatFilter('all')">すべて</button>
+        <button class="filter-chip active" data-cat="all" data-i18n="catAll" onclick="if(!_touchCapableDetected) toggleCatFilter('all')">新着</button>
         <button class="filter-chip" data-cat="recommend" data-i18n="catRecommend" style="display:none;" onclick="if(!_touchCapableDetected) toggleCatFilter('recommend')">おすすめ</button>
         <button class="filter-chip" data-cat="event" data-i18n="catEvent" onclick="if(!_touchCapableDetected) toggleCatFilter('event')">イベント</button>
         <button class="filter-chip" data-cat="show" data-i18n="catShow" onclick="if(!_touchCapableDetected) toggleCatFilter('show')">展示・公演</button>
@@ -240,7 +240,7 @@
       </div>
     </div>
     <div id="news-filter-row" style="display:flex;gap:8px;overflow-x:auto;padding:8px 20px 12px;flex-shrink:0;">
-      <button class="filter-chip active" data-news-cat="" onclick="if(!_touchCapableDetected) setNewsCategory('')" data-i18n="newsCatAll">すべて</button>
+      <button class="filter-chip active" data-news-cat="" onclick="if(!_touchCapableDetected) setNewsCategory('')" data-i18n="newsCatAll">新着</button>
       <button class="filter-chip" data-news-cat="admin" onclick="if(!_touchCapableDetected) setNewsCategory('admin')" data-i18n="newsCatAdmin">政府</button>
       <button class="filter-chip" data-news-cat="transport" onclick="if(!_touchCapableDetected) setNewsCategory('transport')" data-i18n="newsCatTransport">交通</button>
       <button class="filter-chip" data-news-cat="health" onclick="if(!_touchCapableDetected) setNewsCategory('health')" data-i18n="newsCatHealth">医療・健康</button>
@@ -1302,7 +1302,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260830d"></script>
+  <script src="/app.js?v=20260830e"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

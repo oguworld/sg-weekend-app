@@ -355,7 +355,7 @@
         tabThreeWeeks: '3週後',
         sectionTitle: '絞り込む',
         tabAll: '指定なし',
-        catAll: 'すべて',
+        catAll: '新着',
         catRecommend: 'おすすめ',
         addToPlanBtnShort: '予定追加',
         courseCreateBtnShort: 'コース作成',
@@ -464,7 +464,7 @@
         navCourse: '探訪',
         navNews: '生活情報',
         newsScreenTitle: '生活情報・ニュース',
-        newsCatAll: 'すべて',
+        newsCatAll: '新着',
         newsCatAdmin: '政府',
         newsCatTransport: '交通',
         newsCatHealth: '医療・健康',
@@ -672,7 +672,7 @@
         tabThreeWeeks: 'In 3 Weeks',
         sectionTitle: 'Filter',
         tabAll: 'All dates',
-        catAll: 'All',
+        catAll: 'New',
         catRecommend: 'Recommended',
         addToPlanBtnShort: 'Add Plan',
         courseCreateBtnShort: 'Create Course',
@@ -781,7 +781,7 @@
         navCourse: 'Explore',
         navNews: 'Life Info',
         newsScreenTitle: 'Life Info & News',
-        newsCatAll: 'All',
+        newsCatAll: 'New',
         newsCatAdmin: 'Admin',
         newsCatTransport: 'Transport',
         newsCatHealth: 'Health',
@@ -1304,7 +1304,7 @@
     let filterAreas   = new Set();
     let filterKeyword = '';
     let filterEnding  = false;
-    let filterNew     = false;
+    let filterNew     = true; // 先頭チップ（旧「すべて」）は「新着」化したため、初期状態からON
     let _recommendModeActive = false;
     let _draftFilterWeek    = '';
     let _draftFilterWho     = new Set();
@@ -1530,8 +1530,8 @@
     // 片方の取得失敗がもう片方の表示に影響しないよう、呼び出し元でも個別に try/catch する。
 
     let LIFE_INFO_DATA = [];
-    let _newsCategory = ''; // '' = すべて
-    let _newsFilterNew = false;
+    let _newsCategory = ''; // '' = 先頭チップ（新着）
+    let _newsFilterNew = true; // 先頭チップ（旧「すべて」）は「新着」化したため、初期状態からON
     let _newsDataLoaded = false; // 初回のみfetchし、以降のタブ切り替えではキャッシュを再描画するだけにする（おでかけ画面と同じ挙動）
     let _newsDataVersion = 0; // fetchのたびに加算。renderNewsList()の再描画要否判定に使う
     let _newsListRenderedKey = null; // 直近にリストへ実際に描画した(カテゴリ,新着のみ,データ版)の組み合わせ
@@ -1673,8 +1673,11 @@
     }
 
     // ニュース画面: カテゴリ絞り込み込みの一覧表示
+    // 先頭チップ（旧「すべて」）は「新着」に変更済み。cat===''（このチップ）選択時のみ
+    // 新着（直近24時間以内）に絞り込み、他の具体的なカテゴリを選んだ場合は解除する。
     function setNewsCategory(cat) {
       _newsCategory = cat;
+      _newsFilterNew = (cat === '');
       document.querySelectorAll('#news-filter-row .filter-chip').forEach(chip => {
         chip.classList.toggle('active', (chip.dataset.newsCat || '') === cat);
       });
@@ -1900,8 +1903,10 @@
 
     function toggleCatFilter(val) {
       if (val === 'all') {
+        // 先頭チップ（旧「すべて」）は「新着」に変更済み。新着（直近24時間以内）に絞り込む
         filterCats.clear();
         _recommendModeActive = false;
+        filterNew = true;
       } else if (val === 'recommend') {
         if (getGenreList().length === 0) {
           // ジャンル未設定時は「おすすめ」チップ自体が非表示のため、
@@ -1910,6 +1915,7 @@
         }
         filterCats.clear();
         _recommendModeActive = !_recommendModeActive;
+        filterNew = false;
       } else {
         if (filterCats.has(val) && !_recommendModeActive) {
           // 既にアクティブなカテゴリを再タップしても何もしない（タブとして選択状態を維持する。
@@ -1919,6 +1925,7 @@
         _recommendModeActive = false;
         filterCats.clear();
         filterCats.add(val);
+        filterNew = false;
       }
       _syncCatChips();
       _syncRecommendChip();
@@ -4094,12 +4101,13 @@
         // 既に「すべて」表示済み（カテゴリ未選択・おすすめモードOFF）かつ都市も変わっていなければ、
         // タブを叩くだけで毎回チップ再同期・スクロール位置リセット・再描画をやり直す必要はない。
         // ニュース画面の同種の「変化がなければ何もしない」対策と挙動を揃える（生活情報のちかつき対策と同じ考え方）。
-        const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive;
+        const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive && filterNew === true;
         // 縦スクロール位置は変化の有無に関わらず必ず一番上に戻す（生活情報画面と同じ挙動）
         document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         if (!homeAlreadyDefault || cityChanged) {
           filterCats.clear();
           _recommendModeActive = false;
+          filterNew = true; // 先頭チップ（新着）にリセット
           _syncCatChips();
           _syncRecommendChip();
           // チップ行を左端にスクロール
@@ -4138,8 +4146,9 @@
           checkExistingBackupOnOpen();
         }
         if (screen === 'news') {
-          // ボトムナビからニュースタブを開くたびにカテゴリ絞り込みを「すべて」にリセットする
+          // ボトムナビからニュースタブを開くたびにカテゴリ絞り込みを先頭チップ（新着）にリセットする
           _newsCategory = '';
+          _newsFilterNew = true;
           document.querySelectorAll('#news-filter-row .filter-chip').forEach(chip => {
             chip.classList.toggle('active', !(chip.dataset.newsCat || ''));
           });
