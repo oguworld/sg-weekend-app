@@ -34,6 +34,25 @@ function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems 
   fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
 }
 
+// ─── 1日1回、朝の取り込み完了後にアプリへプッシュ通知を送る（設計書173） ───
+// fetch-events.js（6:30 SGT）→fetch-life-info.js（7:15 SGT）の順で毎日実行されるため、
+// 後発のこのスクリプトの完了時点で1日1回だけ呼ぶ。通知はオプトイン済みユーザーのみに届く
+// （data/push-subscriptions.jsonに登録済み＝設定で「イベント通知」をONにした人のみ）。
+async function notifyContentUpdated() {
+  const secret = process.env.ADMIN_SECRET;
+  if (!secret) { console.log('  ⚠️ ADMIN_SECRET未設定のためプッシュ通知をスキップ'); return; }
+  try {
+    const res = await fetch('http://localhost:3000/api/notify-events-updated?city=sg', {
+      method: 'POST',
+      headers: { 'x-admin-secret': secret },
+    });
+    const data = await res.json().catch(() => ({}));
+    console.log(`  🔔 プッシュ通知: ${res.ok ? `${data.sent || 0}件に送信` : `失敗(${res.status})`}`);
+  } catch (e) {
+    console.log(`  ⚠️ プッシュ通知の送信に失敗: ${e.message}`);
+  }
+}
+
 // ─── 都市設定 ────────────────────────────────────────────────────
 const CITY_CONFIG = {
   sg: {
@@ -509,14 +528,20 @@ async function main() {
 
   if (rawItems.length === 0) {
     console.log('\n✅ 新着なし。終了します。\n');
-    if (!dryRun) saveFetchSummary({ rawTotal: 0, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
+    if (!dryRun) {
+      saveFetchSummary({ rawTotal: 0, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
+      await notifyContentUpdated();
+    }
     return;
   }
 
   const uniqueItems = deduplicateItems(rawItems, conf.lifeInfoPath);
   if (uniqueItems.length === 0) {
     console.log('✅ 重複なし新着なし。終了します。\n');
-    if (!dryRun) saveFetchSummary({ rawTotal: rawItems.length, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
+    if (!dryRun) {
+      saveFetchSummary({ rawTotal: rawItems.length, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
+      await notifyContentUpdated();
+    }
     return;
   }
 
@@ -531,6 +556,7 @@ async function main() {
       rejected: result.rejected,
       newItems: result.newItems,
     });
+    await notifyContentUpdated();
   }
 
   console.log('\n🎉 fetch-life-info.js 完了\n');

@@ -2637,7 +2637,7 @@
     // loadLifeInfoPreview(); // イベント画面のプレビューは非表示化（ニュースタブに一本化、2026-08-28）
     loadLifeInfoNewsScreen(); // ニュースタブを初期表示画面にしたため起動時に直接読み込む（2026-08-28）
     setTimeout(() => _debugLogScreenMetrics('news'), 500); // 診断: 初期表示時点のメトリクス（使い捨て）
-    initPushState();
+    initPushState().then(() => _maybePromptPushOnboarding());
     initSettingsProfile();
     initSettingsGenres();
     // JWTトークンの初期化（設計書49）。iOS版は @capacitor/preferences から読み出し、
@@ -3677,6 +3677,19 @@
     function _shouldShowPushPrompt() {
       if (_isCapacitorApp) return !_nativeDeviceToken && !!_getCapPushPlugin() && !_nativePushDenied;
       return !_pushSubscription && 'PushManager' in window && Notification.permission !== 'denied';
+    }
+
+    // 初回起動時のみ、通知をデフォルトでONにするため自動的に許可ダイアログを表示する（iOS版のみ）。
+    // localStorageのフラグで一度きりにする（結果が許可/拒否どちらでも二度と自動では聞かない）。
+    // 起動直後だとまだ画面が整っていないため少し待ってから表示する。
+    async function _maybePromptPushOnboarding() {
+      if (!_isCapacitorApp) return;
+      try {
+        if (localStorage.getItem('app_push_onboarding_prompted')) return;
+        localStorage.setItem('app_push_onboarding_prompted', 'true');
+        if (!_shouldShowPushPrompt()) return;
+        setTimeout(() => { _toggleNativePush(); }, 1500);
+      } catch (_) {}
     }
 
     function _urlBase64ToUint8Array(base64String) {

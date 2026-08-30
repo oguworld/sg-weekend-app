@@ -83,8 +83,8 @@ function subPlatform(sub) {
 }
 async function sendPushToAll(cityKey) {
   const cityConf = CITIES[cityKey] || CITIES.sg;
-  const title = '新着おでかけ情報';
-  const body = '最新の週末スポット情報が届きました！';
+  const title = '最新情報を更新しました';
+  const body = 'おでかけ情報・生活情報の最新記事をチェックしてみましょう！';
   const payload = JSON.stringify({ title, body });
   const subs = loadPushSubs();
   if (subs.length === 0) return 0;
