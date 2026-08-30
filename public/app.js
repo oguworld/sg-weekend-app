@@ -47,12 +47,33 @@
       // 引き起こしたため、2026-08-29にCapacitor限定へ差し戻した。News画面のbody連鎖スクロール問題は
       // 根本原因（#screen-newsのflex-direction指定漏れ、CSS側で修正済み）が解消済みのため、
       // この処理をWeb版に適用しなくても再発しないはず。
+      let _capTouchStartX = 0;
       let _capTouchStartY = 0;
       document.addEventListener('touchstart', e => {
+        _capTouchStartX = e.touches[0].clientX;
         _capTouchStartY = e.touches[0].clientY;
       }, { passive: true });
       document.addEventListener('touchmove', e => {
+        const dx = e.touches[0].clientX - _capTouchStartX;
         const dy = e.touches[0].clientY - _capTouchStartY;
+        // 横方向優勢のジェスチャーは、まず横スクロール可能な祖先（カテゴリタブ行等）を探して許可する。
+        // これが無いと、縦スクロール判定だけのループが横スクロール専用要素（overflow-x:autoのみ、
+        // overflow-y:autoは副作用で真だがscrollHeight<=clientHeightのため対象外）を素通りしてしまい、
+        // 最終的にe.preventDefault()でスワイプ自体がブロックされる（カテゴリタブが横に動かせない不具合）。
+        if (Math.abs(dx) > Math.abs(dy)) {
+          let hEl = e.target;
+          while (hEl && hEl !== document.documentElement) {
+            const hOv = window.getComputedStyle(hEl).overflowX;
+            if ((hOv === 'auto' || hOv === 'scroll') && hEl.scrollWidth > hEl.clientWidth) {
+              const atLeft  = hEl.scrollLeft <= 0;
+              const atRight = hEl.scrollLeft + hEl.clientWidth >= hEl.scrollWidth - 1;
+              if (dx > 0 && atLeft)  { e.preventDefault(); return; }
+              if (dx < 0 && atRight) { e.preventDefault(); return; }
+              return; // 横スクロール余地あり → 許可
+            }
+            hEl = hEl.parentElement;
+          }
+        }
         let el = e.target;
         while (el && el !== document.documentElement) {
           const ov = window.getComputedStyle(el).overflowY;
