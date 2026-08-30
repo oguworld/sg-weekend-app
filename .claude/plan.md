@@ -17242,3 +17242,42 @@ Web検索ができないツール制約のため、既存コードのAPIキー�
 - 既存のイベントカードDOM差分キャッシュ（設計書21）とは別枠の独立コンポーネントとして実装し、既存のイベント一覧ロジックには影響を与えない
 
 この追加により、ホーム画面ロード時に`GET /api/events`と`GET /api/life-info`の2つのAPIを呼ぶことになる。両者は完全に独立したエンドポイント・データソースのため、片方が失敗してももう片方の表示に影響しない設計とする（Promise.allSettled等での独立エラーハンドリングを想定）。
+
+## 設計書174: コメント機能（おでかけ・生活情報カード共通）（2026-08-30実装）
+
+シンガポール在住日本人向けにイベント・生活情報の各カードへコメント機能を追加。ユーザーとの合意事項:
+- コメント投稿にはアカウント連携（Google/Apple）必須。閲覧は誰でも可
+- 表示名は設定画面のニックネーム欄（設計書157/158で非表示化していたものを再表示）を使用、未設定時は「匿名」
+- UIはボトムシートではなく、直前に非表示化した「🎒 ひとことメモ ▽」と同じ位置・同じ開閉パターン（🔽タップでカード内にインライン展開）
+- モデレーションはv1では最小限（ログイン必須による説明責任のみ、自動フィルタ・通報ボタンは未実装）
+
+### データモデル
+`data/sg/comments.json`（配列、`.gitignore`対象、`events.json`/`life-info.json`とは独立）
+`{ id, itemType: 'event'|'news', itemId, userId, nickname, text, createdAt }`
+元データが削除・保持期間切れで消えてもコメント自体は残置（カードごと表示されなくなり実質到達不能になるだけ）。
+
+### API（server.js）
+- `GET /api/comments?itemType=&itemId=` — 認証不要
+- `GET /api/comments/counts?itemType=` — カード一覧描画時にitemId毎の件数を一括取得（N+1回避）
+- `POST /api/comments` — `requireAppAuth`必須、本文300文字上限
+- `DELETE /api/comments/:id` — `requireAppAuth`必須、`comment.userId`と一致する場合のみ（不一致403・存在しない404）
+
+### フロントエンド
+- `_commentDomId()`/`_commentBtnId()`/`toggleCardComments()`/`_loadComments()`/`_renderCommentBox()`/`postComment()`/`deleteComment()`/`_applyCommentCounts()`（`public/app.js`）
+- イベントカード（`renderEventCard()`）: 非表示化済みの`tipsList`/`tipsContent`変数をコメント機能に転用（同じ`.card-sub-row`構造・`.tips-toggle-btn`/`.tips-arrow`クラスを再利用）
+- 生活情報カード（`_lifeInfoCardHtml()`）: ピン留め・元記事リンクの行を`.card-sub-row`（`justify-content:space-between`）に変更しコメントボタンを追加
+- ピン留め画面（`renderPinList()`/`renderNewsPinList()`）も同じカード描画関数を再利用しているため自動的にコメント機能付きで表示される
+- `_getMyUserIdFromToken()`: JWTペイロードを署名検証なしで読み取り、UI表示専用（自分の投稿にのみ削除リンクを出す）に使用。実際の削除権限はサーバー側で必ず再チェック
+- ニックネーム欄（`#nickname-input`等）を設定画面プロフィールセクションで再表示
+
+### CSS
+`.comment-box`/`.comment-item`/`.comment-meta`/`.comment-nickname`/`.comment-text`/`.comment-delete-link`/`.comment-empty`/`.comment-input-row`/`.comment-input`/`.comment-send-btn`/`.comment-auth-gate`を新規追加（`public/app.css`）。
+
+### i18n
+`commentsBtnLabel`/`commentEmpty`/`commentPlaceholder`/`commentDeleteLink`/`commentAuthGate`/`confirmDeleteComment`/`toastCommentSent`/`toastCommentDeleted`/`toastCommentError`をja/en同時追加。
+
+### 検証
+サーバー再起動後、curlで自己発行JWTを使いPOST→GET→counts→DELETE(他ユーザーで403確認)→DELETE(本人で成功)→GET(削除確認)の一連の流れを確認済み。
+
+### スコープ外（v1）
+返信・スレッド化、編集機能、通報ボタン、AIモデレーション、既読/通知、bkk/syd対応

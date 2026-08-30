@@ -507,6 +507,63 @@
     .tips-toggle-btn.active { color: var(--caramel); }
     .tips-arrow { margin-left: 4px; font-size: 10px; opacity: 0.6; }
     .tips-box--collapsible { margin-top: 4px; }
+
+    /* ─── コメント機能（設計書174）。ひとことメモの.tips-toggle-btn/.tips-box--collapsibleと
+       同じ開閉パターンを踏襲し、カード内にインライン展開する ─── */
+    .comment-box {
+      background: var(--cream);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-top: 4px;
+      border-left: 3px solid var(--caramel-light);
+    }
+    .comment-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--sand-dark);
+    }
+    .comment-item:last-of-type { border-bottom: none; }
+    .comment-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--warm-gray);
+    }
+    .comment-nickname { font-weight: 700; color: var(--midnight); }
+    .comment-text { font-size: 13px; color: var(--midnight); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .comment-delete-link { font-size: 11px; color: var(--caramel); cursor: pointer; margin-left: auto; }
+    .comment-empty { font-size: 12px; color: var(--warm-gray); padding: 6px 0; }
+    .comment-input-row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+    .comment-input {
+      flex: 1;
+      border: 1.5px solid var(--sand-dark);
+      background: var(--warm-white);
+      border-radius: 20px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-family: 'Noto Sans JP', sans-serif;
+      color: var(--midnight);
+      min-width: 0;
+    }
+    .comment-send-btn {
+      background: var(--caramel);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .comment-auth-gate { font-size: 12px; color: var(--warm-gray); text-align: center; padding: 10px 0 4px; }
+    .comment-auth-gate a { color: var(--caramel); font-weight: 700; text-decoration: none; cursor: pointer; }
     .card-detail-link {
       font-size: 13px;
       color: var(--caramel);

@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260830c">
+  <link rel="stylesheet" href="/app.css?v=20260830d">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -310,12 +310,12 @@
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secProfile">プロフィール</div>
 
-      <!-- ニックネーム＋アバター -->
-      <div class="settings-item" style="gap:10px;display:none;">
-        <span class="settings-item-label" style="white-space:nowrap;display:none;" data-i18n="labelNickname">ニックネーム</span>
+      <!-- ニックネーム＋アバター（コメント機能で表示名として使用。設計書174で再表示） -->
+      <div class="settings-item" style="gap:10px;">
+        <span class="settings-item-label" style="white-space:nowrap;" data-i18n="labelNickname">ニックネーム</span>
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
           <input id="nickname-input" type="text" maxlength="20" data-i18n-ph="nicknamePlaceholder" placeholder="匿名"
-            style="display:none;width:90px;text-align:right;border:none;background:transparent;font-size:16px;
+            style="width:90px;text-align:right;border:none;background:transparent;font-size:16px;
                    color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
             oninput="localStorage.setItem('user_name', this.value.trim() || t('nicknamePlaceholder'))"
             onblur="if(!this.value.trim()) this.value=''">
@@ -1302,7 +1302,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260830h"></script>
+  <script src="/app.js?v=20260830i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

@@ -399,6 +399,15 @@
         shareBtn: '📤 共有する',
         articleLink: '元記事を見る',
         tipsLabel: '🎒 ひとことメモ',
+        commentsBtnLabel: '💬 コメント',
+        commentEmpty: 'まだコメントがありません。最初のコメントを書いてみましょう！',
+        commentPlaceholder: 'コメントを書く（300文字まで）',
+        commentDeleteLink: '削除',
+        commentAuthGate: 'コメントするには',
+        confirmDeleteComment: 'このコメントを削除しますか？',
+        toastCommentSent: 'コメントを投稿しました',
+        toastCommentDeleted: 'コメントを削除しました',
+        toastCommentError: '通信に失敗しました。もう一度お試しください',
         hintLabel: '💡 ヒント',
         tabWeekendBadge: '今週',
         tabNextWeekendBadge: '来週',
@@ -717,6 +726,15 @@
         shareBtn: '📤 Share',
         articleLink: 'Source article',
         tipsLabel: '🎒 Tips',
+        commentsBtnLabel: '💬 Comments',
+        commentEmpty: 'No comments yet. Be the first to write one!',
+        commentPlaceholder: 'Write a comment (max 300 chars)',
+        commentDeleteLink: 'Delete',
+        commentAuthGate: 'Link your account to comment.',
+        confirmDeleteComment: 'Delete this comment?',
+        toastCommentSent: 'Comment posted',
+        toastCommentDeleted: 'Comment deleted',
+        toastCommentError: 'Something went wrong. Please try again.',
         hintLabel: '💡 Hint',
         tabWeekendBadge: 'This Wk',
         tabNextWeekendBadge: 'Next Wk',
@@ -1395,11 +1413,10 @@
         `<span class="star${idx < (e.major_score || 3) ? ' filled' : ''}">★</span>`
       ).join('');
 
-      // tipsリスト（「ひとことメモ」機能、イベントカードでは非表示化。toggleCardTips()等のロジックは残置）
-      const tipsInner = '';
-      const tipsBtn = '';
-      const tipsContent = '';
-      const tipsList = tipsBtn;
+      // 「ひとことメモ」機能はイベントカードでは非表示化済み（toggleCardTips()等は残置）。
+      // 同じ表示位置・開閉パターンをコメント機能（設計書174）に転用する。
+      const tipsList = `<button class="tips-toggle-btn" id="${_commentBtnId('event', e.id)}" onclick="toggleCardComments('event','${e.id}')" data-comment-item-id="${e.id}">${t('commentsBtnLabel')}<span class="comment-count-label"></span><span class="tips-arrow">▽</span></button>`;
+      const tipsContent = `<div class="comment-box" id="${_commentDomId('event', e.id)}" style="display:none;"></div>`;
 
       // プロフィールバッジ
       const whoLabels = { family: t('whoFamilyBadge'), couple: t('whoCoupleBadge'), solo: t('whoSoloBadge'), group: t('whoGroupBadge') };
@@ -1624,10 +1641,14 @@
         </div>
         <div style="font-size:16px;font-weight:700;color:var(--midnight);margin-bottom:10px;line-height:1.35;">${title}</div>
         <div style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${summary}</div>
-        <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;">
-          <span class="card-detail-link card-pin-link${getNewsPins()[item.id] ? ' pinned' : ''}" style="cursor:pointer;" onclick="toggleNewsPinById('${item.id}')">📌 ${getNewsPins()[item.id] ? t('pinnedBtn') : t('pinBtn')}</span>
-          ${url ? `<a href="${url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
+        <div class="card-sub-row">
+          <button class="tips-toggle-btn" id="${_commentBtnId('news', item.id)}" onclick="toggleCardComments('news','${item.id}')" data-comment-item-id="${item.id}">${t('commentsBtnLabel')}<span class="comment-count-label"></span><span class="tips-arrow">▽</span></button>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <span class="card-detail-link card-pin-link${getNewsPins()[item.id] ? ' pinned' : ''}" style="cursor:pointer;" onclick="toggleNewsPinById('${item.id}')">📌 ${getNewsPins()[item.id] ? t('pinnedBtn') : t('pinBtn')}</span>
+            ${url ? `<a href="${url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
+          </div>
         </div>
+        <div class="comment-box" id="${_commentDomId('news', item.id)}" style="display:none;"></div>
       </div>`;
     }
 
@@ -1716,6 +1737,7 @@
       }
       if (empty) empty.style.display = 'none';
       list.innerHTML = filtered.map(_lifeInfoCardHtml).join('');
+      _applyCommentCounts('news', '#news-list [data-comment-item-id]');
     }
 
     async function loadLifeInfoNewsScreen() {
@@ -1895,6 +1917,136 @@
       btn.classList.toggle('active', open);
       const arrow = btn.querySelector('.tips-arrow');
       if (arrow) arrow.textContent = open ? '△' : '▽';
+    }
+
+    // ─── コメント機能（イベント・生活情報カード共通。設計書174） ───
+    // ひとことメモ（.tips-toggle-btn/.tips-box--collapsible）と同じ開閉パターンを踏襲し、
+    // ボトムシートではなくカード内にインライン展開する。
+    function _commentDomId(itemType, itemId) { return 'comment-box-' + itemType + '-' + itemId; }
+    function _commentBtnId(itemType, itemId) { return 'comment-btn-' + itemType + '-' + itemId; }
+
+    // JWTペイロード（署名検証はしない、UI表示専用の軽量判定）から自分のuserIdを取り出す。
+    // 「自分のコメントにだけ削除リンクを出す」ための見た目上の判定のみに使用し、
+    // 実際の削除権限チェックはサーバー側(DELETE /api/comments/:id)で必ず行う。
+    function _getMyUserIdFromToken() {
+      const token = getAuthToken();
+      if (!token) return null;
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return payload.userId || null;
+      } catch (_) { return null; }
+    }
+
+    function toggleCardComments(itemType, itemId) {
+      const box = document.getElementById(_commentDomId(itemType, itemId));
+      const btn = document.getElementById(_commentBtnId(itemType, itemId));
+      if (!box || !btn) return;
+      const open = box.style.display === 'none' || !box.style.display;
+      box.style.display = open ? 'block' : 'none';
+      const arrow = btn.querySelector('.tips-arrow');
+      if (arrow) arrow.textContent = open ? '△' : '▽';
+      if (open && !box.dataset.loaded) {
+        box.dataset.loaded = '1';
+        _loadComments(itemType, itemId);
+      }
+    }
+
+    async function _loadComments(itemType, itemId) {
+      const box = document.getElementById(_commentDomId(itemType, itemId));
+      if (!box) return;
+      try {
+        const res = await fetch(API_BASE + `/api/comments?itemType=${itemType}&itemId=${encodeURIComponent(itemId)}`);
+        const comments = res.ok ? await res.json() : [];
+        _renderCommentBox(itemType, itemId, comments);
+      } catch (e) {
+        box.innerHTML = `<div class="comment-empty">${t('toastCommentError')}</div>`;
+      }
+    }
+
+    function _renderCommentBox(itemType, itemId, comments) {
+      const box = document.getElementById(_commentDomId(itemType, itemId));
+      if (!box) return;
+      const myUserId = _getMyUserIdFromToken();
+      const listHtml = (comments && comments.length)
+        ? comments.map(c => `
+          <div class="comment-item">
+            <div class="comment-meta">
+              <span class="comment-nickname">${escapeHtml(c.nickname || '匿名')}</span>
+              <span>${_formatLifeInfoDate(c.createdAt)}</span>
+              ${myUserId && c.userId === myUserId ? `<span class="comment-delete-link" onclick="deleteComment('${c.id}','${itemType}','${itemId}')">${t('commentDeleteLink')}</span>` : ''}
+            </div>
+            <div class="comment-text">${escapeHtml(c.text)}</div>
+          </div>`).join('')
+        : `<div class="comment-empty">${t('commentEmpty')}</div>`;
+
+      const inputHtml = getAuthToken()
+        ? `<div class="comment-input-row">
+            <input class="comment-input" id="comment-input-${itemType}-${itemId}" maxlength="300" placeholder="${t('commentPlaceholder')}">
+            <button class="comment-send-btn" onclick="postComment('${itemType}','${itemId}')">➤</button>
+          </div>`
+        : `<div class="comment-auth-gate">${t('commentAuthGate')} <a onclick="goToAccountLinking()">${t('authGateBtn')}</a></div>`;
+
+      box.innerHTML = listHtml + inputHtml;
+    }
+
+    function _updateCommentCountLabel(itemType, itemId, delta) {
+      const btn = document.getElementById(_commentBtnId(itemType, itemId));
+      if (!btn) return;
+      const label = btn.querySelector('.comment-count-label');
+      if (!label) return;
+      const current = parseInt(label.textContent.replace(/[()]/g, ''), 10) || 0;
+      const next = Math.max(0, current + delta);
+      label.textContent = next > 0 ? ` (${next})` : '';
+    }
+
+    async function postComment(itemType, itemId) {
+      const input = document.getElementById(`comment-input-${itemType}-${itemId}`);
+      if (!input) return;
+      const text = input.value.trim();
+      if (!text) return;
+      try {
+        const res = await authedFetch(API_BASE + '/api/comments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemType, itemId, text, nickname: getUserName() }),
+        });
+        if (!res.ok) { showToast(t('toastCommentError')); return; }
+        input.value = '';
+        await _loadComments(itemType, itemId);
+        _updateCommentCountLabel(itemType, itemId, 1);
+      } catch (e) {
+        showToast(t('toastCommentError'));
+      }
+    }
+
+    async function deleteComment(commentId, itemType, itemId) {
+      if (!confirm(t('confirmDeleteComment'))) return;
+      try {
+        const res = await authedFetch(API_BASE + `/api/comments/${commentId}`, { method: 'DELETE' });
+        if (!res.ok) { showToast(t('toastCommentError')); return; }
+        await _loadComments(itemType, itemId);
+        _updateCommentCountLabel(itemType, itemId, -1);
+        showToast(t('toastCommentDeleted'));
+      } catch (e) {
+        showToast(t('toastCommentError'));
+      }
+    }
+
+    // カード一覧描画時に1回だけ呼び、itemId毎のコメント数をボタンのラベルに反映する
+    // （カード枚数分のリクエストを避けるため/api/comments/countsで一括取得）
+    async function _applyCommentCounts(itemType, containerSelector) {
+      try {
+        const res = await fetch(API_BASE + `/api/comments/counts?itemType=${itemType}`);
+        if (!res.ok) return;
+        const counts = await res.json();
+        document.querySelectorAll(containerSelector).forEach(btn => {
+          const label = btn.querySelector('.comment-count-label');
+          const id = btn.dataset.commentItemId;
+          if (!label || !id) return;
+          const n = counts[id] || 0;
+          label.textContent = n > 0 ? ` (${n})` : '';
+        });
+      } catch (_) {}
     }
 
     function toggleCatFilter(val) {
@@ -2279,6 +2431,7 @@
       emptyState.classList.toggle('visible', eventOnlyCount === 0);
       updatePinButtons();
       if (hasNewCard) loadInstagramEmbeds();
+      _applyCommentCounts('event', '#cards-grid [data-comment-item-id]');
     }
 
     function applyFilters() {
@@ -2917,6 +3070,7 @@
         .map(e => renderEventCard(e))
         .join('');
       loadInstagramEmbeds();
+      _applyCommentCounts('event', '#pin-list-content [data-comment-item-id]');
     }
 
     // ニュース記事のピン留め一覧（画面: #screen-pins、シンプルな一覧）
@@ -2934,6 +3088,7 @@
         return;
       }
       container.innerHTML = entries.map(_lifeInfoCardHtml).join('');
+      _applyCommentCounts('news', '#news-pin-list-content [data-comment-item-id]');
     }
 
     function openPinDetail(id) {

@@ -652,6 +652,112 @@ app.get('/api/life-info', (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
+// COMMENTS（イベント・生活情報カードへのコメント機能。設計書174）
+// events.json/life-info.jsonとは独立したファイルで管理し、元データの
+// 再取得・保持期間切れ削除の影響を受けない。
+// ─────────────────────────────────────────────
+function commentsPath(city) {
+  return path.join(__dirname, 'data', city, 'comments.json');
+}
+function loadComments(city) {
+  try { return JSON.parse(fs.readFileSync(commentsPath(city), 'utf8')); } catch { return []; }
+}
+function saveComments(city, comments) {
+  fs.writeFileSync(commentsPath(city), JSON.stringify(comments, null, 2), 'utf8');
+}
+
+// GET /api/comments?itemType=event|news&itemId=xxx — 閲覧は認証不要
+app.get('/api/comments', (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const { itemType, itemId } = req.query;
+    if (!['event', 'news'].includes(itemType) || !itemId) {
+      return res.status(400).json({ error: 'itemType and itemId required' });
+    }
+    const comments = loadComments(city)
+      .filter(c => c.itemType === itemType && c.itemId === itemId)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    res.json(comments);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/comments/counts?itemType=event|news — カード一覧描画時に1回だけ呼び、
+// itemId毎のコメント数をまとめて返す（カード枚数分のN+1リクエストを避けるため）
+app.get('/api/comments/counts', (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const { itemType } = req.query;
+    if (!['event', 'news'].includes(itemType)) {
+      return res.status(400).json({ error: 'itemType required' });
+    }
+    const counts = {};
+    for (const c of loadComments(city)) {
+      if (c.itemType !== itemType) continue;
+      counts[c.itemId] = (counts[c.itemId] || 0) + 1;
+    }
+    res.json(counts);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/comments — 投稿は requireAppAuth 必須（アカウント連携済みユーザーのみ）
+app.post('/api/comments', requireAppAuth, async (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const { itemType, itemId, text, nickname } = req.body || {};
+    if (!['event', 'news'].includes(itemType) || !itemId) {
+      return res.status(400).json({ error: 'invalid itemType/itemId' });
+    }
+    const trimmed = (text || '').trim();
+    if (!trimmed) return res.status(400).json({ error: 'text required' });
+    if (trimmed.length > 300) return res.status(400).json({ error: 'text too long (max 300 chars)' });
+
+    const comment = {
+      id: 'cmt_' + crypto.randomBytes(12).toString('hex'),
+      itemType,
+      itemId,
+      userId: req.authUserId,
+      nickname: (nickname || '').trim().slice(0, 30) || null,
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+    await withFileLock(commentsPath(city), () => {
+      const comments = loadComments(city);
+      comments.push(comment);
+      saveComments(city, comments);
+    });
+    res.json({ ok: true, comment });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/comments/:id — 投稿者本人のみ削除可
+app.delete('/api/comments/:id', requireAppAuth, async (req, res) => {
+  try {
+    const city = resolveCity(req);
+    let status = null; // 'deleted' | 'forbidden' | 'not_found'
+    await withFileLock(commentsPath(city), () => {
+      const comments = loadComments(city);
+      const idx = comments.findIndex(c => c.id === req.params.id);
+      if (idx === -1) { status = 'not_found'; return; }
+      if (comments[idx].userId !== req.authUserId) { status = 'forbidden'; return; }
+      comments.splice(idx, 1);
+      saveComments(city, comments);
+      status = 'deleted';
+    });
+    if (status === 'not_found') return res.status(404).json({ error: 'not found' });
+    if (status === 'forbidden') return res.status(403).json({ error: 'forbidden' });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/sponsored-cards — PRカード（スポンサー広告枠）一覧（設計書23フェーズ2・設計書29）
 // data/{city}/sponsored-cards.json が存在しない場合は空配列を返す（エラーにしない）
 app.get('/api/sponsored-cards', (req, res) => {
