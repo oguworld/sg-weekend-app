@@ -62,9 +62,9 @@
       <div class="section-header" style="padding:0 16px 4px;margin:0 -20px;min-height:0;">
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto;height:28px;">
           <button id="pin-filter-btn" class="sort-btn" style="display:none;" title="ピン留めした項目のみ表示">📌</button>
-          <button id="ending-filter-btn" class="sort-btn" title="今週末が見納め・ラストチャンスのものを表示">⏰</button>
+          <button id="ending-filter-btn" class="sort-btn" title="今週末が見納め・ラストチャンスのものを表示">⏰ <span data-i18n="endingFilterBtn">残りわずか</span></button>
           <button id="new-filter-btn" class="sort-btn" style="display:none;" title="新着（1日以内）のみ表示">🔔</button>
-          <button id="event-filter-btn" class="sort-btn" onclick="openEventFilterSheet()" style="display:flex;align-items:center;gap:3px;" title="絞り込み">🔽<span id="event-filter-badge" style="display:none;background:var(--caramel);color:#fff;border-radius:10px;font-size:11px;padding:1px 5px;"></span></button>
+          <button id="event-filter-btn" class="sort-btn" onclick="openEventFilterSheet()" style="display:none;align-items:center;gap:3px;" title="絞り込み">🔽<span id="event-filter-badge" style="display:none;background:var(--caramel);color:#fff;border-radius:10px;font-size:11px;padding:1px 5px;"></span></button>
           <div id="result-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
         </div>
       </div>
@@ -1302,7 +1302,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260830e"></script>
+  <script src="/app.js?v=20260830f"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
