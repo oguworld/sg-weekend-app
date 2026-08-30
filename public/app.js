@@ -4103,13 +4103,15 @@
         // 既に「すべて」表示済み（カテゴリ未選択・おすすめモードOFF）かつ都市も変わっていなければ、
         // タブを叩くだけで毎回チップ再同期・スクロール位置リセット・再描画をやり直す必要はない。
         // ニュース画面の同種の「変化がなければ何もしない」対策と挙動を揃える（生活情報のちかつき対策と同じ考え方）。
-        const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive && filterNew === true;
+        const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive && filterNew === true && !filterEnding;
         // 縦スクロール位置は変化の有無に関わらず必ず一番上に戻す（生活情報画面と同じ挙動）
         document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         if (!homeAlreadyDefault || cityChanged) {
           filterCats.clear();
           _recommendModeActive = false;
           filterNew = true; // 先頭チップ（新着）にリセット
+          filterEnding = false; // 「残りわずか」フィルターもリセット
+          document.getElementById('ending-filter-btn')?.classList.remove('active');
           _syncCatChips();
           _syncRecommendChip();
           // チップ行を左端にスクロール
