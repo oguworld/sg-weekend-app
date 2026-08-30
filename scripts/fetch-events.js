@@ -175,7 +175,17 @@ async function fetchRssItems(feeds, cityKey = 'sg') {
 
     try {
       console.log(`\n  📡 取得中: ${feed.name}`);
-      const result = await parser.parseURL(feedUrl);
+      // Mothership等、フィード側の生成不備でタイトル内の "&" が "&amp;" にエスケープされず
+      // 生のまま出力されているケースがあり、rss-parser内部のXMLパーサー（xml2js）が
+      // "Invalid character in entity name" で例外を投げていた（scripts/fetch-life-info.jsで
+      // 判明・対応済みと同じ不具合）。生テキストを取得し、正規化された実体参照
+      // （&amp; &lt; &gt; &quot; &apos; &#数値; &#x16進;）以外の素の "&" のみを
+      // "&amp;" に置換してから parseString() に渡すことで許容する。
+      const res = await fetch(feedUrl, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rawXml = await res.text();
+      const sanitizedXml = rawXml.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;');
+      const result = await parser.parseString(sanitizedXml);
       const raw = result.items || [];
 
       // ハイウォーターマーク: 前回取得時に見た GUID（無ければ link）の集合
