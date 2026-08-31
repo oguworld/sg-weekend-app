@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "おでかけNavi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -30,5 +30,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "「すべて」タブを「新着」に変更し、直近24時間の最新情報をすぐ確認できるようにしました。カテゴリタブが横にスクロールできない不具合を修正。画面表示の細かい調整など。"
+  "releaseNotes": "イベント・生活情報の各カードにコメント機能を追加しました。気になる投稿にコメントしてみましょう（投稿にはアカウント連携が必要です）。画面表示の細かい調整など。"
 }
