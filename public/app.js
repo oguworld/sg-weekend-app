@@ -1977,7 +1977,7 @@
             </div>
             <div class="comment-text">${escapeHtml(c.text)}</div>
           </div>`).join('')
-        : `<div class="comment-empty">${t('commentEmpty')}</div>`;
+        : '';
 
       const inputHtml = getAuthToken()
         ? `<div class="comment-input-row">
