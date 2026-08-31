@@ -704,9 +704,19 @@ app.get('/api/comments/counts', (req, res) => {
   }
 });
 
-// POST /api/comments — 投稿は requireAppAuth 必須（アカウント連携済みユーザーのみ）
-app.post('/api/comments', requireAppAuth, async (req, res) => {
+// POST /api/comments — 投稿はrequireAppAuth（アカウント連携済みユーザー）または
+// x-admin-secretヘッダー（post-to-x.jsからのbot投稿）のいずれかの認証で受け付ける
+app.post('/api/comments', async (req, res) => {
   try {
+    const isBot = process.env.ADMIN_SECRET && req.headers['x-admin-secret'] === process.env.ADMIN_SECRET;
+    let authUserId = null;
+    if (isBot) {
+      authUserId = 'bot_odekake_navi';
+    } else {
+      authUserId = verifyAppJwtOptional(req);
+      if (!authUserId) return res.status(401).json({ error: 'unauthorized' });
+    }
+
     const city = resolveCity(req);
     const { itemType, itemId, text, nickname } = req.body || {};
     if (!['event', 'news'].includes(itemType) || !itemId) {
@@ -720,7 +730,7 @@ app.post('/api/comments', requireAppAuth, async (req, res) => {
       id: 'cmt_' + crypto.randomBytes(12).toString('hex'),
       itemType,
       itemId,
-      userId: req.authUserId,
+      userId: authUserId,
       nickname: (nickname || '').trim().slice(0, 30) || null,
       text: trimmed,
       createdAt: new Date().toISOString(),
