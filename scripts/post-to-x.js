@@ -98,7 +98,12 @@ function getActiveEvents(events) {
 function pickEvent(events, history) {
   const { eventIds = [], postedStores = [] } = history;
   const unseen = events.filter(e => !eventIds.includes(e.id) && !postedStores.includes(e.store));
-  const pool = (unseen.length > 0 ? unseen : events.filter(e => !eventIds.includes(e.id)))
+  const candidates = unseen.length > 0 ? unseen : events.filter(e => !eventIds.includes(e.id));
+  // 投稿は取り込み直後に走る運用のため、まず「今日取り込んだ」ものを優先する。
+  // 今日分が無ければ（取り込み0件・タイミングずれ等）従来通り新着順にフォールバックする
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todaysPool = candidates.filter(e => e.fetched_at === todayStr);
+  const pool = (todaysPool.length > 0 ? todaysPool : candidates)
     .sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''))
     .slice(0, 15);
   return pool[Math.floor(Math.random() * pool.length)];
@@ -125,7 +130,12 @@ function loadLifeInfoArticles(city) {
 function pickNewsArticle(articles, history) {
   const { newsIds = [] } = history;
   const unseen = articles.filter(a => !newsIds.includes(a.id));
-  const pool = (unseen.length > 0 ? unseen : articles)
+  const candidates = unseen.length > 0 ? unseen : articles;
+  // 投稿は取り込み直後に走る運用のため、まず「今日取り込んだ」ものを優先する。
+  // 今日分が無ければ（取り込み0件・タイミングずれ等）従来通り新着順にフォールバックする
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todaysPool = candidates.filter(a => a.fetched_at === todayStr);
+  const pool = (todaysPool.length > 0 ? todaysPool : candidates)
     .sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''))
     .slice(0, 15);
   return pool[Math.floor(Math.random() * pool.length)];
