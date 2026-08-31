@@ -1702,6 +1702,7 @@
       document.querySelectorAll('#news-filter-row .filter-chip').forEach(chip => {
         chip.classList.toggle('active', (chip.dataset.newsCat || '') === cat);
       });
+      document.getElementById('news-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
       renderNewsList();
     }
 
