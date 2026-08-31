@@ -99,7 +99,7 @@ function pickEvent(events, history) {
   const { eventIds = [], postedStores = [] } = history;
   const unseen = events.filter(e => !eventIds.includes(e.id) && !postedStores.includes(e.store));
   const pool = (unseen.length > 0 ? unseen : events.filter(e => !eventIds.includes(e.id)))
-    .sort((a, b) => (b.major_score || 0) - (a.major_score || 0))
+    .sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''))
     .slice(0, 15);
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -126,7 +126,7 @@ function pickNewsArticle(articles, history) {
   const { newsIds = [] } = history;
   const unseen = articles.filter(a => !newsIds.includes(a.id));
   const pool = (unseen.length > 0 ? unseen : articles)
-    .sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || ''))
+    .sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''))
     .slice(0, 15);
   return pool[Math.floor(Math.random() * pool.length)];
 }
