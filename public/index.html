@@ -264,15 +264,22 @@
       <span class="screen-title" data-i18n="navPins">ピン留め</span>
     </div>
     <div class="screen-scroll-content">
-      <div class="section-title" data-i18n="pinSectionNews" style="margin-bottom:10px;">ニュース</div>
-      <div id="news-pin-list-content" style="display:flex;flex-direction:column;gap:12px;"></div>
-      <div class="section-divider" style="margin:24px 0;">
-        <div class="divider-line"></div>
-        <div class="divider-dot"></div>
-        <div class="divider-line"></div>
+      <div id="pins-sectioned-content">
+        <div class="section-title" data-i18n="pinSectionNews" style="margin-bottom:10px;">生活情報・ニュース</div>
+        <div id="news-pin-list-content" style="display:flex;flex-direction:column;gap:12px;"></div>
+        <div class="section-divider" style="margin:24px 0;">
+          <div class="divider-line"></div>
+          <div class="divider-dot"></div>
+          <div class="divider-line"></div>
+        </div>
+        <div class="section-title" data-i18n="pinSectionEvents" style="margin-bottom:10px;">おでかけ情報</div>
+        <div id="pin-list-content" class="cards-grid"></div>
       </div>
-      <div class="section-title" data-i18n="pinSectionEvents" style="margin-bottom:10px;">イベント</div>
-      <div id="pin-list-content" class="cards-grid"></div>
+      <div id="pins-empty-combined" style="display:none;height:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:40px 24px;">
+        <div style="font-size:40px;">📌</div>
+        <div style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="pinsEmptyCombinedTitle">まだ何もピン留めしていません</div>
+        <div style="font-size:13px;color:var(--warm-gray);line-height:1.7;" data-i18n="pinsEmptyCombinedDesc">気になるイベントやニュースの📌をタップすると<br>ここにまとめて表示されます</div>
+      </div>
     </div>
   </div>
 
@@ -1302,7 +1309,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260831b"></script>
+  <script src="/app.js?v=20260831c"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

@@ -447,6 +447,8 @@
         pinSectionEvents: 'おでかけ情報',
         pinSectionNews: '生活情報・ニュース',
         newsPinEmpty: 'まだピン留めしたニュースがありません',
+        pinsEmptyCombinedTitle: 'まだ何もピン留めしていません',
+        pinsEmptyCombinedDesc: '気になるイベントやニュースの📌をタップすると<br>ここにまとめて表示されます',
         shareSettingsDesc: 'シンガポール在住の友達にこのアプリを紹介しよう！',
         shareSettingsBtn: '友達にシェアする',
         bannerToday: '⏰ 本日まで',
@@ -774,6 +776,8 @@
         pinSectionEvents: 'Outing Info',
         pinSectionNews: 'Life Info & News',
         newsPinEmpty: 'No pinned news articles yet',
+        pinsEmptyCombinedTitle: 'No pins yet',
+        pinsEmptyCombinedDesc: 'Tap 📌 on any event or news article<br>and it will show up here',
         shareSettingsDesc: 'Share this app with your friends in Singapore!',
         shareSettingsBtn: 'Share with Friends',
         bannerToday: '⏰ Today only',
@@ -3069,6 +3073,7 @@
             <div class="pin-empty-emoji">📌</div>
             <div class="pin-empty-title">${t('pinEmpty')}</div>
           </div>`;
+        _updatePinsScreenEmptyState();
         return;
       }
       // 元のイベントカードをそのまま再利用する（EVENT_REGISTRYは毎回のloadEventData()で
@@ -3081,6 +3086,18 @@
         .join('');
       loadInstagramEmbeds();
       _applyCommentCounts('event', '#pin-list-content [data-comment-item-id]');
+      _updatePinsScreenEmptyState();
+    }
+
+    // ニュース・イベントどちらもピン留めが0件の場合、セクション分けされた表示の代わりに
+    // 画面中央に大きく表示する共通の空状態に切り替える（設計時点の「上に寄りすぎ」対策）
+    function _updatePinsScreenEmptyState() {
+      const sectioned = document.getElementById('pins-sectioned-content');
+      const combined = document.getElementById('pins-empty-combined');
+      if (!sectioned || !combined) return;
+      const bothEmpty = Object.keys(getPins()).length === 0 && Object.keys(getNewsPins()).length === 0;
+      sectioned.style.display = bothEmpty ? 'none' : '';
+      combined.style.display = bothEmpty ? 'flex' : 'none';
     }
 
     // ニュース記事のピン留め一覧（画面: #screen-pins、シンプルな一覧）
@@ -3095,10 +3112,12 @@
             <div class="pin-empty-emoji">📰</div>
             <div class="pin-empty-title">${t('newsPinEmpty')}</div>
           </div>`;
+        _updatePinsScreenEmptyState();
         return;
       }
       container.innerHTML = entries.map(_lifeInfoCardHtml).join('');
       _applyCommentCounts('news', '#news-pin-list-content [data-comment-item-id]');
+      _updatePinsScreenEmptyState();
     }
 
     function openPinDetail(id) {
