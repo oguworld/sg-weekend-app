@@ -1498,10 +1498,11 @@
       const catKey = EVENT_CATEGORY_LABEL_KEYS[e.type] || '';
       const catLabel = catKey ? t(catKey) : '';
       const catColor = EVENT_CATEGORY_COLORS[e.type] || EVENT_CATEGORY_COLORS.event;
-      // 右端バッジ: New とあと何日が両方該当する場合はあと何日を優先（同じ位置・同じサイズ）
+      // 右端バッジ: New とあと何日が両方該当する場合はあと何日を優先（New と全く同じ見た目に統一）
+      const inlineBadgeStyle = 'font-size:11px;font-weight:700;color:white;background:var(--caramel);border-radius:20px;padding:3px 9px;margin-left:auto;';
       const inlineBadgeHtml = bannerLabel
-        ? `<span style="font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:20px;padding:3px 9px;margin-left:auto;">${bannerLabel}</span>`
-        : (newRibbon !== '' ? `<span style="font-size:11px;font-weight:700;color:white;background:var(--caramel);border-radius:20px;padding:3px 9px;margin-left:auto;">New</span>` : '');
+        ? `<span style="${inlineBadgeStyle}">${bannerLabel}</span>`
+        : (newRibbon !== '' ? `<span style="${inlineBadgeStyle}">New</span>` : '');
       const metaRowHtml = (catLabel || e.period || e.hours || inlineBadgeHtml)
         ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--warm-gray);">
             ${catLabel ? `<span style="background:${catColor.bg};color:${catColor.color};border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
