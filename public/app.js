@@ -1481,10 +1481,25 @@
       // 写真に文字を重ねない。以前は写真にオーバーレイでタイトルを重ねていたが可読性が
       // 落ちるためこの並びに変更した）
       const plainTitleHtml = `<h2 style="font-family:'Noto Sans JP',sans-serif;font-size:16px;font-weight:700;color:var(--midnight);margin:0 0 10px;line-height:1.35;">${e.store || e.title || ''}</h2>`;
-      const metaRowHtml = (e.location || e.period || e.hours)
-        ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--warm-gray);">
-            ${e.location ? `<span>📍 ${e.location}</span>` : ''}
+
+      // カテゴリタグの配色（生活情報カードのLIFE_INFO_CATEGORY_COLORSと同じ考え方）
+      const EVENT_CATEGORY_LABEL_KEYS = { event: 'catEvent', show: 'catShow', gourmet: 'catGourmet', sale: 'catSale', opening: 'catOpening' };
+      const EVENT_CATEGORY_COLORS = {
+        event:   { bg: 'var(--caramel-pale)',       color: 'var(--caramel)' },
+        show:    { bg: 'rgba(122,173,204,0.18)',    color: 'var(--sky)' },
+        gourmet: { bg: 'rgba(196,112,90,0.16)',      color: 'var(--terracotta)' },
+        sale:    { bg: 'rgba(110,158,136,0.18)',     color: 'var(--sage)' },
+        opening: { bg: 'rgba(192,144,58,0.16)',      color: 'var(--gold)' },
+      };
+      const catKey = EVENT_CATEGORY_LABEL_KEYS[e.type] || '';
+      const catLabel = catKey ? t(catKey) : '';
+      const catColor = EVENT_CATEGORY_COLORS[e.type] || EVENT_CATEGORY_COLORS.event;
+      const bannerPillHtml = bannerLabel ? `<span style="font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:20px;padding:2px 8px;">${bannerLabel}</span>` : '';
+      const metaRowHtml = (catLabel || e.period || e.hours || bannerPillHtml)
+        ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--warm-gray);">
+            ${catLabel ? `<span style="background:${catColor.bg};color:${catColor.color};border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
             ${(e.period || e.hours) ? `<span>📅 ${e.period || e.hours}</span>` : ''}
+            ${bannerPillHtml}
           </div>` : '';
 
       return `
@@ -1520,7 +1535,6 @@
                       onerror="handleImgError(this,'${bgClass}','${safeEmoji}')" />`
               : `<div class="card-image-bg ${bgClass}" style="height:200px;">${e.emoji || '📍'}</div>`;
             return `${newRibbon}<div class="card-body">
-              ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:20px;padding:3px 9px;margin-bottom:8px;">${bannerLabel}</div>` : ''}
               ${plainTitleHtml}
               <div style="position:relative;border-radius:var(--radius-card);overflow:hidden;margin-bottom:10px;">
                 ${imgHtml}
