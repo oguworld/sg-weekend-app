@@ -1503,9 +1503,10 @@
       const inlineBadgeHtml = bannerLabel
         ? `<span style="${inlineBadgeStyle}">${bannerLabel}</span>`
         : (newRibbon !== '' ? `<span style="${inlineBadgeStyle}">New</span>` : '');
-      const metaRowHtml = (catLabel || e.period || e.hours || inlineBadgeHtml)
+      const metaRowHtml = (catLabel || e.location || e.period || e.hours || inlineBadgeHtml)
         ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--warm-gray);">
             ${catLabel ? `<span style="background:${catColor.bg};color:${catColor.color};border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
+            ${e.location ? `<span>📍 ${e.location}</span>` : ''}
             ${(e.period || e.hours) ? `<span>📅 ${e.period || e.hours}</span>` : ''}
             ${inlineBadgeHtml}
           </div>` : '';

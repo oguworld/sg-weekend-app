@@ -45,7 +45,6 @@
       top: 0;
       z-index: 10;
       flex-shrink: 0;
-      box-shadow: 0 2px 18px rgba(42,37,32,0.06);
     }
 
     .header-top {
