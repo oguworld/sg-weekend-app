@@ -1448,14 +1448,13 @@
       const safeUrl = (e.url || '').replace(/'/g, "\\'");;
       const eAgeAttr = Array.isArray(e.age) ? e.age.join(',') : (e.age || 'all');
 
-      // 新着リボン（1日以内に登録。毎日cron取り込みのため3日→1日に短縮、2026-08-28）
+      // 新着リボン（取り込みから24時間以内、2026-09-02に日付単位判定から厳密な経過時間判定へ変更）
       const newRibbon = (() => {
         if (!e.fetched_at) return '';
-        const fetched = new Date(e.fetched_at + 'T00:00:00');
-        const now = new Date(); now.setHours(0,0,0,0);
-        const days = Math.round((now - fetched) / 86400000);
-        const isEn = getLang() === 'en';
-        if (days <= 1) return `<div class="card-new-ribbon card-new-ribbon--today">New</div>`;
+        const fetched = new Date(e.fetched_at);
+        if (isNaN(fetched.getTime())) return '';
+        const hours = (Date.now() - fetched.getTime()) / 3600000;
+        if (hours <= 24) return `<div class="card-new-ribbon card-new-ribbon--today">New</div>`;
         return '';
       })();
       // 今週まで／今週から判定（7日以内）
@@ -1735,9 +1734,9 @@
 
     function _isLifeInfoItemNew(item) {
       if (!item.fetched_at) return false;
-      const fetched = new Date(item.fetched_at + 'T00:00:00');
-      const now = new Date(); now.setHours(0,0,0,0);
-      return Math.round((now - fetched) / 86400000) <= 1;
+      const fetched = new Date(item.fetched_at);
+      if (isNaN(fetched.getTime())) return false;
+      return (Date.now() - fetched.getTime()) <= 24 * 3600000;
     }
 
     function renderNewsList() {
@@ -2317,12 +2316,12 @@
         // 終了間近
         const endingMatch = !filterEnding || isEndingSoon(e);
 
-        // 新着（1日以内。毎日cron取り込みのため3日→1日に短縮、2026-08-28）
+        // 新着（取り込みから24時間以内、2026-09-02に日付単位判定から厳密な経過時間判定へ変更）
         const newMatch = !filterNew || (() => {
           if (!e.fetched_at) return false;
-          const fetched = new Date(e.fetched_at + 'T00:00:00');
-          const now = new Date(); now.setHours(0,0,0,0);
-          return Math.round((now - fetched) / 86400000) <= 1;
+          const fetched = new Date(e.fetched_at);
+          if (isNaN(fetched.getTime())) return false;
+          return (Date.now() - fetched.getTime()) <= 24 * 3600000;
         })();
 
         // キーワード

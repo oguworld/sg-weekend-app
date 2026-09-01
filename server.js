@@ -1524,7 +1524,7 @@ app.post('/api/line-webhook', async (req, res) => {
           const draft      = await generateEventDraft(image, text, webContent, city);
           draft.image      = ogImage || null;
           draft.city        = city;
-          draft.fetched_at  = new Date().toISOString().slice(0, 10);
+          draft.fetched_at  = new Date().toISOString();
           const pendingId  = savePendingEvent(draft, userId, city);
 
           const cityFlag = { sg: '🇸🇬', bkk: '🇹🇭', syd: '🇦🇺' }[city] || '';

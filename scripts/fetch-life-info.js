@@ -328,7 +328,7 @@ async function filterOutDuplicateStories(newItems, existingItems) {
   recentCutoff.setDate(recentCutoff.getDate() - 3);
   const recentExisting = existingItems.filter(it => {
     if (!it.fetched_at) return false;
-    const d = new Date(it.fetched_at + 'T00:00:00');
+    const d = new Date(it.fetched_at);
     return !isNaN(d.getTime()) && d >= recentCutoff;
   });
 
@@ -461,7 +461,7 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
       source:     original.source || '',
       sourceUrl:  original.link || '',
       publishedAt,
-      fetched_at: new Date().toISOString().slice(0, 10),
+      fetched_at: new Date().toISOString(),
     };
 
     console.log(`    ✅ 採用: ${item.title} (category: ${item.category}, source: ${item.source})`);
@@ -498,7 +498,7 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
     const combined = [...existing, ...newItems];
     const kept = combined.filter(item => {
       if (!item.fetched_at) return true; // 日付不明は安全側で残す
-      const fetched = new Date(item.fetched_at + 'T00:00:00');
+      const fetched = new Date(item.fetched_at);
       return !isNaN(fetched.getTime()) && fetched >= retentionCutoff;
     });
     const removedCount = combined.length - kept.length;

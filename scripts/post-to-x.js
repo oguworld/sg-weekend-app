@@ -102,7 +102,7 @@ function pickEvent(events, history) {
   // 投稿は取り込み直後に走る運用のため、まず「今日取り込んだ」ものを優先する。
   // 今日分が無ければ（取り込み0件・タイミングずれ等）従来通り新着順にフォールバックする
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todaysPool = candidates.filter(e => e.fetched_at === todayStr);
+  const todaysPool = candidates.filter(e => (e.fetched_at || '').slice(0, 10) === todayStr);
   const pool = (todaysPool.length > 0 ? todaysPool : candidates)
     .sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''))
     .slice(0, 15);
@@ -134,7 +134,7 @@ function pickNewsArticle(articles, history) {
   // 投稿は取り込み直後に走る運用のため、まず「今日取り込んだ」ものを優先する。
   // 今日分が無ければ（取り込み0件・タイミングずれ等）従来通り新着順にフォールバックする
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todaysPool = candidates.filter(a => a.fetched_at === todayStr);
+  const todaysPool = candidates.filter(a => (a.fetched_at || '').slice(0, 10) === todayStr);
   const pool = (todaysPool.length > 0 ? todaysPool : candidates)
     .sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''))
     .slice(0, 15);

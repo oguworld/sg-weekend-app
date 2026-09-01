@@ -501,7 +501,7 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
     const item = {
       id,
       city:        cityKey,
-      fetched_at:  new Date().toISOString().slice(0, 10),
+      fetched_at:  new Date().toISOString(),
       type:        validType,
       emoji:       f.emoji || '📌',
       image:       f.image || original.image || null,
