@@ -1458,8 +1458,6 @@
         if (days <= 1) return `<div class="card-new-ribbon card-new-ribbon--today">New</div>`;
         return '';
       })();
-      const hasRibbon = newRibbon !== '';
-
       // 今週まで／今週から判定（7日以内）
       const _today = new Date(); _today.setHours(0,0,0,0);
       const _weekEnd = new Date(_today); _weekEnd.setDate(_today.getDate() + 7);
@@ -1473,6 +1471,12 @@
         else if (d === 1) bannerLabel = t('bannerTomorrow');
         else              bannerLabel = t('bannerDaysLeft').replace('{d}', d);
       }
+
+      // 右上バッジ: New と 残り日数が両方該当する場合は残り日数を優先表示（同じ位置・同じサイズ）
+      const topRightBadgeHtml = bannerLabel
+        ? `<div class="card-new-ribbon" style="background:var(--terracotta);color:white;">${bannerLabel}</div>`
+        : newRibbon;
+      const hasRibbon = topRightBadgeHtml !== '';
 
       const igSc = getInstagramShortcode(e.url);
       const pinLinkHtml = `<span class="card-detail-link card-pin-link${pinned ? ' pinned' : ''}" id="pin-${e.id}" onclick="togglePinById('${e.id}')" style="cursor:pointer;">📌 <span id="pin-label-${e.id}">${pinned ? t('pinnedBtn') : t('pinBtn')}</span></span>`;
@@ -1494,12 +1498,15 @@
       const catKey = EVENT_CATEGORY_LABEL_KEYS[e.type] || '';
       const catLabel = catKey ? t(catKey) : '';
       const catColor = EVENT_CATEGORY_COLORS[e.type] || EVENT_CATEGORY_COLORS.event;
-      const bannerPillHtml = bannerLabel ? `<span style="font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:20px;padding:2px 8px;">${bannerLabel}</span>` : '';
-      const metaRowHtml = (catLabel || e.period || e.hours || bannerPillHtml)
-        ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--warm-gray);">
+      // 右端バッジ: New とあと何日が両方該当する場合はあと何日を優先（同じ位置・同じサイズ）
+      const inlineBadgeHtml = bannerLabel
+        ? `<span style="font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:20px;padding:3px 9px;margin-left:auto;">${bannerLabel}</span>`
+        : (newRibbon !== '' ? `<span style="font-size:11px;font-weight:700;color:white;background:var(--caramel);border-radius:20px;padding:3px 9px;margin-left:auto;">New</span>` : '');
+      const metaRowHtml = (catLabel || e.period || e.hours || inlineBadgeHtml)
+        ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--warm-gray);">
             ${catLabel ? `<span style="background:${catColor.bg};color:${catColor.color};border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
             ${(e.period || e.hours) ? `<span>📅 ${e.period || e.hours}</span>` : ''}
-            ${bannerPillHtml}
+            ${inlineBadgeHtml}
           </div>` : '';
 
       return `
@@ -1510,14 +1517,13 @@
             const igMetaHtml = `
               <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.78) 100%);pointer-events:none;z-index:2;"></div>
               <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px 13px;pointer-events:none;z-index:3;">
-                ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:4px;padding:2px 7px;margin-bottom:5px;">${bannerLabel}</div>` : ''}
                 <h2 style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);${hasRibbon ? 'padding-right:44px;' : ''}">${e.store || e.title || ''}</h2>
                 ${(e.location || e.period || e.hours) ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;opacity:0.92;">
                   ${e.location ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📍 ${e.location}</span>` : ''}
                   ${(e.period || e.hours) ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📅 ${e.period || e.hours}</span>` : ''}
                 </div>` : ''}
               </div>`;
-            return `${newRibbon}<div class="card-body">
+            return `${topRightBadgeHtml}<div class="card-body">
               <div style="position:relative;margin:-14px -14px 12px;">
                 <div class="ig-embed-wrap">
                   <blockquote class="instagram-media"
@@ -1534,12 +1540,12 @@
                       style="width:100%;height:200px;object-fit:cover;display:block;"
                       onerror="handleImgError(this,'${bgClass}','${safeEmoji}')" />`
               : `<div class="card-image-bg ${bgClass}" style="height:200px;">${e.emoji || '📍'}</div>`;
-            return `${newRibbon}<div class="card-body">
+            return `<div class="card-body">
+              ${metaRowHtml}
               ${plainTitleHtml}
               <div style="position:relative;border-radius:var(--radius-card);overflow:hidden;margin-bottom:10px;">
                 ${imgHtml}
-              </div>
-              ${metaRowHtml}`;
+              </div>`;
           })()}
             ${displayContent ? `<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${displayContent}</p>` : ''}
             <div class="card-sub-row">
