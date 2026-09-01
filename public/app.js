@@ -1914,11 +1914,19 @@
     }
 
     function _setIconFilter(type) {
+      // pin/ending/new は元々排他トグルだったが、「新着」チップ(filterCats/filterNew)が
+      // カテゴリ行の主軸になった現在は、残りわずか(ending)・ピン留め(pin)はその上に追加で
+      // 絞り込む補助フィルターという位置づけに変わっている。他方をONにした際に
+      // filterNew を巻き込んで強制OFFにしないよう、自分のグループ内だけで排他制御する
       const wasActive = type === 'pin' ? showPinnedOnly : type === 'ending' ? filterEnding : filterNew;
-      showPinnedOnly = false; filterEnding = false; filterNew = false;
-      document.getElementById('pin-filter-btn')?.classList.remove('active');
-      document.getElementById('ending-filter-btn')?.classList.remove('active');
-      document.getElementById('new-filter-btn')?.classList.remove('active');
+      if (type !== 'new') {
+        showPinnedOnly = false; filterEnding = false;
+        document.getElementById('pin-filter-btn')?.classList.remove('active');
+        document.getElementById('ending-filter-btn')?.classList.remove('active');
+      } else {
+        filterNew = false;
+        document.getElementById('new-filter-btn')?.classList.remove('active');
+      }
       if (!wasActive) {
         if (type === 'pin')    { showPinnedOnly = true; document.getElementById('pin-filter-btn')?.classList.add('active'); }
         if (type === 'ending') { filterEnding   = true; document.getElementById('ending-filter-btn')?.classList.add('active'); }
