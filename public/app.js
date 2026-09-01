@@ -1475,21 +1475,17 @@
       }
 
       const igSc = getInstagramShortcode(e.url);
-      const metaInImage = (e.location || e.period || e.hours)
-        ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;opacity:0.92;">
-            ${e.location ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📍 ${e.location}</span>` : ''}
-            ${(e.period || e.hours) ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📅 ${e.period || e.hours}</span>` : ''}
-          </div>` : '';
       const pinLinkHtml = `<span class="card-detail-link card-pin-link${pinned ? ' pinned' : ''}" id="pin-${e.id}" onclick="togglePinById('${e.id}')" style="cursor:pointer;">📌 <span id="pin-label-${e.id}">${pinned ? t('pinnedBtn') : t('pinBtn')}</span></span>`;
 
-      const heroOverlayContent = `
-        <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.78) 100%);pointer-events:none;"></div>
-        <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px 13px;">
-          ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:4px;padding:2px 7px;margin-bottom:5px;">${bannerLabel}</div>` : ''}
-          <h2 style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);">${e.store || e.title || ''}</h2>
-          ${metaInImage}
-        </div>
-        ${newRibbon}`;
+      // タイトル→写真→説明の順（生活情報カードと同じくタイトルは地の色の上にプレーン表示、
+      // 写真に文字を重ねない。以前は写真にオーバーレイでタイトルを重ねていたが可読性が
+      // 落ちるためこの並びに変更した）
+      const plainTitleHtml = `<h2 style="font-family:'Noto Sans JP',sans-serif;font-size:16px;font-weight:700;color:var(--midnight);margin:0 0 10px;line-height:1.35;">${e.store || e.title || ''}</h2>`;
+      const metaRowHtml = (e.location || e.period || e.hours)
+        ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--warm-gray);">
+            ${e.location ? `<span>📍 ${e.location}</span>` : ''}
+            ${(e.period || e.hours) ? `<span>📅 ${e.period || e.hours}</span>` : ''}
+          </div>` : '';
 
       return `
         <article class="spot-card${isEndingSoon ? ' ending-soon' : ''}" data-tab="${e.tab || 'weekend'}" data-age="${eAgeAttr}"
@@ -1520,14 +1516,16 @@
           })() : (() => {
             const imgHtml = (e.image && !e.image.includes('cdninstagram.com') && !/\.(mp4|mov|webm)(\?|$)/i.test(e.image))
               ? `<img src="${e.image}" alt="${(e.store || '').replace(/"/g,'&quot;')}"
-                      style="width:100%;height:220px;object-fit:cover;display:block;"
+                      style="width:100%;height:200px;object-fit:cover;display:block;"
                       onerror="handleImgError(this,'${bgClass}','${safeEmoji}')" />`
-              : `<div class="card-image-bg ${bgClass}" style="height:220px;">${e.emoji || '📍'}</div>`;
-            return `<div class="card-hero" style="position:relative;overflow:hidden;">
-              ${imgHtml}
-              ${heroOverlayContent}
-            </div>
-            <div class="card-body" style="padding-top:12px;">`;
+              : `<div class="card-image-bg ${bgClass}" style="height:200px;">${e.emoji || '📍'}</div>`;
+            return `${newRibbon}<div class="card-body">
+              ${bannerLabel ? `<div style="display:inline-block;font-size:11px;font-weight:700;color:white;background:var(--terracotta);border-radius:20px;padding:3px 9px;margin-bottom:8px;">${bannerLabel}</div>` : ''}
+              ${plainTitleHtml}
+              <div style="position:relative;border-radius:var(--radius-card);overflow:hidden;margin-bottom:10px;">
+                ${imgHtml}
+              </div>
+              ${metaRowHtml}`;
           })()}
             ${displayContent ? `<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${displayContent}</p>` : ''}
             <div class="card-sub-row">
