@@ -4053,8 +4053,10 @@
         _nativePushRegisterIntent = null;
         _updatePushBtn();
       });
-      // 通知タップでアプリが起動/フォアグラウンド化した際の遷移（共有カレンダー通知なら参加ダイアログ、それ以外はトップ画面へ）
+      // 通知タップでアプリが起動/フォアグラウンド化した際の遷移（共有カレンダー通知なら参加ダイアログ、
+      // ?nav=news 指定なら生活情報タブ、それ以外はトップ画面へ）
       plugin.addListener('pushNotificationActionPerformed', (action) => {
+        let targetNav = 'home';
         try {
           const url = action?.notification?.data?.url;
           if (url) {
@@ -4068,9 +4070,10 @@
               document.getElementById('cal-join-overlay').classList.add('visible');
               document.getElementById('cal-join-modal').classList.add('visible');
             }
+            if (u.searchParams.get('nav') === 'news') targetNav = 'news';
           }
         } catch (e) {}
-        switchNav('home');
+        switchNav(targetNav);
       });
     }
 
@@ -9390,6 +9393,7 @@
     renderCalendar();
     updateCalSyncBtn();
     checkJoinParam();
+    checkNavParam();
 
     // ─── HIDDEN GEMS DATA ───
     const GEMS_DATA = [
@@ -10553,6 +10557,16 @@
       }
       document.getElementById('cal-join-overlay').classList.add('visible');
       document.getElementById('cal-join-modal').classList.add('visible');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    // Web版でのプッシュ通知タップ遷移（?nav=news → 生活情報タブ）。sw.jsのnotificationclickが
+    // client.navigate()で付与するクエリを起動時に読み取る
+    function checkNavParam() {
+      const sp = new URLSearchParams(window.location.search);
+      const nav = sp.get('nav');
+      if (nav !== 'news') return;
+      switchNav('news');
       window.history.replaceState({}, '', window.location.pathname);
     }
 

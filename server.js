@@ -85,14 +85,15 @@ async function sendPushToAll(cityKey) {
   const cityConf = CITIES[cityKey] || CITIES.sg;
   const title = '最新情報を更新しました';
   const body = 'おでかけ情報・生活情報の最新記事をチェックしてみましょう！';
-  const payload = JSON.stringify({ title, body });
+  const url = 'https://dosuru.app/?nav=news';
+  const payload = JSON.stringify({ title, body, data: { url } });
   const subs = loadPushSubs();
   if (subs.length === 0) return 0;
   const expiredEndpoints = new Set();
   const expiredTokens = new Set();
   await Promise.allSettled(subs.map(async sub => {
     if (subPlatform(sub) === 'ios') {
-      const invalid = await sendApnToToken(sub.deviceToken, { title, body });
+      const invalid = await sendApnToToken(sub.deviceToken, { title, body, url });
       if (invalid) expiredTokens.add(sub.deviceToken);
       return;
     }
