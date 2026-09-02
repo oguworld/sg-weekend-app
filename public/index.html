@@ -446,7 +446,8 @@
         </div>
       </div>
 
-      <!-- 興味ジャンル（折りたたみ） -->
+      <!-- 興味ジャンル（折りたたみ）: ユーザー要望により非表示化。ロジック・関数(toggleGenrePanel()等)は残置 -->
+      <div style="display:none;">
       <div class="settings-item" style="cursor:pointer;" onclick="toggleGenrePanel()">
         <span class="settings-item-label" data-i18n="labelGenres">ジャンル・興味</span>
         <span id="genre-status-badge" style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);flex-shrink:0;">
@@ -459,6 +460,7 @@
           <span data-i18n="genreHint">好きなジャンルを選ぶと「⭐ おすすめ」で表示されます</span>
         </div>
         <div id="genre-chips-container" class="genre-chips"></div>
+      </div>
       </div>
 
     </div>
