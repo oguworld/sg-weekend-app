@@ -17663,3 +17663,369 @@ const deletable = ofType
 - `CATEGORY_TARGET_RATIO`・`CATEGORY_CAP_BUFFER`の値自体の見直しは行わない
 - 「終了日が7日以内は保護」という既存ルールの閾値・ロジック自体の変更は行わない
 - `opening`・`travel`タイプを`enforceTypeCap`の対象に含める変更は行わない
+
+---
+
+# 設計書178: 探訪（スタンプラリー）機能・コース機能・予定表機能の完全削除
+
+### 背景・ユーザーストーリー
+
+**ユーザーストーリー**: プロダクトオーナーとして、もう使わないと判断した3つの大機能（探訪/スタンプラリー、コース、予定表）のコードを完全に削除し、コードベースを軽量化・保守しやすくしたい。ただし、削除作業によって現役の他機能（イベント一覧、ピン留め、コメント、生活情報・ニュース、アカウント連携、全データバックアップ、共有カレンダーではなくアカウント基盤等）を一切壊してはならない。
+
+対象3機能は`public/index.html`の`#nav-course`/`#nav-plan`ボトムナビ経由でのみ到達する`#screen-course`/`#screen-plan`に画面としては閉じているが、実装（HTML断片・CSSクラス・JS関数・i18nキー・サーバーAPI・iOSネイティブ依存）は多数の箇所で現役機能と共有・混在しており、機械的な一括削除は極めて危険。本設計書は安全な削除のための詳細手順書である。
+
+**重要な前提の追加確認事項（要ユーザー承認）**: 調査の過程で、「来星日・帰国予定日カウンター」「卒業アルバム」の2つの派生機能が見つかった。これらの**入力欄自体は設定画面（`#screen-settings`）にあり既に`display:none`で非表示化済み**だが、表示先（在住日数カウンター・卒業アルバムリンク・卒業アルバム本体・来星記念日ローカル通知）は全て探訪画面（`#screen-course`）内にある。つまりこの2つの機能は事実上「探訪画面の付属演出」であり、削除対象に含めるのが自然だが、**タスク説明の3機能（探訪・コース・予定表）に明示的には含まれていない**。設計書内ではこれらを「探訪機能に付随する削除対象候補」として明記し、実装前にユーザーに削除可否の最終確認を取ることを必須手順とする。
+
+---
+
+### 受け入れ基準
+
+**正常系**
+- Web版・iOS版のUIから、探訪（スタンプラリー・卒業アルバム含む）・コース・予定表・共有カレンダーに関するボタン・画面・シート・モーダルが一切表示されなくなる。
+- ホーム画面（イベント）・ニュース画面・ピン留め画面・設定画面（アカウント連携・全データバックアップ・ジャンル設定・プロフィール・コメント機能含む）が従来通り完全に動作する。
+- `node --check server.js` / `node --check public/app.js` がエラーなく通る。
+- サーバー起動（`pm2 restart sg-weekend`）後、`curl`で`/api/events`・`/api/life-info`・`/api/comments`・`/api/auth/me`・`/api/user-plans/me`・`/api/config`等の現役APIが従来通り応答する。
+- `/api/stamp-spots`・`/api/stamp-progress/*`・`/api/courses*`・`/api/calendar/*`にリクエストすると404（Expressのルート未定義による自然な404）になる。
+
+**失敗系・エッジケース**
+- 既存ユーザー（Web版・旧App Store版）が探訪・予定表・コース機能に依存するブックマーク／ディープリンク（例: `?join=XXXXXX`共有カレンダー招待URL）を開いた場合、エラー画面やクラッシュにならず、通常のホーム画面等に静かにフォールバックすること（`checkJoinParam()`等の削除後、該当クエリパラメータが単に無視される程度の挙動で許容）。
+- 全データバックアップ（`_collectBackupPayload()`/`_applyRestoredBackup()`）から`customPlans`/`eventPlansByCity`/`myCoursesByCity`/`likedCourses`フィールドを削除した後も、`genres`/`who`/`ageList`/`avatar`等の現役データのバックアップ・復元が壊れないこと。
+- 設定画面のtouchendデリゲーション配列・`closeAllPopups()`・`switchNav()`から該当行だけを削除し、配列/関数自体は残すこと（後述、最重要の注意点）。
+- 削除後、旧バージョンのApp Store版（本設計書の変更が未反映のクライアント）が`GET /api/courses`等を叩いた場合に500エラーでクラッシュするのではなく404を返す程度の挙動になること（Expressの仕様上自然にそうなるため追加対応不要、ただし確認事項として明記）。
+
+**スコープ外（今回作らない・やらないこと）**
+- `data/`配下の実データファイル（`data/sg/stamp-spots.json`、`data/stamp-progress/*.json`、`data/sg/model-courses.json`、`data/sg/community-courses.json`、`data/shared-calendars/*.json`）の削除。理由は以下の通り:
+  1. `data/`は`.gitignore`対象でVPS上にのみ実データが存在し、git履歴からの復元ができない。
+  2. `data/shared-calendars/`には現在10グループの実データ、`data/stamp-progress/`には実ユーザー1名分の進捗データが存在することを確認済み（誤って削除すると復元不可能）。
+  3. コード（API・参照処理）を削除すればこれらのファイルは二度と読み書きされなくなり、実害なく「孤立したファイル」として残るのみ。将来的にディスク容量等の問題が出た場合に別タスクとして手動削除を検討すればよい。
+- `public/vendor/leaflet/`（探訪の地図ライブラリ）・`public/images/stamp-badges/*.png`（バッジ画像）などの静的アセットファイル自体の削除（コードから参照されなくなるだけで実害はないが、念のためbuilderの裁量で削除してもよいと明記。必須ではない）。
+- `data/sg/affiliate-links.json`・`data/affiliate-clicks.json`の削除（同上の理由、コード削除で自然に孤立化）。
+- iOS版の`releaseブランチ`へのpush・TestFlightビルド実行（本設計書のコード変更後、ユーザーの明示指示があるまで実施しない。CLAUDE.md既存ルール通り）。
+- 「来星日・帰国予定日カウンター」「卒業アルバム」機能の削除可否の最終判断（上記の通りユーザー確認必須、本設計書では削除する場合の手順のみ用意する）。
+
+---
+
+### データ共有の影響（Web版／App Store版）に関する必須確認事項
+
+1. **後方互換性**:
+   - `server.js`から`/api/stamp-spots*`・`/api/courses*`・`/api/calendar/*`を削除すると、**まだ更新していない旧バージョンのApp Storeアプリ**がこれらのエンドポイントを叩いた際に、現状の正常応答ではなく404が返るようになる。旧バージョンアプリ側のエラーハンドリング次第だが、通常はfetch失敗として握りつぶされ、該当画面が空表示・エラートースト表示になる程度の影響（アプリ全体のクラッシュには通常至らない設計、CLAUDE.mdの既存fetchパターンは概ねtry/catchで防御的）と推測されるが、**確実な検証はできていない（旧バージョンの実バイナリでの動作確認は不可能）**。
+   - `DELETE /api/auth/me`（アカウント削除、現役）が内部で`community-courses.json`のauthorId匿名化処理を呼んでいるが、コースAPI削除後もこの処理はデータファイルに対する読み書きのみで独立して動作するため、削除せず残しても実害はない（結果的に無意味な処理になるだけ）。この処理自体を削除するかどうかは本設計書スコープ外の判断とし、**残置を推奨**（アカウント削除フローの複雑さを増やしたくないため）。
+2. **影響範囲**: 今回の変更は`server.js`（バックエンドAPI）・`public/index.html`/`public/app.js`/`public/app.css`（フロントエンド）・`ios-app/package.json`・`.github/workflows/ios-deploy.yml`にまたがるため、**Web版とApp Store版の両方に影響する**。`server.js`の変更は`pm2 restart`で即座に全プラットフォーム（Web版・既に配布済みのiOS版含む）に反映される。フロントエンド（`public/`配下）の変更もWeb版には即時反映される。iOS版（Capacitorネイティブアプリ）へは次回`release`ブランチへのpush・TestFlightビルド・App Store審査を経るまで反映されない。
+3. **リリースタイミング**:
+   - `server.js`のAPI削除（`pm2 restart`により即時反映）を、**フロントエンド変更のiOS版反映（TestFlightビルド）より先に行うと**、iOS版の旧バージョンを使っている現行ユーザーが探訪・コース・予定表画面を開いた際、ボトムナビの表示自体は残っているため画面に遷移でき、そこでAPIが404を返す不完全な状態を一時的に見せてしまうリスクがある。
+   - 推奨順序: **(a) フロントエンド側でボトムナビ自体を含め画面ごと到達不可能にする変更を先にWeb版へ反映 → (b) 十分な期間（少なくとも次回のTestFlightビルドがユーザーの手元に届くまで）を置く → (c) その後にserver.js側のAPIエンドポイントを削除する**、という段階的アプローチが理想。ただし、これは「一度に全部消してよい」というユーザーの意向（「もう使わないので完全に削除してほしい」）とは異なる、より安全側に倒した提案であるため、**実際にどちらの順序で進めるかはユーザーに確認する**。一括削除で進める場合も、少なくとも「HTML/CSS/JSのフロントエンド変更」と「server.jsのAPI変更」は別コミットに分け、`pm2 restart`のタイミングを意識的に制御できるようにしておくことを推奨する。
+
+---
+
+## 1. 調査結果サマリー：ファイルと役割
+
+| ファイル | 役割 | 探訪/コース/予定表との関係 |
+|---|---|---|
+| `public/index.html` | 全画面のHTML定義 | `#screen-course`(153-229行目)・`#screen-plan`(288-308行目)が画面本体。加えてモーダル・シート群が599-1393行目に散在 |
+| `public/app.js` | 全フロントエンドロジック（10777行） | 4200-8072行目に探訪・コース機能が集中、8072-10777行目に予定表・共有カレンダー・バックアップ機能が集中。ただし相互に共有関数を挟む |
+| `public/app.css` | 全体CSS | 1796-2654行目・2890-3473行目に該当機能CSSが集中。ダークモード定義（3474-3565行目）にも該当セレクタが混在 |
+| `server.js` | 全APIエンドポイント（3051行） | 1862-2320行目（共有カレンダー・探訪）、2314-2996行目（コース）に集中 |
+| `ios-app/package.json` | iOSネイティブ依存 | `@capacitor/camera`/`@capacitor/geolocation`/`@capacitor/filesystem`/`@capacitor/share`/`@koodos/share-to-insta-stories`が探訪専用の可能性大 |
+| `.github/workflows/ios-deploy.yml` | iOS CI/CD | カメラ・位置情報・フォトライブラリ利用許可文言、Instagram Stories URL Scheme設定が該当 |
+| `scripts/seed-courses.js`/`refresh-courses.js`/`match-affiliate-links.js`/`fill-stamp-spot-images.js` | 運用スクリプト | 全てコース・探訪専用。`refresh-courses.js`はcrontab登録済み（水・日8:00 SGT） |
+| `data/sg/stamp-spots.json`、`data/stamp-progress/`、`data/sg/model-courses.json`、`data/sg/community-courses.json`、`data/shared-calendars/`、`data/user-plans/`（※最後のみ削除禁止） | データファイル | 削除対象外（スコープ外、上記参照） |
+
+---
+
+## 2. 削除してはいけない共有コード（最重要）
+
+以下は名前が似ている、または同じセクション内に定義されているが、**現役の他機能が依存しているため絶対に削除してはいけない**もの。builderは実装前にこのリストを必ず読むこと。
+
+### HTML/CSS
+
+| 要素・クラス | 理由 |
+|---|---|
+| `.screen-auth-gate`（`#course-auth-gate`/`#plan-auth-gate`が使用） | 汎用CSSクラス。id自体（`course-auth-gate`/`plan-auth-gate`）は削除可能だが、クラス定義は他の画面（`news`/`pins`等）で将来使われる可能性のある汎用パターンのため**クラス自体は残す** |
+| `.plan-title-header` | `#screen-news`・`#screen-pins`・`#screen-settings`でも使用中の共有スクリーンヘッダークラス。**削除禁止** |
+| `.plan-modal`/`.plan-modal-overlay`/`.plan-modal-body`/`.plan-modal-title`/`.plan-modal-subtitle`/`.plan-modal-handle`/`.plan-modal-section-label`/`.plan-date-chips`/`.plan-date-chip`/`.plan-modal-textarea`/`.plan-modal-add-btn`/`.plan-modal-text-input`/`.plan-modal-footer`/`.plan-modal-save-btn` | **`#backup-passphrase-sheet`・`#cal-passphrase-sheet`（全データバックアップ・共有カレンダーパスフレーズ機能、後者は削除対象だが前者は現役）が使用中**。特に`#backup-passphrase-sheet`は現役の全データバックアップ機能（設計書54/58/118）の中核UIであり**絶対にこのクラス群を削除してはいけない**。ダークモードCSS（app.css 3497行目）でも`.plan-modal`セレクタが使われている |
+| `.pin-detail-overlay`/`.pin-detail-modal`/`.pin-detail-header`/`.pin-detail-emoji`/`.pin-detail-close`/`.pin-detail-body`/`.pin-detail-title`/`.pin-detail-meta`/`.pin-detail-tips`/`.pin-detail-scroll`/`.pin-detail-content`/`.pin-detail-actions`/`.pin-detail-remove`/`.pin-detail-url-btn` | 現役の`#pin-detail-overlay`/`#pin-detail-modal`（ピン留め詳細、624-644行目）が使用。`#cal-sync-overlay`/`#cal-sync-modal`/`#cal-join-overlay`/`#cal-join-modal`（削除対象）がこのクラスを流用しているだけなので、**id版（`cal-sync-*`/`cal-join-*`）は削除、クラス定義は残す** |
+| `.chat-overlay` | AIチャット機能は既に廃止済みだが、CSSクラス名として`#title-edit-overlay`/`#backup-passphrase-overlay`/`#cal-passphrase-overlay`/`#stamp-*-overlay`/`#pin-picker-overlay`/`#emoji-picker-overlay`/`#schedule-action-overlay`で使い回されている。このうち**`#backup-passphrase-overlay`は現役のバックアップ機能が使用中**のため、**`.chat-overlay`クラス自体は削除禁止**（該当する`id`要素のみ削除） |
+| `.card-plan-btn` | JS側から生成箇所が見つからず実質死んでいるCSSだが、念のため他に参照がないか最終確認してから削除すること（今回の3機能に直接起因するかは断定不可） |
+
+### JS関数・変数
+
+| 関数/変数名 | 理由 |
+|---|---|
+| `goToAccountLinking()` | **コメント機能（設計書174、`_renderCommentBox()`内2030行目）が現役で使用中**。`_applyScreenAuthGate('plan'/'course')`の呼び出し元は削除してよいが、`goToAccountLinking()`関数自体・HTMLの`onclick="goToAccountLinking()"`（コメント機能側、`.comment-auth-gate`内）は絶対に削除しないこと |
+| `getUserName()` | **コメント機能（`postComment()`内2054行目）が現役で使用中**。`getUserId()`はコース専用のため削除可、`getUserName()`は削除禁止 |
+| `handleImgError()` | イベントカード本体・ピン一覧・イベント詳細（予定表からの遷移含む複数箇所）で使われる汎用画像フォールバック処理。**削除禁止** |
+| `fmtDateKey()` | 来星日/帰国予定日入力欄（設定画面プロフィール）、`getScheduleWeeks()`（予定表専用）等、複数機能から呼ばれる汎用日付フォーマッタ。**削除禁止**（`getScheduleWeeks()`自体は削除可） |
+| `lockScroll()`/`unlockScroll()`/`_preventBgScroll()` | イベント絞り込みシート・ピン詳細モーダル・コメント機能等、極めて多数の現役箇所（`openEventFilterSheet`/`openPinDetail`等）で使用中の汎用スクロールロック機構。**削除禁止** |
+| `openAffiliateLink()`／`POST /api/affiliate-click` | 探訪スポット詳細とコース詳細の**両方**から呼ばれているが、両方とも削除対象のため、これは削除可能（ただし依存元を両方確認したうえで削除すること） |
+| `_applyScreenAuthGate()` | `plan`/`course`からしか呼ばれておらず、削除しても実害はないが、`news`/`pins`等の他画面が将来使う可能性がある汎用ヘルパーとして**関数自体は残置してもよい**（呼び出し元がなくなるだけで、死んでいても実害なし。削除するかは任意） |
+| `authedFetch()`/`getAuthToken()`/`setAuthToken()`/`clearAuthToken()`/`refreshLoginUI()`/`_submitGoogleIdToken()`/`_submitAppleIdentityToken()`/`handleLogoutClick()`/`handleDeleteAccountClick()`等の認証基盤一式 | 設定画面のアカウント連携機能そのもの（現役）。コース機能側は`authedFetch()`を利用しているだけ（`publishCourseById`/`unpublishCourseById`等）。**認証基盤自体は絶対に削除しないこと**。コース側の`authedFetch()`呼び出し箇所（関数ごと）は削除してよい |
+| `_collectBackupPayload()`/`_applyRestoredBackup()`/`_syncBackupToServer()`/`isBackupEnabled()`/`renderBackupSection()`/`openBackupPassphraseSheet()`/`_doBackupSetup()`/`_doBackupChange()`/`_doBackupRestore()`等バックアップ機能一式 | **関数自体は削除禁止**（プロフィール・ジャンル設定・いいね・アバター・来星日・思い出メモ等、現役データのバックアップを担う）。ただし`_collectBackupPayload()`/`_applyRestoredBackup()`内の`customPlans`/`eventPlansByCity`/`myCoursesByCity`/`likedCourses`関連の**フィールドのみ**削除すること（後述4章参照） |
+| `sendApnToToken()`/`webpush`（server.js） | `sendPushToAll()`（イベント更新通知、現役）が使用する汎用プッシュ送信ヘルパー。共有カレンダーの`POST /api/calendar/:groupId/notify`エンドポイント内での呼び出しは削除してよいが、**関数定義自体は削除しないこと** |
+| `requireAppAuth`/`verifyAppJwtOptional`/`GET /api/auth/me`/`POST /api/auth/google`/`POST /api/auth/apple`/`DELETE /api/auth/me`/`GET /api/config`（server.js） | 現役の認証基盤。**絶対に削除しないこと** |
+| `GET/PUT /api/user-plans/me`（server.js）、`USER_PLANS_DIR`、`getUserPlansFilePath()` | 全データバックアップ機能の中核API。**絶対に削除しないこと**。予定表専用に見える名前だが実態は全データバックアップであることに注意 |
+| `loadAffiliateLinks()`/`embedAffiliateLinks()`（server.js） | `GET /api/stamp-spots`が使用中（探訪専用、`GET /api/courses`側は設計書32で既にコメントアウト済みで無関係）。探訪機能削除時にまとめて削除可能だが、コース削除だけを先に行う場合はこの2関数を残すこと |
+| `_getCapGeoPlugin()`/`_getCurrentPositionOnce()` | 探訪のGPSチェックイン専用に見えるが、念のためbuilderは削除前に他の呼び出し元がないか`grep`で最終確認すること（調査時点では探訪専用と判断） |
+
+---
+
+## 3. HTML削除範囲（`public/index.html`、全1396行）
+
+### 3-1. 画面本体（screenレベル）
+- **153〜229行目**: `<!-- ─── COURSE SCREEN ─── -->`コメントから`</div>`まで（`#screen-course`全体、探訪+コース機能画面）。
+- **288〜308行目**: `<!-- ─── PLAN SCREEN ─── -->`コメントから`</div>`まで（`#screen-plan`全体、予定表画面）。
+- **647-672行目のボトムナビ**: `#nav-course`（660-663行目）・`#nav-plan`（664-667行目）のボタン2つを削除。残る`#nav-news`/`#nav-home`/`#nav-pins`/`#nav-settings`の4タブ構成になる。
+
+### 3-2. FAB
+- **674-679行目**: `<!-- FAB Plan Speed Dial -->`〜`#fab-plan-group`全体を削除（予定表専用の＋ボタン）。`<button class="fab" id="fab-top" ...>`（675行目、トップに戻る、現役）は残す。
+
+### 3-3. モーダル・シート群（599〜1393行目に散在、探訪/予定表/コース専用のみ）
+削除対象（コメントブロック単位、`<!-- ─── ... ─── -->`見出しごと）:
+- **600〜622行目**: `<!-- ─── 共有カレンダー MODAL ─── -->`（`#cal-sync-overlay`/`#cal-sync-modal`）と`<!-- ─── 参加確認 MODAL ─── -->`（`#cal-join-overlay`/`#cal-join-modal`）。**624〜644行目の`<!-- ─── PIN DETAIL MODAL ─── -->`（`#pin-detail-overlay`/`#pin-detail-modal`）は現役、削除しないこと**。
+- **681〜1070行目付近**: `<!-- Course Generator Sheet -->`（`#course-sheet-overlay`/`#course-sheet`、682-847行目）、`#course-detail-overlay`/`#title-edit-overlay`/`#title-edit-sheet`（848-873行目）、探訪関連一式（`#stamp-spot-detail-overlay`/`-sheet`、`#stamp-level-unlock-overlay`/`-modal`、`#stamp-memory-overlay`/`-sheet`、`#stamp-share-preview-overlay`/`-modal`、954-1062行目）、`#graduation-album-screen`（1064-1069行目）、`#course-detail-sheet`（1071-1077行目）。**ただし874〜915行目の`#backup-passphrase-sheet`（バックアップ機能、現役）・916〜953行目の`#cal-passphrase-sheet`（共有カレンダー、削除対象）は個別に判断すること**: `#backup-passphrase-sheet`(874-915)は絶対に残す。`#cal-passphrase-sheet`(916-953)は削除する。
+- **1080〜1099行目**: `#pin-picker-overlay`/`#pin-picker-sheet`（探訪/予定表専用と確認済み、削除可）、`#emoji-picker-overlay`/`#emoji-picker-sheet`（死んだDOM要素、予定表の絵文字選択は別実装〈`#plan-custom-emoji-inline`〉を使用しており、この要素自体は到達不能。削除可）。
+- **1102〜1131行目**: `#schedule-action-overlay`/`#schedule-action-sheet`、`#cal-popup-overlay`/`#cal-popup`。
+- **1133〜1150行目**: `<!-- ─── DATE PICKER MODAL (共通) ─── -->`（`#date-picker-overlay`/`#date-picker-modal`）。**調査済み: `openDatePickerSheet()`の呼び出し元はコース→予定表追加の1箇所のみであり、イベント絞り込みシート等の他画面からは呼ばれていない。安全に削除可能**。
+- **1151〜1316行目**: `<!-- ─── PLAN MODALS ─── -->`全体（`#plan-modal-overlay`/`#plan-event-modal`/`#plan-custom-modal`/`#plan-detail-modal`）。
+- **1374〜1393行目**: `<!-- ─── SCHEDULE PLAN ACTION SHEET ─── -->`（`#schedule-plan-action-overlay`/`#schedule-plan-action-sheet`）。
+
+削除しないもの（同じ並びにあるが現役）:
+- **599行目**: `<!-- ─── HOWTO MODAL（使い方） ─── -->`コメントのみ（中身は既に存在しない模様、コメント行のみのため実質削除しても影響なし。念のため残す判断でも良い）。
+- **624〜644行目**: `#pin-detail-overlay`/`#pin-detail-modal`（現役）。
+- **1317〜1373行目**: `<!-- ─── EVENT FILTER SHEET ─── -->`（現役、イベント絞り込み機能）。
+- **874〜915行目**: `#backup-passphrase-sheet`（現役）。
+
+### 3-4. 設定画面内（`#screen-settings`）の来星日・帰国予定日入力欄
+- **367〜397行目**: 「来星日」「帰国予定日」の`.settings-item`ブロック2つ。**要ユーザー確認**（上記「背景」参照）。削除する場合は`labelArrivalDate`/`labelDepartureDate`のi18nキーもあわせて削除。
+
+---
+
+## 4. CSS削除範囲（`public/app.css`、全3710行超）
+
+### 4-1. 丸ごと削除可能なセクション
+- **1796〜1824行目**: `/* ─── FAB PLAN SPEED DIAL ─── */`（`.fab-plan-group`/`.fab-plan`。`#course-fab`と`#fab-plan`のみが使用、他に使用箇所なしを確認済み）。
+- **1825〜1905行目**: `/* ─── UNSCHEDULED PINS SECTION ─── */`〜`/* ─── PIN PICKER SHEET ─── */`（`.pin-picker-sheet`/`.pin-picker-header`/`.pin-picker-list`/`.unscheduled-pin-*`）。
+- **1906〜1950行目**: `/* ─── SHARED OVERLAY/SHEET STYLES ─── */`のうち`.chat-sheet-handle`/`.chat-mic-btn`は削除可（`.chat-overlay`自体は前述の通り残す。このセクション内で`.chat-overlay`の定義部分〈1907-1920行目〉だけは残し、`.chat-sheet-handle`〈1921-1927行目〉・`.chat-mic-btn`関連〈1928-1950行目〉を削除する、という細かい仕分けが必要）。
+- **1951〜2654行目**: `/* ─── COURSE FEATURE ─── */`〜`/* ─── 探訪スタンプ帳シェア機能（設計書163） ─── */`まで丸ごと（コース・探訪機能CSS、卒業アルバムのCSSは末尾3710行目以降にあるので別途）。
+- **2760〜2778行目**: `/* ─── 共有カレンダー ─── */`のうち、`.header-cal-sync-btn`/`.cal-sync-status-line`/`.cal-sync-groupid-line`/`.cal-sync-action`は削除可。**ただし直前の`.plan-title-header`（2761-2765行目）は現役共有クラスのため残すこと**（このセクションコメント直下に混在しているので要注意）。
+- **2890〜3473行目**: `/* ─── WEEKEND PLAN FEATURE ─── */`〜`/* ─── ADD TO PLAN BTN (in event cards) ─── */`までほぼ丸ごと。ただし`.plan-modal`/`.plan-modal-overlay`等の共有パターンクラス（前述4章参照）は除外して残すこと。`.card-plan-btn`（2892-2909行目、死んだCSSの可能性）・`.plan-add-card-btn`（3455-3472行目、同じく死んだCSSの可能性）は削除前に最終grep確認。
+- **3710行目以降**: `/* ─── 卒業アルバム（設計書152、フェーズ1）─── */`セクション全体（ファイル末尾までの範囲、行数は`Read`で最終確認すること）。
+
+### 4-2. ダークモードセクション内の個別セレクタ削除（3474〜3565行目）
+このセクションは複数機能のダークモード対応が1つの巨大なCSSルールに`,`区切りで同居しているため、**セレクタ単位で慎重に該当行を除去**する必要がある。丸ごと削除禁止、以下の個別セレクタのみ除去:
+- `html[data-theme="dark"] .plan-modal`（3497行目）→ **除去してはいけない**（`#backup-passphrase-sheet`が使用中）。誤って消さないよう特に注意。
+- `html[data-theme="dark"] .emoji-picker-sheet`（3498行目）・`.pin-picker-sheet`（3499行目）・`.pin-detail-sheet`（3500行目）・`.cal-popup-card`（3501行目）・`.schedule-day-card`（3504行目）: このうち`.emoji-picker-sheet`/`.pin-detail-sheet`/`.cal-popup-card`は**現在のHTMLに存在しないクラス名（過去のリファクタ漏れによる死んだセレクタ、今回の削除作業とは無関係の既存の軽微な技術的負債）**。`.pin-picker-sheet`は今回削除対象。`.schedule-day-card`も削除対象。
+- `.plan-slot-chip`/`.plan-member-chip`/`.plan-time-input`/`.plan-add-card-btn`/`.plan-delete-btn`/`.plan-close-btn`（3510-3515行目）、`.schedule-row`/`.schedule-row-time`/`.schedule-swipe-wrap`/`.schedule-day-header`/`.schedule-member-chip--*`（3522-3531行目）、`.plan-name-input`/`.plan-memo-input`/`.plan-emoji-cell`/`.plan-date-chip`/`.plan-event-info`（3533-3538行目）、`.plan-to-plan-btn`/`.plan-unpin-btn`（3540-3542行目、**`.pin-detail-remove`は同じ行にあるが現役のため除去禁止、この行は`.pin-detail-remove`だけ残して他2つを除去する形になる**）、`.sched-day-card`（3549行目）、`.schedule-week-header--collapsed`/`.schedule-day-card--weekday`（3552-3553行目）、`.plan-pin-toggle-btn`/`.plan-pin-dropdown`/`.plan-pin-dropdown-item`/`.plan-pin-dropdown-name`（3555-3558行目）、`.plan-sheet`（3564行目）: いずれも探訪・予定表・コース専用のため削除可。
+- **削除禁止（同じ並びにある現役セレクタ）**: `.spot-card`/`.pin-card`/`.cal-month-block`/`.settings-item`/`.plan-card`（3493-3503行目の一部）、`.tab:not(.active)`/`.profile-chip`/`.custom-select-pill`/`.city-select`/`.pin-btn`（3505-3509行目）、`#lang-toggle-btn`/`#push-toggle-btn`/`#clear-hidden-btn`/`#dark-mode-toggle-btn`（3516-3519行目）、`.chip:not(.chip--active)`/`.ending-soon-banner`（3520-3521行目）、`.age-chip`/`.sale-filter-chip`（3544-3545行目）、`.sale-card`/`.gem-card`（3547-3548行目）、`.toast`/`.course-card`/`.course-chip`（3560-3562行目、**`.course-card`/`.course-chip`は削除対象だが`.toast`は現役のため同じ行の中で仕分けが必要**）、`.genre-chip`（3565行目）。
+
+### 4-3. `#date-picker-overlay`/`#date-picker-modal`のz-index個別指定（3329-3330行目）
+`.plan-modal`本体は残すが、`#date-picker-overlay { z-index: 3400; }`/`#date-picker-modal { z-index: 3401; }`のid個別指定は削除対象（日付ピッカー自体を削除するため）。
+
+---
+
+## 5. JS削除範囲（`public/app.js`、全10777行）
+
+### 5-1. 丸ごと削除可能な関数群（行番号は調査時点、削除順序に伴いズレるためbuilderは関数名で検索し直すこと）
+
+**コース機能**（4400-4489行目、6982-8071行目の一部、7392-7962行目）:
+`initCourseScreen()`/`switchCourseTab()`/`renderCourseList()`/`getPersonalizedCourses()`/`renderEveryoneTab()`/`renderCompactCourseCard()`/`renderCourseCard()`/`renderPopularCourseCard()`/`_lockCourseScroll()`/`_unlockCourseScroll()`/`openCourseDetail()`/`renderCourseDetail()`/`openAffiliateLink()`/`closeCourseDetail()`/`openCourseSheetFromEvent()`/`openCourseSheet()`/`toggleCourseOptions()`/`closeCourseSheet()`/`showCourseStep()`/`randomizeCourseConditions()`/`startCourseGeneration()`/`renderCourseCandidates()`/`selectCourseCandidate()`/`backToCourseConditions()`/`renderCourseResultHtml()`/`saveGeneratedCourse()`/`saveAndPublishGeneratedCourse()`/`openTitleEdit()`/`closeTitleEdit()`/`saveCourseTitle()`/`deleteMyCourse()`/`addCourseToScheduleById()`/`addCourseToScheduleWithDate()`/`isLiked()`/`toggleLike()`/`checkSimilarCourses()`/`publishCourseById()`/`unpublishCourseById()`/`getUserId()`/`saveMyCourse()`/`toggleCourseNoteVoice()`（3015行目付近、音声入力）/`WHO_JA_MAP`/`_rankLineColor`/`currentCourseTab`/`currentGeneratedCourse`/`LOADING_MSGS`/`COURSE_TABS`/`_courseSwipeStartX`。
+
+**探訪（スタンプラリー）機能**（4490-4980行目の大部分、5010-6980行目）:
+`STAMP_LEVEL_META`/`_stampLevelYearRange()`/`STAMP_BADGE_AREAS`/`STAMP_CATEGORY_META`/`STAMP_CATEGORY_ORDER`/`_stampLeafletMap`等の一連のモジュール変数、`_getCapGeoPlugin()`/`_getCurrentPositionOnce()`/`_getCapCameraPlugin()`/`_openStampMemoryDB()`/`_getStampMemoryPhotos()`/`_saveStampMemoryPhotos()`/`_getAllStampMemoryPhotos()`/`_resizeImageBlob()`/`_getStampMemos()`/`_setStampMemoText()`/`_pickStampMemoryPhotoBlob()`/`_haversineDistanceM()`/`_renderStampUserLocation()`/`initStampMapTab()`/`toggleStampViewMode()`/`_applyStampViewMode()`/`_computeStampNextTarget()`/`_computeStampAreaProgress()`/`_stampRotateDeg()`/`_loadStampSpotsAndProgress()`/`_ensureStampLeafletMap()`/`_stampSpotIsChecked()`/`_stampCheckinDateFor()`/`_renderStampMarkers()`/`_renderStampFog()`/`_renderStampAreaBadges()`/`_computeStampThemeBadgeProgress()`/`_renderStampThemeBadges()`/`_renderStampThemeBadgeSpotList()`/`_toggleStampThemeBadgeSpots()`/`_renderStampCollectionList()`/`_renderStampLevelBadges()`/`_renderStampLevelBadgeSpotList()`/`_toggleStampLevelBadgeSpots()`/`_renderStampLevelRowLocked()`/`_renderStampLevelRowInProgress()`/`_renderStampLevelRowComplete()`/`_toggleStampCompleteList()`/`openStampSpotDetail()`/`closeStampSpotDetail()`/`_updateStampCheckinButton()`/`doStampCheckin()`/`_showStampThemeBadgeCompleteToast()`/`_burstStampConfetti()`/`openStampLevelUnlockModal()`/`openStampLevelCompleteModal()`/`closeStampLevelUnlockModal()`/`_shareStampCompleteBtnClick()`/`_openStampMemorySheet()`/`_closeStampMemorySheetInternal()`/`_skipStampMemory()`/`_renderStampMemoryPhotoSlots()`/`_pickStampMemoryPhoto()`/`_resetStampMemoryPhotoSlot()`/`_refreshStampMemoryCacheForSpot()`/`_saveStampMemory()`/`_buildStampMemoryPhotoScatterHtml()`/`_renderStampDetailMemorySection()`/シェアカード関連一式（`_drawShareCardRibbon()`/`_drawShareCardMessageBox()`/`_drawShareCardEyebrow()`/`_ensureShareCardFontsReady()`/`_shareCardRoundRectPath()`/`_loadImageForShareCard()`/`_isImageTaintedForCanvas()`/`_loadSafeImageForShareCard()`/`_shareCardCanvasToBlob()`/`_wrapShareCardText()`/`_buildStampCompleteShareCardBlob()`/`_buildStampCheckinShareCardBlob()`/`_stampCheckinDateFullFor()`/`_buildStampProgressShareCardBlob()`/`_saveShareCardToTempFile()`/`_getCapFilesystemPlugin()`/`_getCapSharePlugin()`/`_getCapIgStoriesPlugin()`/`_blobToBase64()`/`_downloadShareCardBlob()`/`_shareStampCardToInstagram()`/`_shareStampCardToX()`/`_openStampSharePreview()`/`closeStampSharePreview()`/`_shareStampPreviewToInstagram()`/`_shareStampPreviewToX()`/`shareStampCompleteCard()`/`shareStampCheckinCard()`/`shareStampProgressCard()`）。
+
+**共通日付ピッカー**（7841-7923行目）: `openDatePickerSheet()`/`_selectPickerDate()`/`_confirmDatePicker()`/`closeDatePickerSheet()`。
+
+**予定表機能**（8072-9109行目の大部分）: `getCustomPlans()`/`saveCustomPlans()`/`getEventPlans()`/`saveEventPlans()`/`getScheduleWeeks()`/`buildDateChipsHtml()`/`openEventPlanModal()`/`openCustomPlanModal()`/`openPlanDetailModal()`/`_updateEmojiSelectorDisplay()`/`selectPlanEmoji()`/`toggleEmojiInline()`/`closeEmojiInline()`/`openEmojiPicker()`/`closeEmojiPicker()`/`selectPlanMember()`/`selectPlanDate()`/`toggleAlldayPlan()`/`onPlanTimeInput()`/`onPlanTimeFocus()`/`_syncTimeInputUI()`/`getStartTimeLabel()`/`getPlanTimeSort()`/`updatePlanAddBtn()`/`updateCustomPlanAddBtn()`/`saveEventPlan()`/`saveCustomPlan()`/`savePlanDetail()`/`deleteCustomGroup()`/`openCustomPlanEdit()`/`editCustomGroup()`/`closePlanModal()`/`renderCustomPlansList()`/`renderPinnedEventsList()`/`toggleSchedulePlanExpand()`/`_collapseSchedulePlan()`/`_openCourseFromSchedule()`/`closeSchedulePlanActionSheet()`/`openScheduleActionSheet()`/`closeScheduleActionSheet()`/`scheduleActionViewCard()`/`scheduleActionEdit()`/`scheduleActionDelete()`/`deleteScheduleItem()`/`handleScheduleRowTap()`/`editScheduleItem()`/`_renderPlanPinsList()`/`_updatePinToggleBtn()`/`togglePinDropdown()`/`closePinDropdown()`/`fillPlanFromPin()`/`refreshPinPicker()`/`closePinPicker()`/`_nthWeekday()`/`getJpEvent()`/`renderScheduleTab()`/`adjustScheduleRowNames()`/`buildCalendarEvents()`/`renderCalendarMonth()`/`renderCalendar()`/`showCalPopup()`/`setCalPopupFilter()`/`renderCalPopupEvents()`/`closeCalPopup()`/`openEventDetailFromSchedule()`（3255行目、ピン詳細と隣接するが予定表専用の呼び出し元）。
+
+**共有カレンダー**（10068-10777行目）: `mergeArr()`/`getCalKey()`/`setCalKey()`/`getCalSalt()`/`setCalSalt()`/`_genCalKey()`/`_importCalKey()`/`_encryptPlans()`/`_decryptPlans()`/`_generateQR()`/`getSharedGroupId()`/`setSharedGroupId()`/`getCalDeviceId()`/`_registerGroupPush()`/`_deregisterGroupPush()`/`_showNotifyCheckboxes()`/`_notifyGroupIfChecked()`/`syncToServer()`/`fetchFromServer()`/`updateCalSyncBtn()`/`openCalSync()`/`closeCalSync()`/`renderCalSyncModal()`/`loadCalQR()`/`doCreateGroup()`/`_doCalCreateGroup()`/`doRefreshCalSync()`/`doLeaveGroup()`/`copyJoinLink()`/`_fallbackCopy()`/`shareViaLine()`/`openQRScanner()`/`closeQRScanner()`/`_loadScript()`/`_scanLoopBD()`/`_scanLoopJsQR()`/`handleScannedQR()`/`doManualJoin()`/`checkJoinParam()`/`checkNavParam()`/`closeJoinPrompt()`/`doJoinGroup()`/`_doJoinGroupWithKey()`/`_doJoinGroupWithPassphrase()`/`openCalPassphraseSheet()`/`closeCalPassphraseSheet()`/`submitCalPassphrase()`。
+
+**来星日／卒業アルバム（要ユーザー確認）**（4611-4657行目、4765-4860行目、5101-5318行目付近）: `_getCapLocalNotifPlugin()`/`_scheduleArrivalAnniversaryNotifications()`/`_formatArrivalDateDisplay()`/`_saveArrivalDate()`/`_formatDepartureDateDisplay()`/`_saveDepartureDate()`/`_formatResidencyYM()`/`_renderResidencyCounter()`/`_isGraduationAlbumUnlocked()`/`_renderGraduationAlbumLink()`/`_computeGraduationAlbumData()`/`_escapeHtmlGa()`/`openGraduationAlbum()`/`closeGraduationAlbum()`/`focusStampSpotOnMap()`（探訪マップとの連携のため探訪削除に伴い自動的に削除対象）。ARRIVAL_ANNIVERSARY関連定数も同様。
+
+### 5-2. ⚠️ 部分削除が必須の箇所（配列・関数の一部の行だけを削除、関数/配列自体は残す）
+
+1. **`closeAllPopups()`（4202-4220行目）**: 以下の行のみ削除し、関数定義自体・現役呼び出し（`closeCalPopup()`/`closePinDetail()`/`closeEventFilterSheet()`）は残す。
+   - 削除: `closePinPicker();` `closeEmojiPicker();` `closeScheduleActionSheet();` `closeCourseDetail();` `closeCourseSheet();` `closeDatePickerSheet();` `closePlanModal();` `closeStampSpotDetail();` `closeStampLevelUnlockModal();` `closeStampSharePreview();` `_closeStampMemorySheetForNav();` `closeGraduationAlbum();`（卒業アルバム削除の場合）
+   - 残す: `closeCalPopup();`（※これは共有カレンダーのカレンダーポップアップであり紛らわしいが、共有カレンダー自体が削除対象なので実はこれも削除対象。**要注意: 名前だけでは判断できないため、各関数の定義元を必ず確認すること**）、`closePinDetail();`、`closeEventFilterSheet();`
+   - 実際には`closeCalPopup()`も共有カレンダー機能側の関数（予定表画面の日付タップポップアップ）なので削除対象。`closeAllPopups()`に残るのは実質`closePinDetail();`と`closeEventFilterSheet();`の2行と、末尾の`detail-screen`の`visible`クラス除去処理のみになる見込み。
+
+2. **`switchNav()`（4293-4398行目）**:
+   - `['home','course','news','pins','plan','settings']`配列から`'course'`/`'plan'`を削除し`['home','news','pins','settings']`にする。
+   - `if (screen === 'plan') { ... }`ブロック（4355-4360行目）・`if (screen === 'course') { ... }`ブロック（4361-4368行目）を丸ごと削除。
+   - `if (screen === 'settings')`/`if (screen === 'news')`/`if (screen === 'pins')`/`if (screen === 'home')`の各ブロックは残す。
+   - `FAB_HIDDEN_SCREENS = new Set(['plan', 'settings', 'course'])`（4234行目）を`new Set(['settings'])`に変更（`course`/`plan`両方削除のため）。
+   - `fabPlanGroup`関連コード（4315-4319行目）は`fab-plan-group`要素ごと削除されるため丸ごと削除。
+
+3. **設定画面のtouchendデリゲーション配列**（2724-2789行目付近、「設定画面 即時タップ対応」セクション）: この配列には`#delete-account-btn`のような現役ボタンIDと、探訪・予定表・コース関連のボタンIDが混在している可能性が高い（設計書46・65・118等の記述から推測）。**配列全体を削除せず、該当するidの行だけを個別に削除すること**。builderは実装時に該当セクションを実際に読み、1行ずつ「このidは削除対象3機能に属するか」を判定してから削除すること（本設計書では正確な行番号・全量までは調査時点で確定できていないため、実装フェーズでの再確認必須）。
+
+4. **`_collectBackupPayload()`（9658-9683行目）**: 関数は残し、以下のフィールドのみオブジェクトリテラルから削除:
+   - `eventPlansByCity`（と、その生成元`BACKUP_CITIES.forEach`ループ内の`eventPlansByCity[city] = ...`行）
+   - `myCoursesByCity`（と、同ループ内の`myCoursesByCity[city] = ...`行）
+   - `customPlans: getCustomPlans(),`
+   - `likedCourses`（と、`try { likedCourses = ... } catch`行）
+   - 残すもの: `version`/`genres`/`who`/`ageList`/`avatar`/`stampMemos`（※来星日削除の場合は`stampMemos`も要検討）/`arrivalDate`/`departureDate`（※要ユーザー確認、来星日機能を残すなら維持）
+   - **`BACKUP_CITIES`定数自体**は他に用途がなければ削除可能だが、`eventPlansByCity`/`myCoursesByCity`削除後は参照されなくなるため、削除してよい。
+
+5. **`_applyRestoredBackup()`（9686-9754行目）**: 関数は残し、`eventPlansByCity`/`myCoursesByCity`/`customPlans`/`likedCourses`関連のマージ処理ブロックのみ削除。`genres`/`who`/`ageList`/`avatar`/`stampMemos`/`arrivalDate`/`departureDate`関連の処理は残す。**後方互換分岐（`isLegacy`/旧構造`{customPlans, eventPlans}`の扱い）も削除対象になる**ため、legacy分岐自体を削除してよいか（旧バックアップを持つユーザーが今後復元不能になるリスク）は要ユーザー確認事項として明記する。
+
+6. **`saveGenreList()`/`toggleSettingsWho()`/`selectSettingsAge()`/`toggleLike()`(コース側、削除対象)/`selectAvatar()`内の`_syncBackupToServer()`呼び出し**: これらの現役機能内の`_syncBackupToServer()`呼び出し行は**残す**（バックアップ機能自体は現役のため）。
+
+7. **`STRINGS.ja`/`STRINGS.en`オブジェクトリテラル（340-1001行目）**: オブジェクト自体は残し、該当キーの行のみ削除。5-3節参照。
+
+8. **CSS「4-2」節で前述の通り**、ダークモードの複合セレクタ行は`,`区切りの一部のみ削除するケースが複数ある。
+
+### 5-3. i18nキー（STRINGS.ja/en）削除候補一覧
+
+以下のプレフィックスを持つキーは全て削除対象と確認済み（ja/enの両方、対応するペアで削除すること）:
+`courseCreateBtnShort`/`calScreenTitle`/`navPlan`/`planModal*`/`scheduleNoPlans`/`navCourse`/`courseScreenTitle`/`courseTab*`/`stampMapLoginRequired`/`stampLevel*`/`stampProgressSummary`/`stampCheckedInBadge`/`stampCheckin*`/`stampLocationPermDenied`/`stampViewToggle*`/`stampCollectionLockedNote`/`stampNextTargetLabel`/`stampLevelComplete*`/`stampThemeBadge*`/`stampLevelUnlock*`/`stampAreaBadgesTitle`/`stampLevelBadgesTitle`/`stampCard*`/`stampDetail*`/`stampComplete*`/`stampMemory*`/`stampShare*`/`stampSharePreviewTitle`/`courseSheetTitle`/`coursePins*`/`courseDepart*`/`courseReturn*`/`courseTimeAny`/`courseNote*`/`courseOptions*`/`coursePurpose*`/`courseArea*`/`courseOccasion*`/`courseStyle*`/`courseFood*`/`courseTransport*`/`courseGenerate*`/`courseLoading*`/`courseSave*`/`courseRegenerate*`/`coursePublish*`/`courseDetail*`/`courseAddToPlanBtn`/`courseUnpublishAction`/`courseEditTitleBtn`/`courseDeleteBtn`/`courseEmpty`/`courseSpotsCount`/`scheduleDayCount`/`scheduleHolidayBadge`/`scheduleMakePlan`/`courseCreateBtn`/`calPassphrase*`。
+
+要確認（来星日・卒業アルバム関連、削除可否をユーザーに確認）: `labelArrivalDate`/`labelDepartureDate`/`residencyCounterLabel`/`graduationAlbumLinkLabel`/`arrivalAnniversaryNotifTitle`/`arrivalAnniversaryNotifBody`。
+
+削除禁止（紛らわしいが現役、または独立して現役機能が使用）: `navPins`/`authGateMessage`/`authGateBtn`（コメント機能も使用）/`backup*`（全キー、バックアップ機能現役）。**ただし`backupDisabledDesc`/`backupEnabledDesc`/`backupExcludesCalendarNote`の文言自体は「予定表・マイコース」「共有カレンダー」という削除対象機能への言及を含むため、削除完了後に文言修正が必要**（キー自体は残すが、値の文言をレビューし「プロフィール・ジャンル設定などのデータ」等に更新することを推奨。`backupExcludesCalendarNote`は共有カレンダー自体がなくなるため、このキー・呼び出し行自体を削除するのが自然）。
+
+### 5-4. `_touchCapableDetected`関連の設定画面touchendデリゲーション配列について（再掲・強調）
+
+CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような現役ボタンと予定表/探訪/コース関連ボタンが混在した配列がある可能性が高い。**builderは実装時にこの配列を一行ずつ精査し、該当行のみ削除すること。配列自体・他の現役ボタンの行は絶対に削除しないこと。**
+
+---
+
+## 6. `server.js`削除範囲
+
+### 6-1. 削除可能なエンドポイント・関数
+
+- **探訪（スタンプラリー）**: `haversineDistanceM()`（2105-2113行目）、`getStampProgressFilePath()`（2115-2119行目）、`loadStampSpots()`（2121-2130行目）、`loadStampProgress()`（2132-2144行目）、`STAMP_LEVEL_GATES`/`STAMP_LEVEL_ORDER`（2146-2154行目）、`computeUnlockedLevels()`（2156-2179行目）、`maskLockedStampSpot()`（2181-2192行目）、`GET /api/stamp-spots`（2197-2231行目）、`GET /api/stamp-progress/me`（2234-2248行目）、`POST /api/stamp-progress/checkin`（2253-2312行目）、`STAMP_PROGRESS_DIR`定義と`mkdirSync`（2101-2102行目）。
+- **アフィリエイトリンク（探訪+コース共有）**: `loadAffiliateLinks()`（2321-2329行目）、`embedAffiliateLinks()`（2334-2344行目）、`POST /api/affiliate-click`（2997-3018行目）。**`GET /api/courses`側の呼び出しは既にコメントアウト済みのため、この2関数の削除は探訪機能・コース機能どちらか一方だけを先に削除する場合でも、両方削除されるまで残しておく必要がある**（`GET /api/stamp-spots`が使用中のため）。
+- **コース機能**: `GET /api/courses`（2347-2370行目）、`GET /api/courses/image`（2373-2391行目）、`getExistingCourseTitles()`（2392-2409行目）、`POST /api/courses/candidates`（2410-2503行目）、`POST /api/courses/generate`（2504-2770行目）、`POST /api/courses/chat`（2771-2904行目、注: このエンドポイント名にchatとあるがAIチャット機能廃止後もコース生成のチャット機能として使われている可能性があるため呼び出し元をフロントで再確認すること）、`POST /api/courses/publish`（2905-2926行目）、`DELETE /api/courses/:id`（2927-2949行目）、`POST /api/courses/:id/like`（2950-2970行目）、`POST /api/courses/:id/unpublish`（2971-2996行目）。
+- **共有カレンダー**: `SHARED_CAL_DIR`定義・`mkdirSync`（1862-1863行目）、`generateGroupId()`（1865-1871行目）、`getCalFilePath()`（1873-1876行目）、`POST /api/calendar/create`（1878-1902行目）、`GET /api/calendar/:groupId`（1904-1909行目）、`PUT /api/calendar/:groupId`（1911-1932行目）、`POST /api/calendar/:groupId/join`（1934-1940行目）、`POST/DELETE /api/calendar/:groupId/push-subscribe`（1942-1970行目）、`POST/DELETE /api/calendar/:groupId/push-subscribe-ios`（1973-2001行目）、`calNotifyLimit`（2003-2009行目）と`POST /api/calendar/:groupId/notify`（2010-2043行目）。
+
+### 6-2. 削除禁止（再掲）
+- `GET /api/auth/me`・`POST /api/auth/google`・`POST /api/auth/apple`・`GET /api/auth/apple/state`・`POST /api/auth/apple/callback`・`DELETE /api/auth/me`・`GET /api/config`・`requireAppAuth`・`verifyAppJwtOptional`・`issueAppJwt`・`loadUsers`/`saveUsers`/`genUserId`。
+- `GET /api/user-plans/me`・`PUT /api/user-plans/me`・`USER_PLANS_DIR`・`getUserPlansFilePath()`。
+- `sendApnToToken()`・`sendPushToAll()`・`webpush`関連基盤・`POST /api/notify-events-updated`。
+- `GET /api/comments`・`POST /api/comments`・`DELETE /api/comments/:id`・`GET /api/comments/counts`（コメント機能、現役）。
+- `GET /api/events`・`GET /api/life-info`・`GET /api/sales`・`GET /api/spots`・`GET /api/sponsored-cards`・`GET /api/weather`・`GET /api/school-calendar`・`POST /api/debug-log`・`POST /api/feedback`・`POST /api/chat`（後方互換のため残置済み、CLAUDE.md既存方針通り無変更）・`POST /api/line-webhook`関連一式。
+
+### 6-3. crontab
+`refresh-courses.js --city=sg`のcrontabエントリ（水・日8:00 SGT）を削除すること。VPS上の実際のcrontab（`crontab -e`または`crontab -l`で確認）の編集が必要。CLAUDE.mdの「都市対応状況」「イベント取り込みパイプライン構成」セクションの該当記述も更新が必要。
+
+---
+
+## 7. `scripts/`配下の削除対象
+
+- `scripts/seed-courses.js`（コミュニティコースのシードデータ生成、コース専用）
+- `scripts/refresh-courses.js`（システムコース新陳代謝、コース専用、crontab登録済み・上記6-3参照）
+- `scripts/match-affiliate-links.js`（Klookアフィリエイトリンク半自動登録、コース+探訪共有だが両方削除されるなら削除可）
+- `scripts/generate-model-courses.js`（モデルコース生成、CLAUDE.mdに「参照なし」と明記されている既に死んでいるスクリプトだが、念のため削除対象に含める）
+- `scripts/fill-stamp-spot-images.js`（探訪スポット画像補完、探訪専用）
+
+`scripts/fill-images.js`（イベント画像補完、現役）・`scripts/fetch-events.js`・`scripts/fetch-life-info.js`等の他スクリプトは無関係のため削除しないこと。
+
+---
+
+## 8. `ios-app/package.json`・`.github/workflows/ios-deploy.yml`の変更
+
+### 8-1. npm依存パッケージ削除候補
+| パッケージ | 用途 | 削除可否 |
+|---|---|---|
+| `@capacitor/camera` | 探訪の思い出写真機能専用 | 削除可（他に現役でカメラ機能を使う箇所なし確認済み。QRスキャナーは`navigator.mediaDevices.getUserMedia`というWeb標準APIを直接使っており、このパッケージには依存しない） |
+| `@capacitor/geolocation` | 探訪チェックイン専用 | 削除可（`_getCapGeoPlugin()`は探訪専用と確認済み） |
+| `@capacitor/filesystem` | 探訪シェアカード画像の一時保存専用 | 削除可（`_getCapFilesystemPlugin()`は探訪シェア機能専用と確認済み、他機能での使用なし） |
+| `@capacitor/share` | 探訪シェア機能専用 | 削除可（`_getCapSharePlugin()`は探訪シェア機能専用と確認済み） |
+| `@koodos/share-to-insta-stories` | 探訪Instagramシェア専用 | 削除可 |
+
+**削除しないもの**: `@capacitor/core`/`@capacitor/app`/`@capacitor/browser`/`@capacitor/keyboard`/`@capacitor/local-notifications`（※来星記念日通知専用だが、この機能自体の削除可否がユーザー確認事項のため保留。仮に来星日機能ごと削除するならこのパッケージも削除候補になるが、他に通知機能で使っていないか要再確認）/`@capacitor/preferences`（認証トークン永続化、現役）/`@capacitor/push-notifications`（APNs、現役）/`@capacitor/splash-screen`/`@capacitor/status-bar`/`@codetrix-studio/capacitor-google-auth`（現役）/`@capacitor-community/apple-sign-in`（現役）。
+
+### 8-2. `.github/workflows/ios-deploy.yml`の変更
+- **`NSCameraUsageDescription`（96-97行目）**: 文言が「予定表の共有グループへの参加、および探訪スタンプ帳での思い出の写真撮影のためカメラを使用します」と2用途を1つの文言で共有している。**両方の機能（共有カレンダーQRスキャン・探訪カメラ撮影）が削除対象のため、このステップ自体を丸ごと削除可能**。ただし他に現役でカメラを使う機能が今後追加される可能性を考慮し、削除は最終確認のうえで実施すること。
+- **`NSPhotoLibraryUsageDescription`（103-104行目）**・**`NSPhotoLibraryAddUsageDescription`（105-106行目）**: 探訪専用、削除可。
+- **`NSLocationWhenInUseUsageDescription`（112-113行目）**: 探訪専用、削除可。
+- **`LSApplicationQueriesSchemes`の`instagram-stories`追加ステップ（116-139行目）**: 探訪Instagramシェア専用、削除可。
+- **`com.apple.developer.applesignin`（188行目付近）**: Sign in with Apple機能（現役）のため**絶対に削除しないこと**。
+
+---
+
+## 9. データファイル（`data/`配下）の扱い
+
+前述の「スコープ外」節の通り、**今回はコード削除のみに限定し、データファイル自体は削除しない**方針を推奨する。理由:
+1. `data/`は`.gitignore`対象で、誤って削除すると復元不可能。
+2. 実データが既に存在する（`data/shared-calendars/`に10グループ、`data/stamp-progress/`に1ユーザー分、`data/user-plans/`に2ユーザー分のバックアップ）ことを確認済み。**`data/user-plans/`は探訪・予定表専用ではなく現役の全データバックアップ機能のデータであるため、これは削除対象外（誤って`data/`配下を一括削除するようなコマンドを実行しないよう厳重注意）**。
+3. コード側の参照（API・読み書き処理）を削除すれば、これらのファイルは二度とアクセスされなくなり「孤立したファイル」として無害化される。将来ディスク容量等の問題が出た場合に、別タスクとして手動削除すればよい。
+
+対象データファイル（コードのみ削除、ファイルは触らない）: `data/sg/stamp-spots.json`、`data/stamp-progress/*.json`、`data/sg/model-courses.json`、`data/sg/community-courses.json`、`data/shared-calendars/*.json`、`data/sg/affiliate-links.json`、`data/affiliate-clicks.json`。
+
+---
+
+## 10. 推奨する削除手順の順序
+
+規模が非常に大きい（HTML/CSSで250以上のid/class、JSで150以上の関数、server.jsで約30エンドポイント）ため、**複数回のbuilder実行に分割することを強く推奨する**。1回で全てをやろうとすると、レビュー・動作確認が困難になり見落としリスクが増大する。
+
+### 推奨分割案（4フェーズ）
+
+**フェーズ1: コース機能の削除（フロントエンドのみ）**
+- HTML: `#course-sheet-overlay`〜`#course-sheet`、`#course-detail-overlay`〜`#course-detail-sheet`、`#title-edit-overlay`〜`#title-edit-sheet`、`#date-picker-overlay`〜`#date-picker-modal`（コースからしか呼ばれないため）。
+- CSS: `.course-*`セクション（探訪と共有していない部分）。
+- JS: コース機能一式の関数（5-1節「コース機能」列挙分）、`STRINGS`のcourse系キー。
+- `#screen-course`内のタブ構成から「モデルコース」「マイコース」タブを削除（探訪タブは残す一時的な中間状態、または後述フェーズ2と統合してもよい）。
+- 動作確認: ホーム画面・ニュース画面・ピン留め・設定画面・**探訪機能**（このフェーズではまだ残っている）が正常動作することを確認。
+
+**フェーズ2: 探訪（スタンプラリー）機能の削除（フロントエンド+一部server.js）**
+- HTML: `#screen-course`本体・`#nav-course`・探訪関連モーダル一式・`#course-fab`。
+- CSS: `.stamp-*`セクション一式。
+- JS: 探訪機能一式（5-1節「探訪機能」列挙分）。
+- server.js: `GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`・`loadAffiliateLinks()`/`embedAffiliateLinks()`・`POST /api/affiliate-click`（この時点で参照元がコース・探訪ともになくなるため削除可能）。
+- `switchNav()`/`closeAllPopups()`/`FAB_HIDDEN_SCREENS`から`course`関連の行を削除。
+- ios-app: `@capacitor/camera`/`@capacitor/geolocation`/`@capacitor/filesystem`/`@capacitor/share`/`@koodos/share-to-insta-stories`削除、`.github/workflows/ios-deploy.yml`のカメラ・位置情報・フォトライブラリ・Instagram Stories関連ステップ削除。
+- **来星日・卒業アルバム機能の扱いをここで最終確定**（ユーザー確認結果に基づき削除 or 残置）。
+- `pm2 restart`実施。
+- 動作確認: ホーム・ニュース・ピン留め・設定画面（アカウント連携・バックアップ含む）・**予定表機能**（このフェーズではまだ残っている）が正常動作することを確認。
+
+**フェーズ3: 予定表機能の削除（フロントエンド）**
+- HTML: `#screen-plan`本体・`#nav-plan`・`#fab-plan-group`・`#plan-modal-overlay`〜各種`plan-*-modal`・`#schedule-action-overlay`〜`#schedule-action-sheet`・`#schedule-plan-action-overlay`〜`#schedule-plan-action-sheet`・`#pin-picker-overlay`〜`#pin-picker-sheet`・`#emoji-picker-overlay`〜`#emoji-picker-sheet`・`#cal-popup-overlay`〜`#cal-popup`。
+- CSS: `.plan-*`（共有パターンクラス除く）/`.schedule-*`/`.pin-picker-*`/`.cal-popup-*`セクション。
+- JS: 予定表機能一式（5-1節「予定表機能」列挙分）。
+- `switchNav()`/`closeAllPopups()`/`FAB_HIDDEN_SCREENS`から`plan`関連の残り行を削除。
+- `_collectBackupPayload()`/`_applyRestoredBackup()`から`customPlans`関連フィールドを削除（`myCoursesByCity`/`likedCourses`はフェーズ1で対応済みのはず、この時点で残っていれば併せて対応）。
+- 動作確認: 現役全機能（イベント・ニュース・ピン留め・設定・コメント・アカウント連携・バックアップ）が正常動作することを確認。
+
+**フェーズ4: 共有カレンダー機能の削除（server.js + 最終クリーンアップ）**
+- HTML: `#cal-sync-overlay`〜`#cal-join-modal`、`#cal-passphrase-overlay`〜`#cal-passphrase-sheet`。
+- CSS: `.cal-sync-*`/`.header-cal-sync-btn`。
+- JS: 共有カレンダー機能一式（5-1節「共有カレンダー」列挙分）。
+- server.js: `/api/calendar/*`エンドポイント一式。
+- `_collectBackupPayload()`から`backupExcludesCalendarNote`関連文言の見直し。
+- ダークモードCSSの複合セレクタから該当行を最終除去。
+- crontabから`refresh-courses.js`エントリを削除。
+- CLAUDE.mdの該当セクション（コース機能・スタンプラリー機能・データバックアップ・都市対応状況・イベント取り込みパイプライン構成等）を大幅に更新・簡略化。
+- `pm2 restart`実施。
+- 最終動作確認一式（受け入れ基準の正常系・失敗系を全てチェック）。
+
+この4フェーズに分けることで、各フェーズ後にWeb版で動作確認ができ、万一問題があっても影響範囲を特定しやすくなる。ユーザーが「一気に全部やってほしい」と希望する場合も、**最低限「フロントエンド変更」と「server.js変更（pm2 restartを伴う）」は別コミットに分ける**ことを強く推奨する。
+
+---
+
+## 11. リスク・未解決の質問（実装前にユーザーに確認すべき事項）
+
+1. **来星日・帰国予定日カウンター機能、卒業アルバム機能を削除対象に含めるか？** これらの入力欄は既に設定画面で`display:none`だが、機能自体（在住日数カウンター・卒業アルバム）は探訪画面に依存しており、探訪削除に伴い事実上使い道がなくなる。ユーザーの元の指示（探訪・コース・予定表の3機能）には明示的に含まれていないため、削除するかどうか明確な承認が必要。
+2. **`GET /api/stamp-spots`・`GET /api/courses*`・`GET /api/calendar/*`を叩く旧バージョンのApp Storeアプリが実際にどれだけ残っているか不明**。App Store Connect側の利用統計等で旧バージョン利用者の有無を確認できるとより安全な判断ができるが、これは本タスク（設計）のスコープ外。
+3. **`_applyRestoredBackup()`の後方互換分岐（`isLegacy`、`version`フィールドなしの旧バックアップ構造）を削除してよいか**。これを削除すると、大昔（設計書54以前）にバックアップを作成し、その後一度も更新していない稀なユーザーが復元できなくなる可能性がある。実害は極めて限定的と推測されるが、正確なリスクは不明。
+4. **`refresh-courses.js`のcrontab削除は本番サーバー（VPS）への直接操作が必要**。builderがSSH等で直接crontabを編集する権限・手順を持っているか、あるいはユーザーが手動で行うかを事前に確認すること。
+5. **設定画面のtouchendデリゲーション配列の正確な内容**は本設計書の調査時点では行番号・全量を確定できていない（CLAUDE.mdの記述から存在を推測したのみ）。実装フェーズでbuilderが該当箇所を直接読み、1行ずつ判定する必要がある。
+6. **`POST /api/courses/chat`エンドポイント**は名前に反してAIチャット機能（既に廃止済み）ではなくコース機能の一部として現役かどうか、フロントエンドの実際の呼び出し元をbuilderが実装時に再確認すること（本調査では呼び出し元の特定まで至っていない）。
+7. **`.card-plan-btn`/`.plan-add-card-btn`CSSクラス**はJSからの生成箇所が見当たらず「死んでいるCSS」の可能性が高いが、今回の3機能に直接起因するものか、それとも別の既存の技術的負債かの切り分けが曖昧。削除前に最終grep確認をすること。
+8. **ダークモードCSSの`.emoji-picker-sheet`/`.pin-detail-sheet`/`.cal-popup-card`セレクタ**は現在のHTMLに存在しないクラス名（既存の死んだセレクタ、今回のタスクとは無関係の技術的負債）であることが判明した。これは今回の削除作業の範囲外の問題だが、ついでに整理するかはユーザー判断（本設計書では「今回のタスクの副産物として発見した別問題」として記録するに留め、対応は任意とする）。
+9. **本設計書の「削除順序」は4フェーズに分割する提案だが、ユーザーが「一気に全部やってほしい」場合、1回のbuilder実行の範囲・コンテキスト長・レビュー可能性を考慮すると現実的ではない可能性が高い**。少なくとも2回（フロントエンド一括+server.js一括）には分けることを推奨するが、最終的な分割方針はユーザーとの合意が必要。
+10. **iOS版の`releaseブランチ`へのpush・TestFlightビルドのタイミング**は、CLAUDE.mdの既存運用ルール（ユーザーの明示指示があるまで実施しない）に従う。今回の大規模削除がWeb版とiOS版とで表示に差異が生じる期間が発生することを踏まえ、いつリリースするかはユーザーと個別に相談する。
+
+---
+
+**関連する主要ファイルパス**（実装時に参照するもの、全て絶対パス）:
+- `/home/masahiko/sg-weekend-app/public/index.html`
+- `/home/masahiko/sg-weekend-app/public/app.js`
+- `/home/masahiko/sg-weekend-app/public/app.css`
+- `/home/masahiko/sg-weekend-app/server.js`
+- `/home/masahiko/sg-weekend-app/ios-app/package.json`
+- `/home/masahiko/sg-weekend-app/.github/workflows/ios-deploy.yml`
+- `/home/masahiko/sg-weekend-app/scripts/seed-courses.js`
+- `/home/masahiko/sg-weekend-app/scripts/refresh-courses.js`
+- `/home/masahiko/sg-weekend-app/scripts/match-affiliate-links.js`
+- `/home/masahiko/sg-weekend-app/scripts/generate-model-courses.js`
+- `/home/masahiko/sg-weekend-app/scripts/fill-stamp-spot-images.js`
+- `/home/masahiko/sg-weekend-app/CLAUDE.md`（削除完了後に大幅な記述更新が必要）

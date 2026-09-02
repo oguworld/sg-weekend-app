@@ -358,7 +358,6 @@
         catAll: '新着',
         catRecommend: 'おすすめ',
         addToPlanBtnShort: '予定追加',
-        courseCreateBtnShort: 'コース作成',
         catEvent: 'イベント',
         catShow: '展示・公演',
         catGourmet: 'グルメ・フェア',
@@ -488,8 +487,6 @@
         lifeInfoPreviewTitle: '📰 シンガポールくらし情報',
         lifeInfoPreviewMoreLink: 'もっと見る ›',
         courseScreenTitle: 'シンガポール探訪',
-        courseTabEveryone: 'モデルコース',
-        courseTabMylist: 'マイコース',
         courseTabStampMap: '探訪スタンプ帳',
         stampMapLoginRequired: '探訪スタンプ帳の進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。',
         authGateMessage: 'この機能を使うにはアカウント連携が必要です',
@@ -545,52 +542,9 @@
         toastShareSavedForIG: '画像を保存しました。Instagramアプリで手動投稿してください',
         toastShareSavedForX: '画像を保存しました。Xの投稿画面が開きます。保存した画像を添付してください',
         toastStampShareGenError: '画像の生成に失敗しました。もう一度お試しください。',
-        courseSheetTitle: 'コースを作る',
-        coursePinsLabel: '軸にするイベント',
-        coursePinsHint: '軸にするイベントをタップして選んでください',
-        courseDepartLabel: '出発時間',
-        courseReturnLabel: '帰宅時間',
-        courseTimeAny: '指定なし',
-        courseNoteLabel: 'ひとこと',
-        courseNoteOptional: '（任意）',
-        courseNotePlaceholder: '例）記念日なので特別感がほしい、穴場スポットで行きたい…',
-        courseOptionsToggle: '🎛 こだわり設定',
-        coursePurposeLabel: 'おでかけの目的',
-        courseAreaLabel: 'エリア',
-        courseOccasionLabel: '特別感',
-        courseStyleLabel: 'スタイル',
-        courseFoodLabel: '食の比重',
-        courseTransportLabel: '移動スタイル',
-        courseGenerateBtn: 'コースを作る ✨',
-        courseLoadingMsg: 'コースを考えています…',
-        courseSaveBtn: 'マイコースに保存',
-        courseRegenerateBtn: '🔄 作り直す',
-        coursePublishBtn: 'みんなに公開する',
-        courseDetailAttraction: '📝 このコースの魅力',
-        courseDetailRoute: '🗺️ コース',
-        courseDetailAuthor: '作者:',
         affiliateInfoLink: 'チケット情報',
         prBadgeLabel: 'PR',
-        courseAddToPlanBtn: '📅 予定表に追加',
-        coursePublishAction: 'みんなに公開する',
-        courseUnpublishAction: '🌐 公開中（非公開に）',
-        courseEditTitleBtn: 'タイトルを変更する',
-        courseDeleteBtn: '🗑️ このコースを削除する',
-        courseEmpty: 'コースがありません',
-        courseSpotsCount: '{n}スポット',
-        titleEditLabel: 'タイトルを編集',
         titleEditCancel: 'キャンセル',
-        titleEditSave: '保存',
-        toastCourseSaved: 'マイコースに保存しました',
-        toastCoursePublished2: 'みんなに公開しました',
-        toastCourseTitleSaved: 'タイトルを変更しました',
-        toastCourseDeleted: 'コースを削除しました',
-        toastCoursePublished: 'コースを公開しました！',
-        toastCoursePublishErr: '公開に失敗しました。',
-        toastCourseUnpublish: '非公開にしました',
-        toastCourseFailed: '失敗しました。もう一度お試しください。',
-        toastCourseGenFailed: '生成に失敗しました。もう一度お試しください。',
-        toastCourseAddPlan: '{n}件のスポットを予定に追加しました',
         labelNickname: 'ニックネーム',
         labelDarkMode: 'ダークモード',
         nicknamePlaceholder: '匿名',
@@ -621,7 +575,6 @@
         labelOfficialSite: '公式サイト',
         labelAboutSns: '公式サイト・SNS',
         scheduleMakePlan: '予定を立てる',
-        courseCreateBtn: '🗺 コース作成',
         secAccount: 'アカウント',
         loginWithGoogle: 'Googleでログイン',
         loginWithApple: 'Appleでサインイン',
@@ -688,7 +641,6 @@
         catAll: 'New',
         catRecommend: 'Recommended',
         addToPlanBtnShort: 'Add Plan',
-        courseCreateBtnShort: 'Create Course',
         catEvent: 'Events',
         catShow: 'Shows & Exhibitions',
         catGourmet: 'Food & Fairs',
@@ -818,8 +770,6 @@
         lifeInfoPreviewTitle: '📰 Singapore Life Info',
         lifeInfoPreviewMoreLink: 'More ›',
         courseScreenTitle: 'Explore Singapore',
-        courseTabEveryone: 'Model Courses',
-        courseTabMylist: 'My Courses',
         courseTabStampMap: 'Discovery Stamp Book',
         stampMapLoginRequired: 'To save your progress in the Discovery Stamp Book, please link your account from Settings.',
         authGateMessage: 'Please link your account to use this feature',
@@ -875,52 +825,9 @@
         toastShareSavedForIG: 'Image saved. Please post manually via the Instagram app',
         toastShareSavedForX: "Image saved. Opening X's post screen — please attach the saved image",
         toastStampShareGenError: 'Failed to generate the image. Please try again.',
-        courseSheetTitle: 'Create Course',
-        coursePinsLabel: 'Base pinned event',
-        coursePinsHint: 'Tap to select',
-        courseDepartLabel: 'Departure',
-        courseReturnLabel: 'Return',
-        courseTimeAny: 'Any',
-        courseNoteLabel: 'Note',
-        courseNoteOptional: '(optional)',
-        courseNotePlaceholder: 'e.g. Special occasion, prefer hidden gems…',
-        courseOptionsToggle: '🎛 More options',
-        coursePurposeLabel: 'Purpose',
-        courseAreaLabel: 'Area',
-        courseOccasionLabel: 'Occasion',
-        courseStyleLabel: 'Style',
-        courseFoodLabel: 'Food focus',
-        courseTransportLabel: 'Getting around',
-        courseGenerateBtn: 'Create Course ✨',
-        courseLoadingMsg: 'Planning your course…',
-        courseSaveBtn: 'Save to My Courses',
-        courseRegenerateBtn: '🔄 Try again',
-        coursePublishBtn: 'Share with everyone',
-        courseDetailAttraction: '📝 Highlights',
-        courseDetailRoute: '🗺️ Route',
-        courseDetailAuthor: 'By:',
         affiliateInfoLink: 'Ticket info',
         prBadgeLabel: 'PR',
-        courseAddToPlanBtn: '📅 Add to Schedule',
-        coursePublishAction: 'Share with everyone',
-        courseUnpublishAction: 'Published ✓ &nbsp;(Make private)',
-        courseEditTitleBtn: 'Edit title',
-        courseDeleteBtn: '🗑️ Delete course',
-        courseEmpty: 'No courses yet',
-        courseSpotsCount: '{n} spots',
-        titleEditLabel: 'Edit title',
         titleEditCancel: 'Cancel',
-        titleEditSave: 'Save',
-        toastCourseSaved: 'Saved to My Courses',
-        toastCoursePublished2: 'Published!',
-        toastCourseTitleSaved: 'Title updated',
-        toastCourseDeleted: 'Course deleted',
-        toastCoursePublished: 'Course published!',
-        toastCoursePublishErr: 'Failed to publish.',
-        toastCourseUnpublish: 'Made private',
-        toastCourseFailed: 'Failed. Please try again.',
-        toastCourseGenFailed: 'Generation failed. Please try again.',
-        toastCourseAddPlan: 'Added {n} spots to schedule',
         labelNickname: 'Nickname',
         labelDarkMode: 'Dark Mode',
         nicknamePlaceholder: 'Anonymous',
@@ -951,7 +858,6 @@
         labelOfficialSite: 'Official Site',
         labelAboutSns: 'Official Site & SNS',
         scheduleMakePlan: 'Plan a trip',
-        courseCreateBtn: '🗺 Course',
         secAccount: 'Account',
         loginWithGoogle: 'Sign in with Google',
         loginWithApple: 'Sign in with Apple',
@@ -2995,64 +2901,6 @@
       document.getElementById('cal-popup-events').scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ─── VOICE INPUT ───
-    let voiceRecognition = null;
-    let isVoiceRecording = false;
-
-    (function initVoiceMic() {
-      if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
-        ['course-note-mic-btn'].forEach(id => {
-          const btn = document.getElementById(id);
-          if (btn) btn.style.display = 'none';
-        });
-      }
-    })();
-
-    function stopVoiceInput() {
-      if (voiceRecognition) voiceRecognition.stop();
-    }
-
-    function toggleCourseNoteVoice() {
-      if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) return;
-      if (isVoiceRecording) { stopVoiceInput(); return; }
-
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      voiceRecognition = new SR();
-      voiceRecognition.lang = getLang() === 'en' ? 'en-US' : 'ja-JP';
-      voiceRecognition.continuous = false;
-      voiceRecognition.interimResults = true;
-
-      const micBtn  = document.getElementById('course-note-mic-btn');
-      const textarea = document.getElementById('course-note');
-      const origPlaceholder = textarea.placeholder;
-
-      voiceRecognition.onstart = () => {
-        isVoiceRecording = true;
-        micBtn.classList.add('recording');
-        textarea.placeholder = getLang() === 'en' ? 'Listening...' : '聴いています...';
-      };
-
-      voiceRecognition.onresult = (e) => {
-        textarea.value = Array.from(e.results).map(r => r[0].transcript).join('');
-      };
-
-      voiceRecognition.onend = () => {
-        isVoiceRecording = false;
-        micBtn.classList.remove('recording');
-        textarea.placeholder = origPlaceholder;
-        voiceRecognition = null;
-      };
-
-      voiceRecognition.onerror = () => {
-        isVoiceRecording = false;
-        micBtn.classList.remove('recording');
-        textarea.placeholder = origPlaceholder;
-        voiceRecognition = null;
-      };
-
-      voiceRecognition.start();
-    }
-
     // ─── PIN LOGIC ───
     function pinsKey() { return `${getCity()}_pins`; }
     function getPins() {
@@ -3228,9 +3076,6 @@
               onclick="shareApp('${safeTitle}', '${safeUrl}')">
               ${t('shareBtn')}
             </button>` : ''}
-            <button class="sale-pin-btn" onclick="openCourseSheetFromEvent('${id}'); closePinDetail();">
-              ${t('courseCreateBtn')}
-            </button>
           </div>
         </div>`;
 
@@ -4206,9 +4051,6 @@
       closeEmojiPicker();
       closeScheduleActionSheet();
       closeEventFilterSheet();
-      closeCourseDetail();
-      closeCourseSheet();
-      closeDatePickerSheet();
       closePlanModal();
       closeStampSpotDetail();
       closeStampLevelUnlockModal();
@@ -4397,20 +4239,7 @@
       }
     }
 
-    // ─── COURSE FEATURE ───
-
-    let currentCourseTab = 'popular';
-    let currentGeneratedCourse = null;
-    const LOADING_MSGS = [
-      'スポットを探しています...',
-      'ルートを組み立てています...',
-      'グルメ情報をチェック中...',
-      'コースが完成しました！'
-    ];
-
-    // コース画面初期化
-    const COURSE_TABS = ['everyone', 'mylist'];
-    let _courseSwipeStartX = 0;
+    // ─── COURSE SCREEN（設計書178フェーズ1でコース機能本体を削除。探訪スタンプ帳の初期化のみ残す） ───
 
     async function initCourseScreen() {
       // 設計書72: ボトムナビ「コース」タップ経由の新規進入時のみ一覧表示にリセットする（画面内タブ切り替えではリセットしない）
@@ -4420,71 +4249,25 @@
       _renderResidencyCounter(); // 設計書122: 画面に入るたびに最新の在住日数へ再計算
       _renderGraduationAlbumLink(); // 設計書152: 画面に入るたびに卒業アルバム入口の表示条件を再評価
 
-      // スワイプでタブ切り替え（初回のみ登録）
-      const sc = document.querySelector('#screen-course .screen-content');
-      if (sc && !sc._swipeInit) {
-        sc._swipeInit = true;
-        let _courseSwipeOnHScroll = false;
-        sc.addEventListener('touchstart', e => {
-          _courseSwipeStartX = e.touches[0].clientX;
-          _courseSwipeOnHScroll = !!e.target.closest('#course-everyone-carousel');
-        }, { passive: true });
-      }
-
       // Pull to Refresh（設計書19、初回のみ登録。iOS版のみ有効化。
       // コース画面には横スワイプ機構が存在しないため watchSwipeIntent=false で単独判定。
-      // スタンプマップタブでは地図操作とPTRが競合するため、そのタブの間はリフレッシュ処理自体を何もしない（設計書69）
+      // スタンプマップタブでは地図操作とPTRが競合するため、リフレッシュ処理自体を何もしない（設計書69）
+      const sc = document.querySelector('#screen-course .screen-content');
       _initPtr(sc, 'ptr-indicator-course', async () => {
-        if (currentCourseTab === 'map') return;
-        await switchCourseTab(currentCourseTab);
+        // 設計書178フェーズ1: 探訪スタンプ帳タブのみ残っているため、PTRでの再取得は行わない
       }, false);
     }
 
-    // タブ切り替え
+    // タブ切り替え（設計書178フェーズ1: 探訪スタンプ帳タブのみ残存、常に'map'で呼ばれる）
     async function switchCourseTab(tab) {
-      currentCourseTab = tab;
       document.querySelectorAll('.course-tab').forEach(t =>
         t.classList.toggle('active', t.dataset.tab === tab));
 
-      const city = getCity();
-
-      // 既存2タブ（コース一覧）とスタンプマップは表示領域自体が別（副作用ゼロの追加分岐、設計書69）
-      const courseListEl = document.getElementById('course-list');
       const stampMapViewEl = document.getElementById('stamp-map-view');
       const courseFabEl = document.getElementById('course-fab');
-      if (tab === 'map') {
-        if (courseListEl) courseListEl.style.display = 'none';
-        if (stampMapViewEl) stampMapViewEl.style.display = 'block';
-        if (courseFabEl) courseFabEl.style.display = '';
-        await initStampMapTab();
-        return;
-      } else {
-        if (courseListEl) courseListEl.style.display = 'flex';
-        if (stampMapViewEl) stampMapViewEl.style.display = 'none';
-        if (courseFabEl) courseFabEl.style.display = 'none';
-      }
-
-      if (tab === 'mylist') {
-        const courses = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
-        // 作成日が古い順（一番上が最初に作ったコース）
-        const sorted = [...courses].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        renderCourseList(sorted, false, true);
-        return;
-      }
-
-      try {
-        if (tab === 'everyone') {
-          const [popRes, comRes] = await Promise.all([
-            fetch(API_BASE + `/api/courses?city=${city}&tab=popular`),
-            fetch(API_BASE + `/api/courses?city=${city}&tab=community`)
-          ]);
-          const [popular, community] = await Promise.all([popRes.json(), comRes.json()]);
-          renderEveryoneTab(popular, community);
-        }
-      } catch(e) {
-        document.getElementById('course-list').innerHTML =
-          `<div style="text-align:center;padding:40px;color:var(--warm-gray);">${t('courseEmpty')}</div>`;
-      }
+      if (stampMapViewEl) stampMapViewEl.style.display = 'block';
+      if (courseFabEl) courseFabEl.style.display = '';
+      await initStampMapTab();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -6979,388 +6762,7 @@
       }
     }
 
-    // コース一覧レンダリング
-    const _rankLineColor = ['#C0903A','#9BA5B0','#B07040',null,null];
-    function renderCourseList(courses, withRank = false, isOwn = false) {
-      const container = document.getElementById('course-list');
-      if (!courses.length) {
-        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warm-gray);">${t('courseEmpty')}</div>`;
-        return;
-      }
-      container.innerHTML = courses.map((c, i) => renderCourseCard(c, withRank ? i : null, isOwn)).join('');
-    }
-
-    // みんなのコースタブ レンダリング
-    const WHO_JA_MAP = { family: 'ファミリー', couple: 'カップル', solo: 'ひとり', group: '友人グループ' };
-
-    function getPersonalizedCourses(community, popular) {
-      const who = (getWhoList() || [])[0];
-      const whoJa = WHO_JA_MAP[who] || null;
-      if (!whoJa) return { courses: popular.slice(0, 3), personalized: false };
-
-      const scored = community.map(c => {
-        const withVal = c.conditions?.with || '';
-        const match = withVal === whoJa ? 3 : withVal.includes(whoJa) ? 1 : 0;
-        return { c, score: match * 10 + (c.likes || 0) };
-      });
-      scored.sort((a, b) => b.score - a.score);
-      const top6 = scored.slice(0, 6).map(s => s.c);
-      return { courses: top6.length ? top6 : popular.slice(0, 3), personalized: !!whoJa };
-    }
-
-    function renderEveryoneTab(popular, community) {
-      const container = document.getElementById('course-list');
-      let html = '';
-
-      // ─── 1. 人気コース（常時・いいね上位3件） ───
-      if (popular.length) {
-        html += `<div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;
-          color:var(--midnight);padding:4px 0 10px;">🏆 人気コース</div>
-          <div id="course-everyone-carousel"
-            style="display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;
-              scroll-padding-left:16px;padding:0 16px 8px;box-sizing:border-box;
-              width:100vw;margin-left:-16px;
-              scrollbar-width:none;-webkit-overflow-scrolling:touch;">
-            ${popular.slice(0, 3).map((c, i) => renderPopularCourseCard(c, i)).join('')}
-            <div style="flex-shrink:0;width:16px;"></div>
-          </div>`;
-      }
-
-      // ─── 2. プロフィール別おすすめ or 新着コース ───
-      const whoLabel = WHO_JA_MAP[(getWhoList() || [])[0]] || null;
-      const all = [...community, ...popular.filter(p => !community.find(c => c.id === p.id))];
-      const { courses: personalizedCourses, personalized } = getPersonalizedCourses(all, popular);
-
-      if (personalized && whoLabel) {
-        html += `<div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;
-          color:var(--midnight);padding:20px 0 8px;">✨ ${whoLabel}向け</div>
-          <div style="display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;
-            scroll-padding-left:16px;padding:0 16px 6px;box-sizing:border-box;
-            width:100vw;margin-left:-16px;
-            scrollbar-width:none;-webkit-overflow-scrolling:touch;">
-            ${personalizedCourses.map(c => `<div style="flex-shrink:0;width:160px;scroll-snap-align:start;">${renderCompactCourseCard(c)}</div>`).join('')}
-            <div style="flex-shrink:0;width:16px;"></div>
-          </div>`;
-      } else {
-        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const recentCommunity = community.filter(c => new Date(c.createdAt) >= oneWeekAgo).slice(0, 6);
-        if (recentCommunity.length) {
-          html += `<div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;
-            color:var(--midnight);padding:20px 0 8px;">✨ 新着コース</div>
-            <div style="display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;
-              scroll-padding-left:16px;padding:0 16px 6px;box-sizing:border-box;
-              width:100vw;margin-left:-16px;
-              scrollbar-width:none;-webkit-overflow-scrolling:touch;">
-              ${recentCommunity.map(c => `<div style="flex-shrink:0;width:160px;scroll-snap-align:start;">${renderCompactCourseCard(c)}</div>`).join('')}
-              <div style="flex-shrink:0;width:16px;"></div>
-            </div>`;
-        }
-      }
-
-      // ─── 3. スタイル別 ───
-      {
-        const styleGroups = [
-          { key: '定番',   label: '👑 定番',   desc: '王道・安心定番コース' },
-          { key: 'ローカル', label: '🏪 ローカル', desc: '地元民視点のコース' },
-          { key: 'ニッチ',  label: '🔍 穴場',   desc: '混まない・こだわりコース' },
-        ];
-        for (const sec of styleGroups) {
-          const filtered = community.filter(c => c.conditions?.style === sec.key);
-          if (!filtered.length) continue;
-          html += `
-            <div style="display:flex;align-items:baseline;gap:8px;padding:20px 0 8px;">
-              <div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;color:var(--midnight);">${sec.label}</div>
-              <div style="font-size:12px;color:var(--warm-gray);">${sec.desc}</div>
-            </div>
-            <div style="display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;
-              scroll-padding-left:16px;padding:0 16px 6px;box-sizing:border-box;
-              width:100vw;margin-left:-16px;
-              scrollbar-width:none;-webkit-overflow-scrolling:touch;">
-              ${filtered.map(c => `<div style="flex-shrink:0;width:160px;scroll-snap-align:start;">${renderCompactCourseCard(c)}</div>`).join('')}
-              <div style="flex-shrink:0;width:16px;"></div>
-            </div>`;
-        }
-      }
-
-      if (!html) {
-        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--warm-gray);">${t('courseEmpty')}</div>`;
-        return;
-      }
-      container.innerHTML = html;
-    }
-
-    // 2カラム用コンパクトカード（みんなのコース・新着）
-    function renderCompactCourseCard(c) {
-      const liked = isLiked(c.id);
-      const cond = c.conditions || {};
-      const areaTag = cond.area || cond.with || cond.style || '';
-      return `
-        <div onclick="openCourseDetail('${c.id}')"
-          style="height:240px;border-radius:12px;overflow:hidden;cursor:pointer;
-                 box-shadow:0 2px 6px rgba(0,0,0,0.07);background:var(--warm-white);
-                 display:flex;flex-direction:column;">
-          ${c.imageUrl
-            ? `<img src="${c.imageUrl}" style="width:100%;height:100px;object-fit:cover;display:block;flex-shrink:0;">`
-            : `<div style="width:100%;height:100px;flex-shrink:0;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));
-                 display:flex;align-items:center;justify-content:center;font-size:28px;">✨</div>`
-          }
-          <div style="padding:8px 9px 10px;display:flex;flex-direction:column;gap:4px;flex:1;min-height:0;">
-            <div style="font-family:'Kaisei Opti',serif;font-size:14px;font-weight:700;
-              line-height:1.4;overflow:hidden;display:-webkit-box;
-              -webkit-line-clamp:2;-webkit-box-orient:vertical;">${escapeHtml(c.title)}</div>
-            ${c.tagline ? `<div style="font-size:11px;color:var(--warm-gray);line-height:1.4;
-              overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
-              ${escapeHtml(c.tagline)}</div>` : ''}
-            ${areaTag ? `<span style="display:inline-block;padding:1px 7px;background:var(--sand);
-              border-radius:20px;font-size:11px;color:var(--warm-gray);align-self:flex-start;">${escapeHtml(areaTag)}</span>` : ''}
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;">
-              <div style="font-size:11px;color:var(--light-gray);">
-                ${t('courseSpotsCount').replace('{n}', c.spots?.length||0)}
-              </div>
-              <button onclick="event.stopPropagation();toggleLike('${c.id}')"
-                data-like-id="${c.id}" data-likes="${c.likes||0}"
-                style="font-size:12px;padding:2px 4px;background:none;border:none;
-                       cursor:pointer;border-radius:6px;font-family:inherit;line-height:1;"
-                ontouchstart="this.style.transform='scale(0.85)'"
-                ontouchend="this.style.transform='scale(1)'">
-                ${liked ? '❤️' : '🤍'} ${c.likes||0}
-              </button>
-            </div>
-          </div>
-        </div>`;
-    }
-
-    // マガジン型カード（みんなのコース・新着）
-
-    // コースカード HTML
-    function renderCourseCard(c, rank = null, isOwn = false) {
-      const liked = isLiked(c.id);
-      const cond = c.conditions || {};
-      const tag = cond.with || cond.area || cond.style || '';
-      const lineColor = rank !== null ? (_rankLineColor[rank] ?? null) : null;
-      const rankLine = lineColor ? `<div style="position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px;background:${lineColor};"></div>` : '';
-      return `<div onclick="openCourseDetail('${c.id}')" style="position:relative;display:flex;gap:10px;align-items:flex-start;
-        background:var(--warm-white);border-radius:12px;padding:10px;cursor:pointer;
-        box-shadow:0 1px 3px rgba(0,0,0,0.06);">${rankLine}
-        ${c.imageUrl
-          ? `<img src="${c.imageUrl}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
-          : `<div style="width:64px;height:64px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:22px;">✨</div>`
-        }
-        <div style="flex:1;min-width:0;overflow:hidden;">
-          <div style="margin-bottom:2px;">
-            <div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;line-height:1.35;
-              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.title)}</div>
-          </div>
-          <div style="font-size:12px;color:var(--warm-gray);margin-bottom:5px;
-            overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.tagline || '')}</div>
-          <div style="font-size:11px;color:var(--light-gray);">${tag ? escapeHtml(tag) + ' · ' : ''}${t('courseSpotsCount').replace('{n}', c.spots?.length||0)}</div>
-        </div>
-        ${isOwn
-          ? `<div style="flex-shrink:0;align-self:center;padding:4px 8px;border-radius:20px;font-size:11px;font-weight:700;
-               ${c.published ? 'background:#e8f5e9;color:#4caf50;' : 'background:#f5f5f5;color:#aaa;'}">
-               ${c.published ? '🌐 公開中' : '🔒 非公開'}
-             </div>`
-          : `<button onclick="event.stopPropagation();toggleLike('${c.id}')" data-like-id="${c.id}" data-likes="${c.likes||0}"
-               style="font-size:13px;flex-shrink:0;padding:4px 6px;background:none;border:none;cursor:pointer;
-                      border-radius:8px;font-family:inherit;line-height:1;transition:transform 0.1s;align-self:center;"
-               ontouchstart="this.style.transform='scale(0.85)'" ontouchend="this.style.transform='scale(1)'">${liked ? '❤️' : '🤍'} ${c.likes||0}</button>`
-        }
-      </div>`;
-    }
-
-    // 人気のコース専用カード（フルワイドカルーセル・左バーランク）
-    const _rankBarColor = ['#C0903A','#9BA5B0','#B07040','#C8A97A','#C8A97A'];
-    function renderPopularCourseCard(c, rank) {
-      const liked = isLiked(c.id);
-      const cond = c.conditions || {};
-      const tags = [cond.with, cond.area, cond.style].filter(Boolean);
-      const barColor = _rankBarColor[rank] || 'var(--sand-dark)';
-      return `
-        <div onclick="openCourseDetail('${c.id}')" style="flex-shrink:0;width:calc(100vw - 40px);
-          background:var(--warm-white);border-radius:14px;overflow:hidden;cursor:pointer;
-          box-shadow:0 1px 4px rgba(0,0,0,0.07);scroll-snap-align:start;">
-          <div style="height:4px;background:${barColor};"></div>
-          ${c.imageUrl
-            ? `<img src="${c.imageUrl}" style="width:100%;height:110px;object-fit:cover;display:block;">`
-            : `<div style="width:100%;height:110px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:36px;">✨</div>`
-          }
-          <div style="padding:12px 14px 14px;display:flex;flex-direction:column;gap:5px;">
-            <div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;line-height:1.35;
-              overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.title}</div>
-            <div style="font-size:13px;color:var(--warm-gray);
-              overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;">${c.tagline || ''}</div>
-            ${tags.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">
-              ${tags.map(t=>`<span style="padding:2px 8px;background:var(--sand);border-radius:20px;font-size:11px;color:var(--warm-gray);">${t}</span>`).join('')}
-            </div>` : ''}
-            <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--light-gray);">
-              <span>${t('courseSpotsCount').replace('{n}', c.spots?.length||0)} · ${c.authorAvatar||''}${c.authorName||'AI'}</span>
-              <button onclick="event.stopPropagation();toggleLike('${c.id}')" data-like-id="${c.id}" data-likes="${c.likes||0}"
-                style="font-size:12px;flex-shrink:0;padding:2px 4px;background:none;border:none;cursor:pointer;
-                       border-radius:6px;font-family:inherit;line-height:1;"
-                ontouchstart="this.style.transform='scale(0.85)'"
-                ontouchend="this.style.transform='scale(1)'">
-                ${liked ? '❤️' : '🤍'} ${c.likes||0}
-              </button>
-            </div>
-          </div>
-        </div>`;
-    }
-
-    // 人気のコース（縦並び上位3件）
-
-    // コース詳細を開く
-    let _allLoadedCourses = {};
-    function _lockCourseScroll() {
-      const sc = document.querySelector('#screen-course .screen-content');
-      if (sc) { sc.style.overflow = 'hidden'; sc._ptrLocked = true; }
-    }
-    function _unlockCourseScroll() {
-      const sc = document.querySelector('#screen-course .screen-content');
-      if (sc) { sc.style.overflowY = 'auto'; sc.style.overflow = ''; sc._ptrLocked = false; }
-    }
-
-    async function openCourseDetail(courseId) {
-      const city = getCity();
-      let course = null;
-
-      // マイリストから探す
-      const myList = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
-      course = myList.find(c => c.id === courseId);
-
-      if (!course) {
-        try {
-          const community = await fetch(API_BASE + `/api/courses?city=${city}&tab=community`).then(r => r.json());
-          course = community.find(c => c.id === courseId);
-        } catch(e) {}
-      }
-
-      if (!course) course = _allLoadedCourses[courseId] || null;
-      if (!course) return;
-
-      // 画像なしの場合はバックグラウンドで取得してlocalStorageを更新
-      if (!course.imageUrl) {
-        const query = course.imageSearch || '';
-        fetch(API_BASE + `/api/courses/image?query=${encodeURIComponent(query)}&city=${city}`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.imageUrl) {
-              course.imageUrl = data.imageUrl;
-              _allLoadedCourses[courseId] = course;
-              // localStorageのマイコースも更新
-              const key = city + '_my_courses';
-              const list = JSON.parse(localStorage.getItem(key) || '[]');
-              const idx = list.findIndex(c => c.id === courseId);
-              if (idx !== -1) { list[idx].imageUrl = data.imageUrl; localStorage.setItem(key, JSON.stringify(list)); }
-              // 詳細画面の画像エリアだけ差し替え
-              const imgEl = document.getElementById(`course-detail-img-${courseId}`);
-              if (imgEl) imgEl.outerHTML = `<img src="${data.imageUrl}" style="width:100%;height:180px;object-fit:cover;display:block;">`;
-            }
-          }).catch(() => {});
-      }
-
-      _allLoadedCourses[courseId] = course;
-      renderCourseDetail(course);
-
-      _lockCourseScroll();
-      lockScroll();
-      document.getElementById('course-detail-overlay').style.display = 'block';
-      document.getElementById('course-detail-overlay').style.opacity = '1';
-      document.getElementById('course-detail-sheet').classList.add('visible');
-    }
-
-    function renderCourseDetail(course) {
-      const liked = isLiked(course.id);
-      const isOwn = course.authorId === getUserId();
-
-      const html = `
-        ${course.imageUrl
-          ? `<img src="${course.imageUrl}" style="width:100%;height:200px;object-fit:cover;">`
-          : `<div id="course-detail-img-${course.id}" style="width:100%;height:160px;background:linear-gradient(135deg,var(--caramel-pale),var(--sand));display:flex;align-items:center;justify-content:center;font-size:48px;">✨</div>`
-        }
-        <div style="padding:20px;">
-          <div style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;margin-bottom:4px;">${escapeHtml(course.title)}</div>
-          <div style="font-size:14px;color:var(--warm-gray);margin-bottom:12px;">${escapeHtml(course.tagline || '')}</div>
-
-          ${course.description ? `
-            <div style="background:var(--cream);border-radius:10px;padding:12px;margin-bottom:16px;">
-              <div style="font-size:14px;font-weight:700;color:var(--caramel);margin-bottom:6px;">${t('courseDetailAttraction')}</div>
-              <div style="font-size:15px;line-height:1.65;color:var(--warm-gray);">${escapeHtml(course.description)}</div>
-            </div>
-          ` : ''}
-
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
-            ${course.conditions ? Object.values(course.conditions).filter(Boolean).map(v =>
-              `<span style="padding:4px 10px;background:var(--sand);border-radius:20px;font-size:13px;">${escapeHtml(v)}</span>`
-            ).join('') : ''}
-          </div>
-
-          <div style="font-size:14px;font-weight:700;margin-bottom:8px;">${t('courseDetailRoute')}</div>
-          <div style="font-size:13px;color:var(--caramel);background:var(--caramel-pale);border-radius:8px;padding:8px 12px;margin-bottom:14px;text-align:center;">📍 ${getLang()==='en' ? 'Please check opening hours before visiting.' : '訪問前に営業状況をご確認ください。'}</div>
-          ${(course.spots || []).map(s => `
-            <div class="course-timeline-item">
-              <div class="course-timeline-time">${escapeHtml(s.time)}</div>
-              <div class="course-timeline-body">
-                <div class="course-timeline-name">${s.emoji || ''} ${escapeHtml(s.name)} <span style="font-size:12px;color:var(--light-gray);">[${escapeHtml(s.duration)}]</span></div>
-                <div class="course-timeline-desc">${escapeHtml(s.description || '')}</div>
-                <div class="course-timeline-meta">${escapeHtml(s.address || '')}${s.affiliateLink ? ` · <a onclick="openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a>` : ''}</div>
-              </div>
-            </div>
-          `).join('')}
-
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:14px;color:var(--light-gray);margin:12px 0;">
-            <span>${t('courseDetailAuthor')} ${course.authorName || 'AI'}&nbsp;&nbsp;${(course.createdAt||'').slice(0,10)}</span>
-            <button onclick="event.stopPropagation();toggleLike('${course.id}')" id="like-btn-${course.id}"
-              data-like-id="${course.id}" data-likes="${course.likes||0}"
-              style="font-size:16px;flex-shrink:0;padding:4px 8px;background:none;border:none;cursor:pointer;
-                     border-radius:8px;font-family:inherit;line-height:1;"
-              ontouchstart="this.style.transform='scale(0.85)'"
-              ontouchend="this.style.transform='scale(1)'">${liked ? '❤️' : '🤍'}</button>
-          </div>
-
-          <div style="display:flex;justify-content:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--sand);">
-            <button onclick="addCourseToScheduleById('${course.id}')" class="card-action-btn" style="flex:none;width:calc(33% - 4px);">
-              <span class="card-action-icon">📅</span>
-              <span>予定に追加</span>
-            </button>
-          </div>
-
-          ${isOwn ? `
-            <div style="display:flex;gap:8px;margin-top:8px;">
-              ${course.published !== true ? `
-                <button onclick="publishCourseById('${course.id}')" id="publish-btn-${course.id}"
-                  style="flex:1;padding:11px 8px;background:var(--warm-white);color:var(--caramel);font-size:13px;
-                         border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-                  ${t('coursePublishAction')}
-                </button>
-              ` : `
-                <button onclick="unpublishCourseById('${course.id}')" id="unpublish-btn-${course.id}"
-                  style="flex:1;padding:11px 8px;background:var(--warm-white);color:var(--sage);font-size:13px;
-                         border:1.5px solid var(--sage);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;">
-                  ${t('courseUnpublishAction')}
-                </button>
-              `}
-              <button onclick="openTitleEdit('${course.id}')"
-                style="flex:1;padding:11px 8px;background:var(--warm-white);color:var(--warm-gray);font-size:13px;
-                       border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-                ${t('courseEditTitleBtn')}
-              </button>
-            </div>
-            <div style="text-align:center;margin-top:16px;">
-              <button onclick="deleteMyCourse('${course.id}')"
-                style="background:none;border:none;color:var(--light-gray);font-size:13px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-                ${t('courseDeleteBtn')}
-              </button>
-            </div>
-          ` : ''}
-        </div>
-      `;
-
-      const detailContent = document.getElementById('course-detail-content');
-      detailContent.innerHTML = html;
-      detailContent.scrollTop = 0;
-    }
-
-    // コーススポットのアフィリエイトリンク（Klook等）を開く（設計書23フェーズ1）
+    // コーススポットのアフィリエイトリンク（Klook等）を開く（設計書23フェーズ1、探訪機能のスポット詳細から現役使用中のため残置）
     // Capacitor環境ではデバイスブラウザ（Browser.open）、Web環境では新規タブで開く。
     // クリック計測は fire-and-forget で送信し、遷移はブロックしない。
     function openAffiliateLink(url, provider, spotName) {
@@ -7379,694 +6781,9 @@
       } catch (_) {}
     }
 
-    function closeCourseDetail() {
-      _blurIfFocusInside('course-detail-sheet');
-      _unlockCourseScroll();
-      unlockScroll();
-      document.getElementById('course-detail-overlay').style.display = 'none';
-      document.getElementById('course-detail-overlay').style.opacity = '0';
-      document.getElementById('course-detail-sheet').classList.remove('visible');
-      _resetScrollPaddingAfterKb();
-    }
-
-    // ─── コース生成シート ───
-
-    function openCourseSheetFromEvent(eventId) {
-      if (!getPins()[eventId]) togglePinById(eventId);
-      openCourseSheet();
-      setTimeout(() => {
-        const chip = document.querySelector(
-          `#course-sheet-pins-list .pin-chip[data-pin-id="${eventId}"]`
-        );
-        if (chip && !chip.classList.contains('selected')) chip.click();
-      }, 150);
-    }
-
-    function openCourseSheet() {
-      // 全チップ・テキストをリセット
-      document.querySelectorAll('#course-sheet .course-chip').forEach(b => b.classList.remove('selected'));
-      const noteEl = document.getElementById('course-note');
-      if (noteEl) noteEl.value = '';
-
-      // 日付プリセットバナー
-      const _cpBanner = document.getElementById('course-preset-date-banner');
-      if (_cpBanner) {
-        if (window._coursePresetDate) {
-          const _s = window._coursePresetDate;
-          const _d = new Date(_s + 'T00:00:00');
-          _cpBanner.textContent = `📅 ${_d.getMonth()+1}/${_d.getDate()}（${'日月火水木金土'[_d.getDay()]}）の予定を作ります`;
-          _cpBanner.hidden = false;
-        } else {
-          _cpBanner.hidden = true;
-        }
-      }
-
-      // プロファイル表示
-      const profileEl = document.getElementById('course-sheet-profile-display');
-      if (profileEl) {
-        const whoMap = { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
-        const ageMap = { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
-        const who = getWhoList();
-        const ages = getAgeList();
-        let txt = who.map(v => whoMap[v]).filter(Boolean).join('・');
-        if (who.includes('family') && ages.length) txt += `・${ages.map(a => ageMap[a]).filter(Boolean).join('・')}`;
-        profileEl.textContent = txt ? `設定: ${txt}` : '設定: 指定なし';
-      }
-
-      // エリアチップを都市別に動的生成
-      const city = getCity();
-      const areaChipsEl = document.getElementById('course-area-chips');
-      if (areaChipsEl) {
-        const areas = CITY_COURSE_AREAS[city] || CITY_COURSE_AREAS.sg;
-        areaChipsEl.innerHTML = areas.map(a =>
-          `<button class="course-chip" data-val="${a.val}">${a.label}</button>`
-        ).join('');
-      }
-
-      // transportチップのラベルを都市別に動的変更
-      const transitChip = document.getElementById('course-transit-chip');
-      if (transitChip) {
-        const transitLabel = { sg: '🚇 MRT・バス', bkk: '🚇 BTS・MRT・バス', syd: '🚃 電車・バス' }[city] || '🚇 公共交通・バス';
-        transitChip.textContent = transitLabel;
-      }
-
-      // ピン留めイベントを選択チップとして表示
-      const pins = Object.values(getPins());
-      const pinsArea = document.getElementById('course-sheet-pins');
-      const pinsList = document.getElementById('course-sheet-pins-list');
-      if (pins.length > 0) {
-        pinsList.innerHTML = pins.map((p, i) => `
-          <button class="pin-chip" data-pin-id="${p.id || p.title}"
-            style="display:flex;align-items:center;gap:8px;padding:9px 12px;
-                   font-size:14px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;
-                   border:none;border-top:${i > 0 ? '1px solid var(--border-color,#e8e0d8)' : 'none'};
-                   background:var(--warm-white);color:var(--midnight);text-align:left;width:100%;">
-            <span class="pin-check" style="flex-shrink:0;width:18px;height:18px;border-radius:4px;
-                   border:1.5px solid var(--light-gray);display:inline-block;line-height:15px;
-                   text-align:center;font-size:13px;align-self:center;"></span>
-            <span style="font-size:16px;flex-shrink:0;align-self:center;line-height:1;">${p.emoji || '📌'}</span>
-            <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:center;">${p.title}</span>
-          </button>`).join('');
-        pinsArea.style.display = '';
-      } else {
-        pinsArea.style.display = 'none';
-      }
-
-      // オプションパネルを閉じた状態にリセット
-      const optPanel = document.getElementById('course-options-panel');
-      const optArrow = document.getElementById('course-options-arrow');
-      if (optPanel) optPanel.style.display = 'none';
-      if (optArrow) optArrow.style.transform = '';
-
-      document.getElementById('course-step-conditions').hidden = false;
-      document.getElementById('course-step-loading').hidden = true;
-      document.getElementById('course-step-candidates').hidden = true;
-      document.getElementById('course-step-result').hidden = true;
-      _lockCourseScroll();
-      lockScroll();
-      document.getElementById('course-sheet-overlay').style.display = 'block';
-      document.getElementById('course-sheet-overlay').style.opacity = '1';
-      document.getElementById('course-sheet').classList.add('visible');
-    }
-
-    function toggleCourseOptions() {
-      const panel = document.getElementById('course-options-panel');
-      const arrow = document.getElementById('course-options-arrow');
-      const isOpen = panel.style.display !== 'none';
-      panel.style.display = isOpen ? 'none' : 'block';
-      arrow.style.transform = isOpen ? '' : 'rotate(90deg)';
-    }
-
-    function closeCourseSheet() {
-      _blurIfFocusInside('course-sheet');
-      document.getElementById('course-sheet-overlay').style.display = 'none';
-      document.getElementById('course-sheet-overlay').style.opacity = '0';
-      document.getElementById('course-sheet').classList.remove('visible');
-      _unlockCourseScroll();
-      unlockScroll();
-      window._coursePresetDate = null;
-      _resetScrollPaddingAfterKb();
-    }
-
-    function showCourseStep(step) {
-      ['conditions','loading','candidates','result'].forEach(s => {
-        document.getElementById('course-step-' + s).hidden = s !== step;
-      });
-    }
-
-    const MULTI_SELECT_KEYS = new Set(['purpose', 'area']);
-
-    document.addEventListener('click', e => {
-      // 条件チップ（purpose/area は複数選択、その他は単一選択）
-      const chip = e.target.closest('#course-sheet .course-chip');
-      if (chip) {
-        const group = chip.closest('.course-chips');
-        if (!group) return;
-        if (MULTI_SELECT_KEYS.has(group.dataset.key)) {
-          chip.classList.toggle('selected');
-        } else {
-          const wasSelected = chip.classList.contains('selected');
-          group.querySelectorAll('.course-chip').forEach(b => b.classList.remove('selected'));
-          if (!wasSelected) chip.classList.add('selected');
-        }
-        return;
-      }
-      // ピンチップ（多重選択トグル）
-      const pinChip = e.target.closest('#course-sheet-pins-list .pin-chip');
-      if (pinChip) {
-        const sel = pinChip.classList.contains('selected');
-        const check = pinChip.querySelector('.pin-check');
-        if (sel) {
-          pinChip.classList.remove('selected');
-          pinChip.style.background = 'var(--warm-white)';
-          pinChip.style.color = 'var(--midnight)';
-          pinChip.style.fontWeight = '';
-          if (check) { check.textContent = ''; check.style.borderColor = '#ccc'; check.style.background = ''; }
-        } else {
-          pinChip.classList.add('selected');
-          pinChip.style.background = 'var(--caramel-pale,#fdf5ec)';
-          pinChip.style.color = 'var(--caramel)';
-          pinChip.style.fontWeight = '700';
-          if (check) { check.textContent = '✓'; check.style.borderColor = 'var(--caramel)'; check.style.background = 'var(--caramel)'; check.style.color = '#fff'; }
-        }
-      }
-    });
-
-    function randomizeCourseConditions() {
-      document.querySelectorAll('#course-sheet .course-chips').forEach(group => {
-        const chips = [...group.querySelectorAll('.course-chip')];
-        if (!chips.length) return;
-        chips.forEach(b => b.classList.remove('selected'));
-        if (MULTI_SELECT_KEYS.has(group.dataset.key)) {
-          // 複数選択グループ: 0〜2個をランダム選択
-          const count = Math.floor(Math.random() * Math.min(3, chips.length));
-          const shuffled = [...chips].sort(() => Math.random() - 0.5);
-          shuffled.slice(0, count).forEach(b => b.classList.add('selected'));
-        } else {
-          // 単一選択グループ: 50%の確率で1個選択
-          if (Math.random() > 0.4) {
-            chips[Math.floor(Math.random() * chips.length)].classList.add('selected');
-          }
-        }
-      });
-    }
-
-    async function startCourseGeneration() {
-      const conditions = {};
-      document.querySelectorAll('#course-sheet .course-chips').forEach(group => {
-        const key = group.dataset.key;
-        if (MULTI_SELECT_KEYS.has(key)) {
-          const vals = [...group.querySelectorAll('.course-chip.selected')].map(b => b.dataset.val);
-          if (vals.length) conditions[key] = vals.join('・');
-        } else {
-          const sel = group.querySelector('.course-chip.selected');
-          if (sel) conditions[key] = sel.dataset.val;
-        }
-      });
-      const note = (document.getElementById('course-note')?.value || '').trim();
-      if (note) conditions.note = note;
-
-      // ローディング表示（候補生成用メッセージ）
-      showCourseStep('loading');
-      const loadingMsg = document.querySelector('#course-step-loading [data-i18n="courseLoadingMsg"]');
-      if (loadingMsg) loadingMsg.textContent = getLang() === 'en' ? 'Thinking of 3 ideas...' : '3つの方向性を考えています…';
-
-      const city = getCity();
-      const profile = getProfile();
-
-      // 選択されたピンのみを軸として収集
-      const allPins = getPins();
-      const selectedPinIds = new Set(
-        [...document.querySelectorAll('#course-sheet-pins-list .pin-chip.selected')]
-          .map(el => el.dataset.pinId)
-      );
-      const pinnedEvents = Object.values(allPins)
-        .filter(p => selectedPinIds.has(p.id || p.title))
-        .map(p => ({ title: p.title, area: p.area, type: p.type, emoji: p.emoji, location: p.location }));
-
-      // 選択ピンがあればエリアを自動セット（未選択の場合）
-      if (!conditions.area && pinnedEvents.length > 0) {
-        const pinArea = pinnedEvents[0].area;
-        if (pinArea) conditions.area = pinArea;
-      }
-
-      try {
-        const res = await fetch(API_BASE + '/api/courses/candidates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, conditions, profile, pinnedEvents })
-        });
-        const candidates = await res.json();
-        if (!Array.isArray(candidates) || candidates.length === 0) throw new Error('no candidates');
-        renderCourseCandidates(candidates);
-        showCourseStep('candidates');
-      } catch(e) {
-        showCourseStep('conditions');
-        showToast(t('toastCourseGenFailed'));
-      }
-    }
-
-    function renderCourseCandidates(candidates) {
-      const container = document.getElementById('course-candidates-list');
-      container.innerHTML = candidates.map((c, i) => `
-        <div onclick="selectCourseCandidate(${i})" id="candidate-card-${i}"
-          style="border-radius:14px;border:2px solid var(--sand);background:var(--warm-white);
-                 padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s;">
-          <div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;
-                      line-height:1.4;margin-bottom:4px;">${c.title}</div>
-          <div style="font-size:13px;color:var(--warm-gray);margin-bottom:6px;">${c.tagline || ''}</div>
-          <div style="font-size:14px;color:var(--midnight);line-height:1.6;
-                      overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
-            ${c.description || ''}
-          </div>
-        </div>
-      `).join('');
-      window._currentCandidates = candidates;
-    }
-
-    async function selectCourseCandidate(index) {
-      const candidate = window._currentCandidates?.[index];
-      if (!candidate) return;
-
-      // 選択ハイライト
-      document.querySelectorAll('[id^="candidate-card-"]').forEach((el, i) => {
-        el.style.borderColor = i === index ? 'var(--caramel)' : 'var(--sand)';
-      });
-
-      // 短いディレイ後にgenerate開始
-      await new Promise(r => setTimeout(r, 300));
-
-      // loadingに切り替え
-      showCourseStep('loading');
-      const loadingMsg = document.querySelector('#course-step-loading [data-i18n="courseLoadingMsg"]');
-      if (loadingMsg) loadingMsg.textContent = getLang() === 'en' ? 'Creating your course...' : 'コースを考えています…';
-
-      // 条件を再収集
-      const conditions = {};
-      document.querySelectorAll('#course-sheet .course-chips').forEach(group => {
-        const key = group.dataset.key;
-        if (MULTI_SELECT_KEYS.has(key)) {
-          const vals = [...group.querySelectorAll('.course-chip.selected')].map(b => b.dataset.val);
-          if (vals.length) conditions[key] = vals.join('・');
-        } else {
-          const sel = group.querySelector('.course-chip.selected');
-          if (sel) conditions[key] = sel.dataset.val;
-        }
-      });
-      const note = (document.getElementById('course-note')?.value || '').trim();
-      if (note) conditions.note = note;
-
-      const city = getCity();
-      const profile = getProfile();
-      const allPins = getPins();
-      const selectedPinIds = new Set(
-        [...document.querySelectorAll('#course-sheet-pins-list .pin-chip.selected')]
-          .map(el => el.dataset.pinId)
-      );
-      const pinnedEvents = Object.values(allPins)
-        .filter(p => selectedPinIds.has(p.id || p.title))
-        .map(p => ({ title: p.title, area: p.area, type: p.type, emoji: p.emoji, location: p.location }));
-
-      if (!conditions.area && pinnedEvents.length > 0) {
-        const pinArea = pinnedEvents[0].area;
-        if (pinArea) conditions.area = pinArea;
-      }
-
-      try {
-        const res = await fetch(API_BASE + '/api/courses/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            city, conditions, profile, pinnedEvents,
-            selectedCandidate: candidate,
-            userId: getUserId(), userName: getUserName(), userAvatar: getUserAvatar()
-          })
-        });
-        const course = await res.json();
-        if (!course || course.error) throw new Error(course?.error || 'generation failed');
-        currentGeneratedCourse = course;
-        document.getElementById('course-result-content').innerHTML = renderCourseResultHtml(course);
-        showCourseStep('result');
-      } catch(e) {
-        showCourseStep('candidates');
-        showToast(t('toastCourseGenFailed'));
-      }
-    }
-
-    function backToCourseConditions() {
-      showCourseStep('conditions');
-    }
-
-    function renderCourseResultHtml(course) {
-      return `
-        ${course.imageUrl
-          ? `<img src="${course.imageUrl}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;margin-bottom:12px;display:block;">`
-          : ''}
-        <div style="font-size:17px;font-weight:700;margin:8px 0 4px;">${escapeHtml(course.title || '')}</div>
-        <div style="font-size:14px;color:var(--warm-gray);margin-bottom:12px;">${escapeHtml(course.tagline || '')}</div>
-        ${(course.spots || []).map(s => `
-          <div class="course-timeline-item">
-            <div class="course-timeline-time">${escapeHtml(s.time || '')}</div>
-            <div class="course-timeline-body">
-              <div class="course-timeline-name">${s.emoji || ''} ${escapeHtml(s.name)} <span style="font-size:12px;color:var(--light-gray);">[${escapeHtml(s.duration || '')}]</span></div>
-              <div class="course-timeline-desc">${escapeHtml(s.description || '')}</div>
-              ${s.affiliateLink ? `<div class="course-timeline-meta"><a onclick="openAffiliateLink('${escapeHtml(s.affiliateLink)}','klook','${escapeHtml(s.name || '')}')" style="color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">${t('affiliateInfoLink')}</a></div>` : ''}
-            </div>
-          </div>
-        `).join('')}
-      `;
-    }
-
-    function saveGeneratedCourse() {
-      if (!currentGeneratedCourse) return;
-      saveMyCourse(currentGeneratedCourse);
-      closeCourseSheet();
-      switchCourseTab('mylist');
-      showToast(t('toastCourseSaved'));
-    }
-
-    async function saveAndPublishGeneratedCourse() {
-      if (!currentGeneratedCourse) return;
-      const similar = await checkSimilarCourses(currentGeneratedCourse);
-      if (similar.length > 0) {
-        const names = similar.slice(0, 2).map(c => `「${c.title}」`).join('、');
-        const ok = window.confirm(`${names}と似たコースがすでに公開されています。\nこのまま公開しますか？`);
-        if (!ok) return;
-      }
-      saveMyCourse(currentGeneratedCourse);
-      await publishCourseById(currentGeneratedCourse.id, { skipSimilarCheck: true });
-      closeCourseSheet();
-      switchCourseTab('mylist');
-      showToast(t('toastCoursePublished2'));
-    }
-
-    // ─── マイコース タイトル編集 ───
-    let _editingCourseId = null;
-
-    function openTitleEdit(courseId) {
-      _editingCourseId = courseId;
-      const city = getCity();
-      const list = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
-      const course = list.find(c => c.id === courseId) || _allLoadedCourses[courseId] || {};
-      const input = document.getElementById('title-edit-input');
-      input.value = course.title || '';
-      lockScroll();
-      document.getElementById('title-edit-overlay').classList.add('visible');
-      document.getElementById('title-edit-sheet').classList.add('visible');
-      setTimeout(() => input.focus(), 100);
-    }
-
-    function closeTitleEdit() {
-      _editingCourseId = null;
-      _blurIfFocusInside('title-edit-sheet');
-      unlockScroll();
-      document.getElementById('title-edit-overlay').classList.remove('visible');
-      document.getElementById('title-edit-sheet').classList.remove('visible');
-      document.getElementById('title-edit-sheet').style.bottom = '0px';
-      document.getElementById('title-edit-input').blur();
-      _resetScrollPaddingAfterKb();
-    }
-
-    function saveCourseTitle() {
-      if (!_editingCourseId) return;
-      const newTitle = document.getElementById('title-edit-input').value.trim();
-      if (!newTitle) return;
-      const city = getCity();
-      const key = city + '_my_courses';
-      const list = JSON.parse(localStorage.getItem(key) || '[]');
-      const idx = list.findIndex(c => c.id === _editingCourseId);
-      if (idx !== -1) {
-        list[idx].title = newTitle;
-        localStorage.setItem(key, JSON.stringify(list));
-        if (_allLoadedCourses[_editingCourseId]) _allLoadedCourses[_editingCourseId].title = newTitle;
-        _syncBackupToServer();
-      }
-      closeTitleEdit();
-      // 詳細画面が開いていればタイトルを即更新
-      const detailTitle = document.querySelector('#course-detail-content [style*="font-size:18px"]');
-      if (detailTitle) detailTitle.textContent = newTitle;
-      showToast(t('toastCourseTitleSaved'));
-    }
-
-    // ─── マイコース削除 ───
-
-    async function deleteMyCourse(courseId) {
-      const city = getCity();
-      const key = city + '_my_courses';
-      const list = JSON.parse(localStorage.getItem(key) || '[]');
-      const target = list.find(c => c.id === courseId);
-
-      // localStorageから削除
-      localStorage.setItem(key, JSON.stringify(list.filter(c => c.id !== courseId)));
-      _syncBackupToServer();
-
-      // 公開済みならサーバーからも削除
-      if (target?.published) {
-        try {
-          await authedFetch(API_BASE + `/api/courses/${courseId}?city=${city}`, { method: 'DELETE' });
-        } catch(e) {}
-      }
-
-      closeCourseDetail();
-      switchCourseTab('mylist');
-      showToast(t('toastCourseDeleted'));
-    }
-
-    function addCourseToScheduleById(courseId) {
-      const course = _allLoadedCourses[courseId] || currentGeneratedCourse;
-      if (!course) return;
-      addCourseToScheduleWithDate(course);
-    }
-
-    // ─── 共通日付ピッカー ───
-    let _datepickerCallback = null;
-    let _datepickerMulti    = false;
-    let _datepickerSelectedKeys = new Set();
-
-    function openDatePickerSheet(opts) {
-      // opts: { subtitle, multi, presetKey, onConfirm }
-      if (opts.presetKey) {
-        opts.onConfirm([opts.presetKey]);
-        return;
-      }
-      _datepickerCallback = opts.onConfirm;
-      _datepickerMulti    = !!opts.multi;
-      _datepickerSelectedKeys = new Set();
-
-      document.getElementById('date-picker-subtitle').textContent = opts.subtitle || '';
-      document.getElementById('date-picker-chips').innerHTML =
-        buildDateChipsHtml(null)
-          .replace(/onclick="selectPlanDate\('([^']+)'\)"/g,
-                   "onclick=\"_selectPickerDate('$1')\"");
-      document.getElementById('date-picker-add-btn').disabled = true;
-
-      document.getElementById('date-picker-overlay').classList.add('visible');
-      document.getElementById('date-picker-modal').classList.add('visible');
-      lockScroll();
-    }
-
-    function _selectPickerDate(key) {
-      if (_datepickerMulti) {
-        _datepickerSelectedKeys.has(key)
-          ? _datepickerSelectedKeys.delete(key)
-          : _datepickerSelectedKeys.add(key);
-      } else {
-        _datepickerSelectedKeys = new Set([key]);
-      }
-      document.querySelectorAll('#date-picker-chips .plan-date-chip').forEach(b =>
-        b.classList.toggle('selected', _datepickerSelectedKeys.has(b.dataset.date))
-      );
-      document.getElementById('date-picker-add-btn').disabled = _datepickerSelectedKeys.size === 0;
-    }
-
-    function _confirmDatePicker() {
-      const keys = [..._datepickerSelectedKeys];
-      const cb = _datepickerCallback;
-      closeDatePickerSheet();
-      if (cb) cb(keys);
-    }
-
-    function closeDatePickerSheet() {
-      _blurIfFocusInside('date-picker-modal');
-      document.getElementById('date-picker-overlay').classList.remove('visible');
-      document.getElementById('date-picker-modal').classList.remove('visible');
-      unlockScroll();
-      _datepickerCallback = null;
-      _resetScrollPaddingAfterKb();
-    }
-
-    function addCourseToScheduleWithDate(course) {
-      _allLoadedCourses[course.id] = course;
-      openDatePickerSheet({
-        subtitle:  course.title || 'コース',
-        multi:     false,
-        presetKey: window._coursePresetDate || null,
-        onConfirm: async (keys) => {
-          const dateStr = keys[0];
-          const startTime = course.spots?.[0]?.time || null;
-          const entry = {
-            id: `cp_${Date.now()}`,
-            emoji: '🗺️',
-            name: course.title,
-            dateKey: dateStr,
-            startTime,
-            memo: course.tagline || '',
-            courseId: course.id,
-          };
-          const updated = [...getCustomPlans(), entry];
-          await saveCustomPlans(updated);
-          window._coursePresetDate = null;
-          renderScheduleTab();
-          showToast('📅 コースを予定に追加しました');
-        }
-      });
-    }
-
-    // いいね
-    function isLiked(courseId) {
-      const liked = JSON.parse(localStorage.getItem('liked_courses') || '[]');
-      return liked.includes(courseId);
-    }
-
-    async function toggleLike(courseId) {
-      const liked = JSON.parse(localStorage.getItem('liked_courses') || '[]');
-      const alreadyLiked = liked.includes(courseId);
-      const action = alreadyLiked ? 'unlike' : 'like';
-
-      if (alreadyLiked) {
-        localStorage.setItem('liked_courses', JSON.stringify(liked.filter(id => id !== courseId)));
-      } else {
-        localStorage.setItem('liked_courses', JSON.stringify([...liked, courseId]));
-      }
-      _syncBackupToServer();
-
-      try {
-        await fetch(API_BASE + `/api/courses/${courseId}/like`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city: getCity(), action })
-        });
-      } catch(e) {}
-
-      // カード・詳細ビュー両方のボタンを更新
-      document.querySelectorAll(`[data-like-id="${courseId}"]`).forEach(btn => {
-        const count = parseInt(btn.dataset.likes || '0') + (alreadyLiked ? -1 : 1);
-        btn.dataset.likes = count;
-        const isDetailBtn = btn.id === `like-btn-${courseId}`;
-        btn.textContent = isDetailBtn
-          ? (alreadyLiked ? '🤍' : '❤️')
-          : `${alreadyLiked ? '🤍' : '❤️'} ${Math.max(0, count)}`;
-      });
-    }
-
-    async function checkSimilarCourses(course) {
-      try {
-        const city = getCity();
-        const res = await fetch(API_BASE + `/api/courses?city=${city}&tab=community`);
-        const existing = await res.json();
-        const title = course.title || '';
-        const newSpots = (course.spots || []).map(s => s.name || '').filter(Boolean);
-        const titleKeywords = (title.match(/[぀-龯゠-ヿ]{2,}|[A-Za-z]{4,}/g) || []).filter(w => w.length >= 3);
-        return existing.filter(c => {
-          if (c.id === course.id) return false;
-          // スポット名が2件以上一致
-          const existSpots = (c.spots || []).map(s => s.name || '').filter(Boolean);
-          if (newSpots.filter(s => existSpots.includes(s)).length >= 2) return true;
-          // タイトルキーワードが2語以上共通
-          const existKeywords = ((c.title || '').match(/[぀-龯゠-ヿ]{2,}|[A-Za-z]{4,}/g) || []).filter(w => w.length >= 3);
-          if (titleKeywords.filter(kw => existKeywords.includes(kw)).length >= 2) return true;
-          return false;
-        });
-      } catch { return []; }
-    }
-
-    async function publishCourseById(courseId, opts = {}) {
-      const city = getCity();
-      const myList = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]');
-      const course = myList.find(c => c.id === courseId);
-      if (!course) return;
-
-      if (!opts.skipSimilarCheck) {
-        const similar = await checkSimilarCourses(course);
-        if (similar.length > 0) {
-          const names = similar.slice(0, 2).map(c => `「${c.title}」`).join('、');
-          const ok = window.confirm(`${names}と似たコースがすでに公開されています。\nこのまま公開しますか？`);
-          if (!ok) return;
-        }
-      }
-
-      try {
-        await authedFetch(API_BASE + '/api/courses/publish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...course, isPublic: true })
-        });
-
-        // localStorageの published フラグを更新
-        const updated = myList.map(c => c.id === courseId ? {...c, isPublic: true, published: true} : c);
-        localStorage.setItem(city + '_my_courses', JSON.stringify(updated));
-        _syncBackupToServer();
-
-        // ボタンを「公開済み」表示に更新
-        const publishBtn = document.getElementById(`publish-btn-${courseId}`);
-        if (publishBtn) {
-          publishBtn.disabled = true;
-          publishBtn.textContent = '公開済み ✓';
-          publishBtn.style.color = 'var(--sage)';
-          publishBtn.style.borderColor = 'var(--sage)';
-        }
-        showToast(t('toastCoursePublished'));
-        closeCourseDetail();
-      } catch(e) {
-        showToast(t('toastCoursePublishErr'));
-      }
-    }
-
-    async function unpublishCourseById(courseId) {
-      const city = getCity();
-      try {
-        await authedFetch(API_BASE + `/api/courses/${courseId}/unpublish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city })
-        });
-        const key = city + '_my_courses';
-        const myList = JSON.parse(localStorage.getItem(key) || '[]');
-        localStorage.setItem(key, JSON.stringify(
-          myList.map(c => c.id === courseId ? { ...c, published: false, isPublic: false } : c)
-        ));
-        _syncBackupToServer();
-        showToast(t('toastCourseUnpublish'));
-        closeCourseDetail();
-        switchCourseTab('mylist');
-      } catch(e) {
-        showToast(t('toastCourseFailed'));
-      }
-    }
-
-    // ユーティリティ
-    function getUserId() {
-      let id = localStorage.getItem('user_id');
-      if (!id) { id = 'user_' + Math.random().toString(36).slice(2,10); localStorage.setItem('user_id', id); }
-      return id;
-    }
-
+    // ユーティリティ（getUserName()はコメント機能《postComment()》が現役使用中のため残置。getUserId()はコース機能専用のため設計書178フェーズ1で削除済み）
     function getUserName() {
       return localStorage.getItem('user_name') || '匿名';
-    }
-
-    function saveMyCourse(course) {
-      const city = getCity();
-      const key = city + '_my_courses';
-      const list = JSON.parse(localStorage.getItem(key) || '[]');
-      // 重複チェック
-      if (!list.find(c => c.id === course.id)) {
-        // published: false を付与して保存
-        list.unshift({ ...course, published: false });
-        if (list.length > 10) list.pop();
-        localStorage.setItem(key, JSON.stringify(list));
-        _syncBackupToServer();
-      }
     }
 
     // ─── PLAN FEATURE: DATA LAYER ───
@@ -8713,7 +7430,6 @@
           <div class="plan-card-actions" onclick="event.stopPropagation()">
             <button class="plan-to-plan-btn" onclick="openEventPlanModal('${p.id}')">📅 ${t('addToPlanBtn').replace('📅 ','')}</button>
             <button class="plan-unpin-btn" onclick="removePin('${p.id}')">📌 外す</button>
-            <button class="plan-to-plan-btn" onclick="openCourseSheetFromEvent('${p.id}')">${t('courseCreateBtn')}</button>
           </div>
         </div>`;
       }).join('');
@@ -8738,11 +7454,12 @@
       const el = document.getElementById(`schedule-plan-actions-${dateKey}`);
       if (el) el.style.display = 'none';
     }
+    // 設計書178フェーズ1でコース機能（openCourseSheet()）を削除したため中身を無害化。
+    // 呼び出し元は既に存在しない死んだ関数（design 102時点で判明済み）だが、
+    // 万一の呼び出しでJSエラーにならないよう関数定義自体は残置する。
     function _openCourseFromSchedule(dateKey) {
       _collapseSchedulePlan(dateKey);
       _expandedSchedulePlanKey = null;
-      window._coursePresetDate = dateKey;
-      openCourseSheet();
     }
 
     // ─── SCHEDULE PLAN ACTION SHEET (空き週末日) ───
@@ -8817,9 +7534,10 @@
     }
 
     function handleScheduleRowTap(el) {
+      // 設計書178フェーズ1: コース機能（openCourseDetail()）を削除したため、
+      // courseId付きの過去データがあってもエラーにならないよう何もせず抜ける。
       const courseId = el.dataset.courseId;
       if (courseId) {
-        openCourseDetail(courseId);
         return;
       }
       const planType = el.dataset.planType;
@@ -9654,27 +8372,23 @@
     // 過去にBKK/SYDが稼働していた時期のlocalStorageデータを取りこぼさないよう固定で全都市分を対象にする）
     const BACKUP_CITIES = ['sg', 'bkk', 'syd'];
 
-    // 現在のlocalStorageからバックアップ対象データ一式を集める（設計書58 §3-4 新構造）
+    // 現在のlocalStorageからバックアップ対象データ一式を集める（設計書58 §3-4 新構造。
+    // 設計書178フェーズ1でコース機能削除に伴い myCoursesByCity/likedCourses フィールドを削除）
     function _collectBackupPayload() {
       const eventPlansByCity = {};
-      const myCoursesByCity = {};
       BACKUP_CITIES.forEach(city => {
         try { eventPlansByCity[city] = JSON.parse(localStorage.getItem(city + '_event_plans') || '[]'); } catch (_) { eventPlansByCity[city] = []; }
-        try { myCoursesByCity[city] = JSON.parse(localStorage.getItem(city + '_my_courses') || '[]'); } catch (_) { myCoursesByCity[city] = []; }
       });
-      let genres = [], likedCourses = [], ageList = [];
+      let genres = [], ageList = [];
       try { genres = JSON.parse(localStorage.getItem('app_genres') || '[]'); } catch (_) {}
-      try { likedCourses = JSON.parse(localStorage.getItem('liked_courses') || '[]'); } catch (_) {}
       try { ageList = JSON.parse(localStorage.getItem('app_age_list') || '[]'); } catch (_) {}
       return {
         version: 2,
         customPlans: getCustomPlans(),
         eventPlansByCity,
-        myCoursesByCity,
         genres,
         who: localStorage.getItem('app_who') || '[]',
         ageList,
-        likedCourses,
         avatar: localStorage.getItem('user_avatar') || '',
         stampMemos: _getStampMemos(), // 設計書121: テキストのみ既存バックアップに統合（写真は一切含めない）
         arrivalDate: localStorage.getItem('app_arrival_date') || '', // 設計書122
@@ -9702,23 +8416,11 @@
         }
         const mergedEvent = mergeArr(localEvent, remoteEvent);
         localStorage.setItem(city + '_event_plans', JSON.stringify(mergedEvent));
-
-        const localCourses = (() => { try { return JSON.parse(localStorage.getItem(city + '_my_courses') || '[]'); } catch (_) { return []; } })();
-        const remoteCourses = (!isLegacy && dec.myCoursesByCity && dec.myCoursesByCity[city]) || [];
-        const mergedCourses = mergeArr(localCourses, remoteCourses);
-        localStorage.setItem(city + '_my_courses', JSON.stringify(mergedCourses));
       });
 
       if (!isLegacy) {
         if (Array.isArray(dec.genres) && dec.genres.length && getGenreList().length === 0) {
           saveGenreList(dec.genres);
-        }
-        if (Array.isArray(dec.likedCourses) && dec.likedCourses.length) {
-          try {
-            const localLiked = JSON.parse(localStorage.getItem('liked_courses') || '[]');
-            const mergedLiked = Array.from(new Set([...localLiked, ...dec.likedCourses]));
-            localStorage.setItem('liked_courses', JSON.stringify(mergedLiked));
-          } catch (_) {}
         }
         if (dec.who && getWhoList().length === 0) {
           try { localStorage.setItem('app_who', typeof dec.who === 'string' ? dec.who : JSON.stringify(dec.who)); } catch (_) {}

@@ -76,6 +76,11 @@ sg-weekend-app/
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
 
+## ⚠️ コース機能は2026-09-02フェーズ1（フロントエンドのみ）で削除済み（設計書178、下記「コース機能・探訪機能・予定表機能の完全削除」節参照。本セクション以下は歴史的経緯として残置、実態と大きく乖離）
+- コース生成シート・コース詳細シート・タイトル編集シート・「モデルコース」タブ・コース関連JS関数一式（`initCourseScreen()`が探訪初期化を兼ねていた部分のみ残置）・i18nキー一式は**フロントエンド（`public/`配下）から完全に削除済み**
+- `server.js`側の`POST /api/courses/*`等のAPIエンドポイント・データファイル（`data/{city}/model-courses.json`/`community-courses.json`）・関連スクリプト（`scripts/generate-model-courses.js`等）は**次フェーズ以降の対応、2026-09-02時点ではまだ削除していない**（フロントエンドから呼ばれなくなっているだけ）
+- 探訪（スタンプラリー）機能・予定表機能・共有カレンダー機能は今回のフェーズ1では一切変更していない（次フェーズ以降の対象）
+
 ## コース機能（2026-06-22実装・2026-06-25 BKK/SYD対応・2026-06-26 候補3択対応・2026-06-27 予定表連携対応）
 - ナビ: イベント（2026-07-10改名、旧称「期間限定」） / コース / 予定表 / 設定 の4タブ
 - コース画面タブ: 人気（popular） / 公開コース（community） / マイコース（mylist）の3タブ
@@ -1596,6 +1601,21 @@ design 165で追加したテーマ別バッジ（Kopi巡り／バクテー巡り
 - `scripts/filter-events.js`のみの変更。`server.js`・`public/`配下・データファイルは無変更。`pm2 restart`不要（cron経由の`filter-events.js`のみの変更のため）
 - 検証: `node --check`で構文確認OK。Node.js上でソートロジックを模した簡易ユニットテスト（スコアあり/なし混在の5件）を実行し、削除優先順が「スコア未設定→低スコア→高スコア」の期待通りの順序になることを確認
 - **未検証（次回のcron実行後にフォロー）**: 次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）で実際にHaikuが返す`score`が`events.json`に保存されること、`enforceTypeCap`が実データで意図通りスコアベースの削除順になることは、本タスクではロジックシミュレーションのみで実データでの確認は未実施
+
+## 探訪（スタンプラリー）機能・コース機能・予定表機能の完全削除（設計書178、フェーズ制で段階実装）
+プロダクトオーナー判断により、もう使わない3つの大機能（探訪/スタンプラリー・コース・予定表、いずれも上記の各セクションに詳細記録あり）のコードを完全削除する計画。実装（HTML断片・CSSクラス・JS関数・i18nキー・サーバーAPI）が現役の他機能（イベント一覧・ピン留め・コメント・生活情報・ニュース・アカウント連携・全データバックアップ）と多数共有・混在しているため、`.claude/plan.md`「設計書178」の手順書に従いフェーズ分けして安全に削除する方針。推奨順序は「(1)コース機能→(2)探訪機能→(3)予定表・共有カレンダー機能→(4)server.js側API削除」。
+
+### フェーズ1: コース機能の削除（フロントエンドのみ）（2026-09-02実装）
+- **HTML**（`public/index.html`）: コース生成シート（`#course-sheet-overlay`/`#course-sheet`）・コース詳細シート（`#course-detail-overlay`/`#course-detail-sheet`）・タイトル編集シート（`#title-edit-overlay`/`#title-edit-sheet`）・共通日付ピッカー（`#date-picker-overlay`/`#date-picker-modal`、コース→予定表追加専用と確認済みのため安全に削除）を削除。`#screen-course`内「モデルコース」タブ（`courseTabEveryone`）・`#course-list`要素を削除。「マイコース」タブは既にdesign 94で`display:none`済みのため今回は対象外（変更なし）。**探訪タブ自体・`#screen-course`コンテナ・`#nav-course`ボタン・`#course-fab`（design 94で地図/一覧切替に転用済み）は次フェーズ対象のため今回は残置**
+- **CSS**（`public/app.css`）: `.course-card*`/`.course-condition-*`/`.course-chips`/`.course-chip*`/`.course-time-select`/`.course-loading-dots`/`.course-timeline-*`（コース機能専用クラス一式）を削除。`.chat-mic-btn`（コース音声メモ入力専用）を削除（`.chat-overlay`本体・`.chat-sheet-handle`はpin-picker/emoji-picker等が現役使用中のため残置）。`#date-picker-overlay`/`#date-picker-modal`のz-index個別指定（3400/3401）を削除。ダークモードの`.course-card`/`.course-chip`セレクタを削除（同じ行の`.toast`は現役のため残す）。`.course-tab`/`.course-tab-bar`（探訪スタンプ帳タブバーが現役使用中のため削除禁止）・`#screen-course`本体レイアウトCSSは残置
+- **JS**（`public/app.js`）: `initCourseScreen()`は探訪の初期化処理（`_stampViewMode`リセット・`_renderResidencyCounter()`・`_renderGraduationAlbumLink()`・PTR登録）のみ残し、コースタブ切替用のスワイプ機構（実際には対応する`touchmove`/`touchend`ハンドラが存在せず元々死んでいたコードと判明）を削除。`switchCourseTab(tab)`を`initStampMapTab()`を呼ぶだけのシンプルな実装に単純化（探訪スタンプ帳タブのみ残存のため常に`'map'`で呼ばれる）。コース機能関数群一式（`renderCourseList`/`getPersonalizedCourses`/`renderEveryoneTab`/`renderCompactCourseCard`/`renderCourseCard`/`renderPopularCourseCard`/`_lockCourseScroll`/`_unlockCourseScroll`/`openCourseDetail`/`renderCourseDetail`/`closeCourseDetail`/`openCourseSheetFromEvent`/`openCourseSheet`/`toggleCourseOptions`/`closeCourseSheet`/`showCourseStep`/`randomizeCourseConditions`/`startCourseGeneration`/`renderCourseCandidates`/`selectCourseCandidate`/`backToCourseConditions`/`renderCourseResultHtml`/`saveGeneratedCourse`/`saveAndPublishGeneratedCourse`/`openTitleEdit`/`closeTitleEdit`/`saveCourseTitle`/`deleteMyCourse`/`addCourseToScheduleById`/`addCourseToScheduleWithDate`/`isLiked`/`toggleLike`/`checkSimilarCourses`/`publishCourseById`/`unpublishCourseById`/`getUserId`/`saveMyCourse`）と「VOICE INPUT」セクション全体（`toggleCourseNoteVoice`/`stopVoiceInput`/`voiceRecognition`/`isVoiceRecording`、コース音声メモ専用と確認済み）・共通日付ピッカー4関数（`openDatePickerSheet`/`_selectPickerDate`/`_confirmDatePicker`/`closeDatePickerSheet`）を削除。**`openAffiliateLink()`は探訪スポット詳細（`openStampSpotDetail()`内）で現役使用中のため関数本体は削除せず残置**（コース側の呼び出し元2箇所は関数ごと削除されるため自動的に整合）。**`getUserName()`はコメント機能（`postComment()`）で現役使用中のため残置**、`getUserId()`のみ削除。`closeAllPopups()`から`closeCourseDetail();`/`closeCourseSheet();`/`closeDatePickerSheet();`の3行のみ削除（関数自体・他の行は残す）
+- **副作用対応（コース機能削除に伴うランタイムエラー防止のため実施）**: 予定表画面のピン詳細モーダル・ピン一覧の「🗺 コース作成」ボタン（`openCourseSheetFromEvent()`呼び出し）を2箇所削除。予定表の`_openCourseFromSchedule(dateKey)`（design 102で既に呼び出し元なしと判明済みの死んだ関数だが定義は残置されていた）と`handleScheduleRowTap(el)`のcourseId分岐（過去にコース経由で予定表に追加されたデータへの保険）を、存在しなくなった`openCourseSheet()`/`openCourseDetail()`を呼ばず何もしないよう無害化した
+- **i18n**: コース関連キー一式（`course*`プレフィックス。**`courseScreenTitle`/`courseTabStampMap`は探訪機能の画面共通見出し・タブラベルとして現役使用中のため残置**、`courseTabEveryone`/`courseTabMylist`はタブ削除に伴い削除）・`toastCourse*`一式・`titleEditLabel`/`titleEditSave`を削除。**`titleEditCancel`は`#backup-passphrase-sheet`/`#cal-passphrase-sheet`のキャンセルボタンで既に流用され現役使用中と判明したため残置**
+- **バックアップ機能**（`_collectBackupPayload()`/`_applyRestoredBackup()`）: `myCoursesByCity`/`likedCourses`フィールドを削除。**`customPlans`/`eventPlansByCity`は次フェーズ（予定表削除）まで残置**
+- スコープ外（フェーズ1時点）: 探訪（スタンプラリー）機能一式・予定表機能・共有カレンダー機能・`server.js`側の`POST /api/courses/*`等APIエンドポイント・データファイル（`data/{city}/model-courses.json`/`community-courses.json`）・関連運用スクリプト（`scripts/generate-model-courses.js`/`scripts/seed-courses.js`/`scripts/refresh-courses.js`/`scripts/match-affiliate-links.js`）はいずれも今回未着手のまま残置（次フェーズ対象）
+- `server.js`は無変更（`pm2 restart`不要）。全て`public/`配下フロントエンドのみの変更。キャッシュバスティング: `index.html` app.css `?v=20260902a`→`20260902b`、app.js `?v=20260902h`→`20260902i`、`sw.js` CACHE_NAME=`sg-weekend-v806`→`v807`
+- **未検証（次回フォロー）**: 本タスク実施環境ではPlaywrightがシステム共有ライブラリ不足（`libatk-1.0.so.0`欠如）のため実ブラウザ起動ができず、curlによるHTML/JS配信確認・構文チェック（`node --check`）・静的解析（HTML構造検証・CSS波括弧バランス確認）・主要API疎通確認で代替検証した。実ブラウザでの最終確認（ホーム/ニュース/ピン留め/設定画面の動作、探訪タブが引き続き開けること）・iOS実機確認（次回`release`ブランチへのpush・TestFlightビルドが必要）はいずれも未実施
+- **次フェーズ予告**: 設計書178の推奨順序に従い、次はフェーズ2（探訪/スタンプラリー機能の削除）またはフェーズ3（予定表・共有カレンダー機能の削除）の設計・承認・実装が想定される。いずれも2026-09-02時点で未着手
 
 ## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172。2026-09-02設計書175で「旅行」カテゴリ追加）
 既存の「週末おでかけイベント」取り込みパイプライン（`fetch-events.js`/`filter-events.js`、上記「イベント取り込みパイプライン構成」参照）とはデータ・API・UIとも完全に独立した新機能。行政・ビザ手続き（admin）/天候・災害（weather）/交通・MRT（transport）/日本人コミュニティ（community）/医療・健康（health）/教育・子育て（education）/旅行（travel）の7カテゴリをキュレーション表示する（`health`/`education`は設計書172時点では未記録のタイミングで既に拡張済みだったカテゴリ、`travel`は設計書175で新規追加）。

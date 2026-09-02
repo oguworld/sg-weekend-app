@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260902a">
+  <link rel="stylesheet" href="/app.css?v=20260902b">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -159,20 +159,15 @@
       <div id="graduation-album-link" style="display:none;text-align:right;margin-top:6px;" onclick="openGraduationAlbum()">
         <span style="font-size:12px;font-weight:700;color:var(--caramel);cursor:pointer;" data-i18n="graduationAlbumLinkLabel">🎓 卒業アルバムを見る</span>
       </div>
-      <!-- ピルタブ -->
+      <!-- ピルタブ（設計書178フェーズ1: モデルコース／マイコースタブを削除、探訪スタンプ帳タブのみ残す） -->
       <div class="course-tab-bar">
         <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">探訪スタンプ帳</button>
-        <button class="course-tab" data-tab="everyone" onclick="switchCourseTab('everyone')" data-i18n="courseTabEveryone">モデルコース</button>
-        <button class="course-tab" data-tab="mylist" onclick="switchCourseTab('mylist')" data-i18n="courseTabMylist" style="display:none;">マイコース</button>
       </div>
     </div>
     <div class="screen-content" id="course-screen-content">
 
       <!-- Pull to Refresh インジケーター（設計書19） -->
       <div class="ptr-indicator" id="ptr-indicator-course"><div class="ptr-spinner"></div></div>
-
-      <!-- コース一覧 -->
-      <div id="course-list" style="padding:0 16px;display:flex;flex-direction:column;padding-bottom:120px;"></div>
 
       <!-- スタンプマップ（設計書69） -->
       <div id="stamp-map-view" style="display:none;padding:0 0 100px;">
@@ -678,196 +673,6 @@
     <button class="fab-plan" id="fab-plan" onclick="if(!_touchCapableDetected) openCustomPlanModal()" aria-label="予定を追加">＋</button>
   </div>
 
-  <!-- Course Generator Sheet -->
-  <div id="course-sheet-overlay" class="plan-modal-overlay" onclick="closeCourseSheet()"></div>
-  <div id="course-sheet" class="plan-sheet">
-    <div class="plan-sheet-handle"></div>
-    <button data-close onclick="closeCourseSheet()" style="position:absolute;top:10px;right:16px;background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;z-index:1;">✕</button>
-    <div style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px 20px calc(90px + env(safe-area-inset-bottom,0px));">
-
-      <!-- Step 1: 条件選択 -->
-      <div id="course-step-conditions">
-        <div id="course-preset-date-banner" hidden
-          style="margin:0 0 12px;padding:8px 14px;background:var(--caramel-pale,#fdf5ec);
-                 border-radius:10px;font-size:14px;font-weight:700;color:var(--caramel);">
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin:8px 0 20px;">
-          <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);" data-i18n="courseSheetTitle">コースを作る</div>
-          <div id="course-sheet-profile-display" style="font-size:13px;color:var(--caramel);background:var(--caramel-pale,#fdf5ec);padding:3px 8px;border-radius:20px;"></div>
-        </div>
-
-        <!-- ピン留めイベント選択 -->
-        <div id="course-sheet-pins" style="display:none;margin-bottom:20px;">
-          <div class="course-condition-label" data-i18n="coursePinsLabel">軸にするイベント</div>
-          <div id="course-sheet-pins-list" style="display:flex;flex-direction:column;gap:2px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border-color,#e8e0d8);"></div>
-        </div>
-
-        <!-- メイン条件 -->
-        <div class="course-condition-group">
-          <div class="course-condition-label">時間帯</div>
-          <div class="course-chips" data-key="timeslot">
-            <button class="course-chip" data-val="午前" onclick="selectCourseChip(this)">☀️ 午前</button>
-            <button class="course-chip" data-val="午後" onclick="selectCourseChip(this)">🌤 午後</button>
-            <button class="course-chip" data-val="夕方・夜" onclick="selectCourseChip(this)">🌙 夕方・夜</button>
-          </div>
-        </div>
-
-        <div class="course-condition-group">
-          <div class="course-condition-label"><span data-i18n="courseNoteLabel">ひとこと</span> <span style="font-weight:400;color:var(--light-gray);" data-i18n="courseNoteOptional">（任意）</span></div>
-          <div style="position:relative;">
-            <textarea id="course-note" data-i18n-ph="courseNotePlaceholder" placeholder="例）記念日なので特別感がほしい、穴場スポットで行きたい…"
-              style="width:100%;box-sizing:border-box;padding:10px 44px 10px 12px;font-size:16px;font-family:'Noto Sans JP',sans-serif;
-                     border:1.5px solid var(--sand-dark);border-radius:10px;resize:none;height:80px;
-                     background:var(--warm-white);color:var(--text);line-height:1.5;outline:none;"
-              onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'"></textarea>
-            <button id="course-note-mic-btn" class="chat-mic-btn" onclick="toggleCourseNoteVoice()"
-              style="position:absolute;top:50%;right:8px;transform:translateY(-50%);width:34px;height:34px;font-size:16px;"
-              title="音声入力" aria-label="音声入力">🎤</button>
-          </div>
-        </div>
-
-        <!-- こだわる（折りたたみ） -->
-        <button onclick="toggleCourseOptions()" id="course-options-toggle"
-          style="display:flex;align-items:center;justify-content:space-between;width:100%;
-                 background:var(--sand);border:none;border-radius:10px;cursor:pointer;
-                 color:var(--warm-gray);font-size:13px;font-weight:700;
-                 font-family:'Noto Sans JP',sans-serif;padding:10px 14px;margin-bottom:10px;">
-          <span data-i18n="courseOptionsToggle">🎛 こだわり設定</span>
-          <span id="course-options-arrow" style="font-size:11px;transition:transform 0.2s;transform:rotate(90deg);">▶</span>
-        </button>
-        <div id="course-options-panel" style="display:block;">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-            <button onclick="randomizeCourseConditions()"
-              style="padding:5px 12px;background:none;border:1.5px solid var(--sand-dark);border-radius:20px;
-                     font-size:12px;font-weight:700;color:var(--warm-gray);cursor:pointer;font-family:'Noto Sans JP',sans-serif;">
-              🎲 ランダム
-            </button>
-          </div>
-          <div class="course-condition-group">
-            <div class="course-condition-label" data-i18n="coursePurposeLabel">おでかけの目的</div>
-            <div class="course-chips" data-key="purpose">
-              <button class="course-chip" data-val="ぶらぶら散歩">🚶 ぶらぶら散歩</button>
-              <button class="course-chip" data-val="自然・公園">🌿 自然・公園</button>
-              <button class="course-chip" data-val="アート・文化">🎨 アート・文化</button>
-              <button class="course-chip" data-val="雑貨・お土産">🛍️ 雑貨・お土産</button>
-              <button class="course-chip" data-val="フォトスポット">📸 フォトスポット</button>
-            </div>
-          </div>
-          <div class="course-condition-group">
-            <div class="course-condition-label" data-i18n="courseAreaLabel">エリア</div>
-            <div class="course-chips" data-key="area" id="course-area-chips">
-            </div>
-          </div>
-          <div class="course-condition-group">
-            <div class="course-condition-label" data-i18n="courseOccasionLabel">特別感</div>
-            <div class="course-chips" data-key="occasion">
-              <button class="course-chip" data-val="普段使い">☕ 普段使い</button>
-              <button class="course-chip" data-val="ちょっと特別">✨ ちょっと特別</button>
-            </div>
-          </div>
-          <div class="course-condition-group">
-            <div class="course-condition-label" data-i18n="courseStyleLabel">スタイル</div>
-            <div class="course-chips" data-key="style">
-              <button class="course-chip" data-val="定番">🗺️ 定番</button>
-              <button class="course-chip" data-val="ローカル">🏘️ 地元流</button>
-              <button class="course-chip" data-val="ニッチ">🔍 穴場</button>
-            </div>
-          </div>
-          <div class="course-condition-group">
-            <div class="course-condition-label" data-i18n="courseFoodLabel">食の比重</div>
-            <div class="course-chips" data-key="foodFocus">
-              <button class="course-chip" data-val="食べ歩きメイン">🍜 食べ歩きメイン</button>
-              <button class="course-chip" data-val="バランス">⚖️ バランス</button>
-              <button class="course-chip" data-val="見どころメイン">📍 見どころメイン</button>
-            </div>
-          </div>
-          <div class="course-condition-group">
-            <div class="course-condition-label" data-i18n="courseTransportLabel">移動スタイル</div>
-            <div class="course-chips" data-key="transport">
-              <button class="course-chip" data-val="歩き中心">🚶 歩き中心</button>
-              <button class="course-chip" data-val="公共交通・バス" id="course-transit-chip">🚇 MRT・バス</button>
-              <button class="course-chip" data-val="車・タクシー移動">🚗 車・タクシー</button>
-            </div>
-          </div>
-        </div>
-
-        <button onclick="startCourseGeneration()"
-          style="width:100%;margin-top:8px;padding:14px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;font-size:16px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
-          data-i18n="courseGenerateBtn">
-          コースを作る ✨
-        </button>
-      </div>
-
-      <!-- Step 2: 生成中 -->
-      <div id="course-step-loading" hidden>
-        <div style="text-align:center;padding:40px 0;">
-          <div class="course-loading-dots"><span></span><span></span><span></span></div>
-          <div style="margin-top:16px;color:var(--warm-gray);font-size:15px;" data-i18n="courseLoadingMsg">コースを考えています…</div>
-        </div>
-      </div>
-
-      <!-- Step 2b: 候補選択 -->
-      <div id="course-step-candidates" hidden>
-        <div style="padding:4px 0 16px;">
-          <div style="font-size:14px;color:var(--warm-gray);margin-bottom:16px;text-align:center;">どのコースにしますか？</div>
-          <div id="course-candidates-list"></div>
-          <button onclick="backToCourseConditions()"
-            style="width:100%;padding:12px;margin-top:4px;background:none;border:none;
-                   color:var(--warm-gray);font-size:14px;cursor:pointer;font-family:inherit;">
-            ← 条件に戻る
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 3: 結果 -->
-      <div id="course-step-result" hidden>
-        <div id="course-result-content"></div>
-        <div style="display:flex;gap:8px;margin-top:16px;">
-          <button onclick="saveGeneratedCourse()"
-            style="flex:1;padding:12px;background:var(--caramel);color:white;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
-            data-i18n="courseSaveBtn">
-            マイコースに保存
-          </button>
-          <button onclick="startCourseGeneration()"
-            style="flex:1;padding:12px;background:var(--warm-white);color:var(--warm-gray);border:1.5px solid var(--sand-dark);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
-            data-i18n="courseRegenerateBtn">
-            🔄 作り直す
-          </button>
-        </div>
-        <button onclick="saveAndPublishGeneratedCourse()"
-          style="width:100%;margin-top:8px;padding:12px;background:var(--warm-white);color:var(--caramel);
-                 border:1.5px solid var(--caramel);border-radius:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;"
-          data-i18n="coursePublishBtn">
-          みんなに公開する
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Course Detail Sheet -->
-  <div id="course-detail-overlay" class="plan-modal-overlay" onclick="closeCourseDetail()"></div>
-  <!-- タイトル編集シート -->
-  <div class="chat-overlay" id="title-edit-overlay" onclick="closeTitleEdit()" style="z-index:3101;"></div>
-  <div id="title-edit-sheet" class="plan-modal" style="z-index:3102;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px calc(84px + env(safe-area-inset-bottom,0px));
-    box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div style="font-size:14px;font-weight:700;color:var(--warm-gray);margin-bottom:10px;" data-i18n="titleEditLabel">タイトルを編集</div>
-    <input id="title-edit-input" type="text" maxlength="30"
-      style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
-             border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-             color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
-      onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-    <div style="display:flex;gap:10px;margin-top:12px;">
-      <button onclick="closeTitleEdit()"
-        style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
-               font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
-        data-i18n="titleEditCancel">キャンセル</button>
-      <button onclick="saveCourseTitle()"
-        style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
-               font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
-        data-i18n="titleEditSave">保存</button>
-    </div>
-  </div>
 
   <!-- 個人予定表バックアップ用パスフレーズ入力シート（設計書54） -->
   <div class="chat-overlay" id="backup-passphrase-overlay" onclick="if(!_touchCapableDetected) closeBackupPassphraseSheet()" style="z-index:3601;"></div>
@@ -1068,14 +873,6 @@
     <div id="graduation-album-content" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));"></div>
   </div>
 
-  <div id="course-detail-sheet" class="plan-sheet">
-    <div class="plan-sheet-handle"></div>
-    <div style="display:flex;align-items:center;justify-content:flex-end;padding:4px 16px 8px;flex-shrink:0;">
-      <button data-close onclick="closeCourseDetail()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div id="course-detail-content" style="flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));"></div>
-  </div>
-
   <!-- Pin Picker Sheet -->
   <div class="chat-overlay" id="pin-picker-overlay" onclick="if(!_touchCapableDetected) closePinPicker()"></div>
   <div class="pin-picker-sheet" id="pin-picker-sheet">
@@ -1128,24 +925,6 @@
     </div>
     <div class="cal-popup-events" id="cal-popup-events"></div>
     <button class="cal-popup-fab" id="cal-popup-fab" onclick="calPopupScrollTop()" aria-label="トップへ戻る">↑</button>
-  </div>
-
-  <!-- ─── DATE PICKER MODAL (共通) ─── -->
-  <div class="plan-modal-overlay" id="date-picker-overlay" onclick="closeDatePickerSheet()"></div>
-  <div class="plan-modal" id="date-picker-modal">
-    <div class="plan-modal-handle"></div>
-    <div class="plan-modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
-      <div>
-        <div class="plan-modal-title">📅 日付を選ぶ</div>
-        <div class="plan-modal-subtitle" id="date-picker-subtitle"></div>
-      </div>
-      <button data-close onclick="closeDatePickerSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;flex-shrink:0;">✕</button>
-    </div>
-    <div class="plan-modal-body">
-      <div class="plan-modal-section-label">日付を選ぶ <span style="color:var(--terracotta)">*</span></div>
-      <div class="plan-date-chips" id="date-picker-chips"></div>
-      <button class="plan-modal-add-btn" id="date-picker-add-btn" disabled onclick="_confirmDatePicker()">追加する</button>
-    </div>
   </div>
 
   <!-- ─── PLAN MODALS ─── -->
@@ -1312,7 +1091,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260902h"></script>
+  <script src="/app.js?v=20260902i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
