@@ -1756,7 +1756,7 @@
         : [...LIFE_INFO_DATA];
       if (_newsFilterNew) filtered = filtered.filter(_isLifeInfoItemNew);
       // カテゴリチップの並び順（#news-filter-row）と一致させる
-      const NEWS_CATEGORY_ORDER = { admin: 0, transport: 1, health: 2, education: 3, weather: 4, community: 5 };
+      const NEWS_CATEGORY_ORDER = { admin: 0, transport: 1, health: 2, weather: 3, community: 4, education: 5 };
       filtered.sort((a, b) => {
         const ca = NEWS_CATEGORY_ORDER[a.category] ?? 99;
         const cb = NEWS_CATEGORY_ORDER[b.category] ?? 99;
