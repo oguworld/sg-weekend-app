@@ -17547,3 +17547,119 @@ const VALID_CATEGORIES = ['admin', 'weather', 'transport', 'community', 'health'
 - Haikuプロンプトに`destination`という新規フィールドを追加することで、既存5カテゴリの判定精度・レスポンス形式に予期しない影響が出ないか、統合後の実データで確認が必要
 - 旧App Storeバージョンでの「旅行カテゴリが新着表示にしか出てこない」という制限について、ユーザー体験として許容範囲か
 - 設計書175で発見された`server.js`の`VALID_CATEGORIES`不整合（health/education抜け）の混入時期は依然として特定できていない
+
+---
+
+# 設計書177 — Haiku採用スコアの保存と`enforceTypeCap`削除順のスコアベース化
+
+## 0. 背景
+
+`scripts/filter-events.js`の`enforceTypeCap(eventsPath)`関数（342〜375行目）は、`events.json`内の各`type`（event/show/gourmet/sale）が`CATEGORY_TARGET_RATIO`で定めた比率上限（`CATEGORY_CAP_BUFFER=1.2`倍のバッファ込み）を超えたとき、超過分を削除して枠を維持する仕組み。
+
+現在の削除順は`fetched_at`昇順（古い順）のみで決まっており、記事の質（Haikuの採用スコア）が一切考慮されていない。ユーザーから「スコアの高いものは残るようにしたい」という要望があった（きっかけ: TheSmartLocalのSanrio記事が2度取り込まれたのち、会期が長いためenforceTypeCapで削除されていたことが判明した調査）。
+
+## 1. 調査結果
+
+### 1-1. Haiku採用スコア（`score`）の実体
+
+`filterBatch()`内、Haikuへの指示プロンプト195行目に以下の記載がある。
+
+```
+- score: 0-10（${cityName}在住の日本人にとっての週末おでかけとしての有益度）
+```
+
+採否の閾値は133行目`const scoreThreshold = 6;`で、150行目のプロンプト文言`採用基準（score ${scoreThreshold}以上のみ採用）`によりHaikuに「6以上のみ返す」よう指示している（サーバー側でのポスト検証・再フィルタは行っていない。Haikuの応答を信頼する設計）。カテゴリが薄い場合は146行目で閾値5に緩和される場合もある。
+
+Haikuのレスポンス配列内の各要素は`filterBatch()`の戻り値としてそのまま`filtered.push({ filtered: r, original: ... })`の`r`（＝コード内の変数`f`、`filterAndSave()`492行目`for (const { filtered: f, original } of filtered)`）に格納される。したがって**変数名は`f.score`**であり、値域は指示上0〜10の整数（実質6〜10、カテゴリ補完時は5〜10）。
+
+547行目のログ出力で実際に使われていることを確認済み: `console.log(\`    ✅ 採用: ${enrich.title_ja || f.store} (score: ${f.score}, type: ${f.type}, source: ${src})\`);`
+
+### 1-2. `events.json`保存オブジェクトへの`score`の欠落
+
+518〜543行目の`item`オブジェクト構築部分（`events.json`に実際に書き込まれるフィールド一式）を確認したところ、`major_score: f.major_score || 3,`は存在するが、**`score`（Haiku採用スコア）に対応するフィールドは存在しない**。ログにのみ出力され、保存はされていない。
+
+### 1-3. `major_score`との意味の違い
+
+プロンプト196行目に定義: `- major_score: 1-5（1=超ニッチ発見感あり、5=誰でも知ってる定番）`。これは「発見感・ニッチ度」の指標であり、フロントエンド（★表示等）やAIチャット・LINE Bot向けコンテキストとして使われている。品質・有益度を示す`score`（0〜10）とは意味も用途も異なる。**`major_score`を今回の削除順の判断材料として使うべきではない**（確認済み）。
+
+### 1-4. `enforceTypeCap`の呼び出し箇所と既存データの扱い
+
+`enforceTypeCap`は`filterAndSave()`内、611行目`enforceTypeCap(eventsPath);`の1箇所からのみ呼ばれている。`events.json`は新規追記分だけでなく既存の全件（過去に保存され`score`フィールドを持たない古いデータを含む）を都度読み込んで上限判定するため、**`score`フィールドが存在しない過去データへの後方互換の考慮が必須**。
+
+### 1-5. フィールド名の衝突確認
+
+`server.js`に`score`という単語は一切出現しない（`major_score`のみ）。`public/app.js`の`score`使用箇所2箇所（`profileScore()`内のローカル変数、公開コースのおすすめソート用一時オブジェクトのプロパティ）はいずれもイベントオブジェクトの`score`とは無関係のスコープの異なる変数。**新規に`score`フィールドをイベントオブジェクトに追加してもフィールド名の衝突は起きない**。
+
+## 2. 設計方針
+
+### 2-1. `score`フィールドをイベントオブジェクトに保存する
+
+`filterAndSave()`内、`item`オブジェクト構築部分（518〜543行目）に、`major_score`の直後に新規フィールドを追加する。
+
+```js
+major_score: f.major_score || 3,
+score:       typeof f.score === 'number' ? f.score : null,
+```
+
+デフォルト値を固定値にせず`null`とするのは、「スコア不明」であることを明示的に区別できるようにするため（`enforceTypeCap`側で「未設定＝最低優先扱い」にする設計と整合させる）。
+
+### 2-2. `enforceTypeCap`の削除順ロジック変更
+
+359〜361行目の`deletable`の並び替えロジックを、「`fetched_at`昇順のみ」から「**`score`昇順を第一キー、同点時は`fetched_at`昇順を第二キー（タイブレーク）**」に変更する。
+
+```js
+// 終了日が7日以内のものは保護
+const deletable = ofType
+  .filter(e => !e.end_date || new Date(e.end_date) > protectCutoff)
+  .sort((a, b) => {
+    const scoreA = typeof a.score === 'number' ? a.score : -1;
+    const scoreB = typeof b.score === 'number' ? b.score : -1;
+    if (scoreA !== scoreB) return scoreA - scoreB; // スコアが低いものを先頭（削除優先）に
+    return (a.fetched_at || '').localeCompare(b.fetched_at || ''); // 同点は古い順
+  });
+```
+
+**後方互換**: `score`フィールドを持たない既存データは`scoreA = -1`となり、実在するどのスコア（0〜10）よりも必ず低く扱われる＝「スコア不明の古いデータは真っ先に削除対象になる」。段階的にスコア付きデータへ入れ替わっていく設計とし、マイグレーションスクリプトは不要とする。
+
+**既存の保護ロジック（終了日7日以内は保護）はそのまま維持**。`excess`件数の算出・`toDelete`のSet構築・`toKeep`のフィルタリングなど、削除順の並び替え以降のロジックは無変更。
+
+### 2-3. `opening`・`travel`タイプへの影響
+
+`CATEGORY_TARGET_RATIO`は`event`/`show`/`gourmet`/`sale`の4種のみが対象（`opening`/`travel`は既存方針により対象外、無変更）。`score`フィールドの保存自体は`type`によらず共通処理のため全タイプに付与されるが、削除ロジックの対象外という既存方針は変えない。
+
+## 3. 変更対象ファイルと具体的な変更内容
+
+### `scripts/filter-events.js`のみ
+
+1. **518〜543行目付近（`item`オブジェクト構築部分）**: `major_score: f.major_score || 3,`の直後に`score: typeof f.score === 'number' ? f.score : null,`を追加。
+2. **359〜361行目（`enforceTypeCap`内の`deletable`ソート部分）**: 上記2-2の「スコア昇順→`fetched_at`昇順」の2段階比較関数に置き換える。
+
+他ファイル（`server.js`・`public/app.js`・`public/index.html`）への変更は不要（フィールド名衝突なし、UI表示要件なし）。
+
+## 4. データモデルの変更
+
+`data/sg/events.json`の各イベントオブジェクトに新規フィールド`score`（数値0〜10、またはnull）を追加する。既存データへの一括マイグレーションは行わない（`enforceTypeCap`側のフォールバックで吸収）。
+
+## 5. APIの変更・後方互換性
+
+`GET /api/events`のレスポンスはフィールド追加のみ（既存フィールドの削除・改名・型変更なし）。`server.js`のAPIハンドラ自体は無変更のため`pm2 restart`不要（cron経由の`filter-events.js`の次回実行分から新ロジックが有効）。Web版・App Store版は同一`events.json`を参照するため両方に同時反映される。クライアントアプリのコード変更を伴わないため**TestFlightビルド・App Store申請は不要**。
+
+## 6. フロントエンドの変更
+
+なし。
+
+## 7. リスク・未解決の質問
+
+1. 「スコア不明＝最低優先（真っ先に削除）」という設計は、旧パイプラインで採用された記事の中の高品質なものも道連れにする可能性があるが、削除は超過分のみ・段階的入れ替えのため実害は限定的と判断。
+2. iOSアプリのネイティブ側で`events.json`の厳格スキーマ検証をしている箇所がないかは未確認（フィールド追加のみなら通常は安全という前提）。
+3. Haikuが指示に反してscore省略・範囲外の値を返した場合も型チェックでフォールバック（null扱い）されるため、パイプライン自体は壊れない。
+4. カテゴリ補完時のスコア閾値緩和（5以上）で採用された記事が、通常採用（6以上）の記事より先に削除されやすくなる点は意図した挙動と一致し問題ない。
+
+## 8. スコープ外（明示）
+
+- 既存`events.json`内の`score`未設定データへの一括バックフィルは行わない
+- `score`フィールドのUI表示（★表示・ソート機能への活用等）は行わない
+- `major_score`の算出ロジック・用途への変更は一切行わない
+- `CATEGORY_TARGET_RATIO`・`CATEGORY_CAP_BUFFER`の値自体の見直しは行わない
+- 「終了日が7日以内は保護」という既存ルールの閾値・ロジック自体の変更は行わない
+- `opening`・`travel`タイプを`enforceTypeCap`の対象に含める変更は行わない

@@ -358,7 +358,12 @@ function enforceTypeCap(eventsPath) {
     // 終了日が7日以内のものは保護
     const deletable = ofType
       .filter(e => !e.end_date || new Date(e.end_date) > protectCutoff)
-      .sort((a, b) => (a.fetched_at || '').localeCompare(b.fetched_at || ''));
+      .sort((a, b) => {
+        const scoreA = typeof a.score === 'number' ? a.score : -1;
+        const scoreB = typeof b.score === 'number' ? b.score : -1;
+        if (scoreA !== scoreB) return scoreA - scoreB; // スコアが低いものを先頭（削除優先）に
+        return (a.fetched_at || '').localeCompare(b.fetched_at || ''); // 同点は古い順
+      });
     const excess = ofType.length - cap;
     const toDelete = new Set(deletable.slice(0, excess).map(e => e.id || e.url));
 
@@ -528,6 +533,7 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
       age:         Array.isArray(f.age) ? f.age : ['all'],
       style:       f.style || ['beginner'],
       major_score: f.major_score || 3,
+      score:       typeof f.score === 'number' ? f.score : null,
       period,
       start_date:  f.start_date,
       end_date:    endDate,
