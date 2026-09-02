@@ -191,7 +191,7 @@ app.get('/privacy', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>プライバシーポリシー | おでかけNavi</title>
+  <title>プライバシーポリシー | SG在住Navi</title>
   <style>
     body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.8; color: #333; }
     h1 { font-size: 1.5rem; border-bottom: 2px solid #C8804A; padding-bottom: 8px; }
@@ -203,7 +203,7 @@ app.get('/privacy', (req, res) => {
   <h1>プライバシーポリシー</h1>
   <p>最終更新日：2026年6月4日</p>
 
-  <p>おでかけNavi（以下「本アプリ」）は、東南アジア・オセアニア在住の日本人向け週末おでかけ情報PWAです。本プライバシーポリシーは、本アプリにおける個人情報の取り扱いについて説明します。</p>
+  <p>SG在住Navi（以下「本アプリ」）は、東南アジア・オセアニア在住の日本人向け週末おでかけ情報PWAです。本プライバシーポリシーは、本アプリにおける個人情報の取り扱いについて説明します。</p>
 
   <h2>1. 収集する情報</h2>
   <p>本アプリは以下の情報を収集することがあります。</p>
@@ -234,7 +234,7 @@ app.get('/privacy', (req, res) => {
   <h2>5. お問い合わせ</h2>
   <p>プライバシーに関するご質問は<a href="https://dosuru.app/#settings">アプリのフィードバックフォーム</a>からご連絡ください。</p>
 
-  <p><a href="/">← おでかけNaviに戻る</a></p>
+  <p><a href="/">← SG在住Naviに戻る</a></p>
 </body>
 </html>`);
 });
@@ -1034,7 +1034,7 @@ ${JSON.stringify(eventContext)}
 
 const LINE_GUIDE_MESSAGE = {
   type: 'flex',
-  altText: '📋 おでかけNavi｜イベント投稿の使い方',
+  altText: '📋 SG在住Navi｜イベント投稿の使い方',
   contents: {
     type: 'bubble',
     size: 'mega',
@@ -1044,7 +1044,7 @@ const LINE_GUIDE_MESSAGE = {
       backgroundColor: '#FDF0E6',
       paddingAll: '16px',
       contents: [
-        { type: 'text', text: '🌴 おでかけNavi', weight: 'bold', size: 'lg', color: '#C8804A' },
+        { type: 'text', text: '🌴 SG在住Navi', weight: 'bold', size: 'lg', color: '#C8804A' },
         { type: 'text', text: 'イベント投稿ボット（SG / BKK / SYD）', size: 'sm', color: '#6B5E52', margin: 'xs' },
       ],
     },
@@ -1202,7 +1202,7 @@ async function generateEventDraft(image, userText, webContent, city = 'sg') {
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
-      system: `あなたは${cityConf.nameJa}在住の日本人向けおでかけアプリ「おでかけNavi」のイベント登録アシスタントです。
+      system: `あなたは${cityConf.nameJa}在住の日本人向けおでかけアプリ「SG在住Navi」のイベント登録アシスタントです。
 提供された情報（画像・メモ・Webコンテンツ）をもとに create_event ツールを使いイベント情報を1件生成してください。
 
 生成ルール:

@@ -41,7 +41,7 @@ async function main() {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' });
   const now   = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Singapore', hour12: false });
 
-  const lines = [`🌴 おでかけNavi イベント取込み結果`, `📅 ${now}（SGT）`, ''];
+  const lines = [`🌴 SG在住Navi イベント取込み結果`, `📅 ${now}（SGT）`, ''];
 
   let totalAccepted = 0;
 

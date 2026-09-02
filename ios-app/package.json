@@ -1,7 +1,7 @@
 {
   "name": "odenavi-ios",
   "version": "1.7.15",
-  "description": "おでかけNavi iOS App (Capacitor)",
+  "description": "SG在住Navi iOS App (Capacitor)",
   "private": true,
   "scripts": {
     "sync": "npx cap sync ios",

@@ -8,7 +8,7 @@ const fs   = require('fs');
 const path = require('path');
 const http = require('http');
 
-const SYSTEM_AUTHOR = 'おでかけNavi';
+const SYSTEM_AUTHOR = 'SG在住Navi';
 const TRIM_COUNT    = 2;
 const ADD_COUNT     = 3;
 

@@ -1,6 +1,6 @@
 {
-  "name": "おでかけNavi",
-  "short_name": "おでかけNavi",
+  "name": "SG在住Navi",
+  "short_name": "SG在住Navi",
   "description": "シンガポール在住日本人のための週末おでかけ・セール情報アプリ",
   "start_url": "/",
   "display": "standalone",

@@ -1,7 +1,7 @@
 /** @type {import('@capacitor/cli').CapacitorConfig} */
 const config = {
   appId: 'app.dosuru',
-  appName: 'くらしNavi',
+  appName: 'SG在住Navi',
   webDir: '../public',
   ios: {
     // 設計書15（2026-07-11）: 'always'だとキーボード表示時にwindow.innerHeightがsafe-area-inset-top分縮んで固着し、

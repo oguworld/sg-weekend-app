@@ -1,5 +1,5 @@
 // generate-splash.js
-// ネイティブ起動画面(splash.png / splash-dark.png)を、アプリアイコン + 「くらしNavi」ロゴテキストで生成する
+// ネイティブ起動画面(splash.png / splash-dark.png)を、アプリアイコン + 「SG在住Navi」ロゴテキストで生成する
 // 使い方: node scripts/generate-splash.js
 //
 // splash-dark.png が無いと capacitor-assets がライト版を自動で暗く変換するだけになり、
@@ -20,7 +20,7 @@ const THEMES = [
     name: 'light',
     outPath: path.join(OUT_DIR, 'splash.png'),
     bg: '#FFF9F2', // --cream
-    textDark: '#2C2420', // --midnight (「くらし」)
+    textDark: '#2C2420', // --midnight (「SG在住」)
     textAccent: '#C8804A', // --caramel (「Navi」、ライト/ダーク共通)
   },
   {
@@ -41,7 +41,7 @@ async function generate(theme) {
   const svgText = `
     <svg width="${CANVAS_SIZE}" height="${CANVAS_SIZE}">
       <text x="50%" y="${textY}" text-anchor="middle" font-family="Noto Sans CJK JP" font-weight="700" font-size="130">
-        <tspan fill="${theme.textDark}">くらし</tspan><tspan fill="${theme.textAccent}">Navi</tspan>
+        <tspan fill="${theme.textDark}">SG在住</tspan><tspan fill="${theme.textAccent}">Navi</tspan>
       </text>
     </svg>
   `;

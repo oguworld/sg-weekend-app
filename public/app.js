@@ -3882,7 +3882,7 @@
     async function doShare() {
       const cityMeta = CITY_META[getCity()] || CITY_META.sg;
       const data = {
-        title: 'おでかけNavi',
+        title: 'SG在住Navi',
         text: `${cityMeta.subtitleJa}！週末どうする？はここで決まる👇`,
         url: 'https://apps.apple.com/app/id6787159354',
       };
@@ -5253,7 +5253,7 @@
           ? (lang === 'ja' ? `${_escapeHtmlGa(ym)}、<br>おつかれさまでした。<br>また会う日まで、シンガポール。` : `${_escapeHtmlGa(ym)},<br>thank you for the memories.<br>See you again, Singapore.`)
           : (lang === 'ja' ? 'おつかれさまでした。<br>また会う日まで、シンガポール。' : 'Thank you for the memories.<br>See you again, Singapore.')}
         </div>
-        <div class="sec-closing-brand"><b>おでかけNavi</b> ${lang === 'ja' ? 'と歩いたシンガポール暮らし' : '— your Singapore journey companion'}</div>
+        <div class="sec-closing-brand"><b>SG在住Navi</b> ${lang === 'ja' ? 'と歩いたシンガポール暮らし' : '— your Singapore journey companion'}</div>
       </div>`;
 
       contentEl.innerHTML = html;
@@ -6926,8 +6926,8 @@
         const blob = await _buildStampCompleteShareCardBlob(completedLevel);
         const meta = STAMP_LEVEL_META[completedLevel] || STAMP_LEVEL_META.standard;
         const caption = getLang() === 'ja'
-          ? `シンガポール探訪で「${t(meta.labelKey)}」を制覇しました！ #おでかけNavi #シンガポール`
-          : `I've conquered "${t(meta.labelKey)}" in my Singapore exploration! #OdekakeNavi #Singapore`;
+          ? `シンガポール探訪で「${t(meta.labelKey)}」を制覇しました！ #SG在住Navi #シンガポール`
+          : `I've conquered "${t(meta.labelKey)}" in my Singapore exploration! #SGResidentNavi #Singapore`;
         _openStampSharePreview(blob, caption);
       } catch (e) {
         showToast(t('toastStampShareGenError'));
@@ -6943,8 +6943,8 @@
         const lang = getLang();
         const name = (lang === 'ja' ? (spot.nameJa || spot.name) : (spot.name || spot.nameJa)) || '';
         const caption = lang === 'ja'
-          ? `${name}を訪問しました！ #おでかけNavi #シンガポール`
-          : `I visited ${name}! #OdekakeNavi #Singapore`;
+          ? `${name}を訪問しました！ #SG在住Navi #シンガポール`
+          : `I visited ${name}! #SGResidentNavi #Singapore`;
         _openStampSharePreview(blob, caption);
       } catch (e) {
         showToast(t('toastStampShareGenError'));
@@ -6968,10 +6968,10 @@
           if (months < 0) { years--; months += 12; }
           const ym = _formatResidencyYM(years, months, getLang());
           caption = getLang() === 'ja'
-            ? `シンガポール探訪、在住歴${ym}で続けています。 #おでかけNavi #シンガポール`
-            : `Still exploring Singapore after ${ym} here. #OdekakeNavi #Singapore`;
+            ? `シンガポール探訪、在住歴${ym}で続けています。 #SG在住Navi #シンガポール`
+            : `Still exploring Singapore after ${ym} here. #SGResidentNavi #Singapore`;
         } else {
-          caption = getLang() === 'ja' ? 'シンガポール探訪、続けています。 #おでかけNavi #シンガポール' : 'Still exploring Singapore. #OdekakeNavi #Singapore';
+          caption = getLang() === 'ja' ? 'シンガポール探訪、続けています。 #SG在住Navi #シンガポール' : 'Still exploring Singapore. #SGResidentNavi #Singapore';
         }
         _openStampSharePreview(blob, caption);
       } catch (e) {
@@ -9522,15 +9522,15 @@
     async function shareApp(spotName, eventUrl) {
       const appUrl = 'https://dosuru.app';
       const cityMeta = CITY_META[getCity()] || CITY_META.sg;
-      const appPromo = `📱 おでかけNavi — ${cityMeta.subtitleJa}\n${appUrl}`;
+      const appPromo = `📱 SG在住Navi — ${cityMeta.subtitleJa}\n${appUrl}`;
       const shareData = eventUrl
         ? {
-            title: spotName || 'おでかけNavi',
+            title: spotName || 'SG在住Navi',
             text: `「${spotName}」が気になってます！\n\n${appPromo}`,
             url: eventUrl,
           }
         : {
-            title: 'おでかけNavi',
+            title: 'SG在住Navi',
             text: `${cityMeta.subtitleJa}！週末どうする？はここで決まる👇`,
             url: appUrl,
           };
@@ -10446,7 +10446,7 @@
         ? `https://dosuru.app/?join=${gid}&city=${getCity()}`
         : `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
       // パスフレーズ自体はメッセージ本文に含めない（設計書55 §2-7、意図的に鍵とグループIDを分離したままにする）
-      const msg = `おでかけNaviの予定表グループに参加してください！\n${url}`;
+      const msg = `SG在住Naviの予定表グループに参加してください！\n${url}`;
       window.open(`https://line.me/R/share?text=${encodeURIComponent(msg)}`, '_blank');
     }
 

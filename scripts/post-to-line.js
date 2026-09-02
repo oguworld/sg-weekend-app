@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * おでかけNavi LINE プロモーション投稿スクリプト
+ * SG在住Navi LINE プロモーション投稿スクリプト
  * 毎日8:00・18:00（SGT）にcronで実行。
  * --city=all で全都市のイベントから選択。
  * 毎回: イベント紹介と機能紹介の両方のドラフトを生成してLINEに送信。
@@ -138,7 +138,7 @@ async function generateEventMessage(event) {
     max_tokens: 500,
     messages: [{
       role: 'user',
-      content: `${conf.nameJa}在住の日本人向けPWA「おでかけNavi」の管理者向けLINE投稿文を作ってください。
+      content: `${conf.nameJa}在住の日本人向けPWA「SG在住Navi」の管理者向けLINE投稿文を作ってください。
 この文章はそのままXやInstagramに投稿する素材として使います。
 
 【情報】
@@ -152,7 +152,7 @@ ${tipsText}
 【要件】
 - 日本語
 - 絵文字を1〜2個使う
-- 「おでかけNavi」に自然に触れる
+- 「SG在住Navi」に自然に触れる
 - 末尾に「${conf.appUrl}」を入れる
 - URL除く本文は100文字以内（厳守）
 - SNS投稿として完成した文章を出力（前置き・説明不要）`,
@@ -171,7 +171,7 @@ async function generateFeatureMessage(feature) {
     max_tokens: 500,
     messages: [{
       role: 'user',
-      content: `東南アジア在住の日本人向けPWA「おでかけNavi」の機能紹介SNS投稿文を作ってください。
+      content: `東南アジア在住の日本人向けPWA「SG在住Navi」の機能紹介SNS投稿文を作ってください。
 この文章はそのままXやInstagramに投稿する素材として使います。
 
 【紹介する機能】
@@ -182,7 +182,7 @@ async function generateFeatureMessage(feature) {
 - 日本語
 - 絵文字を1〜2個使う
 - 親しみやすいトーン
-- 「おでかけNavi」に触れる
+- 「SG在住Navi」に触れる
 - 末尾に「${appUrl}」を入れる
 - URL除く本文は100文字以内（厳守）
 - SNS投稿として完成した文章を出力（前置き・説明不要）`,

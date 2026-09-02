@@ -72,7 +72,7 @@ async function generateAndPublish(city, index, total) {
     city,
     conditions,
     profile,
-    userName: 'おでかけNavi',
+    userName: 'SG在住Navi',
     userAvatar: '🗺️',
   });
 

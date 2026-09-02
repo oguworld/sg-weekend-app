@@ -144,11 +144,11 @@ function pickNewsArticle(articles, history) {
 // ─── ハッシュタグ ─────────────────────────────────────────────────
 function buildHashtags(city) {
   const cityTags = {
-    sg:  '#シンガポール #シンガポール生活 #週末の過ごし方 #海外在住日本人 #くらしNavi',
-    bkk: '#バンコク #タイ生活 #週末の過ごし方 #海外在住日本人 #くらしNavi',
-    syd: '#シドニー #オーストラリア生活 #週末の過ごし方 #海外在住日本人 #くらしNavi',
+    sg:  '#シンガポール #シンガポール生活 #週末の過ごし方 #海外在住日本人 #SG在住Navi',
+    bkk: '#バンコク #タイ生活 #週末の過ごし方 #海外在住日本人 #SG在住Navi',
+    syd: '#シドニー #オーストラリア生活 #週末の過ごし方 #海外在住日本人 #SG在住Navi',
   };
-  return (cityTags[city] || '#海外生活 #週末の過ごし方 #海外在住日本人 #くらしNavi').trim();
+  return (cityTags[city] || '#海外生活 #週末の過ごし方 #海外在住日本人 #SG在住Navi').trim();
 }
 
 // ─── テキスト生成 ─────────────────────────────────────────────────
@@ -361,7 +361,7 @@ async function postCommentForItem(itemType, itemId, text) {
     const res = await fetch('http://localhost:3000/api/comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
-      body: JSON.stringify({ itemType, itemId, text, nickname: 'くらしNavi' }),
+      body: JSON.stringify({ itemType, itemId, text, nickname: 'SG在住Navi' }),
     });
     if (res.ok) console.log('  💬 アプリ内コメントとしても投稿しました');
     else console.log(`  ⚠️ コメント投稿に失敗しました(${res.status})`);

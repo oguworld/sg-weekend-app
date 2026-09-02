@@ -1,5 +1,5 @@
 // ─── Service Worker for 今週末どこいく？SG ───
-const CACHE_NAME = 'sg-weekend-v805';
+const CACHE_NAME = 'sg-weekend-v806';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/app.css',
@@ -96,7 +96,7 @@ self.addEventListener('push', event => {
   if (!event.data) return;
   const data = event.data.json();
   event.waitUntil(
-    self.registration.showNotification(data.title || 'おでかけNavi', {
+    self.registration.showNotification(data.title || 'SG在住Navi', {
       body: data.body,
       icon: '/icons/icon-192.svg',
       badge: '/icons/icon-192.svg',
