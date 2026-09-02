@@ -1753,8 +1753,16 @@
       _newsListRenderedKey = key;
       let filtered = _newsCategory
         ? LIFE_INFO_DATA.filter(item => item.category === _newsCategory)
-        : LIFE_INFO_DATA;
+        : [...LIFE_INFO_DATA];
       if (_newsFilterNew) filtered = filtered.filter(_isLifeInfoItemNew);
+      // カテゴリチップの並び順（#news-filter-row）と一致させる
+      const NEWS_CATEGORY_ORDER = { admin: 0, transport: 1, health: 2, education: 3, weather: 4, community: 5 };
+      filtered.sort((a, b) => {
+        const ca = NEWS_CATEGORY_ORDER[a.category] ?? 99;
+        const cb = NEWS_CATEGORY_ORDER[b.category] ?? 99;
+        if (ca !== cb) return ca - cb;
+        return new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0);
+      });
       const countEl = document.getElementById('news-result-count');
       if (countEl) countEl.textContent = getLang() === 'ja' ? `${filtered.length}件` : `${filtered.length}`;
       if (filtered.length === 0) {
@@ -2342,12 +2350,15 @@
         return pinMatch && ageMatch && catMatch && whoFilterMatch && weekMatch && areaMatch && endingMatch && newMatch && kwMatch && recommendMatch;
       });
 
-      const CATEGORY_ORDER = { event: 0, show: 1, gourmet: 2, opening: 3, sale: 4 };
+      // カテゴリチップの並び順（#filter-row-category）と一致させる
+      const CATEGORY_ORDER = { event: 0, show: 1, gourmet: 2, sale: 3, opening: 4, travel: 5 };
       filtered.sort((a, b) => {
+        const ca = CATEGORY_ORDER[a.type] ?? 99;
+        const cb = CATEGORY_ORDER[b.type] ?? 99;
+        if (ca !== cb) return ca - cb;
         const fa = a.fetched_at || '0000-00-00';
         const fb = b.fetched_at || '0000-00-00';
-        if (fb !== fa) return fb.localeCompare(fa);
-        return (CATEGORY_ORDER[a.type] ?? 99) - (CATEGORY_ORDER[b.type] ?? 99);
+        return fb.localeCompare(fa);
       });
 
       // PRカード（スポンサー広告枠、設計書29）: おすすめモード中は非表示。3〜5枚目あたりに1件だけ差し込む
