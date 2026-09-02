@@ -364,6 +364,7 @@
         catGourmet: 'グルメ・フェア',
         catSale: 'プロモ・お得',
         catOpening: '新規オープン',
+        catTravel: '旅行',
         catStarting: '🆕 今週から',
         catEnding: '🔥 今週まで',
         endingFilterBtn: '残りわずか',
@@ -483,7 +484,6 @@
         newsCatEducation: '教育・子育て',
         newsCatWeather: '天候・災害',
         newsCatCommunity: 'コミュニティ',
-        newsCatTravel: '旅行',
         newsEmptyDesc: '現在表示できる情報がありません。<br>また後で確認してください。',
         lifeInfoPreviewTitle: '📰 シンガポール生活情報',
         lifeInfoPreviewMoreLink: 'もっと見る ›',
@@ -694,6 +694,7 @@
         catGourmet: 'Food & Fairs',
         catSale: 'Promos & Deals',
         catOpening: 'Grand Openings',
+        catTravel: 'Travel',
         catStarting: '📅 This Week',
         catEnding: '⏰ Ending Soon',
         endingFilterBtn: 'Ending Soon',
@@ -813,7 +814,6 @@
         newsCatEducation: 'Education',
         newsCatWeather: 'Weather',
         newsCatCommunity: 'Community',
-        newsCatTravel: 'Travel',
         newsEmptyDesc: 'No information available right now.<br>Please check back later.',
         lifeInfoPreviewTitle: '📰 Singapore Life Info',
         lifeInfoPreviewMoreLink: 'More ›',
@@ -1488,13 +1488,14 @@
       const plainTitleHtml = `<h2 style="font-family:'Noto Sans JP',sans-serif;font-size:16px;font-weight:700;color:var(--midnight);margin:0 0 10px;line-height:1.35;">${e.store || e.title || ''}</h2>`;
 
       // カテゴリタグの配色（生活情報カードのLIFE_INFO_CATEGORY_COLORSと同じ考え方）
-      const EVENT_CATEGORY_LABEL_KEYS = { event: 'catEvent', show: 'catShow', gourmet: 'catGourmet', sale: 'catSale', opening: 'catOpening' };
+      const EVENT_CATEGORY_LABEL_KEYS = { event: 'catEvent', show: 'catShow', gourmet: 'catGourmet', sale: 'catSale', opening: 'catOpening', travel: 'catTravel' };
       const EVENT_CATEGORY_COLORS = {
         event:   { bg: 'var(--caramel-pale)',       color: 'var(--caramel)' },
         show:    { bg: 'rgba(122,173,204,0.18)',    color: 'var(--sky)' },
         gourmet: { bg: 'rgba(196,112,90,0.16)',      color: 'var(--terracotta)' },
         sale:    { bg: 'rgba(110,158,136,0.18)',     color: 'var(--sage)' },
         opening: { bg: 'rgba(192,144,58,0.16)',      color: 'var(--gold)' },
+        travel:  { bg: 'var(--plum-pale)',           color: 'var(--plum)' },
       };
       const catKey = EVENT_CATEGORY_LABEL_KEYS[e.type] || '';
       const catLabel = catKey ? t(catKey) : '';
@@ -1581,7 +1582,6 @@
       education: 'newsCatEducation',
       weather:   'newsCatWeather',
       community: 'newsCatCommunity',
-      travel:    'newsCatTravel',
     };
 
     // カテゴリごとのタグ配色（アプリ既存のカラーパレット内の色を流用、見た目のトーンを崩さない範囲で区別）
@@ -1592,7 +1592,6 @@
       education: { bg: 'var(--sand)',            color: 'var(--caramel)' },
       weather:   { bg: 'rgba(122,173,204,0.18)', color: 'var(--sky)' },
       community: { bg: 'rgba(196,112,90,0.16)',  color: 'var(--terracotta)' },
-      travel:    { bg: 'var(--plum-pale)',       color: 'var(--plum)' },
     };
     function _lifeInfoCategoryTagStyle(category) {
       const c = LIFE_INFO_CATEGORY_COLORS[category] || LIFE_INFO_CATEGORY_COLORS.education;

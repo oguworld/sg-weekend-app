@@ -17390,3 +17390,160 @@ Web検索ができないツール制約のため、既存コードのAPIキー�
 - MileLion/Mainly Milesの「クレジットカード特典記事 vs 旅行セール記事」の判定はプロンプトの解釈に依存するグレーゾーンがあり、Haikuの誤判定率は運用しながら様子見する以外に事前検証手段がない
 - 上記11.の後方互換性推測（未知カテゴリ値はタグなしカードとして安全にフォールバックする）は静的コード確認のみで、旧バージョンApp Storeアプリでの実機検証はできていない
 - `GET /api/life-info`の`VALID_CATEGORIES`不整合（health/education抜け）がいつ発生したか特定できなかった（plan.md/CLAUDE.mdに該当する記録が見当たらない）
+
+- **【2026-09-02追記】ユーザーの再検討により配置場所を変更。実装後にユーザーから「おでかけカテゴリかと思った」との指摘があり、AskUserQuestionで確認の結果「おでかけカテゴリに移す」方針が明示的に選択された。本設計書175の実装（コミットd95d784）はロールバックし、旅行情報カテゴリはおでかけ（イベント）画面側に再配置する。詳細は設計書176を参照。**
+
+## 設計書176: 旅行情報カテゴリをおでかけ（イベント）画面へ再配置（2026-09-02設計）
+
+### 経緯
+設計書175（生活情報・ニュース画面への「旅行」カテゴリ統合）はbuilder→checker→closerにより実装済み・コミット済み（`d95d784`、ブランチ`main`、`origin`未push）。実装後にユーザーが「あーお出かけのカテゴリかなと思ったんだけど」と発言し、AskUserQuestionで確認した結果「おでかけカテゴリに移す」ことが明示的に選択された。本設計書は、設計書175の実装内容を部分的にロールバックした上で、旅行情報を「おでかけ（イベント）」画面のカテゴリタブとして作り直す設計を定める。
+
+### 1. 設計書175の実装内容のロールバック設計
+
+#### 1-1. `server.js`（部分ロールバック）
+現状の`VALID_CATEGORIES`（`GET /api/life-info`内、643行目付近）:
+```js
+const VALID_CATEGORIES = ['admin', 'weather', 'transport', 'community', 'health', 'education', 'travel'];
+```
+`'travel'`のみを取り除き、`health`/`education`のバグ修正分は残す:
+```js
+const VALID_CATEGORIES = ['admin', 'weather', 'transport', 'community', 'health', 'education'];
+```
+単純な`git revert`ではこの部分的ロールバックができないため、該当行を直接編集すること。
+
+#### 1-2. `scripts/fetch-life-info.js`（設計書175実装前の状態に戻す）
+- `CITY_CONFIG.sg.feeds`から新規3件（`TheSmartLocal Travel`／`The MileLion`／`Mainly Miles`）を削除し、既存4フィード（CNA/Mothership/Straits Times/JCCI）のみに戻す
+- `CATEGORIES`配列から`'travel'`を削除し6種（`admin`/`transport`/`health`/`education`/`weather`/`community`）に戻す
+- `filterBatch()`内`instructionText`から「travel」カテゴリの判定基準の1行、およびクレジットカード記事除外基準の2行を削除し、6カテゴリの列挙・不採用基準に戻す
+- 保持期間ロジック（`getRetentionDays(category)`ヘルパー、`RETENTION_DAYS_TRAVEL = 30`）を削除し、`RETENTION_DAYS = 7`固定の単純な削除フィルタに戻す
+
+#### 1-3. `public/app.css`（ロールバックしない・残置）
+`:root`の`--plum: #9B7A94`/`--plum-pale: #F3EDF1`、ダークモードブロックの`--plum-pale: #241C22`は取り消さず残置する。後述の「2-(a)」でおでかけ側の新カテゴリ配色として再利用する。
+
+#### 1-4. `public/app.js`（生活情報側から取り消す）
+- `LIFE_INFO_CATEGORY_LABEL_KEYS`から`travel: 'newsCatTravel'`を削除（6エントリに戻す）
+- `LIFE_INFO_CATEGORY_COLORS`から`travel`エントリを削除（6エントリに戻す）
+- STRINGS.ja/enの`newsCatTravel`キーは、後述2-(g)で`catTravel`を新規追加する方針のため削除してよい（使い回さない）
+
+#### 1-5. `public/index.html`（削除）
+`#news-filter-row`内の旅行チップ（`data-news-cat="travel"`、`data-i18n="newsCatTravel"`）を削除し、既存6チップに戻す。
+
+#### 1-6. `CLAUDE.md`（該当節を修正）
+設計書175実装時に追記された「旅行」カテゴリ追加に関する節は、削除せず節の先頭に以下を追記した上で本文はそのまま残す（試行錯誤の記録として保持）:
+```
+【2026-09-02追記】本節の実装はロールバック済み。ユーザーの再検討により、旅行情報カテゴリは生活情報・ニュース画面ではなくおでかけ（イベント）画面のカテゴリタブとして再配置した。詳細は設計書176を参照。
+```
+
+#### 1-7. ロールバック後の動作確認手順（builderが実施）
+1. 上記1-1〜1-6を反映
+2. `node scripts/fetch-life-info.js --city=sg --dry-run`で既存4フィード・6カテゴリのみで動作すること、出力に`category: "travel"`が出現しないことを確認
+3. `node --check`で構文確認
+4. `server.js`変更のため`pm2 restart`が必要（リリース方針は7節参照）
+
+### 2. おでかけ（イベント）側への統合設計
+
+#### 2-(a) `type`の新規値
+既存5種（`event`/`show`/`gourmet`/`sale`/`opening`）に`travel`を追加し6種にする。
+
+- `public/app.js`の`EVENT_CATEGORY_LABEL_KEYS`に`travel: 'catTravel'`を追加
+- `public/app.js`の`EVENT_CATEGORY_COLORS`に`travel: { bg: 'var(--plum-pale)', color: 'var(--plum)' }`を追加（既存5色＝caramel/sky/terracotta/sage/goldを使い切っているため、設計書175で追加済みの`--plum`を流用し新規に色相を増やさない）
+- `scripts/filter-events.js`のHaiku判定プロンプト（`filterBatch()`内`instructionText`）の`type`定義列挙に`"travel"`を追加
+- **【重要・見落とし防止】`scripts/filter-events.js`497行目の型バリデーション**が`['event', 'show', 'gourmet', 'sale', 'opening'].includes(f.type)`という固定配列であることを実コードで確認済み。この配列に`'travel'`を追加しない限り、Haikuが`type: "travel"`と判定してもここで強制的に`'event'`にフォールバックされ、旅行カテゴリが一切保存されない。設計書175の`server.js` VALID_CATEGORIES漏れと同種の見落としリスクがある箇所であり、実装時に必ず確認すること。
+- `scripts/notify-fetch-summary.js`の`EVENT_CAT_LABELS`（実コードで20行目に存在確認済み）に`travel: '旅行'`を追加
+- `scripts/filter-events.js`の`CATEGORY_TARGET_RATIO`（実コードで11行目に存在確認済み、`{ event: 0.30, show: 0.20, gourmet: 0.30, sale: 0.10 }`）・`enforceTypeCap()`には`travel`を追加しない（`opening`と同様に上限管理の対象外とする。更新頻度が低い新カテゴリに上限を課すと比率的に常に超過扱いになり不安定になるため）
+
+#### 2-(b) `area`/`period`フィールドの扱い（結論: 案3を採用）
+実コード確認の結果:
+- `renderEventCard()`のメタ行生成ロジックは`e.location`/`e.period`が空文字ならスパンを出力しないだけで、エラーにはならない
+- `renderEventCards()`のエリア絞り込み`areaMatch = filterAreas.size === 0 || filterAreas.has(e.area)`は、ユーザーが特定エリアを選ばない限り`area`が空でも全件表示される
+- `#event-filter-sheet`のエリアチップはSG7区分の固定ハードコードで、旅行の行き先国名を追加する余地はない
+
+**結論: `location`は行き先表示に使い、`area`（絞り込み専用）は空のままにする。**
+- `scripts/filter-events.js`の`item`生成部で、`type === 'travel'`の場合は`area`をデフォルト値にフォールバックさせず空文字のままにする分岐を追加:
+  ```js
+  location: validType === 'travel' ? (f.destination || '') : (f.area || defaultLocation),
+  area:     validType === 'travel' ? '' : (f.area || defaultArea),
+  ```
+  （`f.destination`はHaikuに新規で返させる行き先名フィールド）
+- `location`をカード表示専用、`area`をSGエリア絞り込み専用という既存の役割分担を踏襲することで、既存のSGエリア絞り込み機能と矛盾なく共存できる
+
+#### 2-(c) `period`/`start_date`/`end_date`フィールドの扱い
+`travel`タイプの記事に限り条件付き抽出を追加する:
+- 航空券・ホテルセール記事: 本文にセール期間の記載があれば`start_date`/`end_date`を抽出し、既存の`period`表示・`isEndingSoon()`・新着バッジロジックをそのまま適用する
+- 行き先紹介ガイド記事: 特定の期間を持たないため、後述3-(d)の通り長期の仮`end_date`を設定する
+- Haikuプロンプトに新規フィールド`destination`（行き先の国・都市名、例:"Malaysia"、"Seoul"）を追加し、2-(b)の`location`に使う
+
+#### 2-(d) 保持期間
+`scripts/fetch-events.js`の`purgeExpiredData()`を実コードで確認した結果、`fresh = all.filter(e => e.end_date && new Date(e.end_date) >= today)`という実装で、**`end_date`が存在しないイベントは無条件に削除される**（生活情報のような一律日数の保持ロジックではなく、`end_date`ベースの削除のみ）。
+
+この既存ロジックに「期限のないガイド記事」を馴染ませるため:
+- 行き先紹介ガイド記事は`end_date`を空にせず、生成時点で**「今日から1年後」の長期の仮`end_date`を機械的に設定する**新規ヘルパー`oneYearLater()`（既存`oneMonthLater()`と同パターン）を`type === 'travel'`かつ記事に具体的な期間の記載がない場合に適用する
+- セール記事（期間の記載がある）はそのまま実際のセール終了日を`end_date`に設定し、既存の`isEndingSoon()`・新着バッジ・`enforceTypeCap()`ロジックがそのまま機能する
+- この設計により`purgeExpiredData()`・`isEndingSoon()`自体のコード変更は不要（`end_date`の設定方法を変えるだけ）
+
+#### 2-(e) RSS取得元の統合方法
+`data/sources.json`の`sg.feeds`配列に以下3件を`status: "active"`で追加する:
+```json
+{ "url": "https://thesmartlocal.com/category/travel/feed/", "name": "TheSmartLocal Travel", "primaryType": "travel", "status": "active", "addedAt": "2026-09-02" },
+{ "url": "https://milelion.com/feed/",                      "name": "The MileLion",         "primaryType": "travel", "status": "active", "addedAt": "2026-09-02" },
+{ "url": "https://mainlymiles.com/feed/",                   "name": "Mainly Miles",         "primaryType": "travel", "status": "active", "addedAt": "2026-09-02" }
+```
+`primaryType`フィールドは`loadActiveSources()`が一切参照しないメタデータ（実コードで確認済み、`status === 'active'`のフィードのみ抽出するだけ）のため、新しい値`"travel"`を追加しても実害はない。
+
+設計書175でこの3フィードを`fetch-life-info.js`の`CITY_CONFIG.sg.feeds`に登録していたが、ロールバックにより削除し、代わりに`data/sources.json`（イベント取得パイプライン専用）に登録し直す。`data/source-fetch-state.json`はキー構造の変更不要（自動追加）。
+
+#### 2-(f) カテゴリチップの追加位置
+`public/index.html`の`#filter-row-category`（新着/イベント/展示・公演/グルメ・フェア/プロモ・お得/新規オープン）の**末尾に追加**する:
+```html
+<button class="filter-chip" data-cat="travel" data-i18n="catTravel" onclick="if(!_touchCapableDetected) toggleCatFilter('travel')">旅行</button>
+```
+
+#### 2-(g) i18nキー
+`public/app.js`のSTRINGS.ja/enに`catTravel`をja/en同時追加（ja「旅行」/en「Travel」、既存の`cat`+英語カテゴリ名という命名パターンに揃える）。
+
+### 3. 変更するファイル一覧
+- `server.js`: `GET /api/life-info`の`VALID_CATEGORIES`から`'travel'`を削除（health/educationは残す）
+- `scripts/fetch-life-info.js`: 1-2節の内容を全てロールバック
+- `public/app.css`: 変更なし（`--plum`/`--plum-pale`は残置、そのまま再利用）
+- `public/app.js`: `LIFE_INFO_CATEGORY_LABEL_KEYS`/`LIFE_INFO_CATEGORY_COLORS`から`travel`削除、`EVENT_CATEGORY_LABEL_KEYS`/`EVENT_CATEGORY_COLORS`に`travel`追加、STRINGS.ja/enの`newsCatTravel`削除・`catTravel`追加
+- `public/index.html`: `#news-filter-row`から旅行チップ削除、`#filter-row-category`に旅行チップ追加
+- `scripts/filter-events.js`: Haiku判定プロンプトの`type`列挙に`travel`追加、497行目のバリデーション配列に`'travel'`追加、`item`生成部の`location`/`area`/`end_date`をtravelタイプ用に分岐、`oneYearLater()`ヘルパー新設
+- `scripts/notify-fetch-summary.js`: `EVENT_CAT_LABELS`に`travel: '旅行'`追加
+- `data/sources.json`: `sg.feeds`に新規3件を`status: "active"`で追加
+- `data/sg/events.json`: スキーマ変更なし（`type: 'travel'`という新しい値、`area`が空文字になるケースが新規に生じる）
+- `data/sg/life-info.json`: スキーマ変更なし（`category: 'travel'`は今後生成されなくなる。既存データの扱いは9節のリスク参照）
+- `CLAUDE.md`: 該当2箇所の追記・修正（1-6節参照）
+
+### 4. データモデルの変更
+- イベントの`type`が5種→6種に拡張（`event`/`show`/`gourmet`/`sale`/`opening`/`travel`）
+- `travel`タイプに限り`area`が空文字になるケースが新規に生じる（既存コードは空文字を安全に扱えることを確認済み）
+- `travel`タイプの`end_date`に「1年後」という長期の仮の値が入るケースが新規に生じる（`isEndingSoon()`は「終了日が今週末+5日以内」を見るロジックのため、1年後のend_dateなら誤って「残りわずか」表示になることはない）
+
+### 5. APIの変更
+`GET /api/events`のレスポンス構造は無変更、`type`の値の集合が拡張されるのみ。`GET /api/life-info`は`VALID_CATEGORIES`から`travel`が外れるのみ。
+
+### 6. フロントエンドの変更
+- おでかけ画面`#filter-row-category`にカテゴリチップ1つ追加（末尾）
+- `EVENT_CATEGORY_LABEL_KEYS`/`EVENT_CATEGORY_COLORS`に1エントリ追加
+- i18nキー`catTravel`をja/en追加
+- 生活情報・ニュース画面`#news-filter-row`から旅行チップを削除（8チップ→7チップに戻す）
+
+### 7. 後方互換性・影響範囲・リリースタイミング
+- **後方互換性**: 旧バージョンApp Storeアプリが未知の`type`値（`travel`）を受け取った場合、`EVENT_CATEGORY_LABEL_KEYS[e.type] || ''`のフォールバックによりカテゴリタグが空文字列で非表示になるだけで、タイトル・画像・説明文・URLは問題なく表示される想定（実機での旧バージョン確認はできていない）。ただし旧バージョンでは「旅行」チップ自体が存在しないため、**旅行イベントは「新着」表示時にのみ見え、カテゴリ絞り込みでは事実上アクセス不能になる**（クラッシュはしないが閲覧経路が制限される）。
+- **影響範囲**: `data/sg/events.json`・`data/sources.json`はWeb版・App Store版で共有。生活情報側（`data/sg/life-info.json`）はロールバックにより今後`category: 'travel'`が生成されなくなる。
+- **リリースタイミング（結論: 同時デプロイ）**: ロールバックと新規実装（`filter-events.js`・`data/sources.json`・`public/`配下のチップ移動）を同一デプロイでまとめて反映し、「旅行情報がどこにも見当たらない空白期間」を作らない。iOSアプリは次回TestFlight/App Store申請ビルドに同梱。
+
+### 8. スコープ外（今回作らないもの）
+- `#event-filter-sheet`のエリアチップに旅行行き先（国・都市名）を追加する対応
+- 生活情報・ニュース画面の旅行チップの復活に備えた設計
+- `CATEGORY_TARGET_RATIO`/`enforceTypeCap()`へのtravel比率管理の追加
+- `data/sg/life-info.json`に既に保存されている過去の`category: 'travel'`エントリのデータ移行（9節参照）
+- BKK/SYD対応、プッシュ通知連携、旧App Storeバージョンでの実機動作確認
+- `data/sources.json`と生活情報パイプラインのソース管理方式の統一
+
+### 9. リスク・未解決の質問
+- **既存データの扱い（要確認）**: 設計書175実装後、本番cron（毎日実行）が既に走っていた場合、`data/sg/life-info.json`に`category: 'travel'`のエントリが既に生成・保存されている可能性がある。実装時に実データを確認し、存在すれば手動削除するか判断が必要（`logs/fetch-life-info.log`で実行回数を確認すること）
+- `data/sources.json`の`primaryType: "travel"`という新しい値が、`fetch-events.js`以外の分析スクリプトで問題にならないか横断的に未確認
+- Haikuプロンプトに`destination`という新規フィールドを追加することで、既存5カテゴリの判定精度・レスポンス形式に予期しない影響が出ないか、統合後の実データで確認が必要
+- 旧App Storeバージョンでの「旅行カテゴリが新着表示にしか出てこない」という制限について、ユーザー体験として許容範囲か
+- 設計書175で発見された`server.js`の`VALID_CATEGORIES`不整合（health/education抜け）の混入時期は依然として特定できていない

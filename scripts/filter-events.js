@@ -171,8 +171,9 @@ typeの定義（厳密に守ること）：
 - "gourmet": 食に関する【新メニュー・新商品の登場】や【フェア・フードイベントの開催】。「〇〇フェア開催」「新メニュー登場」「期間限定コラボ」「フードフェスティバル」など、新しい食体験を提供するもの。チェーン店・個人店問わず対象。通常営業・定番メニュー紹介など常設コンテンツは含めない。
 - "sale": 食品・非食品を問わず【割引・プロモ・クーポン】が主目的の情報。「○%オフ」「1for1」「セット割引」「クーポン配布」「バウチャー」など、価格の優遇が主訴求のもの。新メニューや食のイベントではなく「安く買える・お得に食べられる」がメインの記事はsale。
 - "opening": レストラン・カフェ・ショップ・施設・モール・アトラクションなどの【グランドオープン（初めて営業を開始する）】記事のみ。オープン日が明記されているもの。今後も継続して営業・運営される全く新しいお店・施設に限る。リニューアルオープン・新エリア追加・新ゾーン開設・改装再開業はopeningに含めない（eventまたはgourmetで分類）。
+- "travel": 航空券・ホテルのセール/プロモ情報、${cityName}から行ける近隣国・都市の行き先紹介ガイド記事など、旅行・トラベルに関する記事。
 
-【重要】"other"/"market"/"edu" は使わない。上記5つのいずれかに必ず分類すること。
+【重要】"other"/"market"/"edu" は使わない。上記6つのいずれかに必ず分類すること。
 分類の判断基準（優先順位順に適用すること）：
 1. 全く新しいお店・施設のグランドオープン（初めて営業開始）→ opening
 2. リニューアル・改装再開業・新エリア追加は opening にしない → event またはgourmetで分類
@@ -187,15 +188,16 @@ typeの定義（厳密に守ること）：
 各採用記事について以下のフィールドのみ返すこと：
 - index: 元の記事のインデックス番号（0始まり）
 - store: 施設名・店名・イベント名（英語OK）
-- type: "event" | "show" | "gourmet" | "sale" | "opening"
+- type: "event" | "show" | "gourmet" | "sale" | "opening" | "travel"
 - who: ["family","couple","solo","group"] から該当するもの（複数可）
 - age: ["all","baby","preschool","school"] から該当するもの（複数可）
 - style: ["beginner","resident","local"] から該当するもの（複数可）
 - score: 0-10（${cityName}在住の日本人にとっての週末おでかけとしての有益度）
 - major_score: 1-5（1=超ニッチ発見感あり、5=誰でも知ってる定番）
 - start_date: "YYYY-MM-DD"（不明な場合は今日 ${today}）
-- end_date: "YYYY-MM-DD"（記事に終了日の記載がない場合は${twoWeeksLater}）
+- end_date: "YYYY-MM-DD"（記事に終了日の記載がない場合は${twoWeeksLater}。ただし type が "travel" かつ記事が特定の期間を持たない行き先紹介ガイド記事（セール・プロモではないもの）の場合のみ、end_date は空文字列 "" を返すこと）
 - area: ${cityAreas}
+- destination: type が "travel" の場合のみ、行き先の国・都市名（英語、例:"Malaysia"、"Seoul"）。それ以外のtypeでは空文字列でよい
 - emoji: 内容に合った絵文字1つ
 - image: 記事のサムネイルURL（ない場合はnull）
 - imageSearch: English keyword for Unsplash image search (2-4 words)
@@ -494,8 +496,17 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
     }
     const enrich = enriched.get(f._enrichPos);
     const id = `e_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const validType = ['event', 'show', 'gourmet', 'sale', 'opening'].includes(f.type) ? f.type : 'event';
-    const endDate = validType === 'opening' ? oneMonthLater(f.start_date) : f.end_date;
+    const validType = ['event', 'show', 'gourmet', 'sale', 'opening', 'travel'].includes(f.type) ? f.type : 'event';
+    let endDate;
+    if (validType === 'opening') {
+      endDate = oneMonthLater(f.start_date);
+    } else if (validType === 'travel' && !f.end_date) {
+      // 行き先紹介ガイド記事など特定の期間を持たない旅行記事は、purgeExpiredData()が
+      // end_date未設定のイベントを無条件削除する仕様のため、長期の仮end_dateを設定する
+      endDate = oneYearLater(f.start_date);
+    } else {
+      endDate = f.end_date;
+    }
     const period  = validType === 'opening' ? formatOpenDate(f.start_date) : formatPeriod(f.start_date, endDate);
 
     const item = {
@@ -518,8 +529,8 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
       content_en:  enrich.content_en || '',
       tips:        Array.isArray(enrich.tips_ja) ? enrich.tips_ja : [],
       tips_en:     Array.isArray(enrich.tips_en) ? enrich.tips_en : [],
-      location:    f.area || defaultLocation,
-      area:        f.area || defaultArea,
+      location:    validType === 'travel' ? (f.destination || '') : (f.area || defaultLocation),
+      area:        validType === 'travel' ? '' : (f.area || defaultArea),
       url:         original.link || '',
       source:      original.source || '',
       genres:      Array.isArray(f.genres) ? f.genres : [],
@@ -600,6 +611,16 @@ function oneMonthLater(dateStr) {
   const d = dateStr ? new Date(dateStr) : new Date();
   const year = d.getMonth() === 11 ? d.getFullYear() + 1 : d.getFullYear();
   const month = (d.getMonth() + 1) % 12;
+  const day = Math.min(d.getDate(), new Date(year, month + 1, 0).getDate());
+  return new Date(year, month, day).toISOString().slice(0, 10);
+}
+
+// travelタイプの行き先紹介ガイド記事（期限の記載がない）に、purgeExpiredData()の
+// 「end_date未設定のイベントを無条件削除する」仕様に馴染ませるための長期の仮end_dateを設定する
+function oneYearLater(dateStr) {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const year = d.getFullYear() + 1;
+  const month = d.getMonth();
   const day = Math.min(d.getDate(), new Date(year, month + 1, 0).getDate());
   return new Date(year, month, day).toISOString().slice(0, 10);
 }

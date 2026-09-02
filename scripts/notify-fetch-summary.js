@@ -17,7 +17,7 @@ const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
 const DISCOVER_RESULT_PATH = path.join(LOGS_DIR, 'discover-sources-result.json');
 const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json');
 const LIFE_INFO_CAT_LABELS = { admin: '行政', transport: '交通', health: '医療・健康', education: '教育・子育て', weather: '天候・災害', community: 'コミュニティ' };
-const EVENT_CAT_LABELS = { event: 'イベント', show: '展示・公演', gourmet: 'グルメ・フェア', sale: 'プロモ・お得', opening: '新規オープン' };
+const EVENT_CAT_LABELS = { event: 'イベント', show: '展示・公演', gourmet: 'グルメ・フェア', sale: 'プロモ・お得', opening: '新規オープン', travel: '旅行' };
 
 async function pushToLine(text) {
   const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;

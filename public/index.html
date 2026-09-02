@@ -87,6 +87,7 @@
         <button class="filter-chip" data-cat="gourmet" data-i18n="catGourmet" onclick="if(!_touchCapableDetected) toggleCatFilter('gourmet')">グルメ・フェア</button>
         <button class="filter-chip" data-cat="sale" data-i18n="catSale" onclick="if(!_touchCapableDetected) toggleCatFilter('sale')">プロモ・お得</button>
         <button class="filter-chip" data-cat="opening" data-i18n="catOpening" onclick="if(!_touchCapableDetected) toggleCatFilter('opening')">新規オープン</button>
+        <button class="filter-chip" data-cat="travel" data-i18n="catTravel" onclick="if(!_touchCapableDetected) toggleCatFilter('travel')">旅行</button>
       </div>
     </header>
     <div class="screen-scroll-content" id="home-scroll-content">
@@ -247,7 +248,6 @@
       <button class="filter-chip" data-news-cat="education" onclick="if(!_touchCapableDetected) setNewsCategory('education')" data-i18n="newsCatEducation">教育・子育て</button>
       <button class="filter-chip" data-news-cat="weather" onclick="if(!_touchCapableDetected) setNewsCategory('weather')" data-i18n="newsCatWeather">天候・災害</button>
       <button class="filter-chip" data-news-cat="community" onclick="if(!_touchCapableDetected) setNewsCategory('community')" data-i18n="newsCatCommunity">コミュニティ</button>
-      <button class="filter-chip" data-news-cat="travel" onclick="if(!_touchCapableDetected) setNewsCategory('travel')" data-i18n="newsCatTravel">旅行</button>
     </div>
     <div class="screen-scroll-content" id="news-scroll-content">
       <div class="ptr-indicator" id="ptr-indicator-news"><div class="ptr-spinner"></div></div>
@@ -1312,7 +1312,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260902c"></script>
+  <script src="/app.js?v=20260902d"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
