@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260902c">
+  <link rel="stylesheet" href="/app.css?v=20260902d">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -201,29 +201,6 @@
         <div style="font-size:40px;">📌</div>
         <div style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="pinsEmptyCombinedTitle">まだ何もピン留めしていません</div>
         <div style="font-size:13px;color:var(--warm-gray);line-height:1.7;" data-i18n="pinsEmptyCombinedDesc">気になるイベントやニュースの📌をタップすると<br>ここにまとめて表示されます</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ─── PLAN SCREEN ─── -->
-  <div class="screen" id="screen-plan">
-    <div class="plan-title-header">
-      <span class="screen-title" data-i18n="navPlan">予定表</span>
-      <button class="header-cal-sync-btn" id="cal-sync-header-btn" onclick="openCalSync()">
-        <span class="sync-icon">🔗</span>
-        <span class="sync-label">共有</span>
-      </button>
-    </div>
-    <div class="screen-scroll-content">
-      <div id="schedule-content"></div>
-    </div>
-
-    <!-- アカウント連携必須ゲート（設計書116） -->
-    <div id="plan-auth-gate" class="screen-auth-gate" style="display:none;">
-      <div class="screen-auth-gate-card">
-        <div class="screen-auth-gate-icon">🔒</div>
-        <div class="screen-auth-gate-msg" data-i18n="authGateMessage">この機能を使うにはアカウント連携が必要です</div>
-        <button class="screen-auth-gate-btn" onclick="goToAccountLinking()" data-i18n="authGateBtn">設定で連携する</button>
       </div>
     </div>
   </div>
@@ -485,31 +462,6 @@
     </div><!-- /screen-scroll-content -->
   </div><!-- /screen-settings -->
 
-  <!-- ─── HOWTO MODAL（使い方） ─── -->
-  <!-- ─── 共有カレンダー MODAL ─── -->
-  <div class="pin-detail-overlay" id="cal-sync-overlay" onclick="closeCalSync()"></div>
-  <div class="pin-detail-modal" id="cal-sync-modal">
-    <div class="pin-detail-header">
-      <div class="pin-detail-emoji">🔗</div>
-      <button data-close class="pin-detail-close" onclick="closeCalSync()">✕</button>
-    </div>
-    <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);margin-bottom:16px;">予定表の共有</div>
-    <div id="cal-sync-modal-content" style="overflow-y:auto;max-height:65vh;padding-bottom:4px;"></div>
-  </div>
-
-  <!-- ─── 参加確認 MODAL ─── -->
-  <div class="pin-detail-overlay" id="cal-join-overlay"></div>
-  <div class="pin-detail-modal" id="cal-join-modal">
-    <div class="pin-detail-header">
-      <div class="pin-detail-emoji">📅</div>
-      <button data-close class="pin-detail-close" onclick="closeJoinPrompt()">✕</button>
-    </div>
-    <div style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);margin-bottom:8px;">グループへの参加</div>
-    <div id="cal-join-desc" style="font-size:14px;color:var(--warm-gray);margin-bottom:20px;line-height:1.7;"></div>
-    <button class="cal-sync-action primary" onclick="doJoinGroup()">参加する</button>
-    <button class="cal-sync-action danger"  onclick="closeJoinPrompt()">キャンセル</button>
-  </div>
-
   <!-- ─── PIN DETAIL MODAL ─── -->
   <div class="pin-detail-overlay" id="pin-detail-overlay" onclick="if(!_touchCapableDetected) closePinDetail()"></div>
   <div class="pin-detail-modal" id="pin-detail-modal">
@@ -546,10 +498,6 @@
       <span class="nav-icon">📌</span>
       <span class="nav-label" data-i18n="navPins">ピン留め</span>
     </button>
-    <button class="nav-item" id="nav-plan" style="display:none;" onclick="if(!_touchCapableDetected) switchNav('plan')">
-      <span class="nav-icon">📅</span>
-      <span class="nav-label" data-i18n="navPlan">予定表</span>
-    </button>
     <button class="nav-item" id="nav-settings" onclick="if(!_touchCapableDetected) switchNav('settings')">
       <span class="nav-icon">⚙️</span>
       <span class="nav-label" data-i18n="navSettings">設定</span>
@@ -558,10 +506,6 @@
 
   <!-- FAB -->
   <button class="fab" id="fab-top" onclick="if(!_touchCapableDetected) fabScrollTop()" aria-label="トップへ戻る">↑</button>
-  <!-- FAB Plan Speed Dial -->
-  <div class="fab-plan-group" id="fab-plan-group">
-    <button class="fab-plan" id="fab-plan" onclick="if(!_touchCapableDetected) openCustomPlanModal()" aria-label="予定を追加">＋</button>
-  </div>
 
 
   <!-- 個人予定表バックアップ用パスフレーズ入力シート（設計書54） -->
@@ -607,263 +551,12 @@
     </div>
   </div>
 
-  <!-- 共有カレンダー用パスフレーズ入力シート（設計書55、作成用・参加用でタイトルのみ出し分け） -->
-  <div class="chat-overlay" id="cal-passphrase-overlay" onclick="if(!_touchCapableDetected) closeCalPassphraseSheet()" style="z-index:3603;"></div>
-  <div id="cal-passphrase-sheet" class="plan-modal" style="z-index:3604;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;
-    box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
-      <div id="cal-passphrase-title" style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="calPassphraseSetupTitle">共有用パスフレーズを設定</div>
-      <button data-close onclick="closeCalPassphraseSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
-      <div id="cal-passphrase-warn" style="font-size:12px;color:var(--terracotta);line-height:1.6;background:var(--caramel-pale);border-radius:10px;padding:8px 10px;margin-bottom:12px;" data-i18n="calPassphraseWarning">⚠️ パスフレーズを忘れると共有カレンダーは復元できません。参加者に別途お伝えください。</div>
-      <input id="cal-passphrase-input" type="password" maxlength="100" autocomplete="off"
-        data-i18n-ph="backupPassphrasePlaceholder" placeholder="パスフレーズ"
-        style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
-               border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-               color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:10px;"
-        onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-      <div id="cal-passphrase-confirm-row">
-        <input id="cal-passphrase-confirm-input" type="password" maxlength="100" autocomplete="off"
-          data-i18n-ph="backupPassphraseConfirmPlaceholder" placeholder="パスフレーズ（確認）"
-          style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
-                 border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-                 color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
-          onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-      </div>
-      <div style="display:flex;gap:10px;margin-top:12px;margin-bottom:8px;">
-        <button onclick="closeCalPassphraseSheet()"
-          style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
-                 font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
-          data-i18n="titleEditCancel">キャンセル</button>
-        <button id="cal-passphrase-submit-btn" onclick="if(!_touchCapableDetected) submitCalPassphrase()"
-          style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
-                 font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
-          data-i18n="backupPassphraseSubmit">確定</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Pin Picker Sheet -->
-  <div class="chat-overlay" id="pin-picker-overlay" onclick="if(!_touchCapableDetected) closePinPicker()"></div>
-  <div class="pin-picker-sheet" id="pin-picker-sheet">
-    <div class="chat-sheet-handle"></div>
-    <div class="pin-picker-header">
-      <span id="pin-picker-title">📌 ピン留めから選ぶ</span>
-      <button data-close onclick="closePinPicker()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div class="pin-picker-list" id="pin-picker-list"></div>
-  </div>
-
-  <!-- Emoji Picker Sheet -->
-  <div class="chat-overlay" id="emoji-picker-overlay" onclick="if(!_touchCapableDetected) closeEmojiPicker()" style="z-index:2099;"></div>
-  <div class="pin-picker-sheet" id="emoji-picker-sheet" style="z-index:2100;">
-    <div class="chat-sheet-handle"></div>
-    <div class="pin-picker-header">
-      <span>アイコンを選ぶ</span>
-      <button data-close onclick="closeEmojiPicker()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div class="emoji-picker-grid" id="emoji-picker-grid"></div>
-  </div>
-
-  <!-- Schedule Action Sheet -->
-  <div class="chat-overlay" id="schedule-action-overlay" onclick="if(!_touchCapableDetected) closeScheduleActionSheet()" style="z-index:2199;background:transparent;"></div>
-  <div class="schedule-action-popover" id="schedule-action-sheet">
-    <button class="schedule-action-btn" id="schedule-action-view-btn" onclick="scheduleActionViewCard()" style="display:none;">🔍 詳細を見る</button>
-    <button class="schedule-action-btn" id="schedule-action-edit-btn" onclick="scheduleActionEdit()">✏️ 編集</button>
-    <button class="schedule-action-btn schedule-action-btn--delete" onclick="scheduleActionDelete()">🗑 削除</button>
-  </div>
-
-  <!-- Calendar Popup Overlay -->
-  <div class="cal-popup-overlay" id="cal-popup-overlay" onclick="if(!_touchCapableDetected) closeCalPopup()"></div>
-
-  <!-- Calendar Popup -->
-  <div class="cal-popup" id="cal-popup">
-    <div class="cal-popup-header">
-      <div class="cal-popup-date" id="cal-popup-date"></div>
-      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
-        <button id="cal-sort-btn" class="sort-btn" onclick="toggleCalSort()" title="開始日で並び替え">開始日↓</button>
-        <div id="cal-popup-count" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;"></div>
-        <button data-close class="cal-popup-close" onclick="closeCalPopup()">✕</button>
-      </div>
-    </div>
-    <div class="cal-popup-filter-row" id="cal-popup-filter-row">
-      <button class="sale-filter-chip" data-cat="event">イベント</button>
-      <button class="sale-filter-chip" data-cat="show">展示・公演</button>
-      <button class="sale-filter-chip" data-cat="gourmet">グルメ・フェア</button>
-      <button class="sale-filter-chip" data-cat="sale">プロモ・お得</button>
-      <button class="sale-filter-chip" data-cat="opening">新規オープン</button>
-    </div>
-    <div class="cal-popup-events" id="cal-popup-events"></div>
-    <button class="cal-popup-fab" id="cal-popup-fab" onclick="calPopupScrollTop()" aria-label="トップへ戻る">↑</button>
-  </div>
-
-  <!-- ─── PLAN MODALS ─── -->
-  <div class="plan-modal-overlay" id="plan-modal-overlay" onclick="closePlanModal()"></div>
-
-  <!-- Modal A: イベントプランに追加 -->
-  <div class="plan-modal" id="plan-event-modal">
-    <div class="plan-modal-handle"></div>
-    <div class="plan-modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
-      <div>
-        <div class="plan-modal-title" id="plan-event-modal-title">プランに追加</div>
-        <div class="plan-modal-subtitle" id="plan-event-modal-subtitle"></div>
-      </div>
-      <button data-close onclick="closePlanModal()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;flex-shrink:0;">✕</button>
-    </div>
-    <div class="plan-modal-body">
-      <div class="plan-modal-section-label" data-i18n="planModalDateLabel">日付を選ぶ</div>
-      <div class="plan-date-chips" id="plan-event-date-chips"></div>
-      <div class="plan-modal-section-label" data-i18n="labelStartTime">開始時刻</div>
-      <div class="plan-time-row" id="plan-event-time-row">
-        <input type="time" class="plan-time-input" id="plan-event-time-input" onfocus="onPlanTimeFocus('event')" oninput="onPlanTimeInput('event')">
-        <button class="plan-slot-chip" id="plan-event-allday-btn" onclick="toggleAlldayPlan('event')" data-i18n="labelAllday">終日</button>
-      </div>
-      <div class="plan-modal-section-label" data-i18n="labelMembers">参加メンバー</div>
-      <div class="plan-member-chips" id="plan-event-member-chips">
-        <button class="plan-member-chip" data-member="papa" onclick="selectPlanMember('papa')"><span class="member-emoji">👨</span></button>
-        <button class="plan-member-chip" data-member="mama" onclick="selectPlanMember('mama')"><span class="member-emoji">👩</span></button>
-        <button class="plan-member-chip" data-member="boy" onclick="selectPlanMember('boy')"><span class="member-emoji">👦</span></button>
-        <button class="plan-member-chip" data-member="girl" onclick="selectPlanMember('girl')"><span class="member-emoji">👧</span></button>
-        <button class="plan-member-chip" data-member="dog" onclick="selectPlanMember('dog')"><span class="member-emoji">🐕</span></button>
-        <button class="plan-member-chip" data-member="cat" onclick="selectPlanMember('cat')"><span class="member-emoji">🐱</span></button>
-      </div>
-      <div class="plan-modal-section-label" data-i18n="planModalMemoLabel">メモ</div>
-      <textarea class="plan-modal-textarea" id="plan-event-memo" rows="2" data-i18n-ph="planMemoPlaceholder" placeholder="例：予約済み、持ち物メモなど"></textarea>
-      <div class="plan-flag-row">
-        <label class="plan-important-label" onclick="event.stopPropagation()">
-          <input type="checkbox" id="plan-event-important-cb">
-          <span data-i18n="labelImportant">⭐ 重要イベント</span>
-        </label>
-        <label class="plan-notify-row" id="plan-event-notify-row" onclick="event.stopPropagation()">
-          <input type="checkbox" id="plan-event-notify-cb">
-          <span data-i18n="labelNotify">🔔 メンバー通知</span>
-        </label>
-      </div>
-      <button class="plan-modal-add-btn" id="plan-event-add-btn" disabled onclick="saveEventPlan()" data-i18n="planModalAddBtn">追加する</button>
-    </div>
-  </div>
-
-  <!-- Modal B: 自分の予定追加／編集 -->
-  <div class="plan-modal" id="plan-custom-modal">
-    <div class="plan-modal-handle"></div>
-    <div class="plan-modal-header" style="display:flex;align-items:center;justify-content:space-between;">
-      <div class="plan-modal-title" id="plan-custom-modal-title" data-i18n="planModalCustomTitle">予定を追加</div>
-      <button data-close onclick="closePlanModal()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;flex-shrink:0;">✕</button>
-    </div>
-    <div class="plan-modal-body">
-      <div class="plan-modal-section-label"><span data-i18n="labelTitle">タイトル</span> <span style="color:var(--terracotta)">*</span></div>
-      <div class="plan-title-row">
-        <button class="plan-emoji-selector-btn" id="plan-custom-emoji-selector" onclick="toggleEmojiInline('custom')">
-          <span class="pes-emoji" id="plan-custom-selected-emoji">📝</span>
-        </button>
-        <input class="plan-modal-text-input" id="plan-custom-title" type="text" data-i18n-ph="customPlanTitlePlaceholder" placeholder="タイトルを入力" maxlength="40" oninput="updateCustomPlanAddBtn()" style="margin-bottom:0;flex:1;" />
-      </div>
-      <div id="plan-custom-emoji-inline" style="display:none;margin-top:6px;"></div>
-      <div id="plan-custom-pins-container" style="display:none;margin-top:8px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border-color,#e8e0d8);">
-        <div id="plan-custom-pins-list"></div>
-      </div>
-      <div id="plan-custom-date-section">
-        <div class="plan-modal-section-label">日付 <span style="color:var(--terracotta)">*</span></div>
-        <div class="plan-date-chips" id="plan-custom-date-chips"></div>
-      </div>
-      <div class="plan-modal-section-label" data-i18n="labelStartTime">開始時刻</div>
-      <div class="plan-time-row" id="plan-custom-time-row">
-        <input type="time" class="plan-time-input" id="plan-custom-time-input" onfocus="onPlanTimeFocus('custom')" oninput="onPlanTimeInput('custom')">
-        <button class="plan-slot-chip" id="plan-custom-allday-btn" onclick="toggleAlldayPlan('custom')" data-i18n="labelAllday">終日</button>
-      </div>
-      <div class="plan-modal-section-label" data-i18n="labelMembers">参加メンバー</div>
-      <div class="plan-member-chips" id="plan-custom-member-chips">
-        <button class="plan-member-chip" data-member="papa" onclick="selectPlanMember('papa')"><span class="member-emoji">👨</span></button>
-        <button class="plan-member-chip" data-member="mama" onclick="selectPlanMember('mama')"><span class="member-emoji">👩</span></button>
-        <button class="plan-member-chip" data-member="boy" onclick="selectPlanMember('boy')"><span class="member-emoji">👦</span></button>
-        <button class="plan-member-chip" data-member="girl" onclick="selectPlanMember('girl')"><span class="member-emoji">👧</span></button>
-        <button class="plan-member-chip" data-member="dog" onclick="selectPlanMember('dog')"><span class="member-emoji">🐕</span></button>
-        <button class="plan-member-chip" data-member="cat" onclick="selectPlanMember('cat')"><span class="member-emoji">🐱</span></button>
-      </div>
-      <div id="plan-custom-memo-section">
-        <div class="plan-modal-section-label" data-i18n="planModalMemoLabel">メモ</div>
-        <textarea class="plan-modal-textarea" id="plan-custom-memo" rows="2" placeholder="例：持ち物メモ、注意事項など"></textarea>
-      </div>
-      <div class="plan-flag-row">
-        <label class="plan-important-label" onclick="event.stopPropagation()">
-          <input type="checkbox" id="plan-custom-important-cb">
-          <span data-i18n="labelImportant">⭐ 重要イベント</span>
-        </label>
-        <label class="plan-notify-row" id="plan-custom-notify-row" onclick="event.stopPropagation()">
-          <input type="checkbox" id="plan-custom-notify-cb">
-          <span data-i18n="labelNotify">🔔 メンバー通知</span>
-        </label>
-      </div>
-      <button class="plan-modal-add-btn" id="plan-custom-add-btn" disabled onclick="saveCustomPlan()" data-i18n="planModalAddBtn">追加する</button>
-      <div class="plan-modal-footer" id="plan-custom-edit-footer" style="display:none;">
-        <button class="plan-modal-save-btn" id="plan-custom-save-btn" onclick="saveCustomPlan()" data-i18n="planModalSaveBtn">保存する</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal C: 詳細・編集 -->
-  <div class="plan-modal" id="plan-detail-modal">
-    <div class="plan-modal-handle"></div>
-    <div class="plan-modal-header" id="plan-detail-modal-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
-      <div>
-        <div class="plan-modal-title" id="plan-detail-header"></div>
-        <div class="plan-modal-subtitle" id="plan-detail-meta"></div>
-      </div>
-      <button data-close onclick="closePlanModal()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;flex-shrink:0;">✕</button>
-    </div>
-    <div class="plan-modal-body">
-      <div id="plan-detail-emoji-wrap" style="display:none;">
-        <div class="plan-modal-section-label"><span data-i18n="labelTitle">タイトル</span> <span style="color:var(--terracotta)">*</span></div>
-        <div class="plan-title-row">
-          <button class="plan-emoji-selector-btn" id="plan-detail-emoji-selector" onclick="toggleEmojiInline('detail')">
-            <span class="pes-emoji" id="plan-detail-selected-emoji">📝</span>
-          </button>
-          <input class="plan-modal-text-input" id="plan-detail-title" type="text" placeholder="タイトルを入力" maxlength="40" style="margin-bottom:0;flex:1;" />
-        </div>
-        <div id="plan-detail-emoji-inline" style="display:none;margin-top:6px;"></div>
-      </div>
-      <div class="plan-modal-section-label" data-i18n="planModalDateLabel">日付を選ぶ</div>
-      <div class="plan-date-chips" id="plan-detail-date-chips"></div>
-      <div class="plan-modal-section-label" data-i18n="labelStartTime">開始時刻</div>
-      <div class="plan-time-row" id="plan-detail-time-row">
-        <input type="time" class="plan-time-input" id="plan-detail-time-input" onfocus="onPlanTimeFocus('detail')" oninput="onPlanTimeInput('detail')">
-        <button class="plan-slot-chip" id="plan-detail-allday-btn" onclick="toggleAlldayPlan('detail')" data-i18n="labelAllday">終日</button>
-      </div>
-      <div class="plan-modal-section-label" data-i18n="labelMembers">参加メンバー</div>
-      <div class="plan-member-chips" id="plan-detail-member-chips">
-        <button class="plan-member-chip" data-member="papa" onclick="selectPlanMember('papa')"><span class="member-emoji">👨</span></button>
-        <button class="plan-member-chip" data-member="mama" onclick="selectPlanMember('mama')"><span class="member-emoji">👩</span></button>
-        <button class="plan-member-chip" data-member="boy" onclick="selectPlanMember('boy')"><span class="member-emoji">👦</span></button>
-        <button class="plan-member-chip" data-member="girl" onclick="selectPlanMember('girl')"><span class="member-emoji">👧</span></button>
-        <button class="plan-member-chip" data-member="dog" onclick="selectPlanMember('dog')"><span class="member-emoji">🐕</span></button>
-        <button class="plan-member-chip" data-member="cat" onclick="selectPlanMember('cat')"><span class="member-emoji">🐱</span></button>
-      </div>
-      <div class="plan-modal-section-label" data-i18n="planModalMemoLabel">メモ</div>
-      <textarea class="plan-modal-textarea" id="plan-detail-memo" rows="2"></textarea>
-      <div class="plan-modal-footer" style="flex-direction:column;gap:0;">
-        <div class="plan-flag-row" style="margin-bottom:10px;">
-          <label class="plan-important-label" onclick="event.stopPropagation()">
-            <input type="checkbox" id="plan-detail-important-cb">
-            <span data-i18n="labelImportant">⭐ 重要イベント</span>
-          </label>
-          <label class="plan-notify-row" id="plan-detail-notify-row" style="margin:0;" onclick="event.stopPropagation()">
-            <input type="checkbox" id="plan-detail-notify-cb">
-            <span data-i18n="labelNotify">🔔 メンバー通知</span>
-          </label>
-        </div>
-        <button class="plan-modal-save-btn" onclick="savePlanDetail()" data-i18n="planModalSaveBtn">保存する</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260902j"></script>
+  <script src="/app.js?v=20260902k"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
@@ -922,26 +615,6 @@
     </div>
   </div>
 
-  <!-- ─── SCHEDULE PLAN ACTION SHEET ─── -->
-  <!-- ─── SCHEDULE PLAN ACTION SHEET ─── -->
-  <div id="schedule-plan-action-overlay" class="plan-modal-overlay" style="z-index:3500;" onclick="closeSchedulePlanActionSheet()"></div>
-  <div id="schedule-plan-action-sheet" class="plan-modal" style="z-index:3501;padding:0 20px calc(90px + env(safe-area-inset-bottom,0px));max-height:auto;">
-    <div class="plan-modal-handle"></div>
-    <div id="schedule-plan-action-label"
-      style="font-size:14px;font-weight:700;color:var(--midnight);margin:8px 0 16px;text-align:center;font-family:'Noto Sans JP',sans-serif;"></div>
-    <div style="display:flex;gap:6px;">
-      <button id="schedule-plan-action-add-btn" class="card-action-btn"
-        style="flex:1;padding:10px 8px;">
-        <span class="card-action-icon">📅</span>
-        <span>予定を追加</span>
-      </button>
-      <button id="schedule-plan-action-course-btn" class="card-action-btn"
-        style="flex:1;padding:10px 8px;">
-        <span class="card-action-icon">🗺</span>
-        <span>コースを作る</span>
-      </button>
-    </div>
-  </div>
 
 </body>
 </html>

@@ -110,15 +110,16 @@
       });
     });
 
-    // ─── パスフレーズ入力シート（バックアップ/共有カレンダー）フォーカス中はbottom-navを一時的に隠す（設計書60）───
+    // ─── パスフレーズ入力シート（バックアップ）フォーカス中はbottom-navを一時的に隠す（設計書60。
+    // 設計書178フェーズ3で共有カレンダー機能削除に伴い#cal-passphrase-sheetを対象から除外）───
     // Web版Safari・iOS版共通（Capacitor限定にしない）。モバイルSafariのキーボード表示時、独立したposition:fixed;bottom:0
-    // 要素同士（.bottom-nav と #backup-passphrase-sheet/#cal-passphrase-sheet）の可視領域追従がズレ、
-    // ボタン行がボトムナビと重なる不具合の対策。対象を2シート内のinput/textareaに厳密に限定する。
+    // 要素同士（.bottom-nav と #backup-passphrase-sheet）の可視領域追従がズレ、
+    // ボタン行がボトムナビと重なる不具合の対策。対象をシート内のinput/textareaに厳密に限定する。
     document.addEventListener('focusin', (e) => {
       try {
         const t = e.target;
         if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
-        if (!t.closest('#backup-passphrase-sheet, #cal-passphrase-sheet')) return;
+        if (!t.closest('#backup-passphrase-sheet')) return;
         const nav = document.querySelector('.bottom-nav');
         if (nav) nav.style.visibility = 'hidden';
       } catch (_) {}
@@ -127,7 +128,7 @@
       try {
         const t = e.target;
         if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
-        if (!t.closest('#backup-passphrase-sheet, #cal-passphrase-sheet')) return;
+        if (!t.closest('#backup-passphrase-sheet')) return;
         const nav = document.querySelector('.bottom-nav');
         if (nav) nav.style.visibility = '';
       } catch (_) {}
@@ -351,7 +352,6 @@
         tabAll: '指定なし',
         catAll: '新着',
         catRecommend: 'おすすめ',
-        addToPlanBtnShort: '予定追加',
         catEvent: 'イベント',
         catShow: '展示・公演',
         catGourmet: 'グルメ・フェア',
@@ -366,7 +366,6 @@
         emptyTitle: 'まだスポット準備中！',
         emptyDesc: 'このカテゴリのおでかけ先は<br>近日公開予定です。<br>絞り込み条件を変えて探してみましょう。',
         pinScreenTitle: '📌 ピン留め',
-        calScreenTitle: '📅 カレンダー',
         homeScreenTitle: 'おでかけ情報',
         settingsTitle: '設定',
         secProfile: 'プロフィール',
@@ -386,7 +385,6 @@
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
         navHome: 'おでかけ',
-        navPlan: '予定表',
         navSettings: '設定',
         pinBtn: 'ピン留め',
         pinnedBtn: '外す ✓',
@@ -450,23 +448,6 @@
         bannerDaysLeft: '⏰ あと{d}日',
         toastProfileSet: '✅ {label} に設定しました',
         profileLabelAll: '指定なし（すべて）',
-        planModalDateLabel: '日付を選ぶ',
-        planModalSlotLabel: '時間帯を選ぶ',
-        planModalDateLabelReq: '日付を選ぶ <span style="color:var(--terracotta)">*</span>',
-        planModalSlotLabelReq: '時間帯を選ぶ <span style="color:var(--terracotta)">*</span>',
-        planModalMemoLabel: 'メモ',
-        planModalAddBtn: '追加する',
-        planModalSaveBtn: '保存する',
-        planModalCustomTitle: '予定を追加',
-        planMemoPlaceholder: '例：予約済み、持ち物メモなど',
-        addToPlanBtn: '📅 予定に追加',
-        customPlanEmpty: '右の ＋ から習い事・誕生日・用事などを追加できます',
-        pinnedEventsEmpty: '探索タブで 📌 をタップするとここに表示されます',
-        toastPlanAdded: '📅 プランに追加しました',
-        toastPlanDeleted: '🗑 削除しました',
-        toastPlanUpdated: '✅ 保存しました',
-        scheduleNoPlans: '予定なし',
-        customPlanTitlePlaceholder: 'タイトルを入力',
         navNews: 'くらし',
         newsScreenTitle: 'くらし情報',
         newsCatAll: '新着',
@@ -486,14 +467,6 @@
         labelNickname: 'ニックネーム',
         labelDarkMode: 'ダークモード',
         nicknamePlaceholder: '匿名',
-        labelStartTime: '開始時刻',
-        labelMembers: '参加メンバー',
-        labelImportant: '⭐ 重要イベント',
-        labelNotify: '🔔 メンバー通知',
-        labelAllday: '終日',
-        labelTitle: 'タイトル',
-        scheduleDayCount: '{n}件',
-        scheduleHolidayBadge: '🎌 連休',
         labelWhoWith: '一緒に行く人',
         labelWhoSolo: '🚶 ひとりで',
         labelWhoCouple: '💑 夫婦・カップル',
@@ -512,7 +485,6 @@
         labelAboutApp: 'アプリについて',
         labelOfficialSite: '公式サイト',
         labelAboutSns: '公式サイト・SNS',
-        scheduleMakePlan: '予定を立てる',
         secAccount: 'アカウント',
         loginWithGoogle: 'Googleでログイン',
         loginWithApple: 'Appleでサインイン',
@@ -531,7 +503,6 @@
         backupDisabledDesc: 'パスフレーズを設定すると、予定表・マイコースなどのデータをサーバーに暗号化してバックアップできます。パスフレーズを知っている本人以外は内容を読めません。',
         backupEnabledDesc: 'バックアップは有効です。予定表・マイコースなどのデータの変更は自動的に暗号化して同期されます。',
         backupFoundExistingDesc: '別の端末で作成済みのバックアップが見つかりました。パスフレーズを入力して復元するか、新しくバックアップを作成できます。',
-        backupExcludesCalendarNote: '※ 共有カレンダーへの参加状態は引き継がれません',
         backupEnable: 'バックアップを有効にする',
         backupDisable: 'バックアップを無効にする',
         backupChangePassphrase: 'パスフレーズを変更',
@@ -551,13 +522,6 @@
         toastBackupRestored: '✅ バックアップから復元しました',
         toastBackupError: '⚠️ 処理に失敗しました。もう一度お試しください',
         toastBackupPassphraseWrong: 'パスフレーズが正しくありません',
-        // 共有カレンダーのパスフレーズ方式（設計書55）
-        calPassphraseSetupTitle: '共有用パスフレーズを設定',
-        calPassphraseJoinTitle: 'パスフレーズを入力',
-        calPassphraseWarning: '⚠️ パスフレーズを忘れると共有カレンダーは復元できません。参加者に別途お伝えください。',
-        toastCalGroupCreateError: 'グループ作成に失敗しました',
-        toastCalJoinError: '参加に失敗しました。グループIDをご確認ください。',
-        toastCalPassphraseWrong: 'パスフレーズが正しくありません',
       },
       en: {
         headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
@@ -572,7 +536,6 @@
         tabAll: 'All dates',
         catAll: 'New',
         catRecommend: 'Recommended',
-        addToPlanBtnShort: 'Add Plan',
         catEvent: 'Events',
         catShow: 'Shows & Exhibitions',
         catGourmet: 'Food & Fairs',
@@ -587,7 +550,6 @@
         emptyTitle: 'Coming soon!',
         emptyDesc: 'No spots in this category yet.<br>Try adjusting your filters to see more.',
         pinScreenTitle: '📌 Pinned',
-        calScreenTitle: '📅 Calendar',
         homeScreenTitle: 'Outing Info',
         settingsTitle: 'Settings',
         secProfile: 'Profile',
@@ -607,7 +569,6 @@
         aboutAppName: 'App',
         aboutVersion: 'Version',
         navHome: 'Outings',
-        navPlan: 'Schedule',
         navSettings: 'Settings',
         pinBtn: 'Pin',
         pinnedBtn: 'Unpin ✓',
@@ -671,23 +632,6 @@
         bannerDaysLeft: '⏰ {d} days left',
         toastProfileSet: '✅ Set to: {label}',
         profileLabelAll: 'All (no preference)',
-        planModalDateLabel: 'Select Date',
-        planModalSlotLabel: 'Select Time',
-        planModalDateLabelReq: 'Select Date <span style="color:var(--terracotta)">*</span>',
-        planModalSlotLabelReq: 'Select Time <span style="color:var(--terracotta)">*</span>',
-        planModalMemoLabel: 'Memo',
-        planModalAddBtn: 'Add',
-        planModalSaveBtn: 'Save',
-        planModalCustomTitle: 'Add to schedule',
-        planMemoPlaceholder: 'e.g. booked, bring umbrella, etc.',
-        addToPlanBtn: '📅 Add to Plan',
-        customPlanEmpty: 'Tap + to add activities, birthdays, or appointments.',
-        pinnedEventsEmpty: 'Tap 📌 on events in the Explore tab to pin them here.',
-        toastPlanAdded: '📅 Added to plan!',
-        toastPlanDeleted: '🗑 Deleted',
-        toastPlanUpdated: '✅ Saved',
-        scheduleNoPlans: 'No plans',
-        customPlanTitlePlaceholder: 'Enter title',
         navNews: 'Life Info',
         newsScreenTitle: 'Life Info & News',
         newsCatAll: 'New',
@@ -707,14 +651,6 @@
         labelNickname: 'Nickname',
         labelDarkMode: 'Dark Mode',
         nicknamePlaceholder: 'Anonymous',
-        labelStartTime: 'Start time',
-        labelMembers: 'Members',
-        labelImportant: '⭐ Important',
-        labelNotify: '🔔 Notify members',
-        labelAllday: 'All day',
-        labelTitle: 'Title',
-        scheduleDayCount: '{n}',
-        scheduleHolidayBadge: '🎌 Long Weekend',
         labelWhoWith: 'Who to go with',
         labelWhoSolo: '🚶 Solo',
         labelWhoCouple: '💑 Couple',
@@ -733,7 +669,6 @@
         labelAboutApp: 'About',
         labelOfficialSite: 'Official Site',
         labelAboutSns: 'Official Site & SNS',
-        scheduleMakePlan: 'Plan a trip',
         secAccount: 'Account',
         loginWithGoogle: 'Sign in with Google',
         loginWithApple: 'Sign in with Apple',
@@ -752,7 +687,6 @@
         backupDisabledDesc: 'Set a passphrase to back up your plans, my courses, and other data to the server, encrypted so only you can read them.',
         backupEnabledDesc: 'Backup is enabled. Changes to your plans, my courses, and other data are automatically encrypted and synced.',
         backupFoundExistingDesc: 'An existing backup from another device was found. Enter your passphrase to restore it, or create a new backup.',
-        backupExcludesCalendarNote: '* Shared calendar memberships are not included in this backup',
         backupEnable: 'Enable Backup',
         backupDisable: 'Disable Backup',
         backupChangePassphrase: 'Change Passphrase',
@@ -772,13 +706,6 @@
         toastBackupRestored: '✅ Restored from backup',
         toastBackupError: '⚠️ Something went wrong. Please try again',
         toastBackupPassphraseWrong: 'Incorrect passphrase',
-        // Shared calendar passphrase mode (design doc 55)
-        calPassphraseSetupTitle: 'Set a Sharing Passphrase',
-        calPassphraseJoinTitle: 'Enter Passphrase',
-        calPassphraseWarning: '⚠️ If the passphrase is forgotten, the shared calendar cannot be recovered. Please share it with participants separately.',
-        toastCalGroupCreateError: 'Failed to create group',
-        toastCalJoinError: 'Failed to join. Please check the group ID.',
-        toastCalPassphraseWrong: 'Incorrect passphrase',
       }
     };
 
@@ -888,7 +815,6 @@
       localStorage.setItem('app_city', city);
       updateCityUI();
       updateTabLabels();
-      renderScheduleTab();
       const meta = CITY_META[city];
       showToast(`${meta.flag} ${getLang() === 'en' ? meta.nameEn : meta.nameJa}に切り替えました`);
     }
@@ -936,7 +862,6 @@
       updateCityUI();
       updateDarkModeUI();
       renderEventCards();
-      renderScheduleTab();
       showToast(lang === 'en' ? '🇬🇧 Switched to English' : '🇯🇵 日本語に切り替えました');
     }
 
@@ -1103,7 +1028,6 @@
     let EVENT_REGISTRY = {};
     let SPONSORED_CARDS = []; // PRカード（スポンサー広告枠）一覧（設計書29）
     let eventSortOrder = 'desc'; // desc = 新しい開始日が上
-    let calSortOrder = 'desc';
 
     // ─── フィルター変数 ───
     let filterCats    = new Set();
@@ -1153,7 +1077,6 @@
         }
       }
       renderEventCards();
-      renderPinnedEventsList();
     }
 
     const BG_CLASSES = ['kite','jewel','science','gardens','sentosa','safari','aquarium','haji','eastcoast','botanical','cafe','ramen','park'];
@@ -1697,13 +1620,6 @@
     }
 
     let showPinnedOnly = false;
-
-    function toggleCalSort() {
-      calSortOrder = calSortOrder === 'desc' ? 'asc' : 'desc';
-      const isEn = getLang() === 'en';
-      document.getElementById('cal-sort-btn').textContent = isEn ? (calSortOrder === 'desc' ? 'Start↓' : 'Start↑') : (calSortOrder === 'desc' ? '開始日↓' : '開始日↑');
-      renderCalPopupEvents();
-    }
 
     function _setIconFilter(type) {
       // pin/ending/new は元々排他トグルだったが、「新着」チップ(filterCats/filterNew)が
@@ -2427,7 +2343,7 @@
     // ─── ボトムナビ 即時タップ対応（iOS Safari scroll-offset click mismatch 回避）───
     {
       let _navTouchStartX = 0, _navTouchStartY = 0;
-      ['home', 'news', 'pins', 'plan', 'settings'].forEach(s => {
+      ['home', 'news', 'pins', 'settings'].forEach(s => {
         const btn = document.getElementById('nav-' + s);
         if (!btn) return;
         btn.addEventListener('touchstart', e => {
@@ -2472,7 +2388,6 @@
     {
       let _fabTx = 0, _fabTy = 0;
       [
-        { id: 'fab-plan',   fn: () => openCustomPlanModal() },
         { id: 'fab-top',    fn: () => fabScrollTop() },
       ].forEach(({ id, fn }) => {
         const btn = document.getElementById(id);
@@ -2549,16 +2464,6 @@
       }
     }
 
-    // ─── カレンダーポップアップ 即時タップ対応 ───
-    document.getElementById('cal-popup-filter-row').addEventListener('touchend', e => {
-      const chip = e.target.closest('.sale-filter-chip');
-      if (!chip) return;
-      e.preventDefault();
-      setCalPopupFilter(chip.dataset.cat);
-    }, { passive: false });
-
-
-
     // ─── 閉じる✕ボタン 即時タップ対応（data-close 属性で一括登録） ───
     document.addEventListener('touchend', e => {
       const btn = e.target.closest('[data-close]');
@@ -2570,32 +2475,13 @@
     // ─── オーバーレイ・モーダル閉じる 即時タップ対応 ───
     [
       ['pin-detail-overlay', () => closePinDetail()],
-      ['pin-picker-overlay',   () => closePinPicker()],
-      ['emoji-picker-overlay',    () => closeEmojiPicker()],
-      ['schedule-action-overlay', () => closeScheduleActionSheet()],
-      ['cal-popup-overlay',       () => closeCalPopup()],
       ['backup-passphrase-overlay', () => closeBackupPassphraseSheet()],
-      ['cal-passphrase-overlay',    () => closeCalPassphraseSheet()],
       ['backup-passphrase-submit-btn', () => submitBackupPassphrase()],
-      ['cal-passphrase-submit-btn',    () => submitCalPassphrase()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
     });
 
-
-    // 旧キー (sg_custom_plans etc.) → 統一キー (custom_plans) への一回限り移行
-    (function migrateCustomPlans() {
-      if (localStorage.getItem('_custom_plans_migrated')) return;
-      const unified = JSON.parse(localStorage.getItem('custom_plans') || '[]');
-      const seen = new Set(unified.map(p => p.id));
-      ['sg', 'bkk', 'syd'].forEach(c => {
-        const old = JSON.parse(localStorage.getItem(c + '_custom_plans') || '[]');
-        old.forEach(p => { if (!seen.has(p.id)) { unified.push(p); seen.add(p.id); } });
-      });
-      localStorage.setItem('custom_plans', JSON.stringify(unified));
-      localStorage.setItem('_custom_plans_migrated', '1');
-    })();
 
     // app-headerはscreen-home内のstickyヘッダーになったためsyncHeaderHeightは不要
     function syncHeaderHeight() {}
@@ -2750,19 +2636,11 @@
       document.getElementById('news-scroll-content')?.addEventListener('scroll', () => {
         fab.classList.toggle('visible', document.getElementById('news-scroll-content').scrollTop > 300);
       }, { passive: true });
-
-      const calFab = document.getElementById('cal-popup-fab');
-      document.getElementById('cal-popup-events').addEventListener('scroll', () => {
-        calFab.classList.toggle('visible', document.getElementById('cal-popup-events').scrollTop > 150);
-      }, { passive: true });
     })();
     function fabScrollTop() {
       const targetId = document.getElementById('nav-news')?.classList.contains('active')
         ? 'news-scroll-content' : 'home-scroll-content';
       document.getElementById(targetId)?.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    function calPopupScrollTop() {
-      document.getElementById('cal-popup-events').scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // ─── PIN LOGIC ───
@@ -2961,63 +2839,12 @@
       if (scroll) { scroll.style.maxHeight = ''; scroll.style.marginBottom = ''; scroll.style.overflow = ''; }
     }
 
-    function openEventDetailFromSchedule(eventId, planId, planType) {
-      const event = EVENT_REGISTRY[eventId];
-      if (!event) return;
-      lockScroll();
-      const bgClass = event.bgClass || getBgClass(event.id || event.store || '');
-      const isEn = getLang() === 'en';
-      const content = (isEn && event.content_en) ? event.content_en : (event.content || '');
-      const tipsArr = (isEn && Array.isArray(event.tips_en) && event.tips_en.length)
-        ? event.tips_en : (Array.isArray(event.tips) ? event.tips : []);
-      const tipsList = tipsArr.length
-        ? `<div class="tips-box"><div class="tips-label">${t('tipsLabel')}</div><ul class="tips-list">${tipsArr.map(tip => `<li>${tip}</li>`).join('')}</ul></div>`
-        : '';
-      const modal = document.getElementById('pin-detail-modal');
-      modal.style.padding = '0';
-      const pinHeader = modal.querySelector('.pin-detail-header');
-      if (pinHeader) pinHeader.style.display = 'none';
-      const pinActions = document.getElementById('pin-detail-actions');
-      if (pinActions) pinActions.style.display = 'none';
-      const scroll = document.getElementById('pin-detail-scroll');
-      scroll.style.overflow = 'auto'; scroll.style.flex = '1'; scroll.style.minHeight = '0';
-      scroll.style.maxHeight = 'none'; scroll.style.marginBottom = '0';
-      scroll.style.webkitOverflowScrolling = 'touch'; scroll.scrollTop = 0;
-      const safePlanId = planId.replace(/'/g, "\\'");
-      const safePlanType = planType.replace(/'/g, "\\'");
-      const emojiSafe = (event.emoji || '🎡').replace(/'/g, "\\'");
-      scroll.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:flex-end;padding:12px 16px 8px;">
-          <button onclick="closePinDetail()" style="background:var(--sand);border:none;border-radius:50%;width:32px;height:32px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
-        </div>
-        <div style="padding:0 20px 12px;">
-          <div style="font-size:16px;font-weight:700;color:var(--midnight);line-height:1.35;">${event.store||''}</div>
-        </div>
-        <div>
-          ${event.image
-            ? `<img src="${event.image}" alt="${(event.store||'').replace(/"/g,'&quot;')}" style="width:100%;height:170px;object-fit:cover;display:block;" onerror="handleImgError(this,'${bgClass}','${emojiSafe}')" />`
-            : `<div class="card-image-bg ${bgClass}" style="height:170px;">${event.emoji||'🎡'}</div>`
-          }
-        </div>
-        <div style="padding:12px 20px calc(20px + env(safe-area-inset-bottom));">
-          <div class="card-meta" style="margin-bottom:12px;">
-            ${event.location?`<span class="meta-item"><span class="meta-icon">📍</span>${event.location}</span>`:''}
-            ${event.period?`<span class="meta-item"><span class="meta-icon">📅</span>${event.period}${event.url?`　<a href="${event.url}" target="_blank" rel="noopener" style="color:var(--caramel);font-size:15px;text-decoration:none;">🔗 ${t('articleLink')}</a>`:''}</span>`:''}
-          </div>
-          ${content?`<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:12px;">${content}</p>`:''}
-          ${tipsList}
-        </div>`;
-      modal.classList.add('visible');
-      document.getElementById('pin-detail-overlay').classList.add('visible');
-    }
-
     function removePin(id) {
       const pins = getPins();
       delete pins[id];
       savePins(pins);
       updatePinButtons();
       renderPinList();
-      renderPinnedEventsList();
     }
 
     function clearPins() {
@@ -3025,7 +2852,6 @@
       localStorage.removeItem(pinsKey());
       updatePinButtons();
       renderPinList();
-      renderPinnedEventsList();
       showToast(t('toastClearedPins'));
     }
 
@@ -3665,9 +3491,7 @@
       if (Notification.permission === 'denied') { showToast(t('toastPushDenied')); return; }
       try {
         const reg = await navigator.serviceWorker.ready;
-        const gid = getSharedGroupId();
         if (_pushSubscription) {
-          if (gid) await _deregisterGroupPush(gid);
           await _pushSubscription.unsubscribe();
           await fetch(API_BASE + '/api/push-subscribe', {
             method: 'DELETE',
@@ -3690,18 +3514,12 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subscription: _pushSubscription }),
           });
-          if (gid) await _registerGroupPush(gid);
           showToast(t('toastPushOn'));
         }
       } catch(e) {
         showToast(t('toastPushError'));
       }
       _updatePushBtn();
-    }
-
-    async function enablePushForCalendar() {
-      await togglePush();
-      if (getSharedGroupId()) renderCalSyncModal();
     }
 
     // ─── PUSH NOTIFICATIONS（iOSアプリ/Capacitor版・APNs） ───
@@ -3741,8 +3559,6 @@
         _setPushIntent(true); // ON確定の共通合流点（toggle-on/init両方をカバー・設計書52）
         _registerNativePushToken(token.value);
         if (_nativePushRegisterIntent === 'toggle-on') {
-          const gid = getSharedGroupId();
-          if (gid) _registerGroupPush(gid);
           showToast(t('toastPushOn'));
         }
         _nativePushRegisterIntent = null;
@@ -3754,23 +3570,15 @@
         _nativePushRegisterIntent = null;
         _updatePushBtn();
       });
-      // 通知タップでアプリが起動/フォアグラウンド化した際の遷移（共有カレンダー通知なら参加ダイアログ、
-      // ?nav=news 指定なら生活情報タブ、それ以外はトップ画面へ）
+      // 通知タップでアプリが起動/フォアグラウンド化した際の遷移
+      // （?nav=news 指定なら生活情報タブ、それ以外はトップ画面へ。
+      //  共有カレンダー参加ダイアログへの誘導は設計書178フェーズ3で予定表・共有カレンダー機能削除に伴い撤去）
       plugin.addListener('pushNotificationActionPerformed', (action) => {
         let targetNav = 'home';
         try {
           const url = action?.notification?.data?.url;
           if (url) {
             const u = new URL(url, 'https://dosuru.app');
-            const joinId = u.searchParams.get('join');
-            if (joinId && /^[A-Z2-9]{6}$/.test(joinId)) {
-              _pendingJoinGroupId = joinId;
-              _pendingJoinKey = u.hash.replace('#', '') || null;
-              const desc = document.getElementById('cal-join-desc');
-              if (desc) desc.innerHTML = `グループ <strong>${joinId}</strong> に参加しますか？<br><br>現在の予定データと統合されます。`;
-              document.getElementById('cal-join-overlay').classList.add('visible');
-              document.getElementById('cal-join-modal').classList.add('visible');
-            }
             if (u.searchParams.get('nav') === 'news') targetNav = 'news';
           }
         } catch (e) {}
@@ -3836,8 +3644,6 @@
       _bindNativePushListenersOnce(plugin);
       try {
         if (_nativeDeviceToken) {
-          const gid = getSharedGroupId();
-          if (gid) await _deregisterGroupPush(gid);
           await _deregisterNativePushToken(_nativeDeviceToken);
           _nativeDeviceToken = null;
           localStorage.removeItem('app_ios_push_token');
@@ -3887,18 +3693,13 @@
 
     // ─── NAV LOGIC ───
     function closeAllPopups() {
-      closeCalPopup();
       closePinDetail();
-      closePinPicker();
-      closeEmojiPicker();
-      closeScheduleActionSheet();
       closeEventFilterSheet();
-      closePlanModal();
       const detail = document.getElementById('detail-screen');
       if (detail) detail.classList.remove('visible');
     }
 
-    const FAB_HIDDEN_SCREENS = new Set(['plan', 'settings']);
+    const FAB_HIDDEN_SCREENS = new Set(['settings']);
 
     let _loadedCity = getCity();
 
@@ -3964,7 +3765,7 @@
         document.activeElement.blur();
       }
       closeAllPopups();
-      ['home','news','pins','plan','settings'].forEach(s => {
+      ['home','news','pins','settings'].forEach(s => {
         document.getElementById('nav-' + s).classList.remove('active');
         const el = document.getElementById('screen-' + s);
         if (el) {
@@ -3979,11 +3780,6 @@
       document.getElementById('fab-top').style.display = hideFabs ? 'none' : '';
       // スクロールトップは scrollY リセット後なので非表示に戻す
       document.getElementById('fab-top').classList.remove('visible');
-      const fabPlanGroup = document.getElementById('fab-plan-group');
-      if (fabPlanGroup) {
-        fabPlanGroup.classList.toggle('visible', screen === 'plan');
-        if (screen !== 'plan') fabPlanGroup.classList.remove('open');
-      }
 
       const cityChanged = getCity() !== _loadedCity;
       const appHeader = document.querySelector('.app-header');
@@ -4018,12 +3814,6 @@
         if (el) {
           el.style.display = 'flex';
           el.classList.add('visible');
-        }
-        if (screen === 'plan') {
-          renderScheduleTab();
-          if (getSharedGroupId()) fetchFromServer().then(ok => { if (ok) renderScheduleTab(); });
-          const gated = _applyScreenAuthGate('plan');
-          if (gated && fabPlanGroup) fabPlanGroup.classList.remove('visible');
         }
         if (screen === 'settings') {
           initSettingsProfile();
@@ -4061,52 +3851,8 @@
       return localStorage.getItem('user_name') || '匿名';
     }
 
-    // ─── PLAN FEATURE: DATA LAYER ───
-    // custom_plans は都市によらず共通（個人カレンダー）
-    // event_plans は都市別（イベントIDが都市固有のため）
-    function getCustomPlans() { return JSON.parse(localStorage.getItem('custom_plans') || '[]'); }
-    async function saveCustomPlans(arr) {
-      localStorage.setItem('custom_plans', JSON.stringify(arr));
-      if (getSharedGroupId() && !_calSyncFromServer) await syncToServer();
-      // 個人予定表バックアップ（設計書54）: ログイン中かつバックアップ有効時のみ、restore経由の書き込み以外でバックグラウンド同期
-      if (!_calSyncFromServer) _syncBackupToServer();
-    }
-    function getEventPlans() { return JSON.parse(localStorage.getItem(getCity()+'_event_plans') || '[]'); }
-    async function saveEventPlans(arr) {
-      localStorage.setItem(getCity()+'_event_plans', JSON.stringify(arr));
-      if (getSharedGroupId() && !_calSyncFromServer) await syncToServer();
-      if (!_calSyncFromServer) _syncBackupToServer();
-    }
-
     function fmtDateKey(d) {
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    }
-
-    // 予定表・日付選択用：今週月〜日から4週分を返す
-    function getScheduleWeeks() {
-      const today = new Date(); today.setHours(0,0,0,0);
-      const dow = today.getDay();
-      const mondayOffset = dow === 0 ? -6 : 1 - dow;
-      const thisMonday = new Date(today); thisMonday.setDate(today.getDate() + mondayOffset);
-      const holidays = getCityHolidays();
-      const isHoliday = d => holidays.some(h => fmtDateKey(h) === fmtDateKey(d));
-      const jaLabels = ['今週','来週','2週後','3週後'];
-      const enLabels = ['This Week','Next Week','In 2 Weeks','In 3 Weeks'];
-      return Array.from({length: 4}, (_, w) => {
-        const mon = new Date(thisMonday); mon.setDate(thisMonday.getDate() + w * 7);
-        const allDays = Array.from({length: 7}, (_, i) => {
-          const d = new Date(mon); d.setDate(mon.getDate() + i); return d;
-        });
-        const nextMon = new Date(allDays[6]); nextMon.setDate(allDays[6].getDate() + 1);
-        const isLong = isHoliday(allDays[4]) || isHoliday(nextMon);
-        return {
-          label: getLang() === 'en' ? enLabels[w] : jaLabels[w],
-          allDays,
-          isLong,
-          startStr: fmtDateKey(allDays[0]),
-          endStr:   fmtDateKey(allDays[6]),
-        };
-      });
     }
 
     function handleImgError(el, cls, emoji) {
@@ -4151,1255 +3897,6 @@
       }
     }
 
-    // ─── PLAN MODAL STATE ───
-    let _planModalType = null;
-    let _planModalEventId = null;
-    let _planModalSelectedDate = null;
-    let _planModalSelectedDates = new Set();
-    let _planModalSelectedStartTime = null;
-    let _planModalDetailId = null;
-    let _planModalDetailType = null;
-    let _selectedPlanEmoji = '📝';
-    let _selectedPlanMembers = [];
-    let _editingGroupIds = [];
-
-    function buildDateChipsHtml(selectedDate) {
-      const weeks = getScheduleWeeks();
-      const isEn = getLang() === 'en';
-      const dayNamesJa = ['日','月','火','水','木','金','土'];
-      const dayNamesEn = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      const dayNames = isEn ? dayNamesEn : dayNamesJa;
-      const holidays = getCityHolidays();
-      const isHoliday = d => holidays.some(h => fmtDateKey(h) === fmtDateKey(d));
-      return weeks.map(g => {
-        const chips = g.allDays.map(d => {
-          const key = fmtDateKey(d);
-          const dow = d.getDay();
-          const isHolidayDay = isHoliday(d);
-          const isWeekend = dow === 6 || dow === 0;
-          let cls = 'plan-date-chip';
-          if (!isWeekend && !isHolidayDay) cls += ' plan-date-chip--weekday';
-          else if (dow === 6) cls += ' plan-date-chip--sat';
-          else if (dow === 0 || isHolidayDay) cls += ' plan-date-chip--sun';
-          if (selectedDate === key) cls += ' selected';
-          const mm = d.getMonth()+1; const dd = d.getDate();
-          return `<button class="${cls}" data-date="${key}" onclick="selectPlanDate('${key}')">${dayNames[dow]}<br>${mm}/${dd}</button>`;
-        }).join('');
-        return `<div class="plan-date-week-row"><span class="plan-date-week-label">${g.label}${g.isLong ? ' 🎌' : ''}</span><div class="plan-date-week-chips-row">${chips}</div></div>`;
-      }).join('');
-    }
-
-    function openEventPlanModal(eventId) {
-      lockScroll();
-      try {
-      const event = EVENT_REGISTRY[eventId];
-      const pin = getPins()[eventId];
-      const title = (event?.store || event?.title || pin?.title || '').slice(0,30);
-      const emoji = event?.emoji || pin?.emoji || '📍';
-      const area = event?.area || event?.location || pin?.location || '';
-      const period = event?.period || pin?.hours || '';
-      const meta = [area, period].filter(Boolean).join(' · ');
-      _planModalType = 'event';
-      _planModalEventId = eventId;
-      _planModalSelectedDate = null;
-      _planModalSelectedStartTime = '09:00';
-      document.getElementById('plan-event-modal-title').textContent = `${emoji} ${title}`;
-      document.getElementById('plan-event-modal-subtitle').textContent = meta;
-      document.getElementById('plan-event-date-chips').innerHTML = buildDateChipsHtml(null);
-      document.getElementById('plan-event-memo').value = '';
-      _selectedPlanMembers = [];
-      document.querySelectorAll('#plan-event-member-chips .plan-member-chip').forEach(b => b.classList.remove('selected'));
-      updatePlanAddBtn('event');
-      _showNotifyCheckboxes();
-      const _evImpCb = document.getElementById('plan-event-important-cb');
-      if (_evImpCb) _evImpCb.checked = false;
-      document.getElementById('plan-modal-overlay').classList.add('visible');
-      document.getElementById('plan-event-modal').classList.add('visible');
-      requestAnimationFrame(() => _syncTimeInputUI('event'));
-      } catch(e) {
-        unlockScroll();
-        document.getElementById('plan-modal-overlay')?.classList.remove('visible');
-        document.getElementById('plan-event-modal')?.classList.remove('visible');
-        throw e;
-      }
-    }
-
-    let _customPlanPresetDateKey = null;
-
-    function openCustomPlanModal(presetDateKey = null) {
-      _customPlanPresetDateKey = presetDateKey || null;
-      lockScroll();
-      try {
-      _planModalType = 'custom';
-      _editingGroupIds = [];
-      _planModalSelectedDate = null;
-      _planModalSelectedDates = new Set();
-      _customPlanSelectedDateKeys = [];
-      _planModalSelectedDates = new Set();
-      _planModalSelectedStartTime = '09:00';
-      _selectedPlanEmoji = '📝';
-      _updateEmojiSelectorDisplay('custom', '📝');
-      document.getElementById('plan-custom-title').value = '';
-      document.getElementById('plan-custom-memo').value = '';
-      // 日付チップを直接表示・リセット
-      const _chips = document.getElementById('plan-custom-date-chips');
-      if (_chips) {
-        _chips.style.display = '';
-        _chips.innerHTML = buildDateChipsHtml(null);
-        if (_customPlanPresetDateKey) {
-          _planModalSelectedDates.add(_customPlanPresetDateKey);
-          const presetChip = _chips.querySelector(`[data-date="${_customPlanPresetDateKey}"]`);
-          if (presetChip) presetChip.classList.add('selected');
-        }
-      }
-      _selectedPlanMembers = [];
-      document.querySelectorAll('#plan-custom-member-chips .plan-member-chip').forEach(b => b.classList.remove('selected'));
-      document.getElementById('plan-custom-modal-title').textContent = getLang() === 'en' ? 'Add to schedule' : '予定を追加';
-      document.getElementById('plan-custom-add-btn').style.display = '';
-      document.getElementById('plan-custom-edit-footer').style.display = 'none';
-      _renderPlanPinsList();
-      updateCustomPlanAddBtn();
-      _showNotifyCheckboxes();
-      const _cuImpCb = document.getElementById('plan-custom-important-cb');
-      if (_cuImpCb) _cuImpCb.checked = false;
-      document.getElementById('plan-modal-overlay').classList.add('visible');
-      document.getElementById('plan-custom-modal').classList.add('visible');
-      requestAnimationFrame(() => _syncTimeInputUI('custom'));
-      const customBody = document.querySelector('#plan-custom-modal .plan-modal-body');
-      if (customBody) customBody.scrollTop = 0;
-      } catch(e) {
-        unlockScroll();
-        document.getElementById('plan-modal-overlay')?.classList.remove('visible');
-        document.getElementById('plan-custom-modal')?.classList.remove('visible');
-        throw e;
-      }
-    }
-
-    function openPlanDetailModal(planId, planType) {
-      lockScroll();
-      const plans = planType === 'custom' ? getCustomPlans() : getEventPlans();
-      const plan = plans.find(p => p.id === planId);
-      if (!plan) return;
-
-      if (planType === 'custom') {
-        openCustomPlanEdit([plan]);
-        return;
-      }
-
-      _planModalType = 'detail';
-      _planModalDetailId = planId;
-      _planModalDetailType = planType;
-      _planModalSelectedDate = plan.dateKey;
-      _planModalSelectedStartTime = plan.startTime != null ? plan.startTime : (plan.slot === 'allday' ? 'allday' : null);
-      document.getElementById('plan-detail-emoji-wrap').style.display = 'none';
-      document.getElementById('plan-detail-modal-header').style.alignItems = 'flex-start';
-      _selectedPlanMembers = Array.isArray(plan.member) ? [...plan.member] : (plan.member ? [plan.member] : []);
-      document.querySelectorAll('#plan-detail-member-chips .plan-member-chip').forEach(b => {
-        b.classList.toggle('selected', _selectedPlanMembers.includes(b.dataset.member));
-      });
-      document.getElementById('plan-detail-header').textContent = `${plan.emoji} ${plan.name}`;
-      document.getElementById('plan-detail-meta').textContent = plan.meta || '';
-      document.getElementById('plan-detail-date-chips').innerHTML = buildDateChipsHtml(plan.dateKey);
-      document.getElementById('plan-detail-memo').value = plan.memo || '';
-      _showNotifyCheckboxes();
-      const _dtImpCb = document.getElementById('plan-detail-important-cb');
-      if (_dtImpCb) _dtImpCb.checked = !!plan.important;
-      document.getElementById('plan-modal-overlay').classList.add('visible');
-      document.getElementById('plan-detail-modal').classList.add('visible');
-      requestAnimationFrame(() => _syncTimeInputUI('detail'));
-    }
-
-    const PLAN_EMOJIS = [
-      ['🎡','おでかけ'], ['🍽','食事'],     ['🛒','買い物'],   ['🎂','記念日'],   ['✈️','旅行'],
-      ['⚽','習い事'],   ['🏊','スポーツ'],  ['🎵','音楽'],     ['🎬','映画'],     ['🎮','ゲーム'],
-      ['🏫','学校'],    ['💼','仕事'],     ['🏥','病院'],     ['💈','美容院'],   ['🏠','家のこと'],
-      ['🌸','季節'],    ['🎁','プレゼント'],['🍺','飲み会'],   ['💆','マッサージ'],['📝','その他'],
-    ];
-
-    let _emojiPickerTarget = null;
-
-    function _updateEmojiSelectorDisplay(target, emoji) {
-      const sfx = target === 'custom' ? 'custom' : 'detail';
-      const eEl = document.getElementById(`plan-${sfx}-selected-emoji`);
-      if (eEl) eEl.textContent = emoji;
-    }
-
-    function selectPlanEmoji(emoji) {
-      _selectedPlanEmoji = emoji;
-      _updateEmojiSelectorDisplay(_emojiPickerTarget || 'custom', emoji);
-      document.querySelectorAll('#emoji-picker-grid .emoji-picker-btn').forEach(b => {
-        b.classList.toggle('selected', b.dataset.emoji === emoji);
-      });
-    }
-
-    function toggleEmojiInline(target) {
-      const inline = document.getElementById(`plan-${target}-emoji-inline`);
-      if (!inline) return;
-      if (inline.style.display !== 'none') {
-        inline.style.display = 'none';
-        return;
-      }
-      _emojiPickerTarget = target;
-      inline.innerHTML = `<div class="emoji-picker-grid" style="padding:8px 0 4px;">${
-        PLAN_EMOJIS.map(([e, l]) =>
-          `<button class="emoji-picker-btn${_selectedPlanEmoji === e ? ' selected' : ''}" data-emoji="${e}" onclick="selectPlanEmoji('${e}');closeEmojiInline('${target}');">${e}<span class="emoji-label">${l}</span></button>`
-        ).join('')
-      }</div>`;
-      inline.style.display = 'block';
-    }
-
-    function closeEmojiInline(target) {
-      const inline = document.getElementById(`plan-${target}-emoji-inline`);
-      if (inline) inline.style.display = 'none';
-      _emojiPickerTarget = null;
-    }
-
-    function openEmojiPicker(target) { toggleEmojiInline(target); }
-    function closeEmojiPicker() {
-      closeEmojiInline('custom');
-      closeEmojiInline('detail');
-    }
-
-    function selectPlanMember(member) {
-      const idx = _selectedPlanMembers.indexOf(member);
-      if (idx === -1) _selectedPlanMembers.push(member);
-      else _selectedPlanMembers.splice(idx, 1);
-      ['plan-custom-member-chips', 'plan-event-member-chips', 'plan-detail-member-chips'].forEach(id => {
-        document.querySelectorAll(`#${id} .plan-member-chip`).forEach(b => {
-          b.classList.toggle('selected', _selectedPlanMembers.includes(b.dataset.member));
-        });
-      });
-    }
-
-    function selectPlanDate(dateKey) {
-      if (_planModalType === 'custom') {
-        if (_planModalSelectedDates.has(dateKey)) {
-          _planModalSelectedDates.delete(dateKey);
-        } else {
-          _planModalSelectedDates.add(dateKey);
-        }
-        document.querySelectorAll('#plan-custom-date-chips .plan-date-chip').forEach(c => {
-          c.classList.toggle('selected', _planModalSelectedDates.has(c.dataset.date));
-        });
-        updateCustomPlanAddBtn();
-      } else {
-        _planModalSelectedDate = dateKey;
-        const prefix = _planModalType === 'event' ? 'plan-event' : 'plan-detail';
-        document.querySelectorAll(`#${prefix}-date-chips .plan-date-chip`).forEach(c => {
-          c.classList.toggle('selected', c.dataset.date === dateKey);
-        });
-        if (_planModalType === 'event') updatePlanAddBtn('event');
-      }
-    }
-
-    function toggleAlldayPlan(modalType) {
-      _planModalSelectedStartTime = (_planModalSelectedStartTime === 'allday') ? '09:00' : 'allday';
-      _syncTimeInputUI(modalType);
-    }
-
-    function onPlanTimeInput(modalType) {
-      const prefix = modalType === 'event' ? 'plan-event' : modalType === 'custom' ? 'plan-custom' : 'plan-detail';
-      const val = document.getElementById(`${prefix}-time-input`)?.value;
-      _planModalSelectedStartTime = val || '09:00';
-      document.getElementById(`${prefix}-allday-btn`)?.classList.remove('selected');
-    }
-
-    function onPlanTimeFocus(modalType) {
-      if (_planModalSelectedStartTime === 'allday') {
-        _planModalSelectedStartTime = '09:00';
-        _syncTimeInputUI(modalType);
-      }
-    }
-
-    function _syncTimeInputUI(modalType) {
-      const prefix = modalType === 'event' ? 'plan-event' : modalType === 'custom' ? 'plan-custom' : 'plan-detail';
-      const alldayBtn = document.getElementById(`${prefix}-allday-btn`);
-      const timeInput = document.getElementById(`${prefix}-time-input`);
-      if (!alldayBtn || !timeInput) return;
-      const isAllday = _planModalSelectedStartTime === 'allday';
-      alldayBtn.classList.toggle('selected', isAllday);
-      timeInput.style.opacity = isAllday ? '0.35' : '';
-      if (isAllday) {
-        timeInput.value = '09:00';
-      } else if (_planModalSelectedStartTime) {
-        timeInput.value = _planModalSelectedStartTime;
-      } else {
-        timeInput.value = '';
-      }
-    }
-
-    function getStartTimeLabel(plan, lang) {
-      const st = plan.startTime;
-      if (st === 'allday') return lang === 'en' ? 'All Day' : '終日';
-      if (st) return st;
-      if (!plan.slot) return null;
-      const labels = lang === 'en' ? PLAN_SLOT_LABELS_EN : PLAN_SLOT_LABELS;
-      return labels[plan.slot] || null;
-    }
-
-    function getPlanTimeSort(plan) {
-      const st = plan.startTime;
-      if (st === 'allday') return -1;
-      if (st) { const [h, m] = st.split(':').map(Number); return h * 60 + m; }
-      const legacyOrder = { allday: -1, morning: 9*60, noon: 12*60, evening: 17*60, night: 19*60 };
-      return plan.slot != null ? (legacyOrder[plan.slot] ?? 9999) : 9999;
-    }
-
-    function updatePlanAddBtn(type) {
-      const btn = document.getElementById(`plan-${type}-add-btn`);
-      if (btn) btn.disabled = !_planModalSelectedDate;
-    }
-
-    function updateCustomPlanAddBtn() {
-      const title = document.getElementById('plan-custom-title')?.value?.trim();
-      const addBtn = document.getElementById('plan-custom-add-btn');
-      const saveBtn = document.getElementById('plan-custom-save-btn');
-      const hasDate = _planModalSelectedDates.size > 0;
-      if (addBtn) addBtn.disabled = !(title && hasDate);
-      if (saveBtn) saveBtn.disabled = !(title && hasDate);
-    }
-
-    async function saveEventPlan() {
-      const event = EVENT_REGISTRY[_planModalEventId];
-      const pin = getPins()[_planModalEventId];
-      const title = event?.store || event?.title || pin?.title || '';
-      const emoji = event?.emoji || pin?.emoji || '🎡';
-      const area = event?.area || event?.location || pin?.location || '';
-      const period = event?.period || pin?.hours || '';
-      const meta = [area, period].filter(Boolean).join(' · ');
-      const memo = document.getElementById('plan-event-memo')?.value?.trim() || '';
-      const _evImp = document.getElementById('plan-event-important-cb')?.checked || false;
-      const plans = getEventPlans();
-      const _evEntry = { id: 'ep_'+Date.now(), eventId: _planModalEventId, emoji, name: title, meta, dateKey: _planModalSelectedDate, startTime: _planModalSelectedStartTime || null, memo, member: _selectedPlanMembers.length ? [..._selectedPlanMembers] : undefined };
-      if (_evImp) _evEntry.important = true;
-      plans.push(_evEntry);
-      await saveEventPlans(plans);
-      _notifyGroupIfChecked('plan-event-notify-cb', title, 'added');
-      const pins = getPins();
-      if (pins[_planModalEventId]) {
-        delete pins[_planModalEventId];
-        savePins(pins);
-        updatePinButtons();
-      }
-      closePlanModal();
-      showToast(t('toastPlanAdded'));
-      renderScheduleTab();
-    }
-
-    let _customPlanSelectedDateKeys = [];
-
-    async function saveCustomPlan() {
-      const title = document.getElementById('plan-custom-title')?.value?.trim();
-      if (!title) return;
-      const memo = document.getElementById('plan-custom-memo')?.value?.trim() || '';
-      const isEdit = _editingGroupIds.length > 0;
-      let plans = getCustomPlans();
-      if (isEdit) {
-        const oldIds = new Set(_editingGroupIds);
-        plans = plans.filter(p => !oldIds.has(p.id));
-      }
-      const important = document.getElementById('plan-custom-important-cb')?.checked || false;
-      const now = Date.now();
-      const keys = [..._planModalSelectedDates];
-      keys.forEach((dateKey, i) => {
-        const entry = {
-          id: 'cp_'+(now+i),
-          emoji: _selectedPlanEmoji,
-          name: title,
-          dateKey,
-          startTime: _planModalSelectedStartTime || null,
-          memo
-        };
-        if (_selectedPlanMembers.length) entry.member = [..._selectedPlanMembers];
-        if (important) entry.important = true;
-        plans.push(entry);
-      });
-      await saveCustomPlans(plans);
-      _notifyGroupIfChecked('plan-custom-notify-cb', title, isEdit ? 'updated' : 'added');
-      closePlanModal();
-      showToast(t(isEdit ? 'toastPlanUpdated' : 'toastPlanAdded'));
-      renderScheduleTab();
-    }
-
-    async function savePlanDetail() {
-      const memo = document.getElementById('plan-detail-memo')?.value?.trim() || '';
-      const dtImportant = document.getElementById('plan-detail-important-cb')?.checked || false;
-      let planName = '';
-      if (_planModalDetailType === 'custom') {
-        const title = document.getElementById('plan-detail-title')?.value?.trim();
-        if (!title) return;
-        planName = title;
-        const plans = getCustomPlans();
-        const idx = plans.findIndex(p => p.id === _planModalDetailId);
-        if (idx !== -1) {
-          plans[idx].emoji = _selectedPlanEmoji;
-          plans[idx].name = title;
-          plans[idx].dateKey = _planModalSelectedDate;
-          plans[idx].startTime = _planModalSelectedStartTime || null;
-          plans[idx].memo = memo;
-          if (_selectedPlanMembers.length) plans[idx].member = [..._selectedPlanMembers]; else delete plans[idx].member;
-          if (dtImportant) plans[idx].important = true; else delete plans[idx].important;
-          await saveCustomPlans(plans);
-        }
-      } else {
-        const plans = getEventPlans();
-        const idx = plans.findIndex(p => p.id === _planModalDetailId);
-        if (idx !== -1) {
-          planName = plans[idx].name || '';
-          plans[idx].dateKey = _planModalSelectedDate;
-          plans[idx].startTime = _planModalSelectedStartTime || null;
-          plans[idx].memo = memo;
-          if (_selectedPlanMembers.length) plans[idx].member = [..._selectedPlanMembers]; else delete plans[idx].member;
-          if (dtImportant) plans[idx].important = true; else delete plans[idx].important;
-          await saveEventPlans(plans);
-        }
-      }
-      _notifyGroupIfChecked('plan-detail-notify-cb', planName, 'updated');
-      closePlanModal();
-      showToast(t('toastPlanUpdated'));
-      renderScheduleTab();
-    }
-
-    async function deleteCustomGroup(idsStr) {
-      const ids = new Set(idsStr.split(','));
-      await saveCustomPlans(getCustomPlans().filter(p => !ids.has(p.id)));
-      showToast(t('toastPlanDeleted'));
-      renderScheduleTab();
-    }
-
-    function openCustomPlanEdit(groupPlans) {
-      lockScroll();
-      groupPlans.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-      const first = groupPlans[0];
-      _planModalType = 'custom';
-      _editingGroupIds = groupPlans.map(p => p.id);
-      _planModalSelectedDate = null;
-      _planModalSelectedDates = new Set(groupPlans.map(p => p.dateKey));
-      _planModalSelectedStartTime = first.startTime != null ? first.startTime : (first.slot === 'allday' ? 'allday' : null);
-      _selectedPlanEmoji = first.emoji || '📝';
-      _updateEmojiSelectorDisplay('custom', _selectedPlanEmoji);
-      document.getElementById('plan-custom-title').value = first.name || '';
-      // 編集モードは日付チップセクションを表示する（トリガーUIを隠してチップを表示）
-      const _editChips = document.getElementById('plan-custom-date-chips');
-      if (_editChips) { _editChips.style.display = ''; _editChips.innerHTML = buildDateChipsHtml(null); }
-      document.querySelectorAll('#plan-custom-date-chips .plan-date-chip').forEach(c => {
-        c.classList.toggle('selected', _planModalSelectedDates.has(c.dataset.date));
-      });
-      _syncTimeInputUI('custom');
-      _selectedPlanMembers = Array.isArray(first.member) ? [...first.member] : (first.member ? [first.member] : []);
-      document.querySelectorAll('#plan-custom-member-chips .plan-member-chip').forEach(b => {
-        b.classList.toggle('selected', _selectedPlanMembers.includes(b.dataset.member));
-      });
-      document.getElementById('plan-custom-memo').value = first.memo || '';
-      const _editImpCb = document.getElementById('plan-custom-important-cb');
-      if (_editImpCb) _editImpCb.checked = !!first.important;
-      document.getElementById('plan-custom-modal-title').textContent = getLang() === 'en' ? 'Edit schedule' : '予定を編集';
-      document.getElementById('plan-custom-add-btn').style.display = 'none';
-      document.getElementById('plan-custom-edit-footer').style.display = 'flex';
-      closePinDropdown();
-      _updatePinToggleBtn();
-      updateCustomPlanAddBtn();
-      _showNotifyCheckboxes();
-      document.getElementById('plan-modal-overlay').classList.add('visible');
-      document.getElementById('plan-custom-modal').classList.add('visible');
-      const customBody = document.querySelector('#plan-custom-modal .plan-modal-body');
-      if (customBody) customBody.scrollTop = 0;
-    }
-
-    function editCustomGroup(idsStr) {
-      const ids = idsStr.split(',');
-      const allPlans = getCustomPlans();
-      const groupPlans = ids.map(id => allPlans.find(p => p.id === id)).filter(Boolean);
-      if (!groupPlans.length) return;
-      openCustomPlanEdit(groupPlans);
-    }
-
-    function closePlanModal() {
-      _blurIfFocusInside('plan-event-modal', 'plan-custom-modal', 'plan-detail-modal');
-      unlockScroll();
-      closePinDropdown();
-      document.getElementById('plan-modal-overlay').classList.remove('visible');
-      document.getElementById('plan-event-modal').classList.remove('visible');
-      document.getElementById('plan-custom-modal').classList.remove('visible');
-      document.getElementById('plan-detail-modal').classList.remove('visible');
-      _resetScrollPaddingAfterKb();
-      _planModalType = null;
-      _planModalSelectedDate = null;
-      _planModalSelectedStartTime = null;
-      _editingGroupIds = [];
-    }
-
-    // ─── PLAN TAB RENDER ───
-
-    function renderCustomPlansList() {
-      const container = document.getElementById('custom-plans-list');
-      if (!container) return;
-      const plans = getCustomPlans();
-      if (plans.length === 0) {
-        container.innerHTML = `<div class="plan-empty">${t('customPlanEmpty')}</div>`;
-        return;
-      }
-      const today = new Date(); today.setHours(0,0,0,0);
-      const _lang = getLang();
-
-      // Group by emoji+name+startTime+memo
-      const groupMap = new Map();
-      plans.forEach(p => {
-        const mKey = Array.isArray(p.member) ? p.member.join(',') : (p.member || '');
-        const stKey = p.startTime ?? p.slot ?? '';
-        const key = `${p.emoji}|${p.name}|${stKey}|${p.memo||''}|${mKey}`;
-        if (!groupMap.has(key)) groupMap.set(key, []);
-        groupMap.get(key).push(p);
-      });
-
-      let animIdx = 0;
-      container.innerHTML = [...groupMap.values()].map(group => {
-        group.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-        const first = group[0];
-        const safeIds = group.map(p => p.id).join(',').replace(/'/g, "\\'");
-        const dateChips = group.map(p => {
-          const [,mm,dd] = p.dateKey.split('-');
-          return `<span class="plan-chip">${parseInt(mm)}/${parseInt(dd)}</span>`;
-        }).join('');
-        const upcoming = group.filter(p => new Date(p.dateKey+'T00:00:00') >= today);
-        const mArr = Array.isArray(first.member) ? first.member : (first.member ? [first.member] : []);
-        const memberChip = mArr.length ? mArr.map(m => `<span class="plan-chip plan-chip--member">${MEMBER_EMOJIS[m]||''}</span>`).join('') : '';
-        return `<div class="plan-card" style="animation-delay:${(animIdx++)*0.05}s;">
-          <div class="plan-card-emoji">${first.emoji}</div>
-          <div class="plan-card-info">
-            <div class="plan-card-title">${escapeHtml(first.name)}</div>
-            <div class="plan-card-chips">
-              ${dateChips}
-              ${getStartTimeLabel(first, _lang) ? `<span class="plan-chip">${getStartTimeLabel(first, _lang)}</span>` : ''}
-              ${memberChip}
-            </div>
-            ${first.memo ? `<div class="plan-card-memo">📝 ${escapeHtml(first.memo)}</div>` : ''}
-          </div>
-          <button class="plan-card-edit" onclick="editCustomGroup('${safeIds}')">✏️</button>
-          <button class="plan-card-delete" onclick="deleteCustomGroup('${safeIds}')">🗑</button>
-        </div>`;
-      }).join('');
-    }
-
-    function renderPinnedEventsList() {
-      const container = document.getElementById('pinned-events-list');
-      if (!container) return;
-      const pins = getPins();
-      const entries = Object.values(pins);
-      if (entries.length === 0) {
-        container.innerHTML = `<div class="plan-empty">${t('pinnedEventsEmpty')}</div>`;
-        return;
-      }
-      container.innerHTML = entries.map((p, i) => {
-        const safeTitle = (p.title||'').replace(/'/g,"\\'");
-        const safeUrl = (p.url||'').replace(/'/g,"\\'");
-        return `<div class="plan-card plan-card--event" style="animation-delay:${i*0.05}s;cursor:pointer;" onclick="openPinDetail('${p.id}')">
-          <div class="plan-card-emoji">${p.emoji||'📌'}</div>
-          <div class="plan-card-info">
-            <div class="plan-card-title">${p.title}</div>
-            <div class="card-meta" style="margin-bottom:0;gap:10px;">
-              ${p.location ? `<span class="meta-item"><span class="meta-icon">📍</span>${p.location}</span>` : ''}
-              ${p.hours ? `<span class="meta-item"><span class="meta-icon">📅</span>${p.hours}</span>` : ''}
-            </div>
-          </div>
-          <div class="plan-card-actions" onclick="event.stopPropagation()">
-            <button class="plan-to-plan-btn" onclick="openEventPlanModal('${p.id}')">📅 ${t('addToPlanBtn').replace('📅 ','')}</button>
-            <button class="plan-unpin-btn" onclick="removePin('${p.id}')">📌 外す</button>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    // ─── SCHEDULE PLAN INLINE EXPAND (空き週末日) ───
-    let _expandedSchedulePlanKey = null;
-
-    function toggleSchedulePlanExpand(dateKey) {
-      if (_expandedSchedulePlanKey === dateKey) {
-        _collapseSchedulePlan(dateKey);
-        _expandedSchedulePlanKey = null;
-        return;
-      }
-      if (_expandedSchedulePlanKey) _collapseSchedulePlan(_expandedSchedulePlanKey);
-      const actions = document.getElementById(`schedule-plan-actions-${dateKey}`);
-      if (!actions) return;
-      actions.style.display = 'flex';
-      _expandedSchedulePlanKey = dateKey;
-    }
-    function _collapseSchedulePlan(dateKey) {
-      const el = document.getElementById(`schedule-plan-actions-${dateKey}`);
-      if (el) el.style.display = 'none';
-    }
-    // 設計書178フェーズ1でコース機能（openCourseSheet()）を削除したため中身を無害化。
-    // 呼び出し元は既に存在しない死んだ関数（design 102時点で判明済み）だが、
-    // 万一の呼び出しでJSエラーにならないよう関数定義自体は残置する。
-    function _openCourseFromSchedule(dateKey) {
-      _collapseSchedulePlan(dateKey);
-      _expandedSchedulePlanKey = null;
-    }
-
-    // ─── SCHEDULE PLAN ACTION SHEET (空き週末日) ───
-
-    function closeSchedulePlanActionSheet() {
-      document.getElementById('schedule-plan-action-overlay').classList.remove('visible');
-      document.getElementById('schedule-plan-action-sheet').classList.remove('visible');
-      unlockScroll();
-    }
-
-    // ─── SCHEDULE ACTION SHEET ───
-    let _scheduleActionPlanId = null, _scheduleActionPlanType = null, _scheduleActionEventId = null;
-
-    function openScheduleActionSheet(planId, planType, name, btn, eventId) {
-      _scheduleActionPlanId = planId;
-      _scheduleActionPlanType = planType;
-      _scheduleActionEventId = eventId || null;
-      const _san = document.getElementById('schedule-action-name'); if (_san) _san.textContent = name;
-      const viewBtn = document.getElementById('schedule-action-view-btn');
-      const showView = planType === 'event' && !!eventId;
-      viewBtn.style.display = showView ? 'block' : 'none';
-      const popover = document.getElementById('schedule-action-sheet');
-      const rect = btn.getBoundingClientRect();
-      const popH = showView ? 125 : 92;
-      let top = rect.bottom + 6;
-      if (top + popH > window.innerHeight - 80) top = rect.top - popH - 6;
-      popover.style.top = `${top}px`;
-      popover.style.right = `${window.innerWidth - rect.right}px`;
-      popover.style.left = 'auto';
-      const overlay = document.getElementById('schedule-action-overlay');
-      overlay.style.display = 'block';
-      overlay.style.pointerEvents = 'auto';
-      popover.classList.add('visible');
-    }
-
-    function closeScheduleActionSheet() {
-      const overlay = document.getElementById('schedule-action-overlay');
-      overlay.style.display = 'none';
-      overlay.style.pointerEvents = 'none';
-      document.getElementById('schedule-action-sheet').classList.remove('visible');
-      _scheduleActionPlanId = null;
-      _scheduleActionPlanType = null;
-      _scheduleActionEventId = null;
-    }
-
-    function scheduleActionViewCard() {
-      const id = _scheduleActionPlanId, type = _scheduleActionPlanType, evId = _scheduleActionEventId;
-      closeScheduleActionSheet();
-      openEventDetailFromSchedule(evId, id, type);
-    }
-
-    function scheduleActionEdit() {
-      const id = _scheduleActionPlanId, type = _scheduleActionPlanType;
-      closeScheduleActionSheet();
-      editScheduleItem(id, type);
-    }
-
-    function scheduleActionDelete() {
-      const id = _scheduleActionPlanId, type = _scheduleActionPlanType;
-      closeScheduleActionSheet();
-      deleteScheduleItem(id, type);
-    }
-
-    async function deleteScheduleItem(planId, planType) {
-      if (planType === 'custom') {
-        await saveCustomPlans(getCustomPlans().filter(p => p.id !== planId));
-      } else {
-        await saveEventPlans(getEventPlans().filter(p => p.id !== planId));
-      }
-      showToast(t('toastPlanDeleted'));
-      renderScheduleTab();
-    }
-
-    function handleScheduleRowTap(el) {
-      // 設計書178フェーズ1: コース機能（openCourseDetail()）を削除したため、
-      // courseId付きの過去データがあってもエラーにならないよう何もせず抜ける。
-      const courseId = el.dataset.courseId;
-      if (courseId) {
-        return;
-      }
-      const planType = el.dataset.planType;
-      const eventId = el.dataset.eventId;
-      if (planType === 'event' && eventId) {
-        openEventDetailFromSchedule(eventId, el.dataset.planId, planType);
-      }
-    }
-
-    function editScheduleItem(planId, planType) {
-      if (planType === 'event') {
-        openPlanDetailModal(planId, 'event');
-        return;
-      }
-      const plans = getCustomPlans();
-      const target = plans.find(p => p.id === planId);
-      if (!target) return;
-      const _mk = m => Array.isArray(m) ? m.join(',') : (m || '');
-      const _stk = p => p.startTime ?? p.slot ?? '';
-      const groupKey = `${target.emoji}|${target.name}|${_stk(target)}|${target.memo||''}|${_mk(target.member)}`;
-      openCustomPlanEdit(plans.filter(p => `${p.emoji}|${p.name}|${_stk(p)}|${p.memo||''}|${_mk(p.member)}` === groupKey));
-    }
-
-    // ─── FAB PLAN SPEED DIAL ───
-    function _renderPlanPinsList() {
-      const container = document.getElementById('plan-custom-pins-container');
-      const list = document.getElementById('plan-custom-pins-list');
-      if (!container || !list) return;
-      const pins = Object.values(getPins());
-      if (!pins.length) { container.style.display = 'none'; return; }
-      const currentTitle = (document.getElementById('plan-custom-title')?.value || '').trim();
-      list.innerHTML = pins.map((p, i) => {
-        const safeId = (p.id || p.title).replace(/'/g, "\\'");
-        const sel = currentTitle && currentTitle === (p.title || '').slice(0, 40);
-        return `<button onclick="fillPlanFromPin('${safeId}')"
-          style="display:flex;align-items:center;gap:8px;padding:9px 12px;width:100%;
-                 font-size:14px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;text-align:left;
-                 border:none;border-top:${i > 0 ? '1px solid var(--border-color,#e8e0d8)' : 'none'};
-                 background:${sel ? 'var(--caramel-pale)' : 'var(--warm-white)'};
-                 color:${sel ? 'var(--caramel)' : 'var(--midnight)'};font-weight:${sel ? '700' : 'normal'};">
-          <span style="flex-shrink:0;width:18px;height:18px;border-radius:4px;
-                 border:1.5px solid ${sel ? 'var(--caramel)' : 'var(--light-gray)'};
-                 background:${sel ? 'var(--caramel)' : ''};color:#fff;
-                 display:inline-block;line-height:15px;text-align:center;font-size:13px;align-self:center;">
-            ${sel ? '✓' : ''}</span>
-          <span style="font-size:16px;flex-shrink:0;align-self:center;line-height:1;">${p.emoji || '📌'}</span>
-          <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.title || ''}</span>
-        </button>`;
-      }).join('');
-      container.style.display = '';
-    }
-
-    function _updatePinToggleBtn() { _renderPlanPinsList(); }
-    function togglePinDropdown() {}
-    function closePinDropdown() {}
-
-    function fillPlanFromPin(pinId) {
-      const pin = getPins()[pinId];
-      if (!pin) return;
-      _selectedPlanEmoji = pin.emoji || '📝';
-      _updateEmojiSelectorDisplay('custom', _selectedPlanEmoji);
-      const titleInput = document.getElementById('plan-custom-title');
-      if (titleInput) titleInput.value = (pin.title || '').slice(0, 40);
-      updateCustomPlanAddBtn();
-      _renderPlanPinsList();
-    }
-
-    // ─── PIN PICKER SHEET ───
-    function refreshPinPicker() {
-      const pins = getPins();
-      const entries = Object.values(pins);
-      const list = document.getElementById('pin-picker-list');
-      if (!list) return;
-      const isEn = getLang() === 'en';
-      if (entries.length === 0) {
-        list.innerHTML = `<div class="pin-empty" style="padding:32px 0;"><div class="pin-empty-emoji">📌</div><div class="pin-empty-title">${t('pinEmpty')}</div></div>`;
-      } else {
-        list.innerHTML = entries.map(p => {
-          const safeId = p.id.replace(/'/g, "\\'");
-          return `<div class="unscheduled-pin-row">
-            <span class="unscheduled-pin-emoji">${p.emoji || '📌'}</span>
-            <span class="unscheduled-pin-name">${p.title || ''}</span>
-            <button class="unscheduled-pin-remove" onclick="removePin('${safeId}'); refreshPinPicker();" title="${isEn ? 'Unpin' : 'ピンを外す'}">📌</button>
-            <button class="unscheduled-pin-add" onclick="closePinPicker(); openEventPlanModal('${safeId}')">${isEn ? '+ Add' : '＋ 追加'}</button>
-          </div>`;
-        }).join('');
-      }
-    }
-
-    function closePinPicker() {
-      document.getElementById('pin-picker-overlay')?.classList.remove('visible');
-      document.getElementById('pin-picker-sheet')?.classList.remove('visible');
-      unlockScroll();
-    }
-
-    // ─── SCHEDULE TAB RENDER ───
-    const PLAN_SLOT_ORDER = { allday:0, morning:1, noon:2, evening:3, night:4 };
-    const PLAN_SLOT_LABELS = { allday:'🗓 終日', morning:'☀️ 午前', noon:'🌞 昼', evening:'🌇 夕方', night:'🌙 夜' };
-    const PLAN_SLOT_LABELS_EN = { allday:'🗓 All Day', morning:'☀️ Morning', noon:'🌞 Noon', evening:'🌇 Evening', night:'🌙 Night' };
-    const MEMBER_EMOJIS = { papa: '👨', mama: '👩', boy: '👦', girl: '👧', dog: '🐕', cat: '🐱' };
-
-    // [ja, en] ペア。en が空なら日本語をそのまま使う
-    const JP_EVENTS_FIXED = {
-      '1/1':  ['元日',           "New Year's"],
-      '1/7':  ['七草',           ''],
-      '2/3':  ['節分',           'Setsubun'],
-      '2/14': ['バレンタイン',   "Valentine's"],
-      '3/3':  ['ひな祭り',       'Hinamatsuri'],
-      '3/14': ['ホワイトデー',   'White Day'],
-      '4/1':  ['エイプリルフール','April Fools'],
-      '5/5':  ['こどもの日',     "Children's Day"],
-      '7/7':  ['七夕',           'Tanabata'],
-      '8/13': ['お盆',           'Obon'],
-      '10/31':['ハロウィン',     'Halloween'],
-      '11/15':['七五三',         ''],
-      '12/24':['クリスマスイブ', 'Xmas Eve'],
-      '12/25':['クリスマス',     'Christmas'],
-      '12/31':['大晦日',         "New Year's Eve"],
-    };
-    function _nthWeekday(year, month0, weekday, n) {
-      const d = new Date(year, month0, 1); let cnt = 0;
-      while (d.getMonth() === month0) {
-        if (d.getDay() === weekday && ++cnt === n) return d.getDate();
-        d.setDate(d.getDate() + 1);
-      }
-      return -1;
-    }
-    function getJpEvent(date) {
-      const y = date.getFullYear(), m = date.getMonth(), day = date.getDate();
-      const isEn = getLang() === 'en';
-      const pick = (ja, en) => isEn && en ? en : ja;
-      const fixed = JP_EVENTS_FIXED[`${m+1}/${day}`];
-      if (fixed) return pick(fixed[0], fixed[1]);
-      if (m === 4 && day === _nthWeekday(y, 4, 0, 2)) return pick('母の日', "Mother's Day");
-      if (m === 5 && day === _nthWeekday(y, 5, 0, 3)) return pick('父の日', "Father's Day");
-      return null;
-    }
-
-
-
-    function renderScheduleTab() {
-      _expandedSchedulePlanKey = null;
-      const container = document.getElementById('schedule-content');
-      if (!container) return;
-      const weeks = getScheduleWeeks();
-      const customPlans = getCustomPlans();
-      const eventPlans = getEventPlans();
-      const isEn = getLang() === 'en';
-      const dayNamesJa = ['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日'];
-      const dayNamesEn = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      const dayNames = isEn ? dayNamesEn : dayNamesJa;
-      const holidays = getCityHolidays();
-      const isHoliday = d => holidays.some(h => fmtDateKey(h) === fmtDateKey(d));
-
-      const todayDate = new Date(); todayDate.setHours(0,0,0,0);
-      let html = '';
-      weeks.forEach((g, gi) => {
-        const smm = parseInt(g.startStr.slice(5,7)), sdd = parseInt(g.startStr.slice(8,10));
-        const emm = parseInt(g.endStr.slice(5,7)), edd = parseInt(g.endStr.slice(8,10));
-        const rangeStr = smm === emm ? `${smm}/${sdd}〜${edd}` : `${smm}/${sdd}〜${emm}/${edd}`;
-
-        const daysHtml = g.allDays.map(d => {
-          if (d < todayDate) return ''; // 過去の日は表示しない
-          const key = fmtDateKey(d);
-          const dow = d.getDay();
-          const isHolidayDay = isHoliday(d);
-          const isWeekday = dow >= 1 && dow <= 5 && !isHolidayDay;
-
-          const dayCustom = customPlans.filter(p => p.dateKey === key);
-          const dayEvent  = eventPlans.filter(p => p.dateKey === key);
-          const allItems  = [
-            ...dayCustom.map(p => ({...p, pType:'custom'})),
-            ...dayEvent.map(p => ({...p, pType:'event'})),
-          ].sort((a,b) => getPlanTimeSort(a) - getPlanTimeSort(b));
-
-          // 平日は予定がある日のみ表示
-          if (isWeekday && allItems.length === 0) return '';
-
-          let numCls = 'schedule-day-num';
-          if (dow === 0 || isHolidayDay) numCls += ' schedule-day-num--sun';
-          else if (dow === 6) numCls += ' schedule-day-num--sat';
-
-          const countBadge = allItems.length > 0 ? `<span class="schedule-day-count">${t('scheduleDayCount').replace('{n}', allItems.length)}</span>` : '';
-          const dateKey = key;
-          const rowsHtml = allItems.length > 0
-            ? allItems.map(item => {
-                const emojiCls = item.pType === 'event' ? 'schedule-row-emoji--event' : 'schedule-row-emoji--custom';
-                const st = item.startTime;
-                let timeHtml = '';
-                if (st === 'allday') {
-                  timeHtml = `<span class="schedule-row-time-allday">${isEn ? 'All day' : '終日'}</span>`;
-                } else if (st) {
-                  timeHtml = `<span class="schedule-row-time-hm">${st}</span>`;
-                } else if (item.slot) {
-                  const legacyLabels = isEn ? PLAN_SLOT_LABELS_EN : PLAN_SLOT_LABELS;
-                  const legacyLabel = legacyLabels[item.slot];
-                  if (legacyLabel) timeHtml = `<span class="schedule-row-time-allday" style="font-size:9px;text-align:center;line-height:1.3;">${legacyLabel}</span>`;
-                }
-                const safeItemId = item.id.replace(/'/g,"\\'");
-                const safeEventId = (item.eventId||'').replace(/'/g,"\\'");
-                const safePType = item.pType.replace(/'/g,"\\'");
-                const safeCourseId = (item.courseId||'').replace(/'/g,"\\'");
-                const mArr2 = Array.isArray(item.member) ? item.member : (item.member ? [item.member] : []);
-                const memberHtml = mArr2.map(m => MEMBER_EMOJIS[m] ? `<span class="schedule-member-chip schedule-member-chip--${m}"><span class="member-icon">${MEMBER_EMOJIS[m]}</span></span>` : '').join('');
-                const memoHtml = item.memo ? `<span class="schedule-row-memo">📝 ${escapeHtml(item.memo)}</span>` : '';
-                const safeName = item.name.replace(/'/g,"\\'");
-                const importantCls = item.important ? ' schedule-row--important' : '';
-                return `<div class="schedule-swipe-wrap">
-                  <div class="schedule-row${importantCls}"
-                    data-plan-id="${safeItemId}"
-                    data-plan-type="${safePType}"
-                    data-event-id="${safeEventId}"
-                    data-course-id="${safeCourseId}"
-                    onclick="handleScheduleRowTap(this)">
-                    <div class="schedule-row-time">${timeHtml}</div>
-                    <div class="schedule-row-content">
-                      <div class="schedule-row-emoji ${emojiCls}">${item.emoji}</div>
-                      <div class="schedule-row-info">
-                        <div class="schedule-row-name">${escapeHtml(item.name)}</div>
-                        ${memberHtml || memoHtml ? `<div class="schedule-row-meta">${memberHtml}${memoHtml}</div>` : ''}
-                      </div>
-                      <button class="schedule-row-menu-btn" onclick="event.stopPropagation(); openScheduleActionSheet('${safeItemId}','${safePType}','${safeName}',this,'${safeEventId}')">⋮</button>
-                    </div>
-                  </div>
-                </div>`;
-              }).join('')
-            : isWeekday
-              ? `<div class="schedule-empty-day">${t('scheduleNoPlans')}</div>`
-              : `<div class="schedule-empty-day" style="padding:0;overflow:hidden;">
-                   <div style="cursor:pointer;text-align:center;padding:10px 14px;"
-                     onclick="toggleSchedulePlanExpand('${dateKey}')">
-                     <span style="font-size:13px;color:var(--light-gray);">＋ ${t('scheduleMakePlan')}</span>
-                   </div>
-                   <div id="schedule-plan-actions-${dateKey}"
-                     style="display:none;padding:4px 12px 10px;justify-content:center;gap:6px;">
-                     <button class="card-action-btn" style="flex:none;width:calc(33% - 4px);"
-                       onclick="event.stopPropagation();openCustomPlanModal('${dateKey}')">
-                       <span class="card-action-icon">📅</span><span>予定を追加</span>
-                     </button>
-                   </div>
-                 </div>`;
-
-          const cityHolidayName = getCityHolidayName(d);
-          const jpEvent = cityHolidayName ? null : getJpEvent(d);
-          const eventLabel = cityHolidayName || jpEvent;
-          const cardCls = isWeekday ? 'schedule-day-card schedule-day-card--weekday' : 'schedule-day-card';
-          return `<div class="${cardCls}">
-            <div class="schedule-day-header">
-              <div class="schedule-day-num-col"><div class="${numCls}">${d.getDate()}</div></div>
-              <div class="schedule-day-right">
-                <div class="schedule-day-label">${dayNames[dow]}</div>
-                ${eventLabel ? `<div class="schedule-jp-event">${cityHolidayName ? '🎌' : '🎉'} ${eventLabel}</div>` : ''}
-              </div>
-              ${countBadge}
-            </div>
-            ${rowsHtml}
-          </div>`;
-        }).join('');
-
-        html += `<div class="schedule-week-group">
-          <div class="schedule-week-header">
-            ${g.label}
-            <span style="font-size:14px;color:var(--warm-gray);font-family:'Noto Sans JP',sans-serif;font-weight:400;">${rangeStr}</span>
-            ${g.isLong?`<span class="schedule-holiday-badge">${t('scheduleHolidayBadge')}</span>`:''}
-          </div>
-          ${daysHtml}
-        </div>`;
-      });
-      container.innerHTML = html;
-      adjustScheduleRowNames();
-    }
-
-    function adjustScheduleRowNames() {
-      document.querySelectorAll('.schedule-row-name').forEach(el => {
-        if (el.scrollWidth <= el.clientWidth) return;
-        el.style.fontSize = '13px';
-        if (el.scrollWidth <= el.clientWidth) return;
-        el.style.fontSize = '15px';
-        el.style.whiteSpace = 'normal';
-        el.style.display = '-webkit-box';
-        el.style.webkitLineClamp = '2';
-        el.style.webkitBoxOrient = 'vertical';
-        el.style.textOverflow = 'unset';
-      });
-    }
-
-    // ─── CALENDAR LOGIC ───
-    function buildCalendarEvents(year, month) {
-      const eventMap = {}; // { date: { events: [], sales: [] } }
-
-      const addToMap = (date, bucket, item) => {
-        if (!eventMap[date]) eventMap[date] = { events: [], sales: [] };
-        eventMap[date][bucket].push(item);
-      };
-
-      // EVENT_DATA のみ使用（typeでバッジ色を分ける）
-      const { who: calWhoList, age: calAge } = getProfile();
-      const filteredCalEvents = EVENT_DATA.filter(e => {
-        const eAge = Array.isArray(e.age) ? e.age : (e.age ? [e.age] : ['all']);
-        const ageMatch = calAge === 'all' || eAge.includes(calAge) || eAge.includes('all');
-        const eWho = Array.isArray(e.who) ? e.who : null;
-        const whoMatch = calWhoList.length === 0 || !eWho || calWhoList.some(w => eWho.includes(w));
-        return ageMatch && whoMatch;
-      });
-      filteredCalEvents.forEach(e => {
-        if (!e.start_date || !e.end_date) return;
-        const badgeClass = e.type === 'gourmet' ? 'cal-count-gourmet'
-                         : e.type === 'sale'    ? 'cal-count-sale'
-                         : 'cal-count-event';
-        // event typeはeventsバケット、それ以外はsalesバケット
-        const bucket = e.type === 'event' ? 'events' : 'sales';
-        let d = new Date(e.start_date + 'T00:00:00');
-        const end = new Date(e.end_date + 'T00:00:00');
-        while (d <= end) {
-          if (d.getFullYear() === year && d.getMonth() === month) {
-            addToMap(d.getDate(), bucket, {
-              id: e.id,
-              title: e.store || e.title || '',
-              location: e.location || '',
-              hours: e.period || '',
-              tip: e.tip || e.content || '',
-              emoji: e.emoji || '📍',
-              badgeClass,
-            });
-          }
-          d.setDate(d.getDate() + 1);
-        }
-      });
-
-      return eventMap;
-    }
-
-    const CAL_MONTHS_TO_SHOW = 12; // 今月から12ヶ月分表示
-
-    function renderCalendarMonth(year, month) {
-      const today = new Date();
-      const eventMap = buildCalendarEvents(year, month);
-      const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-
-      const firstDay = new Date(year, month, 1).getDay();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
-      const weeks = totalCells / 7;
-
-      // 連休の日付マップ {date: vacationName}
-      const vacationMap = {};
-      getLongVacations().forEach(vac => {
-        let d = new Date(vac.start); d.setHours(0,0,0,0);
-        const end = new Date(vac.end); end.setHours(0,0,0,0);
-        while (d <= end) {
-          if (d.getFullYear() === year && d.getMonth() === month) {
-            vacationMap[d.getDate()] = vac.name;
-          }
-          d = new Date(d); d.setDate(d.getDate() + 1);
-        }
-      });
-
-      const sgHolidaySet = new Set();
-      getCityHolidays().forEach(h => {
-        if (h.getFullYear() === year && h.getMonth() === month) sgHolidaySet.add(h.getDate());
-      });
-
-      const DAY_LABELS = ['日','月','火','水','木','金','土'];
-      const headerHtml = DAY_LABELS.map((d, i) =>
-        `<div class="cal-day-label" style="${i===0?'color:var(--terracotta)':i===6?'color:var(--sky)':''}">${d}</div>`
-      ).join('');
-
-      let weeksHtml = '';
-      for (let w = 0; w < weeks; w++) {
-        let cellsHtml = '';
-        // この週で連休が占めるセルの範囲を計算（バー描画用）
-        let barStart = -1, barEnd = -1;
-        const cellUnit = 100 / 7;
-
-        for (let c = 0; c < 7; c++) {
-          const i = w * 7 + c;
-          let date, isOtherMonth = false;
-          if (i < firstDay || i >= firstDay + daysInMonth) {
-            isOtherMonth = true; date = 0;
-          } else {
-            date = i - firstDay + 1;
-          }
-
-          if (!isOtherMonth && date && vacationMap[date]) {
-            if (barStart === -1) barStart = c;
-            barEnd = c;
-          }
-
-          const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          const isPast = !isOtherMonth && date > 0 &&
-            new Date(year, month, date) < todayMidnight;
-          const isToday = !isOtherMonth &&
-            today.getFullYear() === year &&
-            today.getMonth() === month &&
-            today.getDate() === date;
-          const dayData = !isOtherMonth && !isPast && date ? eventMap[date] : null;
-          const hasEvent = dayData && (dayData.events.length > 0 || dayData.sales.length > 0);
-
-          const isHoliday = !isOtherMonth && !isPast && !!date && sgHolidaySet.has(date);
-
-          let classes = 'cal-cell';
-          if (isOtherMonth || isPast) classes += ' other-month';
-          if (isToday) classes += ' today';
-          if (hasEvent) classes += ' has-event';
-          if (isHoliday) classes += ' sg-holiday';
-
-          const sunStyle = c === 0 && !isOtherMonth && !isPast && !isHoliday ? 'color:var(--terracotta)' : '';
-          const satStyle = c === 6 && !isOtherMonth && !isPast && !isHoliday ? 'color:var(--sky)' : '';
-          const dateStyle = isToday ? '' : (sunStyle || satStyle);
-
-          if (isOtherMonth || isPast) {
-            cellsHtml += `<div class="${classes}"></div>`;
-          } else {
-            // 件数バッジ
-            let badgesHtml = '';
-            if (hasEvent) {
-              const ec = dayData.events.length;
-              const sc = dayData.sales.length;
-              const allItems = [...dayData.events, ...dayData.sales];
-              const total = ec + sc;
-              badgesHtml = `<div class="cal-event-counts">
-                <span class="cal-count-badge cal-count-event">${total}</span>
-              </div>`;
-              const clickAttr = ` onclick='showCalPopup(${date}, ${year}, ${month+1}, ${JSON.stringify(allItems).replace(/'/g,"&#39;")})'`;
-              cellsHtml += `<div class="${classes}"${clickAttr}>
-                <span class="cal-date"${dateStyle ? ` style="${dateStyle}"` : ''}>${date}</span>
-
-                ${badgesHtml}
-              </div>`;
-            } else {
-              cellsHtml += `<div class="${classes}">
-                <span class="cal-date"${dateStyle ? ` style="${dateStyle}"` : ''}>${date}</span>
-
-              </div>`;
-            }
-          }
-        }
-
-        // 連休バーを週の中のセル範囲に重ねて描画
-        let barHtml = '';
-        if (barStart !== -1) {
-          const left = barStart * cellUnit;
-          const width = (barEnd - barStart + 1) * cellUnit;
-          // バーの最初のセルに連休名を表示
-          const vacName = (() => {
-            for (let c = barStart; c <= barEnd; c++) {
-              const i = w * 7 + c;
-              const date = i < firstDay ? 0 : i - firstDay + 1;
-              if (date && vacationMap[date]) return vacationMap[date];
-            }
-            return '';
-          })();
-          // 連休開始日かどうか（この週の最初のバーセルが連休全体の最初か）
-          const firstVacDate = (() => {
-            for (let c = barStart; c <= barEnd; c++) {
-              const i = w * 7 + c;
-              const date = i - firstDay + 1;
-              return date;
-            }
-          })();
-          const showLabel = firstVacDate && !vacationMap[firstVacDate - 1];
-
-          const vacNameEn = { '春休み': 'Spring Break', 'ゴールデンウィーク': 'Golden Week', '夏休み': 'Summer Break', '冬休み': 'Winter Break' };
-          const displayVacName = getLang() === 'en' ? (vacNameEn[vacName] || vacName) : vacName;
-          const sijsSuffix = getLang() === 'en' ? '(SIJS)' : '（SIJS）';
-          barHtml = `<div class="cal-vacation-bar" style="left:calc(${left}% + 2px);width:calc(${width}% - 4px);">
-            ${showLabel ? `<span style="position:absolute;left:4px;top:-12px;font-size:8px;color:var(--caramel);font-weight:700;white-space:nowrap;opacity:0.85;">${displayVacName}<span style="font-weight:400;opacity:0.75;"> ${sijsSuffix}</span></span>` : ''}
-          </div>`;
-        }
-
-        weeksHtml += `<div class="cal-week">${barHtml}${cellsHtml}</div>`;
-      }
-
-      return `
-        <div class="cal-month-block">
-          <div class="cal-month-heading">${year}年 ${monthNames[month]}</div>
-          <div class="cal-grid-header">${headerHtml}</div>
-          <div class="cal-grid">${weeksHtml}</div>
-        </div>`;
-    }
-
-    function renderCalendar() {
-      const wrap = document.getElementById('cal-months-wrap');
-      if (!wrap) return; // 旧カレンダー廃止
-      const today = new Date();
-      let html = '';
-      for (let i = 0; i < CAL_MONTHS_TO_SHOW; i++) {
-        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        html += renderCalendarMonth(d.getFullYear(), d.getMonth());
-      }
-      wrap.innerHTML = html;
-    }
-
-    let _calPopupAllEvents = [];
-    let _calPopupFilters = new Set();
-    let _calPopupDateLabel = '';
-
-    function showCalPopup(date, year, month, events) {
-      lockScroll();
-      _calPopupAllEvents = Array.isArray(events) ? events : [events];
-      _calPopupFilters.clear();
-      const lang = getLang();
-      _calPopupDateLabel = lang === 'en' ? `${month}/${date}/${year}` : `${year}年${month}月${date}日`;
-
-      document.querySelectorAll('#cal-popup-filter-row .sale-filter-chip').forEach(chip => {
-        chip.classList.remove('active');
-      });
-
-      renderCalPopupEvents();
-      document.getElementById('cal-popup').classList.add('visible');
-      document.getElementById('cal-popup-overlay').classList.add('visible');
-      document.getElementById('cal-popup-events').scrollTop = 0;
-      document.getElementById('cal-popup-fab').classList.remove('visible');
-    }
-
-    function setCalPopupFilter(cat) {
-      if (_calPopupFilters.has(cat)) {
-        _calPopupFilters.clear();
-      } else {
-        _calPopupFilters.clear();
-        _calPopupFilters.add(cat);
-      }
-      document.querySelectorAll('#cal-popup-filter-row .sale-filter-chip').forEach(chip => {
-        chip.classList.toggle('active', _calPopupFilters.has(chip.dataset.cat));
-      });
-      renderCalPopupEvents();
-      document.getElementById('cal-popup-events').scrollTop = 0;
-    }
-
-    function renderCalPopupEvents() {
-      const lang = getLang();
-      const filtered = _calPopupFilters.size === 0
-        ? _calPopupAllEvents
-        : _calPopupAllEvents.filter(ev => {
-            const full = ev.id ? EVENT_REGISTRY[ev.id] : null;
-            if (!full) return false;
-            return _calPopupFilters.has(full.type);
-          });
-
-      filtered.sort((a, b) => {
-        const fa = a.id ? EVENT_REGISTRY[a.id] : null;
-        const fb = b.id ? EVENT_REGISTRY[b.id] : null;
-        const da = fa && fa.start_date ? new Date(fa.start_date) : new Date(0);
-        const db = fb && fb.start_date ? new Date(fb.start_date) : new Date(0);
-        return calSortOrder === 'desc' ? db - da : da - db;
-      });
-
-      const count = filtered.length;
-      document.getElementById('cal-popup-date').textContent = _calPopupDateLabel;
-      document.getElementById('cal-popup-count').textContent = lang === 'en'
-        ? `${count} item${count !== 1 ? 's' : ''}`
-        : `${count}件`;
-
-      const cardsHtml = filtered.map((ev, i) => {
-        const fullEvent = ev.id ? EVENT_REGISTRY[ev.id] : null;
-        if (fullEvent) return renderEventCard(fullEvent, i) || '';
-        return `
-        <div class="cal-popup-event-item">
-          <div class="cal-popup-title">${ev.emoji} ${escapeHtml(ev.title)}</div>
-          <div class="cal-popup-meta">
-            <span>📍 ${escapeHtml(ev.location)}</span>
-            <span>📅 ${escapeHtml(ev.hours)}</span>
-          </div>
-          ${ev.tip ? `<div class="cal-popup-tips">${escapeHtml(ev.tip)}</div>` : ''}
-        </div>`;
-      }).join('');
-      const lang2 = getLang();
-      const eventsEl = document.getElementById('cal-popup-events');
-      if (cardsHtml) {
-        eventsEl.classList.remove('empty');
-        eventsEl.innerHTML = cardsHtml;
-      } else {
-        eventsEl.classList.add('empty');
-        eventsEl.innerHTML = `<div style="text-align:center;color:var(--warm-gray);font-size:14px;">${lang2 === 'en' ? 'No items for this category' : 'このカテゴリの\nイベントはありません'}</div>`;
-      }
-      updatePinButtons();
-    }
-
-    function closeCalPopup() {
-      unlockScroll();
-      document.getElementById('cal-popup').classList.remove('visible');
-      document.getElementById('cal-popup-overlay').classList.remove('visible');
-    }
-
-    renderCalendar();
-    updateCalSyncBtn();
-    checkJoinParam();
     checkNavParam();
 
     // ─── HIDDEN GEMS DATA ───
@@ -5585,7 +4082,7 @@
     async function _importKeyMaterial(b64) {
       return crypto.subtle.importKey('raw', _b64urlDecode(b64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
     }
-    // CryptoKeyオブジェクトを直接受け取る汎用の暗号化・復号（IV12バイト先頭付与、Base64url、既存_encryptPlans/_decryptPlansと同パターン）
+    // CryptoKeyオブジェクトを直接受け取る汎用の暗号化・復号（IV12バイト先頭付与、Base64url形式）
     async function _encryptWithKey(cryptoKey, data) {
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(JSON.stringify(data)));
@@ -5643,25 +4140,16 @@
       return !!_getBackupKeyMaterial();
     }
 
-    // 全データバックアップ対象の都市（設計書58 §3-3: ACTIVE_CITIESが['sg']のみでも、
-    // 過去にBKK/SYDが稼働していた時期のlocalStorageデータを取りこぼさないよう固定で全都市分を対象にする）
-    const BACKUP_CITIES = ['sg', 'bkk', 'syd'];
-
     // 現在のlocalStorageからバックアップ対象データ一式を集める（設計書58 §3-4 新構造。
     // 設計書178フェーズ1でコース機能削除に伴い myCoursesByCity/likedCourses フィールドを削除。
-    // 設計書178フェーズ2で探訪（スタンプラリー）機能削除に伴い stampMemos/arrivalDate/departureDate フィールドを削除）
+    // 設計書178フェーズ2で探訪（スタンプラリー）機能削除に伴い stampMemos/arrivalDate/departureDate フィールドを削除。
+    // 設計書178フェーズ3で予定表機能削除に伴い customPlans/eventPlansByCity フィールドを削除）
     function _collectBackupPayload() {
-      const eventPlansByCity = {};
-      BACKUP_CITIES.forEach(city => {
-        try { eventPlansByCity[city] = JSON.parse(localStorage.getItem(city + '_event_plans') || '[]'); } catch (_) { eventPlansByCity[city] = []; }
-      });
       let genres = [], ageList = [];
       try { genres = JSON.parse(localStorage.getItem('app_genres') || '[]'); } catch (_) {}
       try { ageList = JSON.parse(localStorage.getItem('app_age_list') || '[]'); } catch (_) {}
       return {
         version: 2,
-        customPlans: getCustomPlans(),
-        eventPlansByCity,
         genres,
         who: localStorage.getItem('app_who') || '[]',
         ageList,
@@ -5670,19 +4158,9 @@
     }
 
     // 復号したバックアップデータをlocalStorageへローカルとマージして書き込む（設計書58 §3-5。
-    // 設計書178フェーズ2で旧構造〈versionフィールドなし〉の後方互換分岐を削除、常にversion:2形式として扱う）
+    // 設計書178フェーズ2で旧構造〈versionフィールドなし〉の後方互換分岐を削除、常にversion:2形式として扱う。
+    // 設計書178フェーズ3で予定表機能削除に伴い customPlans/eventPlansByCity のマージ処理を削除）
     async function _applyRestoredBackup(dec) {
-      const localCustom = getCustomPlans();
-      const mergedCustom = mergeArr(localCustom, dec.customPlans || []);
-      await saveCustomPlans(mergedCustom);
-
-      BACKUP_CITIES.forEach(city => {
-        const localEvent = (() => { try { return JSON.parse(localStorage.getItem(city + '_event_plans') || '[]'); } catch (_) { return []; } })();
-        const remoteEvent = (dec.eventPlansByCity && dec.eventPlansByCity[city]) || [];
-        const mergedEvent = mergeArr(localEvent, remoteEvent);
-        localStorage.setItem(city + '_event_plans', JSON.stringify(mergedEvent));
-      });
-
       if (Array.isArray(dec.genres) && dec.genres.length && getGenreList().length === 0) {
         saveGenreList(dec.genres);
       }
@@ -5697,7 +4175,7 @@
       }
     }
 
-    // saveCustomPlans/saveEventPlans/マイコース保存・ジャンル/プロフィール/いいね変更から呼ばれる。
+    // マイコース保存・ジャンル/プロフィール/いいね変更から呼ばれる。
     // バックアップ未設定・未ログインなら即return（実害なし）。
     async function _syncBackupToServer() {
       if (!getAuthToken()) return;
@@ -5747,8 +4225,7 @@
           <button class="cal-sync-action secondary" data-backup-action="disable">🚫 <span data-i18n="backupDisable">${t('backupDisable')}</span></button>`;
       } else {
         el.innerHTML = `
-          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 6px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
-          <p style="font-size:12px;color:var(--warm-gray);line-height:1.6;margin:0 0 10px;" data-i18n="backupExcludesCalendarNote">${t('backupExcludesCalendarNote')}</p>
+          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
           <button class="cal-sync-action primary" data-backup-action="setup">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
       }
     }
@@ -5967,7 +4444,6 @@
         _backupSheetMandatory = false; // 成功時は必須モードでも閉じられるようにする（設計書118）
         closeBackupPassphraseSheet();
         renderBackupSection();
-        renderScheduleTab();
         showToast(t('toastBackupRestored'));
       } catch (e) {
         _sendDebugLog('backup_error', {
@@ -6009,515 +4485,6 @@
       } catch (e) {}
     }
 
-    // ─── 共有カレンダー ───
-    let _calSyncFromServer = false;
-    let _pendingJoinGroupId = null;
-    let _pendingJoinKey = null;
-    let _scannerStream = null;
-    let _scannerRafId = null;
-
-    // idベースの和集合マージ（後勝ち＝第2引数bの内容が優先される）。
-    // 設計書22: doJoinGroup()専用だった実装を共通関数として切り出し、fetchFromServer()からも使う。
-    function mergeArr(a, b) {
-      const m = {};
-      [...a, ...b].forEach(p => { if (p && p.id) m[p.id] = p; });
-      return Object.values(m);
-    }
-
-    // ─── E2E ENCRYPTION (AES-256-GCM) ───
-    // 設計書55: 新方式（パスフレーズ由来の鍵）と旧方式（URLフラグメントのランダム鍵）が共存する。
-    // getCalKey/setCalKey は「実際に暗号化・復号に使う鍵材料（Base64url）」を保持する点は旧方式から変更なし。
-    // 新方式ではパスフレーズ自体ではなく、パスフレーズから導出した鍵material（raw export→Base64url）をここに保存する
-    // （案X-B: 端末保存・自動復元、設計書55 §2-8）。
-    function getCalKey() { return localStorage.getItem(getCity()+'_shared_cal_key') || null; }
-    function setCalKey(k) {
-      if (k) localStorage.setItem(getCity()+'_shared_cal_key', k); else localStorage.removeItem(getCity()+'_shared_cal_key');
-      if (_CapPrefs) {
-        const prefKey = getCity()+'_shared_cal_key';
-        if (k) _CapPrefs.set({ key: prefKey, value: k }).catch(() => {});
-        else _CapPrefs.remove({ key: prefKey }).catch(() => {});
-      }
-    }
-    // salt: 新方式グループのみ持つ。平文（非秘密）、パスフレーズと組み合わせて鍵を導出するために必要。
-    function getCalSalt() { return localStorage.getItem(getCity()+'_shared_cal_salt') || null; }
-    function setCalSalt(s) {
-      if (s) localStorage.setItem(getCity()+'_shared_cal_salt', s); else localStorage.removeItem(getCity()+'_shared_cal_salt');
-    }
-
-    async function _genCalKey() {
-      const k = await crypto.subtle.generateKey({name:'AES-GCM',length:256}, true, ['encrypt','decrypt']);
-      const raw = await crypto.subtle.exportKey('raw', k);
-      return btoa(String.fromCharCode(...new Uint8Array(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    }
-    async function _importCalKey(b64) {
-      const raw = Uint8Array.from(atob(b64.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
-      return crypto.subtle.importKey('raw', raw, {name:'AES-GCM'}, false, ['encrypt','decrypt']);
-    }
-    async function _encryptPlans(keyB64, data) {
-      const key = await _importCalKey(keyB64);
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const ct = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(JSON.stringify(data)));
-      const buf = new Uint8Array(12 + ct.byteLength);
-      buf.set(iv); buf.set(new Uint8Array(ct), 12);
-      return btoa(String.fromCharCode(...buf)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    }
-    async function _decryptPlans(keyB64, encB64) {
-      const key = await _importCalKey(keyB64);
-      const buf = Uint8Array.from(atob(encB64.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
-      const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(0,12)}, key, buf.slice(12));
-      return JSON.parse(new TextDecoder().decode(plain));
-    }
-    async function _generateQR(url) {
-      if (!window.qrcode) await _loadScript('/qrcode-generator.js');
-      const qr = qrcode(0, 'M');
-      qr.addData(url);
-      qr.make();
-      return qr.createDataURL(4, 0);
-    }
-
-    function getSharedGroupId() { return localStorage.getItem(getCity()+'_shared_group_id')||null; }
-    function setSharedGroupId(id) {
-      if (id) localStorage.setItem(getCity()+'_shared_group_id', id);
-      else localStorage.removeItem(getCity()+'_shared_group_id');
-    }
-
-    function getCalDeviceId() {
-      let id = localStorage.getItem('cal_device_id');
-      if (!id) { id = 'dev_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('cal_device_id', id); }
-      return id;
-    }
-    async function _registerGroupPush(gid) {
-      if (_isCapacitorApp) {
-        if (!_nativeDeviceToken) return;
-        try {
-          await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe-ios', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceToken: _nativeDeviceToken, deviceId: getCalDeviceId() }),
-          });
-        } catch(e) {}
-        return;
-      }
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!sub) return;
-        await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscription: sub, deviceId: getCalDeviceId() }),
-        });
-      } catch(e) {}
-    }
-
-    async function _deregisterGroupPush(gid) {
-      if (_isCapacitorApp) {
-        if (!_nativeDeviceToken) return;
-        try {
-          await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe-ios', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceToken: _nativeDeviceToken }),
-          });
-        } catch(e) {}
-        return;
-      }
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!sub) return;
-        await fetch(API_BASE + '/api/calendar/'+gid+'/push-subscribe', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        });
-      } catch(e) {}
-    }
-
-    function _showNotifyCheckboxes() {
-      const inGroup = !!getSharedGroupId();
-      ['plan-event-notify-row', 'plan-custom-notify-row', 'plan-detail-notify-row'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = inGroup ? 'flex' : 'none';
-      });
-      ['plan-event-notify-cb', 'plan-custom-notify-cb', 'plan-detail-notify-cb'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.checked = false;
-      });
-    }
-
-    async function _notifyGroupIfChecked(cbId, planName, actionType) {
-      const gid = getSharedGroupId();
-      if (!gid) return;
-      const cb = document.getElementById(cbId);
-      if (!cb || !cb.checked) return;
-      const actionLabel = actionType === 'updated' ? '更新' : '追加';
-      try {
-        await fetch(API_BASE + '/api/calendar/'+gid+'/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: '📅 カレンダーが更新されました',
-            body: planName + ' が' + actionLabel + 'されました',
-            deviceId: getCalDeviceId(),
-          }),
-        });
-      } catch(e) {}
-    }
-
-    async function syncToServer() {
-      const gid = getSharedGroupId(); if (!gid) return;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 設計書22: 5秒でタイムアウトし、失敗しても静かに諦める（UIをハングさせない）
-      try {
-        const customPlans = getCustomPlans();
-        const eventPlans  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const key = getCalKey();
-        let body;
-        if (key) {
-          body = { encryptedData: await _encryptPlans(key, {customPlans, eventPlans}) };
-        } else {
-          body = { customPlans, eventPlans };
-        }
-        await fetch(API_BASE + '/api/calendar/'+gid, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-      } catch(e) {
-        // タイムアウト・ネットワーク断とも同様に扱う。ローカル保存は既に完了しているため、
-        // ここで例外を投げずに静かに諦める（呼び出し元のUIをブロックしない）。
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    }
-
-    async function fetchFromServer() {
-      const gid = getSharedGroupId(); if (!gid) return false;
-      try {
-        const r = await fetch(API_BASE + '/api/calendar/'+gid);
-        if (!r.ok) {
-          if (r.status === 404) { setSharedGroupId(null); updateCalSyncBtn(); }
-          return false;
-        }
-        const d = await r.json();
-        let serverCustom, serverEvent;
-        if (d.encryptedData) {
-          const key = getCalKey();
-          if (!key) return false;
-          try {
-            const dec = await _decryptPlans(key, d.encryptedData);
-            serverCustom = dec.customPlans || [];
-            serverEvent  = dec.eventPlans  || [];
-          } catch(e) { showToast('復号に失敗しました'); return false; }
-        } else {
-          serverCustom = d.customPlans || [];
-          serverEvent  = d.eventPlans  || [];
-        }
-        // 設計書22（案B）: 全置換ではなくidベースの和集合マージ（サーバー優先）にする。
-        // これにより、保存直後のforce quit等でPUTがサーバーに未到達だった場合でも、
-        // 次回同期時にローカルにしかない予定が丸ごと消えることを防ぐ。
-        const localCustom = getCustomPlans();
-        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const customPlans = mergeArr(localCustom, serverCustom);
-        const eventPlans  = mergeArr(localEvent, serverEvent);
-        _calSyncFromServer = true;
-        await saveCustomPlans(customPlans);
-        await saveEventPlans(eventPlans);
-        _calSyncFromServer = false;
-        return true;
-      } catch(e) { _calSyncFromServer = false; return false; }
-    }
-
-    function updateCalSyncBtn() {
-      const btn = document.getElementById('cal-sync-header-btn');
-      if (!btn) return;
-      const connected = !!getSharedGroupId();
-      btn.classList.toggle('connected', connected);
-      const lbl = btn.querySelector('.sync-label');
-      if (lbl) lbl.textContent = connected ? '共有中' : '共有';
-    }
-
-    function openCalSync() {
-      renderCalSyncModal();
-      lockScroll();
-      document.getElementById('cal-sync-overlay').classList.add('visible');
-      document.getElementById('cal-sync-modal').classList.add('visible');
-    }
-    function closeCalSync() {
-      unlockScroll();
-      document.getElementById('cal-sync-overlay').classList.remove('visible');
-      document.getElementById('cal-sync-modal').classList.remove('visible');
-    }
-
-    function renderCalSyncModal() {
-      const gid = getSharedGroupId();
-      const el = document.getElementById('cal-sync-modal-content');
-      if (gid) {
-        const showPushPrompt = _shouldShowPushPrompt();
-        el.innerHTML = `
-          ${showPushPrompt ? `
-          <div style="background:var(--caramel-pale);border:1px solid var(--caramel-light);border-radius:12px;padding:12px 14px;margin-bottom:14px;text-align:center;">
-            <div style="font-size:14px;font-weight:600;color:var(--midnight);margin-bottom:4px;">🔔 通知をオンにしましょう</div>
-            <div style="font-size:13px;color:var(--warm-gray);margin-bottom:10px;line-height:1.6;">メンバーの予定が更新されたとき<br>プッシュ通知で受け取れます</div>
-            <button class="cal-sync-action primary" style="margin-bottom:0;" onclick="enablePushForCalendar()">通知をオンにする</button>
-          </div>` : ''}
-          <div class="cal-sync-status-line">✅ グループ接続中</div>
-          <div class="cal-sync-groupid-line">グループID: <strong>${gid}</strong></div>
-          <div style="background:var(--sage-pale);border:1px solid var(--sage-light);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--warm-gray);line-height:1.65;">
-            🔒 予定は<strong>暗号化</strong>して保存されています。共有メンバー以外は読めません（アプリ管理者も含む）。<br>
-            ${getCalSalt()
-              ? '<span style="color:var(--terracotta);">⚠️ 参加にはパスフレーズが必要です。招待相手に別途パスフレーズをお伝えください。</span>'
-              : '<span style="color:var(--terracotta);">⚠️ リンク（またはQR）を知っている人は誰でも参加できます。</span><br>信頼できる相手にだけ共有してください。'}
-          </div>
-          <p style="font-size:13px;color:var(--warm-gray);text-align:center;margin:0 0 10px;">QRコードを読み取るか、リンクを送ると参加できます</p>
-          <div id="cal-qr-wrap" style="display:flex;justify-content:center;margin-bottom:12px;min-height:200px;align-items:center;">
-            <span style="font-size:13px;color:var(--light-gray);">読み込み中...</span>
-          </div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <button class="cal-sync-action secondary" style="flex:1;margin-bottom:0;" onclick="copyJoinLink('${gid}')">📋 リンクをコピー</button>
-            <button class="cal-sync-action secondary" style="flex:1;margin-bottom:0;" onclick="shareViaLine('${gid}')">💬 LINEで共有</button>
-          </div>
-          <button class="cal-sync-action secondary" onclick="doRefreshCalSync()">🔄 最新データを取得</button>
-          <button class="cal-sync-action danger"     onclick="doLeaveGroup()">🚪 グループから離脱</button>`;
-        loadCalQR(gid);
-      } else {
-        el.innerHTML = `
-          <p style="font-size:15px;color:var(--warm-gray);text-align:center;margin:0 0 24px;line-height:1.8;">
-            家族の予定表をまとめて<br>みんなで共有できます。<br>
-            <span style="font-size:13px;">グループを作って家族にリンクを共有するか、<br>QRコードをスキャンして参加できます。</span>
-          </p>
-          <button class="cal-sync-action primary" id="cal-create-btn" onclick="doCreateGroup()">🔗 グループを作成する</button>
-          <button class="cal-sync-action secondary" onclick="openQRScanner()">📷 QRコードをスキャン</button>`;
-      }
-    }
-
-    // 新方式（salt）グループはフラグメントなしURL、旧方式（fragment鍵）グループは従来通りフラグメント付きURL（設計書55 §3）
-    async function loadCalQR(gid) {
-      try {
-        const salt = getCalSalt();
-        const key = getCalKey();
-        const url = salt
-          ? `https://dosuru.app/?join=${gid}&city=${getCity()}`
-          : `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
-        const dataUrl = await _generateQR(url);
-        const wrap = document.getElementById('cal-qr-wrap');
-        if (wrap) wrap.innerHTML = `<img src="${dataUrl}" width="200" height="200" style="border-radius:12px;" alt="QR">`;
-      } catch(e) {}
-    }
-
-    // 「グループを作成する」ボタン押下 → パスフレーズ設定シートを開くフローに変更（設計書55）
-    function doCreateGroup() {
-      openCalPassphraseSheet('create');
-    }
-
-    async function _doCalCreateGroup(passphrase) {
-      const btn = document.getElementById('cal-passphrase-submit-btn');
-      try {
-        const city = getCity();
-        const salt = _genSaltB64();
-        const cryptoKey = await _deriveKeyFromPassphrase(passphrase, salt);
-        const customPlans = getCustomPlans();
-        const eventPlans  = JSON.parse(localStorage.getItem(city+'_event_plans')||'[]');
-        const encryptedData = await _encryptWithKey(cryptoKey, {customPlans, eventPlans});
-        const r = await fetch(API_BASE + '/api/calendar/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ city, salt, encryptedData })
-        });
-        if (!r.ok) throw new Error('create failed');
-        const d = await r.json();
-        const material = await _exportKeyMaterial(cryptoKey);
-        setCalKey(material);
-        setCalSalt(salt);
-        setSharedGroupId(d.groupId);
-        if (_hasActivePushSub()) await _registerGroupPush(d.groupId);
-        updateCalSyncBtn();
-        closeCalPassphraseSheet();
-        renderCalSyncModal();
-      } catch(e) {
-        showToast(t('toastCalGroupCreateError'));
-        if (btn) { btn.disabled = false; }
-      }
-    }
-
-    async function doRefreshCalSync() {
-      showToast('データを取得中...');
-      const ok = await fetchFromServer();
-      if (ok) { renderScheduleTab(); showToast('最新データに更新しました'); }
-      else showToast('取得に失敗しました');
-    }
-
-    async function doLeaveGroup() {
-      if (!confirm('グループから離脱しますか？\n最新のサーバーデータをローカルに保存します。')) return;
-      const gid = getSharedGroupId();
-      if (gid && _hasActivePushSub()) await _deregisterGroupPush(gid);
-      await fetchFromServer();
-      setSharedGroupId(null);
-      setCalKey(null);
-      setCalSalt(null);
-      updateCalSyncBtn();
-      renderScheduleTab();
-      closeCalSync();
-      showToast('グループから離脱しました');
-    }
-
-    function copyJoinLink(gid) {
-      const salt = getCalSalt();
-      const key = getCalKey();
-      const url = salt
-        ? `https://dosuru.app/?join=${gid}&city=${getCity()}`
-        : `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(url).then(() => showToast('リンクをコピーしました')).catch(() => _fallbackCopy(url));
-      } else {
-        _fallbackCopy(url);
-      }
-    }
-    function _fallbackCopy(text) {
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); showToast('リンクをコピーしました'); } catch(e) { showToast('コピーできませんでした'); }
-      document.body.removeChild(ta);
-    }
-
-    function shareViaLine(gid) {
-      const salt = getCalSalt();
-      const key = getCalKey();
-      const url = salt
-        ? `https://dosuru.app/?join=${gid}&city=${getCity()}`
-        : `https://dosuru.app/?join=${gid}&city=${getCity()}${key ? '#'+key : ''}`;
-      // パスフレーズ自体はメッセージ本文に含めない（設計書55 §2-7、意図的に鍵とグループIDを分離したままにする）
-      const msg = `SG在住Naviの予定表グループに参加してください！\n${url}`;
-      window.open(`https://line.me/R/share?text=${encodeURIComponent(msg)}`, '_blank');
-    }
-
-    async function openQRScanner() {
-      const el = document.getElementById('cal-sync-modal-content');
-      el.innerHTML = `
-        <p style="font-size:14px;color:var(--warm-gray);text-align:center;margin:0 0 12px;line-height:1.6;">QRコードをカメラに向けてください</p>
-        <div id="qr-scanner-wrap" style="position:relative;background:#000;border-radius:12px;overflow:hidden;margin:0 auto 12px;width:min(260px,100%);aspect-ratio:1;">
-          <video id="qr-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block;"></video>
-          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
-            <div style="width:55%;aspect-ratio:1;border:2.5px solid var(--caramel);border-radius:10px;box-shadow:0 0 0 2000px rgba(0,0,0,0.35);"></div>
-          </div>
-        </div>
-        <canvas id="qr-canvas" style="display:none;"></canvas>
-        <button class="cal-sync-action secondary" onclick="closeQRScanner()">キャンセル</button>
-        <div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
-          <div style="flex:1;height:1px;background:var(--light-gray);opacity:0.4;"></div>
-          <span style="font-size:13px;color:var(--light-gray);">または直接入力</span>
-          <div style="flex:1;height:1px;background:var(--light-gray);opacity:0.4;"></div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <input id="manual-group-id" type="text" maxlength="6" placeholder="グループID（例: ABC123）"
-                 style="flex:1;padding:12px 10px;border:1.5px solid var(--light-gray);border-radius:10px;font-size:16px;font-family:inherit;background:var(--cream);text-transform:uppercase;"/>
-          <button class="cal-sync-action primary" style="width:96px;margin:0;" onclick="doManualJoin()">参加</button>
-        </div>`;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
-        _scannerStream = stream;
-        const video = document.getElementById('qr-video');
-        if (!video) { stream.getTracks().forEach(t => t.stop()); _scannerStream = null; return; }
-        video.srcObject = stream;
-        await video.play().catch(() => {});
-        if ('BarcodeDetector' in window) {
-          const detector = new BarcodeDetector({ formats: ['qr_code'] });
-          _scanLoopBD(detector, video);
-        } else {
-          if (!window.jsQR) await _loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
-          _scanLoopJsQR(video);
-        }
-      } catch(e) {
-        const wrap = document.getElementById('qr-scanner-wrap');
-        if (wrap) { wrap.innerHTML = '<p style="color:var(--light-gray);font-size:13px;text-align:center;padding:40px 0;">カメラを使用できません</p>'; }
-      }
-    }
-
-    function closeQRScanner() {
-      if (_scannerStream) { _scannerStream.getTracks().forEach(t => t.stop()); _scannerStream = null; }
-      if (_scannerRafId) { cancelAnimationFrame(_scannerRafId); _scannerRafId = null; }
-      renderCalSyncModal();
-    }
-
-    function _loadScript(src) {
-      return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-        const s = document.createElement('script');
-        s.src = src; s.onload = resolve; s.onerror = reject;
-        document.head.appendChild(s);
-      });
-    }
-
-    async function _scanLoopBD(detector, video) {
-      if (!_scannerStream) return;
-      try {
-        const codes = await detector.detect(video);
-        if (codes.length > 0) { handleScannedQR(codes[0].rawValue); return; }
-      } catch(e) {}
-      _scannerRafId = requestAnimationFrame(() => _scanLoopBD(detector, video));
-    }
-
-    function _scanLoopJsQR(video) {
-      if (!_scannerStream || !window.jsQR) return;
-      const canvas = document.getElementById('qr-canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const vw = video.videoWidth, vh = video.videoHeight;
-      if (vw && vh) {
-        canvas.width = vw; canvas.height = vh;
-        ctx.drawImage(video, 0, 0, vw, vh);
-        const code = jsQR(ctx.getImageData(0, 0, vw, vh).data, vw, vh);
-        if (code) { handleScannedQR(code.data); return; }
-      }
-      _scannerRafId = requestAnimationFrame(() => _scanLoopJsQR(video));
-    }
-
-    function handleScannedQR(raw) {
-      if (_scannerStream) { _scannerStream.getTracks().forEach(t => t.stop()); _scannerStream = null; }
-      if (_scannerRafId) { cancelAnimationFrame(_scannerRafId); _scannerRafId = null; }
-      let joinId = null, joinKey = null;
-      try {
-        const u = new URL(raw);
-        const j = u.searchParams.get('join');
-        if (j && /^[A-Z2-9]{6}$/.test(j)) { joinId = j; joinKey = u.hash.replace('#','') || null; }
-      } catch(e) {
-        if (/^[A-Z2-9]{6}$/.test(raw.trim().toUpperCase())) joinId = raw.trim().toUpperCase();
-      }
-      if (!joinId) { renderCalSyncModal(); showToast('無効なQRコードです'); return; }
-      renderCalSyncModal();
-      _pendingJoinGroupId = joinId;
-      _pendingJoinKey = joinKey;
-      const desc = document.getElementById('cal-join-desc');
-      if (desc) desc.innerHTML = `グループ <strong>${joinId}</strong> に参加しますか？<br><br>現在の予定データと統合されます。`;
-      document.getElementById('cal-join-overlay').classList.add('visible');
-      document.getElementById('cal-join-modal').classList.add('visible');
-    }
-
-    function doManualJoin() {
-      const input = document.getElementById('manual-group-id');
-      const id = (input?.value || '').trim().toUpperCase();
-      if (!/^[A-Z2-9]{6}$/.test(id)) { showToast('グループIDは6文字（英数字）です'); return; }
-      handleScannedQR(id);
-    }
-
-    function checkJoinParam() {
-      const sp = new URLSearchParams(window.location.search);
-      const joinId = sp.get('join');
-      if (!joinId || !/^[A-Z2-9]{6}$/.test(joinId)) return;
-      _pendingJoinGroupId = joinId;
-      _pendingJoinKey = window.location.hash.replace('#', '') || null;
-      const desc = document.getElementById('cal-join-desc');
-      if (desc) {
-        desc.innerHTML = `グループ <strong>${joinId}</strong> に参加しますか？<br><br>現在の予定データと統合されます。`;
-      }
-      document.getElementById('cal-join-overlay').classList.add('visible');
-      document.getElementById('cal-join-modal').classList.add('visible');
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-
     // Web版でのプッシュ通知タップ遷移（?nav=news → 生活情報タブ）。sw.jsのnotificationclickが
     // client.navigate()で付与するクエリを起動時に読み取る
     function checkNavParam() {
@@ -6526,196 +4493,5 @@
       if (nav !== 'news') return;
       switchNav('news');
       window.history.replaceState({}, '', window.location.pathname);
-    }
-
-    function closeJoinPrompt() {
-      document.getElementById('cal-join-overlay').classList.remove('visible');
-      document.getElementById('cal-join-modal').classList.remove('visible');
-      _pendingJoinGroupId = null;
-      _pendingJoinKey = null;
-    }
-
-    // 「参加する」ボタン押下。salt有無で新方式（パスフレーズ入力）/旧方式（フラグメント鍵）に分岐する（設計書55 §2-5）。
-    async function doJoinGroup() {
-      if (!_pendingJoinGroupId) return;
-      const gid = _pendingJoinGroupId;
-      // 旧方式: URLフラグメントに鍵が含まれていた場合はそのまま従来ロジックで参加する
-      if (_pendingJoinKey) {
-        await _doJoinGroupWithKey(gid, _pendingJoinKey);
-        return;
-      }
-      // 新方式判定のため、まずグループ情報を取得してsaltの有無を見る
-      try {
-        const r = await fetch(API_BASE + `/api/calendar/${gid}`);
-        if (!r.ok) throw new Error();
-        const serverData = await r.json();
-        if (serverData.salt) {
-          // 新方式グループ: パスフレーズ入力シートへ誘導（確認ダイアログはそのまま維持、閉じてから開く）
-          closeJoinPrompt();
-          _pendingJoinGroupId = gid;
-          openCalPassphraseSheet('join');
-          return;
-        }
-        // saltなし・暗号化なしグループ（既存の無暗号化グループ）
-        await _doJoinGroupWithKey(gid, null);
-      } catch (e) {
-        showToast('参加に失敗しました。グループIDをご確認ください。');
-      }
-    }
-
-    async function _doJoinGroupWithKey(gid, key) {
-      try {
-        const r = await fetch(API_BASE + `/api/calendar/${gid}`);
-        if (!r.ok) throw new Error();
-        const serverData = await r.json();
-
-        let serverCustom = [], serverEvent = [];
-        if (serverData.encryptedData) {
-          if (!key) { showToast('リンクから参加してください（暗号化キーが必要です）'); return; }
-          try {
-            const dec = await _decryptPlans(key, serverData.encryptedData);
-            serverCustom = dec.customPlans || [];
-            serverEvent  = dec.eventPlans  || [];
-          } catch(e) { showToast('暗号化キーが正しくありません'); return; }
-        } else {
-          serverCustom = serverData.customPlans || [];
-          serverEvent  = serverData.eventPlans  || [];
-        }
-
-        const localCustom = getCustomPlans();
-        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const merged = { customPlans: mergeArr(serverCustom, localCustom), eventPlans: mergeArr(serverEvent, localEvent) };
-
-        let putBody;
-        if (key) {
-          putBody = { encryptedData: await _encryptPlans(key, merged) };
-        } else {
-          putBody = merged;
-        }
-        await fetch(API_BASE + `/api/calendar/${gid}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(putBody)
-        });
-
-        if (key) setCalKey(key);
-        _calSyncFromServer = true;
-        await saveCustomPlans(merged.customPlans);
-        await saveEventPlans(merged.eventPlans);
-        _calSyncFromServer = false;
-        setSharedGroupId(gid);
-        if (_hasActivePushSub()) await _registerGroupPush(gid);
-        updateCalSyncBtn();
-        renderScheduleTab();
-        closeJoinPrompt();
-        showToast('グループに参加しました！');
-        if (_shouldShowPushPrompt()) {
-          renderCalSyncModal();
-          document.getElementById('cal-sync-modal').classList.add('visible');
-        }
-      } catch(e) {
-        showToast('参加に失敗しました。グループIDをご確認ください。');
-      }
-    }
-
-    // 新方式グループ（salt あり）への参加。パスフレーズ入力シートから呼ばれる（設計書55 §2-5）。
-    async function _doJoinGroupWithPassphrase(gid, passphrase) {
-      try {
-        const r = await fetch(API_BASE + `/api/calendar/${gid}`);
-        if (!r.ok) throw new Error();
-        const serverData = await r.json();
-        if (!serverData.salt || !serverData.encryptedData) { showToast(t('toastCalJoinError')); return; }
-
-        const cryptoKey = await _deriveKeyFromPassphrase(passphrase, serverData.salt);
-        let dec;
-        try {
-          dec = await _decryptWithKey(cryptoKey, serverData.encryptedData);
-        } catch (e) {
-          showToast(t('toastCalPassphraseWrong'));
-          return;
-        }
-        const serverCustom = dec.customPlans || [];
-        const serverEvent  = dec.eventPlans  || [];
-        const localCustom = getCustomPlans();
-        const localEvent  = JSON.parse(localStorage.getItem(getCity()+'_event_plans')||'[]');
-        const merged = { customPlans: mergeArr(serverCustom, localCustom), eventPlans: mergeArr(serverEvent, localEvent) };
-        const encryptedData = await _encryptWithKey(cryptoKey, merged);
-        await fetch(API_BASE + `/api/calendar/${gid}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ encryptedData })
-        });
-
-        const material = await _exportKeyMaterial(cryptoKey);
-        setCalKey(material);
-        setCalSalt(serverData.salt);
-        _calSyncFromServer = true;
-        await saveCustomPlans(merged.customPlans);
-        await saveEventPlans(merged.eventPlans);
-        _calSyncFromServer = false;
-        setSharedGroupId(gid);
-        if (_hasActivePushSub()) await _registerGroupPush(gid);
-        updateCalSyncBtn();
-        renderScheduleTab();
-        closeCalPassphraseSheet();
-        showToast('グループに参加しました！');
-        if (_shouldShowPushPrompt()) {
-          renderCalSyncModal();
-          document.getElementById('cal-sync-overlay').classList.add('visible');
-          document.getElementById('cal-sync-modal').classList.add('visible');
-        }
-      } catch (e) {
-        showToast(t('toastCalJoinError'));
-      }
-    }
-
-    // ─── 共有カレンダー用パスフレーズ入力シート（作成用・参加用共通、設計書55）───
-    let _calPassphraseMode = null; // 'create' | 'join'
-
-    function openCalPassphraseSheet(mode) {
-      _calPassphraseMode = mode;
-      const titleEl = document.getElementById('cal-passphrase-title');
-      const confirmRow = document.getElementById('cal-passphrase-confirm-row');
-      document.getElementById('cal-passphrase-input').value = '';
-      document.getElementById('cal-passphrase-confirm-input').value = '';
-      if (mode === 'create') {
-        if (titleEl) titleEl.textContent = t('calPassphraseSetupTitle');
-        if (confirmRow) confirmRow.style.display = '';
-      } else {
-        if (titleEl) titleEl.textContent = t('calPassphraseJoinTitle');
-        if (confirmRow) confirmRow.style.display = 'none';
-      }
-      lockScroll();
-      document.getElementById('cal-passphrase-overlay').classList.add('visible');
-      document.getElementById('cal-passphrase-sheet').classList.add('visible');
-    }
-
-    function closeCalPassphraseSheet() {
-      _blurIfFocusInside('cal-passphrase-sheet');
-      unlockScroll();
-      document.getElementById('cal-passphrase-overlay').classList.remove('visible');
-      document.getElementById('cal-passphrase-sheet').classList.remove('visible');
-    }
-
-    async function submitCalPassphrase() {
-      const passphrase = (document.getElementById('cal-passphrase-input').value || '').trim();
-      if (!passphrase) { showToast(t('backupPassphraseEmpty')); return; }
-      const mode = _calPassphraseMode;
-      if (mode === 'create') {
-        const confirmVal = (document.getElementById('cal-passphrase-confirm-input').value || '').trim();
-        if (passphrase !== confirmVal) { showToast(t('backupPassphraseMismatch')); return; }
-      }
-      const btn = document.getElementById('cal-passphrase-submit-btn');
-      if (btn) { btn.disabled = true; }
-      try {
-        if (mode === 'create') {
-          await _doCalCreateGroup(passphrase);
-        } else {
-          if (!_pendingJoinGroupId) { showToast(t('toastCalJoinError')); return; }
-          await _doJoinGroupWithPassphrase(_pendingJoinGroupId, passphrase);
-        }
-      } finally {
-        if (btn) { btn.disabled = false; }
-      }
     }
 
