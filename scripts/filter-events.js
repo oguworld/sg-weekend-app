@@ -498,16 +498,22 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
     const id = `e_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const validType = ['event', 'show', 'gourmet', 'sale', 'opening', 'travel'].includes(f.type) ? f.type : 'event';
     let endDate;
+    let isFallbackTravelEndDate = false;
     if (validType === 'opening') {
       endDate = oneMonthLater(f.start_date);
     } else if (validType === 'travel' && !f.end_date) {
       // 行き先紹介ガイド記事など特定の期間を持たない旅行記事は、purgeExpiredData()が
       // end_date未設定のイベントを無条件削除する仕様のため、長期の仮end_dateを設定する
       endDate = oneYearLater(f.start_date);
+      isFallbackTravelEndDate = true;
     } else {
       endDate = f.end_date;
     }
-    const period  = validType === 'opening' ? formatOpenDate(f.start_date) : formatPeriod(f.start_date, endDate);
+    // 仮end_date（1年後）はカード表示用の「期間」としては意味を持たない（年をまたぐため
+    // formatPeriod()が月日だけを出すと「9/2〜9/1」のように逆転して見える）ので空にする
+    const period  = validType === 'opening' ? formatOpenDate(f.start_date)
+                   : isFallbackTravelEndDate ? ''
+                   : formatPeriod(f.start_date, endDate);
 
     const item = {
       id,
