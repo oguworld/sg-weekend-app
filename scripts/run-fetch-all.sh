@@ -1,7 +1,8 @@
 #!/bin/bash
 # fetch-events（全都市）→ check-content-integrity → notify-fetch-summary を直列実行
-# 毎日実行される軽量パイプライン。discover-sources/analyze-sources/refresh-courses は
-# run-source-analysis.sh / refresh-courses.js（cron個別エントリ）に分離済み（設計書18）。
+# 毎日実行される軽量パイプライン。discover-sources/analyze-sources は
+# run-source-analysis.sh（cron個別エントリ）に分離済み（設計書18）。
+# コース機能は設計書178で完全削除済みのため refresh-courses.js への言及は削除済み。
 
 NODE=/usr/bin/node
 SCRIPTS=/home/masahiko/sg-weekend-app/scripts
