@@ -17281,3 +17281,112 @@ Web検索ができないツール制約のため、既存コードのAPIキー�
 
 ### スコープ外（v1）
 返信・スレッド化、編集機能、通報ボタン、AIモデレーション、既読/通知、bkk/syd対応
+
+## 設計書175: 旅行情報カテゴリ追加（生活情報・ニュース機能への統合、2026-09-02設計）
+
+シンガポール在住日本人向けに「旅行」情報カテゴリを追加する。新しいボトムナビタブは作らず、既存の「生活情報・ニュース」画面（設計書172）に新カテゴリタブとして統合する（ユーザー合意済み・更新頻度が低いため専用タブだと閑散として見える懸念）。
+
+### 前提として判明した既存実装の状況（設計時に確認）
+- `data/sg/life-info.json`のカテゴリは設計書172時点の4種（admin/weather/transport/community）から、**未記録のタイミングで既に6種（admin/transport/health/education/weather/community）に拡張済み**（`scripts/fetch-life-info.js`のCATEGORIES定数、`public/index.html`のカテゴリチップ、`public/app.js`のLIFE_INFO_CATEGORY_LABEL_KEYS/LIFE_INFO_CATEGORY_COLORSがいずれも6種対応）。この拡張に対応する設計書がplan.md/CLAUDE.mdに見当たらず、経緯不明。
+- **⚠️ 既存の不整合を発見・確認済み**: `server.js`の`GET /api/life-info`の`VALID_CATEGORIES`（643行目）は`['admin', 'weather', 'transport', 'community']`の4種のまま更新されておらず、`scripts/fetch-life-info.js`のCATEGORIES（70行目）は6種。`health`/`education`は`?category=`クエリでのサーバー側フィルタが効かない（該当クエリを投げると空フィルタ扱いになり全件が返る）。実害は「フロントの`_newsCategory`によるクライアント側フィルタ（`renderNewsList()`内`LIFE_INFO_DATA.filter(item => item.category === _newsCategory)`）で最終的に絞り込まれているため表面化していない」と推測される。**今回`travel`を追加する際は同じ不整合を再発させないよう、`VALID_CATEGORIES`に`travel`を含む7種類へ更新する（health/educationの既存の抜けも合わせて修正する）**。
+- `data/sources.json`（イベント取得パイプライン専用のソース管理ファイル、`scripts/fetch-events.js`が使用）には`https://thesmartlocal.com/feed`（メインフィード）が`primaryType: "mixed"`, `status: "active"`で登録済み。今回使う`https://thesmartlocal.com/category/travel/feed/`は別URLのため、このファイルには依存せず新規登録が必要（後述）。
+- `scripts/fetch-life-info.js`はソースをこのsources.jsonからではなく、スクリプト内`CITY_CONFIG.sg.feeds`（61行目）にハードコードされた配列から読んでいる（イベント側とは異なる設計）。
+
+### 1. データモデル: 分離ではなく統合を採用（結論）
+新規`data/sg/travel-info.json`＋新規`scripts/fetch-travel-info.js`という完全分離案は不採用とし、**既存`data/sg/life-info.json`のスキーマに`category: 'travel'`を追加し、既存`scripts/fetch-life-info.js`に3ソースを統合する**。
+
+理由:
+- API・UI・コメント機能・ピン留め機能をすべて無変更〜最小変更で再利用できる（`GET /api/life-info`、`_lifeInfoCardHtml()`、`toggleCardComments('news', item.id)`は`category`の値が増えるだけで動作する）。
+- 新しいカテゴリのためだけに別ファイル・別API・別cronを増やすと、7日保持や重複排除ロジックの二重メンテナンスが発生し、今回の更新頻度（1日1.5〜2件）に対して運用コストが見合わない。
+- cron実行時間への影響: 現状`scripts/fetch-life-info.js`は独立cronではなく`scripts/run-fetch-all.sh`内で`fetch-events.js`→`check-content-integrity.js`→`fetch-life-info.js`→`notify-fetch-summary.js`の順に直列実行されている。フィードが既存4本→7本に増えるが、RSS取得・Haiku/Sonnet呼び出し（バッチ処理、BATCH_SIZE=10、ENRICH_BATCH_SIZE=8）とも1日あたり数件増える程度では実行時間への影響は軽微と判断（実測未確認、次回本番実行時にログの実行時間で確認する）。
+- Haiku分類プロンプトへの影響: 既存6カテゴリの判定基準文と混ざることで判定精度が落ちるリスクはある。対策は「4. Haiku分類プロンプトの調整」を参照。既存カテゴリの誤判定が増えないか、統合後1週間分の実データで目視確認する（次回タスクへの引き継ぎ事項）。
+
+### 2. カテゴリの色・ラベル
+- 日本語ラベル: 「旅行」を採用。英語ラベルは`Travel`。
+- 色: 既存6色（gold=admin、sage=transport、terracotta-light=health、caramel=education、sky=weather、terracotta=community）はアプリの`:root`パレットに定義済みのアクセント色をほぼ使い切っており、既存の`--caramel-light`/`--gold-light`等の「明度違い」は同一色相の既存カテゴリと視覚的に紛らわしいため転用しない。**新規CSS変数`--plum: #9B7A94`（`--plum-pale: #F3EDF1`）を`public/app.css`の`:root`に追加し、travelカテゴリ専用の新しい色相として採用する**（暖色中心の既存パレットに対し、彩度を抑えた落ち着いた紫系を1色だけ足すことで、既存6色のどれとも混同しない）。ダークモード（`html[data-theme="dark"]`ブロック）にも対応する変数再定義を追加すること（既存の`--caramel-pale`/`--sage-pale`等がダークモードで別値を持つのと同じパターンを踏襲）。
+- `LIFE_INFO_CATEGORY_COLORS`（`public/app.js`）に追加: `travel: { bg: 'var(--plum-pale)', color: 'var(--plum)' }`（既存`education`エントリの`{ bg: 'var(--sand)', color: 'var(--caramel)' }`と同じ「CSS変数参照」形式に合わせる）。
+
+### 3. リテンション期間: 旅行カテゴリのみ延長する（結論）
+既存の生活情報（admin/transport/health/education/weather/community）は「鮮度が命」で7日保持だが、旅行カテゴリ（特にTheSmartLocalの行き先紹介ガイド記事）は時事性が低く、7日で消えるのは機会損失と判断。**`category === 'travel'`の記事のみ保持期間を30日に延長する**。
+
+理由・設計:
+- セール・プロモ情報（航空券セール等）は「締切」が本文中にあり鮮度が意味を持つ一方、行き先紹介ガイド（Tiomanガイド、Kluangガイド等）は数ヶ月単位で有用であり、ユーザーが旅行を計画するタイミングは記事公開日と無関係。7日保持ではこの種の記事のほとんどが「読まれる前に消える」構造になってしまう。
+- 実装方法: `scripts/fetch-life-info.js`の保持期間削除ロジック（`RETENTION_DAYS = 7`固定のフィルタ）を、`category`に応じて異なるカットオフ日を適用する形に変更する（`getRetentionDays(category)`のようなヘルパーを導入し、`combined.filter(item => ...)`のカットオフ計算をアイテムごとに算出する）。既存5カテゴリの7日保持は無変更。
+- 副作用: 30日保持により、旅行カテゴリのデータ件数は他カテゴリよりストックが多く見える状態が定常化する（1日1.5〜2件×30日で最大45〜60件程度）。これは意図した挙動（時事性の低い記事を厚く見せる）であり不具合ではない。ただし件数が増えることでホーム画面プレビュー（直近3件、`loadLifeInfoPreview()`）に旅行カテゴリが偏って表示され続けるリスクがある。プレビューのカテゴリ混在バランス調整は今回スコープ外とし、実データで偏りが顕著になった場合に別タスクとして再検討する。
+
+### 4. Haiku分類プロンプトの調整
+`scripts/fetch-life-info.js`の`filterBatch()`内`instructionText`に以下を追加する。
+
+【対象とするカテゴリ】に7つ目として追加:
+```
+- "travel": 旅行・トラベルハック（航空券・ホテルのセール/プロモ情報、SGから行ける近隣国・都市の行き先紹介ガイド、旅行関連のフェス・展示会情報）
+```
+
+【不採用とすべきもの】に以下を追加（MileLion/Mainly Milesのクレジットカード記事除外のための明示的な除外基準）:
+```
+- クレジットカードの入会特典・ポイント還元率・年会費比較など、決済手段そのものに関する記事（旅行先や航空券セールと無関係なもの）
+- マイル・ポイントの貯め方・使い方の一般論（具体的な行き先・航空券セール・ホテルセールと結びついていないもの）
+```
+
+判定基準の考え方: 「本文が具体的な行き先名・航空券/ホテルの具体的なセール内容・旅行フェス/展示会の情報を含むか」を主軸にする。MileLion/Mainly Milesの記事は同じブログ内でも「セール情報記事」と「カード特典記事」が混在するため、カテゴリタグではなく記事本文の実質的内容で判定させる。この基準はプロンプトのみで担保し、機械的なキーワードフィルタは導入しない（記事タイトルパターンが多様なため、キーワードマッチでは誤除外・誤採用のリスクがある）。
+
+既存カテゴリ判定への影響懸念: 6カテゴリ→7カテゴリになることでプロンプト長が増えるが、既存の判定基準文言自体は変更しないため、既存カテゴリの精度低下リスクは限定的と判断。ただし実データでの検証は次回引き継ぎ事項とする。
+
+### 5. 新規ソース登録
+`data/sources.json`はイベント取得パイプライン専用であり、生活情報パイプラインはこのファイルを参照しない設計のため、変更対象外。
+
+`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`配列に以下3件を追加する:
+```js
+{ url: 'https://thesmartlocal.com/category/travel/feed/', name: 'TheSmartLocal Travel' },
+{ url: 'https://milelion.com/feed/',                      name: 'The MileLion' },
+{ url: 'https://mainlymiles.com/feed/',                   name: 'Mainly Miles' },
+```
+既存4件（CNA/Mothership/Straits Times/JCCI）はそのまま維持し、合計7フィードになる。`name`は`data/sg/life-info.json`の`source`フィールド・カード表示（`_lifeInfoCardHtml()`の`item.source`表示部分）にそのまま出るため、"TheSmartLocal Travel"は既存の"The Smart Local"（イベント用ソース名）と区別できるよう末尾に"Travel"を付与した。
+
+`data/life-info-fetch-state.json`（ハイウォーターマーク管理）は既存の`cityState[feed.name]`キー構造にそのまま3件分のエントリが自動追加される想定で、コード変更不要。
+
+### 6. UIのカテゴリチップ追加位置
+既存チップ順（新着 / 政府 / 交通 / 医療・健康 / 教育・子育て / 天候・災害 / コミュニティ）の**末尾に追加**し、「新着 / 政府 / 交通 / 医療・健康 / 教育・子育て / 天候・災害 / コミュニティ / 旅行」の8チップ構成とする。既存カテゴリは「生活の困りごと・必須情報」→「環境」→「つながり」という並びになっており、「旅行」は前向き・オプショナルな情報として性質が異なるため末尾に置く。横スクロールのチップ行のため、末尾追加でも既存チップの表示位置・アクセス性に影響しない。
+
+### 7. 変更するファイル一覧
+- `public/app.css`: `:root`に`--plum`/`--plum-pale`を追加、`html[data-theme="dark"]`ブロックにダークモード値を追加
+- `scripts/fetch-life-info.js`: `CITY_CONFIG.sg.feeds`に3件追加、`CATEGORIES`配列に`'travel'`追加、`filterBatch()`のプロンプト文言追加（4.参照）、保持期間ロジックをカテゴリ別に変更（3.参照）
+- `server.js`: `GET /api/life-info`の`VALID_CATEGORIES`に`'travel'`を追加。あわせて既存の抜け漏れだった`'health'`/`'education'`もこの機会に追加し7種類（travel含む）に修正する
+- `public/index.html`: `#news-filter-row`内に旅行チップ（`data-news-cat="travel"`、`data-i18n="newsCatTravel"`）を末尾に追加
+- `public/app.js`: `LIFE_INFO_CATEGORY_LABEL_KEYS`に`travel: 'newsCatTravel'`追加、`LIFE_INFO_CATEGORY_COLORS`に`travel: {...}`追加、STRINGS.ja/enに`newsCatTravel`キー追加
+- `data/sg/life-info.json`: スキーマ変更なし（既存フィールドに`category: 'travel'`という新しい値が入るだけ）
+- `data/life-info-fetch-state.json`: コード変更不要（実行時に自動でキー追加）
+
+### 8. データモデルの変更
+新規フィールド追加なし。既存`category`フィールドが取りうる値の集合が6種→7種に拡張されるのみ（`admin|transport|health|education|weather|community|travel`）。イベントカードのような「エリア・期間」専用フィールドは追加しない（価格・締切・行き先名は`summary`/`summary_en`の要約文の中で表現する）。
+
+### 9. APIの変更
+`GET /api/life-info?city=sg&category=travel`が有効なクエリとして機能するよう`VALID_CATEGORIES`を更新する（上記7.参照）。レスポンスの構造（フィールド名一覧）自体は無変更。
+
+### 10. フロントエンドの変更
+- カテゴリチップ1つ追加（末尾）
+- カテゴリラベル辞書・配色辞書に1エントリ追加
+- i18nキー`newsCatTravel`をja/en追加
+- ホーム画面プレビュー（`loadLifeInfoPreview()`）・ピン留め画面（`renderNewsPinList()`）・コメント機能は`category`の値を分岐条件に使っていないため無変更で旅行記事にも自動適用される
+
+### 11. 後方互換性・影響範囲・リリースタイミング
+- **後方互換性**: `GET /api/life-info`のレスポンス構造（フィールド名・型）は無変更。`category`フィールドが取りうる値が増えるだけ。旧バージョンApp Storeアプリが未知の`category`値（`travel`）を受け取った場合、`_lifeInfoCardHtml()`内の`LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || ''`のフォールバックにより**カテゴリタグが空文字列で非表示になるだけ**で、タイトル・要約・ソース・日付は問題なく表示されると推測される（`_lifeInfoCategoryTagStyle()`も`|| LIFE_INFO_CATEGORY_COLORS.education`で安全側フォールバックする既存実装のため、仮にタグが表示されても既存色にフォールバックしクラッシュはしない）。実機（旧バージョン）での確認はできていないが、コードの防御的な作りにより後方互換性リスクは低いと判断する。
+- **影響範囲**: `data/sg/life-info.json`はWeb版・App Store版で共有されるデータファイル。`fetch-life-info.js`の変更・cron実行により、翌日以降Web版・App Store版の両方に`category: 'travel'`の記事が同時に配信される。
+- **リリースタイミング（結論: 同時デプロイを採用）**: `server.js`（VALID_CATEGORIES更新）・`scripts/fetch-life-info.js`（新カテゴリ追加）・Web版（`public/`配下のチップ追加・i18n追加）を同時にデプロイすることで、「データは収集されているがWeb版にチップがまだない」という空白期間を作らない。iOSアプリは次回TestFlight/App Store申請ビルドに同梱し、審査通過後に反映する（既存の「Web先行→iOSは次回ビルド」パターンを踏襲）。
+
+### 12. スコープ外（今回作らないもの）
+- 新しいボトムナビタブ（ユーザー合意済み、既存生活情報画面への統合のみ）
+- イベントカードのような「エリア」「期間」専用フィールド（要約文内での表現に統一）
+- `data/sources.json`への統合（イベント用と生活情報用のソース管理ファイルの一本化は今回スコープ外）
+- ホームプレビューでのカテゴリ混在バランス調整（30日保持による旅行カテゴリの相対的な件数増加への対処）
+- 既存の`VALID_CATEGORIES`不整合（health/education抜け）以外の、生活情報機能の他の未発見の不整合の洗い出し
+- BKK/SYD対応
+- プッシュ通知連携（旅行カテゴリの新着通知）
+- 旧App Storeバージョンでの実機動作確認（次回TestFlightビルド後にフォローする既存運用ルールを踏襲）
+
+### 13. リスク・未解決の質問
+- 30日保持により旅行カテゴリの件数が他カテゴリより多くなり、「新着」フィルタなし表示時に旅行記事が目立ちすぎないか、実データ蓄積後に見た目のバランスを確認する必要がある
+- Haikuプロンプトへのカテゴリ追加が既存6カテゴリの判定精度に影響しないか、統合後の実データで確認が必要（次回引き継ぎ事項）
+- MileLion/Mainly Milesの「クレジットカード特典記事 vs 旅行セール記事」の判定はプロンプトの解釈に依存するグレーゾーンがあり、Haikuの誤判定率は運用しながら様子見する以外に事前検証手段がない
+- 上記11.の後方互換性推測（未知カテゴリ値はタグなしカードとして安全にフォールバックする）は静的コード確認のみで、旧バージョンApp Storeアプリでの実機検証はできていない
+- `GET /api/life-info`の`VALID_CATEGORIES`不整合（health/education抜け）がいつ発生したか特定できなかった（plan.md/CLAUDE.mdに該当する記録が見当たらない）

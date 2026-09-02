@@ -483,6 +483,7 @@
         newsCatEducation: '教育・子育て',
         newsCatWeather: '天候・災害',
         newsCatCommunity: 'コミュニティ',
+        newsCatTravel: '旅行',
         newsEmptyDesc: '現在表示できる情報がありません。<br>また後で確認してください。',
         lifeInfoPreviewTitle: '📰 シンガポール生活情報',
         lifeInfoPreviewMoreLink: 'もっと見る ›',
@@ -812,6 +813,7 @@
         newsCatEducation: 'Education',
         newsCatWeather: 'Weather',
         newsCatCommunity: 'Community',
+        newsCatTravel: 'Travel',
         newsEmptyDesc: 'No information available right now.<br>Please check back later.',
         lifeInfoPreviewTitle: '📰 Singapore Life Info',
         lifeInfoPreviewMoreLink: 'More ›',
@@ -1579,6 +1581,7 @@
       education: 'newsCatEducation',
       weather:   'newsCatWeather',
       community: 'newsCatCommunity',
+      travel:    'newsCatTravel',
     };
 
     // カテゴリごとのタグ配色（アプリ既存のカラーパレット内の色を流用、見た目のトーンを崩さない範囲で区別）
@@ -1589,6 +1592,7 @@
       education: { bg: 'var(--sand)',            color: 'var(--caramel)' },
       weather:   { bg: 'rgba(122,173,204,0.18)', color: 'var(--sky)' },
       community: { bg: 'rgba(196,112,90,0.16)',  color: 'var(--terracotta)' },
+      travel:    { bg: 'var(--plum-pale)',       color: 'var(--plum)' },
     };
     function _lifeInfoCategoryTagStyle(category) {
       const c = LIFE_INFO_CATEGORY_COLORS[category] || LIFE_INFO_CATEGORY_COLORS.education;

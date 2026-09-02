@@ -1586,8 +1586,8 @@ design 165で追加したテーマ別バッジ（Kopi巡り／バクテー巡り
 - `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css/app.js `?v=20260726d`/`20260726c`→`20260729a`、`sw.js` CACHE_NAME=`sg-weekend-v718`→`v719`
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのトースト表示タイミング・見た目（絵文字サイズ・2行テキストの折り返し）、思い出シートとの表示順序が意図通り重ならないことは2026-07-29時点でコード確認・curlによる配信反映確認・`node --check`のみ完了、実ブラウザ・実機とも未確認
 
-## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172）
-既存の「週末おでかけイベント」取り込みパイプライン（`fetch-events.js`/`filter-events.js`、上記「イベント取り込みパイプライン構成」参照）とはデータ・API・UIとも完全に独立した新機能。行政・ビザ手続き（admin）/天候・災害（weather）/交通・MRT（transport）/日本人コミュニティ（community）の4カテゴリをキュレーション表示する。
+## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172。2026-09-02設計書175で「旅行」カテゴリ追加）
+既存の「週末おでかけイベント」取り込みパイプライン（`fetch-events.js`/`filter-events.js`、上記「イベント取り込みパイプライン構成」参照）とはデータ・API・UIとも完全に独立した新機能。行政・ビザ手続き（admin）/天候・災害（weather）/交通・MRT（transport）/日本人コミュニティ（community）/医療・健康（health）/教育・子育て（education）/旅行（travel）の7カテゴリをキュレーション表示する（`health`/`education`は設計書172時点では未記録のタイミングで既に拡張済みだったカテゴリ、`travel`は設計書175で新規追加）。
 
 - **データ取得パイプライン**: 新規`scripts/fetch-life-info.js`。取得元RSS3件（CNA `https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10416`／Mothership.sg `https://mothership.sg/feed/`／JCCI `https://www.jcci.org.sg/feed/`）を`rss-parser`で取得。ハイウォーターマーク方式（新規`data/life-info-fetch-state.json`、既存の`data/source-fetch-state.json`＝イベント用とは分離）で新着記事のみ抽出。フィード取得自体が失敗したソースは状態を更新せず次回また試行する（既存`fetch-events.js`と同じフォールトトレランス設計）。Haiku（`claude-haiku-4-5-20251001`）で「シンガポール在住日本人の生活に関係あるか」を判定し`category`（admin/weather/transport/community）を付与、スポーツ・芸能・単純な事件事故等の無関係記事は却下。採用記事はSonnet（`claude-sonnet-4-6`）で日本語要約＋英語要約（`title`/`title_en`/`summary`/`summary_en`）を生成し、新規`data/sg/life-info.json`（配列、gitignore対象）に追記保存。フィールドは`id`/`category`/`title`/`title_en`/`summary`/`summary_en`/`source`（"CNA"/"Mothership"/"JCCI"）/`sourceUrl`/`publishedAt`/`fetched_at`（`severity`フィールドは、報道記事ベースで構造化された警報データでないため見送り）。`--dry-run`オプション対応
 - **cron**: 新規エントリを追加、毎日7:15 SGT（1:15 CEST）に`node scripts/fetch-life-info.js --city=sg`を実行。既存の6:30 SGT（`run-fetch-all.sh`）・7:00/18:00 SGT（`post-to-x.js --to-line`）・水日7:30 SGT（`run-source-analysis.sh`）のいずれとも時刻が衝突しない。ログは`logs/fetch-life-info.log`
@@ -1600,6 +1600,23 @@ design 165で追加したテーマ別バッジ（Kopi巡り／バクテー巡り
 - `server.js`の変更を伴うため`pm2 restart`実施済み。キャッシュバスティング: `index.html` app.js `?v=20260827a`→`20260828a`、`sw.js` CACHE_NAME=`sg-weekend-v720`→`v721`（`app.css`は変更なしのため据え置き）
 - スコープ外（設計時点で明示）: プッシュ通知連携（緊急情報の即時配信）、ICA/MOM/NEA/LTA等の非公式スクレイピング実装、多言語ソースの機械翻訳精度保証、ユーザーからの情報投稿・コメント機能、カテゴリごとの通知オンオフ設定UI、BKK/SYD対応、iOSアプリのビルド・push（Web版への反映のみ、iOS版は次回TestFlightビルドで反映）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのニュースタブ・ホーム画面プレビューセクションの表示、タップ後の外部リンク遷移（`Browser.open()`）の実際の動作は2026-08-28時点でWeb版での確認（curl・ロジック検証・実データでのパイプライン完走確認）のみ完了、実機未確認
+
+### 「旅行」カテゴリ追加（2026-09-02実装、設計書175）
+上記の生活情報・ニュース機能に7つ目のカテゴリ「旅行」を追加した。新しいボトムナビタブは作らず既存の生活情報・ニュース画面に統合する設計（ユーザー合意済み、更新頻度が低いため専用タブだと閑散として見える懸念）。分離ではなく統合方式を採用: 新規`data/sg/travel-info.json`＋新規`scripts/fetch-travel-info.js`という完全分離案は不採用とし、既存`data/sg/life-info.json`のスキーマに`category:'travel'`を追加し、既存`scripts/fetch-life-info.js`に3ソースを統合した。
+
+- **⚠️ 既存の不整合を発見・修正**: `server.js`の`GET /api/life-info`の`VALID_CATEGORIES`が`['admin','weather','transport','community']`の4種のまま更新されておらず、`health`/`education`（設計書172時点では未記録のタイミングで既に拡張されていたカテゴリ）がサーバー側の`?category=`クエリでフィルタできない状態だった（クライアント側フィルタで最終的に絞り込まれるため表面化していなかった）。今回`travel`を追加する際に7種類へ更新し、この既存の抜けも合わせて修正した
+- **新規ソース3件**（`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`）: `TheSmartLocal Travel`（`https://thesmartlocal.com/category/travel/feed/`）・`The MileLion`（`https://milelion.com/feed/`）・`Mainly Miles`（`https://mainlymiles.com/feed/`）。既存4フィード（CNA/Mothership/Straits Times/JCCI）はそのまま維持し、合計7フィードになった。`data/sources.json`（イベント取得パイプライン専用）はこの機能のソース管理には使われないため変更対象外
+- **カテゴリの色・ラベル**: 日本語ラベル「旅行」（英語`Travel`）。新規CSS変数`--plum: #9B7A94`/`--plum-pale: #F3EDF1`を`public/app.css`の`:root`に追加（ダークモードは`--plum-pale: #241C22`を別途定義）。既存6色（gold/sage/terracotta-light/caramel/sky/terracotta）を使い切っていたため、彩度を抑えた紫系の新色相を採用し既存カテゴリと混同しないようにした。`LIFE_INFO_CATEGORY_COLORS`（`public/app.js`）に`travel: { bg:'var(--plum-pale)', color:'var(--plum)' }`を追加
+- **リテンション期間: travelカテゴリのみ30日保持**（他5カテゴリは既存通り7日保持）。理由: セール・プロモ情報と異なり、TheSmartLocalの行き先紹介ガイド記事（Tiomanガイド、Kluangガイド等）は時事性が低く数ヶ月単位で有用なため、7日保持では読まれる前に消えてしまう構造になる。`scripts/fetch-life-info.js`に`getRetentionDays(category)`/`retentionCutoffFor(category)`ヘルパーを新設し、削除フィルタをアイテムごとにカテゴリ別カットオフで判定するよう変更（既存5カテゴリの7日保持ロジックは無変更）。副作用として、30日保持により旅行カテゴリの件数が他カテゴリより多くなり定常化する見込み（1日1.5〜2件×30日で最大45〜60件程度）。ホーム画面プレビュー（直近3件）のカテゴリ混在バランス調整は今回スコープ外
+- **Haiku分類プロンプトの調整**（`filterBatch()`内`instructionText`）: 「travel」カテゴリの判定基準（航空券・ホテルのセール/プロモ情報、SGから行ける近隣国・都市の行き先紹介ガイド、旅行関連のフェス・展示会情報）を追加。あわせて、MileLion/Mainly Milesのブログ内に混在する「クレジットカードの入会特典・ポイント還元率・年会費比較」「マイル・ポイントの貯め方・使い方の一般論」を明示的に除外する基準を追加（同じブログでも「セール情報記事」と「カード特典記事」が混在するため、カテゴリタグではなく記事本文の実質的内容で判定させる方針。機械的なキーワードフィルタは導入していない）
+- **UIカテゴリチップ**: 既存チップ順（新着/政府/交通/医療・健康/教育・子育て/天候・災害/コミュニティ）の末尾に「旅行」を追加し8チップ構成に。「旅行」は前向き・オプショナルな情報として性質が異なるため意図的に末尾配置
+- **`server.js`のAPI変更**: `GET /api/life-info?city=sg&category=travel`が有効なクエリとして機能するよう`VALID_CATEGORIES`を7種類（`admin`/`weather`/`transport`/`community`/`health`/`education`/`travel`）に更新。レスポンスの構造（フィールド名一覧）自体は無変更
+- **後方互換性**: `GET /api/life-info`のレスポンス構造（フィールド名・型）は無変更、`category`フィールドが取りうる値が増えるだけ。旧バージョンApp Storeアプリが未知の`category`値（`travel`）を受け取った場合、`LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || ''`のフォールバックによりカテゴリタグが空文字列で非表示になるだけで、タイトル・要約・ソース・日付は問題なく表示される想定（コードの防御的な作りによる推測、実機での旧バージョン確認はできていない）
+- **リリースタイミング（同時デプロイ）**: `server.js`（VALID_CATEGORIES更新）・`scripts/fetch-life-info.js`（新カテゴリ追加）・Web版（`public/`配下のチップ追加・i18n追加）を同時にデプロイ。iOSアプリは次回TestFlight/App Store申請ビルドに同梱し反映する（既存の「Web先行→iOSは次回ビルド」パターンを踏襲）
+- i18n新規キー: `newsCatTravel`（ja「旅行」/en「Travel」）をja/en同時追加
+- `server.js`の変更を伴うため`pm2 restart`実施済み。キャッシュバスティング: `index.html` app.css `?v=20260901a`→`20260902a`、app.js `?v=20260902b`→`20260902c`、`sw.js` CACHE_NAME=`sg-weekend-v800`→`v801`
+- スコープ外（設計時点で明示）: 新しいボトムナビタブ（既存生活情報画面への統合のみ）、イベントカードのような「エリア」「期間」専用フィールド、`data/sources.json`への統合、ホームプレビューでのカテゴリ混在バランス調整、既存の`VALID_CATEGORIES`不整合以外の生活情報機能の他の未発見の不整合の洗い出し、BKK/SYD対応、プッシュ通知連携、旧App Storeバージョンでの実機動作確認
+- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での旅行チップ表示・タグ配色（`--plum`）の見た目は2026-09-02時点でcurl・`node scripts/fetch-life-info.js --city=sg --dry-run`によるパイプライン完走確認のみ完了、実ブラウザ・実機とも未確認。7フィードに増えたことによるcron実行時間への影響は実測未確認（次回本番実行ログで確認）。Haiku分類プロンプトへのtravelカテゴリ追加が既存6カテゴリの判定精度に影響しないかは統合後1週間分の実データでの目視確認が必要。MileLion/Mainly Milesの「クレジットカード特典記事 vs 旅行セール記事」の判定精度は運用しながら様子見
 
 ## 環境構成と注意事項（2026-07-07）
 

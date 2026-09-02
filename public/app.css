@@ -17,6 +17,8 @@
       --gold: #C0903A;
       --gold-light: #E4C472;
       --sky: #7AADCC;
+      --plum: #9B7A94;
+      --plum-pale: #F3EDF1;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 4px 20px rgba(42,37,32,0.07);
@@ -3477,6 +3479,7 @@
       --sand-dark: #382A20;
       --caramel-pale: #28180E;
       --sage-pale: #141E1C;
+      --plum-pale: #241C22;
       --midnight: #F0E8DF;
       --warm-gray: #9E9080;
       --light-gray: #483C32;

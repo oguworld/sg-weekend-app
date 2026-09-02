@@ -640,7 +640,7 @@ app.get('/api/life-info', (req, res) => {
     if (!Array.isArray(items)) items = [];
 
     const category = (req.query.category || '').toLowerCase();
-    const VALID_CATEGORIES = ['admin', 'weather', 'transport', 'community'];
+    const VALID_CATEGORIES = ['admin', 'weather', 'transport', 'community', 'health', 'education', 'travel'];
     if (VALID_CATEGORIES.includes(category)) {
       items = items.filter(item => item.category === category);
     }

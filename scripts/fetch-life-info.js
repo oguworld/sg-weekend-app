@@ -63,11 +63,14 @@ const CITY_CONFIG = {
       { url: 'https://mothership.sg/feed/',                                                          name: 'Mothership' },
       { url: 'https://www.straitstimes.com/news/singapore/rss.xml',                                  name: 'Straits Times' },
       { url: 'https://www.jcci.org.sg/feed/',                                                         name: 'JCCI' },
+      { url: 'https://thesmartlocal.com/category/travel/feed/', name: 'TheSmartLocal Travel' },
+      { url: 'https://milelion.com/feed/',                      name: 'The MileLion' },
+      { url: 'https://mainlymiles.com/feed/',                   name: 'Mainly Miles' },
     ],
   },
 };
 
-const CATEGORIES = ['admin', 'transport', 'health', 'education', 'weather', 'community'];
+const CATEGORIES = ['admin', 'transport', 'health', 'education', 'weather', 'community', 'travel'];
 
 // ─── CLI引数解析 ─────────────────────────────────────────────────
 function parseArgs() {
@@ -212,17 +215,20 @@ async function filterBatch(batch, cityKey) {
 - "education": 教育・子育て（学校情報、保活、子育て支援制度など）
 - "weather": 天候・災害・ヘイズ（PSI指数・洪水警報・大雨警報・気象関連ニュース）
 - "community": 日本人コミュニティ・近隣制度（日本人会・日本人学校・日系企業・近隣国との往来制度等）
+- "travel": 旅行・トラベルハック（航空券・ホテルのセール/プロモ情報、SGから行ける近隣国・都市の行き先紹介ガイド、旅行関連のフェス・展示会情報）
 
 【不採用とすべきもの】
 - スポーツ・芸能・エンタメ関連のニュース
 - 単純な事件・事故報道（生活への影響が薄いもの）
 - 政治的な論争・スキャンダル記事で生活情報としての実用性がないもの
 - 広告・PR記事
-- 上記6カテゴリのいずれにも明確に該当しないもの
+- クレジットカードの入会特典・ポイント還元率・年会費比較など、決済手段そのものに関する記事（旅行先や航空券セールと無関係なもの）
+- マイル・ポイントの貯め方・使い方の一般論（具体的な行き先・航空券セール・ホテルセールと結びついていないもの）
+- 上記7カテゴリのいずれにも明確に該当しないもの
 
 各採用記事について以下のフィールドのみ返すこと：
 - index: 元の記事のインデックス番号（0始まり）
-- category: "admin" | "transport" | "health" | "education" | "weather" | "community"
+- category: "admin" | "transport" | "health" | "education" | "weather" | "community" | "travel"
 
 JSON配列のみ返すこと（前置き・説明・コードブロック不要）。不採用は配列に含めない。
 
@@ -483,12 +489,20 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
     console.log(`  🔁 意味的重複と判定し${beforeDedupCount - newItems.length}件を除外しました`);
   }
 
-  // 保持期間: fetched_atが7日以上前の記事は削除する（生活情報は鮮度が命のため、events.jsonと異なり
-  // 蓄積し続けない方針。新規採用が0件の日も既存データの棚卸しのため必ず実行する）
-  const RETENTION_DAYS = 7;
-  const retentionCutoff = new Date();
-  retentionCutoff.setHours(0, 0, 0, 0);
-  retentionCutoff.setDate(retentionCutoff.getDate() - RETENTION_DAYS);
+  // 保持期間: fetched_atが一定日数以上前の記事は削除する（生活情報は鮮度が命のため、events.jsonと異なり
+  // 蓄積し続けない方針。新規採用が0件の日も既存データの棚卸しのため必ず実行する）。
+  // travelカテゴリのみ時事性が低く数ヶ月単位で有用なため30日保持、それ以外は既存通り7日保持（設計書175）。
+  const RETENTION_DAYS_DEFAULT = 7;
+  const RETENTION_DAYS_TRAVEL = 30;
+  function getRetentionDays(category) {
+    return category === 'travel' ? RETENTION_DAYS_TRAVEL : RETENTION_DAYS_DEFAULT;
+  }
+  function retentionCutoffFor(category) {
+    const cutoff = new Date();
+    cutoff.setHours(0, 0, 0, 0);
+    cutoff.setDate(cutoff.getDate() - getRetentionDays(category));
+    return cutoff;
+  }
 
   if (dryRun) {
     console.log(`\n  🧪 --dry-run のため保存はスキップします（採用${newItems.length}件）`);
@@ -499,13 +513,14 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
     const kept = combined.filter(item => {
       if (!item.fetched_at) return true; // 日付不明は安全側で残す
       const fetched = new Date(item.fetched_at);
-      return !isNaN(fetched.getTime()) && fetched >= retentionCutoff;
+      const cutoff = retentionCutoffFor(item.category);
+      return !isNaN(fetched.getTime()) && fetched >= cutoff;
     });
     const removedCount = combined.length - kept.length;
     if (newItems.length > 0 || removedCount > 0) {
       fs.mkdirSync(path.dirname(lifeInfoPath), { recursive: true });
       fs.writeFileSync(lifeInfoPath, JSON.stringify(kept, null, 2), 'utf8');
-      console.log(`\n  💾 ${lifeInfoPath} に${newItems.length}件追記 / ${RETENTION_DAYS}日超過${removedCount}件削除（現在${kept.length}件）`);
+      console.log(`\n  💾 ${lifeInfoPath} に${newItems.length}件追記 / 保持期間超過${removedCount}件削除（現在${kept.length}件、travelのみ${RETENTION_DAYS_TRAVEL}日保持・他は${RETENTION_DAYS_DEFAULT}日保持）`);
     }
   }
 
