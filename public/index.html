@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260902b">
+  <link rel="stylesheet" href="/app.css?v=20260902c">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -147,80 +147,6 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- ─── COURSE SCREEN ─── -->
-  <div class="screen" id="screen-course" style="display:none;">
-    <div class="course-screen-header plan-title-header">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;">
-        <span class="screen-title" data-i18n="courseScreenTitle">シンガポール探訪</span>
-        <div id="stamp-residency-counter" onclick="shareStampProgressCard()" style="display:none;cursor:pointer;font-size:11px;color:var(--warm-gray);font-weight:600;text-align:right;line-height:1.5;margin-top:4px;flex-shrink:0;"></div>
-      </div>
-      <div id="graduation-album-link" style="display:none;text-align:right;margin-top:6px;" onclick="openGraduationAlbum()">
-        <span style="font-size:12px;font-weight:700;color:var(--caramel);cursor:pointer;" data-i18n="graduationAlbumLinkLabel">🎓 卒業アルバムを見る</span>
-      </div>
-      <!-- ピルタブ（設計書178フェーズ1: モデルコース／マイコースタブを削除、探訪スタンプ帳タブのみ残す） -->
-      <div class="course-tab-bar">
-        <button class="course-tab active" data-tab="map" onclick="switchCourseTab('map')" data-i18n="courseTabStampMap">探訪スタンプ帳</button>
-      </div>
-    </div>
-    <div class="screen-content" id="course-screen-content">
-
-      <!-- Pull to Refresh インジケーター（設計書19） -->
-      <div class="ptr-indicator" id="ptr-indicator-course"><div class="ptr-spinner"></div></div>
-
-      <!-- スタンプマップ（設計書69） -->
-      <div id="stamp-map-view" style="display:none;padding:0 0 100px;">
-        <div id="stamp-map-login-required" style="display:none;text-align:center;padding:60px 24px;color:var(--warm-gray);">
-          <div style="font-size:36px;margin-bottom:12px;">🗺️</div>
-          <div style="font-size:14px;line-height:1.7;margin-bottom:18px;" data-i18n="stampMapLoginRequired">探訪スタンプ帳の進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。</div>
-        </div>
-        <div id="stamp-map-content" style="display:none;">
-          <div style="display:none;padding:14px 16px 6px;align-items:center;justify-content:flex-end;gap:8px;">
-            <button id="stamp-view-toggle-btn" class="sort-btn" onclick="if(!_touchCapableDetected) toggleStampViewMode()" style="flex-shrink:0;"></button>
-          </div>
-          <!-- エリア制覇バッジ（設計書77）は設計書83で一時停止（display:none）。コード（_renderStampAreaBadges()/STAMP_BADGE_AREAS/関連CSS）は残置、復活時はこのdisplay:noneを解除するのみ -->
-          <div style="display:none;">
-            <div style="padding:0 16px 4px;font-size:11px;font-weight:700;color:var(--warm-gray);" data-i18n="stampAreaBadgesTitle">エリア制覇バッジ</div>
-            <div id="stamp-area-badges" class="stamp-area-badges-page"></div>
-          </div>
-          <div id="stamp-map-view-inner" style="position:relative;width:100%;height:min(60vh,480px);border-radius:16px;overflow:hidden;margin:0 16px;width:calc(100% - 32px);box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-            <div id="stamp-leaflet-map" style="position:absolute;inset:0;"></div>
-            <div id="stamp-fog-overlay" style="position:absolute;inset:0;pointer-events:none;"></div>
-          </div>
-          <!-- 探訪の記録（設計書166、レベル別バッジ） -->
-          <div id="stamp-level-badges-section" style="padding:14px 16px 4px;">
-            <div class="stamp-level-section-title">
-              <span class="stamp-level-title-main">🏅 <span data-i18n="stampLevelBadgesTitle">探訪の記録</span></span>
-            </div>
-            <div id="stamp-level-badges" class="stamp-theme-badges-grid stamp-level-badges-grid"></div>
-            <div id="stamp-level-badge-spot-lists"></div>
-          </div>
-          <!-- テーマ別バッジ（設計書165） -->
-          <div id="stamp-theme-badges-section" style="padding:14px 16px 4px;">
-            <div class="stamp-level-section-title">
-              <span class="stamp-level-title-main">🏅 <span data-i18n="stampThemeBadgesTitle">テーマ別バッジ</span></span>
-            </div>
-            <div id="stamp-theme-badges" class="stamp-theme-badges-grid"></div>
-            <div id="stamp-theme-badge-spot-lists"></div>
-          </div>
-          <div id="stamp-collection-list" style="display:none;padding:2px 16px 4px;"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- アカウント連携必須ゲート（設計書116） -->
-    <div id="course-auth-gate" class="screen-auth-gate" style="display:none;">
-      <div class="screen-auth-gate-card">
-        <div class="screen-auth-gate-icon">🔒</div>
-        <div class="screen-auth-gate-msg" data-i18n="authGateMessage">この機能を使うにはアカウント連携が必要です</div>
-        <button class="screen-auth-gate-btn" onclick="goToAccountLinking()" data-i18n="authGateBtn">設定で連携する</button>
-      </div>
-    </div>
-
-    <!-- FAB -->
-    <button id="course-fab" onclick="if(!_touchCapableDetected) toggleStampViewMode()" class="fab-plan"
-      style="position:fixed;bottom:calc(100px + env(safe-area-inset-bottom,0px));right:20px;z-index:200;font-size:22px;">⇄</button>
   </div>
 
   <!-- ─── NEWS SCREEN（設計書172、生活情報・ニュースのキュレーション） ─── -->
@@ -356,38 +282,6 @@
         <span class="settings-item-label" data-i18n="labelCity">都市</span>
         <div class="city-select-wrapper">
           <select id="city-select" class="city-select" onchange="selectCity(this.value)"></select>
-        </div>
-      </div>
-
-      <div class="settings-item" style="padding:12px 18px;display:none;">
-        <span class="settings-item-label" data-i18n="labelArrivalDate">来星日</span>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="position:relative;">
-            <span id="arrival-date-display"
-              style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;
-                     border:1.5px solid var(--sand-dark);background:var(--warm-white);
-                     font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;
-                     color:var(--midnight);pointer-events:none;"></span>
-            <input id="arrival-date-input" type="date"
-              style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
-              onchange="_saveArrivalDate(this.value)">
-          </div>
-        </div>
-      </div>
-
-      <div class="settings-item" style="padding:12px 18px;display:none;">
-        <span class="settings-item-label" data-i18n="labelDepartureDate">帰国予定日</span>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="position:relative;">
-            <span id="departure-date-display"
-              style="display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;
-                     border:1.5px solid var(--sand-dark);background:var(--warm-white);
-                     font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;
-                     color:var(--midnight);pointer-events:none;"></span>
-            <input id="departure-date-input" type="date"
-              style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;"
-              onchange="_saveDepartureDate(this.value)">
-          </div>
         </div>
       </div>
 
@@ -652,10 +546,6 @@
       <span class="nav-icon">📌</span>
       <span class="nav-label" data-i18n="navPins">ピン留め</span>
     </button>
-    <button class="nav-item" id="nav-course" style="display:none;" onclick="if(!_touchCapableDetected) switchNav('course')">
-      <span class="nav-icon">🧭</span>
-      <span class="nav-label" data-i18n="navCourse">探訪</span>
-    </button>
     <button class="nav-item" id="nav-plan" style="display:none;" onclick="if(!_touchCapableDetected) switchNav('plan')">
       <span class="nav-icon">📅</span>
       <span class="nav-label" data-i18n="navPlan">予定表</span>
@@ -753,124 +643,6 @@
           data-i18n="backupPassphraseSubmit">確定</button>
       </div>
     </div>
-  </div>
-
-  <!-- スタンプラリー: スポット詳細シート（設計書69） -->
-  <div class="chat-overlay" id="stamp-spot-detail-overlay" onclick="if(!_touchCapableDetected) closeStampSpotDetail()" style="z-index:3700;"></div>
-  <div id="stamp-spot-detail-sheet" class="plan-modal" style="z-index:3701;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;
-    box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-shrink:0;">
-      <div id="stamp-spot-detail-level-badge" style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:50px;"></div>
-      <button data-close onclick="closeStampSpotDetail()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
-      <div id="stamp-spot-detail-image-container"></div>
-      <div id="stamp-spot-detail-name" style="font-family:'Kaisei Opti',serif;font-size:18px;font-weight:700;color:var(--midnight);margin-bottom:6px;"></div>
-      <div id="stamp-spot-detail-area" style="font-size:12px;color:var(--warm-gray);margin-bottom:10px;"></div>
-      <div style="margin-bottom:10px;">
-        <span class="sort-btn" style="cursor:pointer;"
-          onclick="focusStampSpotOnMap(_stampSelectedSpot && _stampSelectedSpot.id)"
-          data-i18n="stampDetailMapLink">📍 地図で見る</span>
-      </div>
-      <div id="stamp-spot-detail-desc" style="font-size:14px;line-height:1.7;color:var(--text);margin-bottom:16px;"></div>
-      <!-- あなたの記録（写真・メモ、設計書121） -->
-      <div id="stamp-spot-detail-memory" class="stamp-detail-memory-section" style="display:none;">
-        <div class="stamp-detail-memory-title" data-i18n="stampDetailMemoryLabel">あなたの記録</div>
-        <div id="stamp-spot-detail-memory-body"></div>
-      </div>
-      <!-- 設計書163: チェックイン済み（訪問済み）の場合のみ表示。openStampSpotDetail()がstyle.displayを制御する -->
-      <div id="stamp-share-detail-btn-row" class="stamp-share-btn-row" style="display:none;">
-        <button type="button" class="stamp-share-btn stamp-share-btn--main" onclick="shareStampCheckinCard()">
-          <span>🔗</span><span data-i18n="stampSharePreviewTitle">シェアする</span>
-        </button>
-      </div>
-      <div id="stamp-spot-detail-ticket-link" style="display:none;margin-bottom:16px;">
-        <span style="font-size:12px;color:var(--caramel);text-decoration:underline;cursor:pointer;" data-i18n="affiliateInfoLink">チケット情報</span>
-      </div>
-      <div id="stamp-spot-detail-distance" style="font-size:13px;color:var(--warm-gray);text-align:center;margin-bottom:10px;"></div>
-      <button id="stamp-checkin-btn" onclick="if(!_touchCapableDetected) doStampCheckin()" disabled
-        style="width:100%;padding:14px;background:var(--caramel);border:none;border-radius:14px;
-               font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;opacity:0.4;margin-bottom:8px;"
-        data-i18n="stampCheckinBtn">現在地を確認中…</button>
-    </div>
-  </div>
-
-  <!-- スタンプラリー: レベル解禁演出モーダル（設計書70改善3） -->
-  <div class="chat-overlay" id="stamp-level-unlock-overlay" onclick="if(!_touchCapableDetected) closeStampLevelUnlockModal()" style="z-index:3702;"></div>
-  <div id="stamp-level-unlock-modal" class="plan-modal" style="z-index:3703;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:28px 20px 0;
-    box-shadow:0 -4px 20px rgba(0,0,0,0.12);align-items:center;text-align:center;">
-    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;">
-      <div id="stamp-level-unlock-emoji" class="stamp-unlock-emoji"></div>
-      <div id="stamp-level-unlock-title" style="font-family:'Kaisei Opti',serif;font-size:20px;font-weight:700;color:var(--midnight);margin:14px 0 6px;" data-i18n="stampLevelUnlockModalTitle">🔓 新しいレベルが解禁されました！</div>
-      <div id="stamp-level-unlock-name" style="font-size:16px;font-weight:700;color:var(--caramel);margin-bottom:14px;"></div>
-      <div id="stamp-level-unlock-subtext" style="width:100%;background:var(--sand);border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;color:var(--midnight);margin-bottom:20px;"></div>
-      <!-- 設計書163: 全制覇（コンプリート）モーダルの時のみ表示。openStampLevelCompleteModal()がstyle.displayを制御する。
-           タップでカードを生成し共有プレビューミニモーダル（#stamp-share-preview-modal、IG/Xボタンはそちら側に集約）を開く -->
-      <div id="stamp-share-complete-btn-row" class="stamp-share-btn-row" style="display:none;">
-        <button type="button" class="stamp-share-btn stamp-share-btn--main" onclick="_shareStampCompleteBtnClick()">
-          <span>🔗</span><span data-i18n="stampSharePreviewTitle">シェアする</span>
-        </button>
-      </div>
-      <button onclick="if(!_touchCapableDetected) closeStampLevelUnlockModal()"
-        style="width:100%;padding:14px;background:var(--caramel);border:none;border-radius:14px;
-               font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;margin-bottom:8px;"
-        data-i18n="stampLevelUnlockModalClose">閉じる</button>
-    </div>
-  </div>
-
-  <!-- スタンプラリー: チェックイン後「思い出を残す」ミニシート（設計書121） -->
-  <div class="chat-overlay" id="stamp-memory-overlay" onclick="_skipStampMemory()" style="z-index:3704;"></div>
-  <div id="stamp-memory-sheet" class="plan-modal" style="z-index:3705; background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
-      <div style="text-align:center;margin-bottom:18px;">
-        <div style="font-size:30px;margin-bottom:6px;">🎉</div>
-        <div id="stamp-memory-title" style="font-family:'Kaisei Opti',serif;font-size:17px;font-weight:700;color:var(--midnight);" data-i18n="stampMemorySheetTitle">この瞬間を残しますか？</div>
-        <div id="stamp-memory-spot-name" style="font-size:12px;color:var(--warm-gray);"></div>
-      </div>
-      <div id="stamp-memory-photo-slots" class="stamp-memory-photo-slots">
-        <div class="stamp-memory-photo-slot" data-slot="0" onclick="_pickStampMemoryPhoto(0)"><div class="icon">📷</div><div class="lbl" data-i18n="stampMemoryPhotoAddLabel">追加</div></div>
-        <div class="stamp-memory-photo-slot" data-slot="1" onclick="_pickStampMemoryPhoto(1)"><div class="icon">📷</div><div class="lbl" data-i18n="stampMemoryPhotoAddLabel">追加</div></div>
-        <div class="stamp-memory-photo-slot" data-slot="2" onclick="_pickStampMemoryPhoto(2)"><div class="icon">📷</div><div class="lbl" data-i18n="stampMemoryPhotoAddLabel">追加</div></div>
-      </div>
-      <textarea id="stamp-memory-text" class="stamp-memory-textarea" maxlength="300" data-i18n-ph="stampMemoryTextPlaceholder" placeholder="気づきや感想を残す（任意）"></textarea>
-      <div class="stamp-memory-local-note" data-i18n="stampMemoryPhotoLocalNote">🔒 写真は端末内にのみ保存されます</div>
-      <div style="display:flex;gap:10px;margin-top:12px;margin-bottom:8px;">
-        <button onclick="_skipStampMemory()" style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);" data-i18n="stampMemorySkipBtn">スキップ</button>
-        <button id="stamp-memory-save-btn" onclick="_saveStampMemory()" style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;" data-i18n="stampMemorySaveBtn">保存する</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- スタンプラリー: シェアカード共有プレビューミニモーダル（設計書163、3箇所〈全制覇/チェックイン/進捗〉共通で使い回す） -->
-  <div class="chat-overlay" id="stamp-share-preview-overlay" onclick="if(!_touchCapableDetected) closeStampSharePreview()" style="z-index:3730;"></div>
-  <div id="stamp-share-preview-modal" class="plan-modal" style="z-index:3731;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;
-    box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
-      <div style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;color:var(--midnight);" data-i18n="stampSharePreviewTitle">シェアする</div>
-      <button data-close onclick="closeStampSharePreview()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
-      <img id="stamp-share-preview-img" alt="" style="width:100%;max-width:320px;display:block;margin:0 auto 16px;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,0.18);">
-      <div class="stamp-share-btn-row">
-        <button type="button" class="stamp-share-btn stamp-share-btn--ig" onclick="_shareStampPreviewToInstagram()">
-          <span>📷</span><span data-i18n="stampShareToInstagram">Instagramでシェア</span>
-        </button>
-        <button type="button" class="stamp-share-btn stamp-share-btn--x" onclick="_shareStampPreviewToX()">
-          <span>𝕏</span><span data-i18n="stampShareToX">Xでシェア</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 卒業アルバム（設計書152、フェーズ1: 表示のみ） -->
-  <div id="graduation-album-screen" style="position:fixed;inset:0;z-index:3720;background:var(--warm-white);overflow-y:auto;display:none;">
-    <div style="position:sticky;top:0;z-index:1;display:flex;justify-content:flex-end;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 8px;background:var(--warm-white);">
-      <button onclick="closeGraduationAlbum()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div id="graduation-album-content" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));"></div>
   </div>
 
   <!-- Pin Picker Sheet -->
@@ -1091,7 +863,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260902i"></script>
+  <script src="/app.js?v=20260902j"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

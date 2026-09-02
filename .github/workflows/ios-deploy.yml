@@ -90,54 +90,12 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UIStatusBarStyle string UIStatusBarStyleDarkContent" ios/App/App/Info.plist || \
           /usr/libexec/PlistBuddy -c "Set :UIStatusBarStyle UIStatusBarStyleDarkContent" ios/App/App/Info.plist
 
+      # 共有カレンダーのQRコード読み取り（navigator.mediaDevices.getUserMedia()）に必須。
       - name: Set camera usage description in Info.plist
         run: |
           cd ios-app
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループへの参加、および探訪スタンプ帳での思い出の写真撮影のためカメラを使用します" ios/App/App/Info.plist || \
-          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループへの参加、および探訪スタンプ帳での思い出の写真撮影のためカメラを使用します" ios/App/App/Info.plist
-
-      # 探訪スタンプ帳の「思い出」機能（設計書121）: チェックイン時にフォトライブラリから既存の写真を選択できるようにするため
-      - name: Set photo library usage description in Info.plist
-        run: |
-          cd ios-app
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist || \
-          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryUsageDescription 探訪スタンプ帳で思い出の写真を選択するためフォトライブラリを使用します" ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 探訪スタンプ帳で撮影した思い出の写真を保存するためフォトライブラリへのアクセスを使用します" ios/App/App/Info.plist || \
-          /usr/libexec/PlistBuddy -c "Set :NSPhotoLibraryAddUsageDescription 探訪スタンプ帳で撮影した思い出の写真を保存するためフォトライブラリへのアクセスを使用します" ios/App/App/Info.plist
-
-      # スタンプラリー機能（設計書69）: GPS近接検知によるチェックインのため位置情報（使用中のみ）を利用する
-      - name: Set location usage description in Info.plist
-        run: |
-          cd ios-app
-          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 近くのスタンプラリースポットを検知するため位置情報を使用します" ios/App/App/Info.plist || \
-          /usr/libexec/PlistBuddy -c "Set :NSLocationWhenInUseUsageDescription 近くのスタンプラリースポットを検知するため位置情報を使用します" ios/App/App/Info.plist
-
-      # 探訪スタンプ帳シェア機能（設計書163）: Instagram Storiesへの共有時、@koodos/share-to-insta-storiesが
-      # instagram-stories:// URL SchemeをcanOpenURL()で判定するために必須。iOS 9以降、
-      # LSApplicationQueriesSchemesに登録していないURL SchemeはcanOpenURL()が常にNOを返す仕様のため、
-      # このキーが無いとInstagramインストール有無に関わらず常にフォールバック（ダウンロード＋案内）扱いになる。
-      # LSApplicationQueriesSchemesは配列のため、CFBundleURLTypes等と同じくplistlibで安全に追記する。
-      - name: Add instagram-stories to LSApplicationQueriesSchemes in Info.plist
-        run: |
-          cd ios-app
-          python3 - <<'PYEOF'
-          import plistlib
-
-          plist_path = "ios/App/App/Info.plist"
-
-          with open(plist_path, "rb") as f:
-              plist = plistlib.load(f)
-
-          schemes = plist.get("LSApplicationQueriesSchemes", [])
-          if "instagram-stories" not in schemes:
-              schemes.append("instagram-stories")
-          plist["LSApplicationQueriesSchemes"] = schemes
-
-          with open(plist_path, "wb") as f:
-              plistlib.dump(plist, f)
-
-          print(f"LSApplicationQueriesSchemes now: {plist['LSApplicationQueriesSchemes']}")
-          PYEOF
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 予定表の共有グループへの参加のためカメラを使用します" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 予定表の共有グループへの参加のためカメラを使用します" ios/App/App/Info.plist
 
       # Google Sign-In（@codetrix-studio/capacitor-google-auth）を実機で機能させるために必須。
       # 認証フロー完了後にアプリへ復帰するためのURL Scheme（Reversed Client ID）を登録する（設計書41）。
