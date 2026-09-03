@@ -16,8 +16,19 @@ const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シド
 const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
 const DISCOVER_RESULT_PATH = path.join(LOGS_DIR, 'discover-sources-result.json');
 const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json');
-const LIFE_INFO_CAT_LABELS = { admin: '行政', transport: '交通', health: '医療・健康', education: '教育・子育て', weather: '天候・災害', community: 'コミュニティ' };
+// ラベル・順番は public/index.html のカテゴリチップ（#screen-news / #screen-home）と一致させること
+const LIFE_INFO_CAT_LABELS = { admin: 'SG政府', transport: '都市開発・交通', health: '医療・健康', weather: '天候・災害', community: 'コミュニティ', education: '教育・子育て' };
 const EVENT_CAT_LABELS = { event: 'イベント', show: '展示・公演', gourmet: 'グルメ・フェア', sale: 'プロモ・お得', opening: '新規オープン', travel: '旅行' };
+
+// カテゴリ別件数を、チップの表示順（オブジェクトのキー順）で整形する。
+// catCounts のキー順はその日の取得データ次第でバラつくため、ラベル定義側の順序に従う。
+function formatCatCounts(catCounts, labels) {
+  if (!catCounts) return null;
+  const parts = Object.keys(labels)
+    .filter(k => catCounts[k])
+    .map(k => `${labels[k]}:${catCounts[k]}`);
+  return parts.length > 0 ? parts.join(' / ') : null;
+}
 
 async function pushToLine(text) {
   const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -41,10 +52,11 @@ async function main() {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' });
   const now   = new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Singapore', hour12: false });
 
-  const lines = [`🌴 SG在住Navi イベント取込み結果`, `📅 ${now}（SGT）`, ''];
+  const lines = [`🌴 SG在住Navi 取込み結果`, `📅 ${now}（SGT）`, ''];
 
   let totalAccepted = 0;
 
+  lines.push('━━ 🏖️ おでかけ情報 ━━');
   for (const cityKey of CITIES) {
     const summaryPath = path.join(LOGS_DIR, `fetch-summary-${cityKey}.json`);
 
@@ -64,35 +76,26 @@ async function main() {
 
     lines.push(`【${s.cityLabel}】${s.accepted}件採用 / ${s.rawTotal}件取得`);
 
-    // カテゴリ別サマリー（生活情報・ニュースセクションと表示スタイルを統一）
-    if (s.catCounts && Object.keys(s.catCounts).length > 0) {
-      const catLine = Object.entries(s.catCounts)
-        .map(([k, v]) => `${EVENT_CAT_LABELS[k] || k}:${v}`)
-        .join(' / ');
-      lines.push(`  ${catLine}`);
-    }
+    const catLine = formatCatCounts(s.catCounts, EVENT_CAT_LABELS);
+    if (catLine) lines.push(`  ${catLine}`);
 
     if (!s.newItems || s.newItems.length === 0) {
       lines.push('  （新着なし）');
     }
-
-    lines.push('');
   }
 
   lines.push(`合計 ${totalAccepted}件採用`);
 
-  // 生活情報・ニュース（設計書172）セクションを追記（当日のJSONが存在する場合のみ）
+  // くらし情報セクションを追記（当日のJSONが存在する場合のみ）
   try {
     if (fs.existsSync(LIFE_INFO_SUMMARY_PATH)) {
       const li = JSON.parse(fs.readFileSync(LIFE_INFO_SUMMARY_PATH, 'utf8'));
       if (li.date === today) {
         lines.push('');
-        lines.push('━━ 生活情報・ニュース ━━');
+        lines.push('━━ 🏛️ くらし情報 ━━');
         lines.push(`📰 ${li.accepted}件採用 / ${li.rawTotal}件取得`);
-        if (li.catCounts && Object.keys(li.catCounts).length > 0) {
-          const catLine = Object.entries(li.catCounts)
-            .map(([k, v]) => `${LIFE_INFO_CAT_LABELS[k] || k}:${v}`)
-            .join(' / ');
+        const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
+        if (catLine) {
           lines.push(`  ${catLine}`);
         } else {
           lines.push('  （新着なし）');
