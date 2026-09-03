@@ -421,6 +421,7 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市�
   - `analyze-sources.js`: `activeIG`集計・IG停止済みソースの永久除外判定・IG候補への入れ替えロジックを削除。**Step2「rawTotal不足時の量補充」はIG候補のみで実装されていたため機能ごと削除**（RSS候補による代替実装は行っていない、rawTotal不足は警告ログのみになった）
   - 3ファイルとも`node --check`・`--dry-run`実行で正常動作確認済み（Instagram関連の出力が一切出ないこと、RSS側の処理は従来通り動くことを確認）
   - `data/sources.json`/`data/source-pool.json`/`data/source-candidates.json`内の既存`instagramAccounts`データ自体は削除していない（コードから参照されなくなっただけで、意図的にファイルには残置）
+- **`analyze-sources.js`のソース自動入れ替えロジックを廃止、直接「永久除外」する方式に変更**: ユーザー要望「入れ替えロジックとめていい、採用率が低いやつだけ永久除外のリストに追加するだけにして。ときどきチェックするので」を受けて変更。旧Step1（不良ソースを`paused`にして`source-candidates.json`の候補と自動で入れ替え）を撤去し、不良ソース（直近4回で採用率5%未満または4回連続0件）を検知したら直接`status:'rejected'`にするだけに単純化。候補との入れ替え・`source-candidates.json`の読み込み自体を`analyze-sources.js`から削除（`sortCandidatesByDiversity()`関数・`PATHS.candidates`・`cityCands`も不要になったため削除）。新規ソースの追加は今後ユーザーが手動で`data/sources.json`を編集する運用。`notify-fetch-summary.js`のソース分析セクション表示も「❌ 停止」「➕ 追加」の2行から「🚫 永久除外」の1行のみに変更。`--dry-run`実行で正常動作確認済み（不良ソースが直接rejectedになり、候補入れ替えが発生しないことを確認）
 
 ## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172。2026-09-03時点でコード確認済み）
 週末おでかけイベント取り込みパイプライン（`fetch-events.js`/`filter-events.js`）とはデータ・API・UIとも独立した機能。ボトムナビ「くらし」タブ（表示ラベル、内部id`#nav-news`）の中身。

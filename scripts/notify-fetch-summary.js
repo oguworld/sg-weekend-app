@@ -118,8 +118,7 @@ async function main() {
             lines.push(`✅ ${cityName}: 変更なし（アクティブ${cityData.activeCount}ソース）`);
           } else {
             lines.push(`【${cityName}】`);
-            for (const label of (cityData.removed || [])) lines.push(`❌ 停止: ${label}`);
-            for (const label of (cityData.added   || [])) lines.push(`➕ 追加: ${label}`);
+            for (const label of (cityData.removed || [])) lines.push(`🚫 永久除外: ${label}`);
           }
         }
       }

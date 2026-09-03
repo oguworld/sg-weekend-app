@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // scripts/analyze-sources.js
-// ソース採用率・コンテンツ多様性を分析し、不良ソースを候補と自動入れ替えする
+// ソース採用率・コンテンツ多様性を分析し、不良ソースを永久除外リストに追加する
+// （2026-09-03: 候補への自動入れ替えは廃止。除外するのみで、新規ソース追加は手動運用）
 // 実行: node analyze-sources.js [--city=sg|bkk|syd|all] [--dry-run]
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
@@ -30,7 +31,6 @@ const TYPE_LABELS = { event: 'イベント', show: '展示・公演', gourmet: '
 const PATHS = {
   history:         path.join(__dirname, '..', 'data', 'source-history.json'),
   sources:         path.join(__dirname, '..', 'data', 'sources.json'),
-  candidates:      path.join(__dirname, '..', 'data', 'source-candidates.json'),
   log:             path.join(__dirname, '..', 'logs', 'source-analysis.log'),
   analysisResult:  path.join(__dirname, '..', 'logs', 'source-analysis-result.json'),
 };
@@ -146,16 +146,6 @@ function analyzeSource(runs) {
   return { windowRuns: window.length, totalSent, totalAccepted, adoptionRate, allZero, isPoor };
 }
 
-// ─── 候補を多様性を考慮してソート ────────────────────────────────
-function sortCandidatesByDiversity(candidates, mostNeededType) {
-  if (!mostNeededType) return [...candidates];
-  return [...candidates].sort((a, b) => {
-    const aMatch = a.contentFocus === mostNeededType || a.contentFocus === 'mixed' ? 0 : 1;
-    const bMatch = b.contentFocus === mostNeededType || b.contentFocus === 'mixed' ? 0 : 1;
-    return aMatch - bMatch;
-  });
-}
-
 // ─── 過多カテゴリのソースを先頭に移動（優先停止用） ─────────────
 function sortActiveByOverrepresented(activeList, overRepresented) {
   if (!overRepresented) return activeList;
@@ -166,11 +156,10 @@ function sortActiveByOverrepresented(activeList, overRepresented) {
 }
 
 // ─── 都市ごとの分析と入れ替え処理 ────────────────────────────────
-function analyzeCity(cityKey, history, sources, candidates) {
+function analyzeCity(cityKey, history, sources) {
   const cityName   = CITY_NAMES[cityKey];
   const cityHist   = history[cityKey] || {};
   const cityConf   = sources[cityKey]    || { feeds: [] };
-  const cityCands  = candidates[cityKey] || { feeds: [] };
 
   const activeFeeds = cityConf.feeds.filter(f => f.status === 'active');
   const activeTotal = activeFeeds.length;
@@ -192,8 +181,6 @@ function analyzeCity(cityKey, history, sources, candidates) {
     log(`  📊 現在の構成: ${distStr}${mostNeeded ? ` → ${TYPE_LABELS[mostNeeded]}が不足` : ''}`);
   }
 
-  const paused    = [];  // { label, reason }
-  const activated = [];  // { label, reason, contentFocus }
   const warnings  = [];
   const rejected  = [];  // { label, reason }
 
@@ -220,25 +207,17 @@ function analyzeCity(cityKey, history, sources, candidates) {
     }
   }
 
-  // 候補リスト（まだ未使用かつ rejected でないもの）、多様性を考慮してソート
-  const rejectedUrls = new Set(cityConf.feeds.filter(f => f.status === 'rejected').map(f => f.url));
-  let unusedFeedCands = sortCandidatesByDiversity(
-    (cityCands.feeds || []).filter(c =>
-      !cityConf.feeds.some(f => f.url === c.url) && !rejectedUrls.has(c.url)
-    ),
-    mostNeeded
-  );
-
-  // ─ Step1: 不良ソースを特定して入れ替え ─
-  const allActiveRaw = activeFeeds.map(f => ({ type: 'feed', key: f.name, obj: f }));
-  // 過多カテゴリのソースを先頭に移動（優先停止のため）
+  // ─ Step1: 不良ソースを永久除外リストに追加（2026-09-03: 自動入れ替えは廃止。停止→候補差し替えはせず、
+  //   直接 rejected にする。ユーザーが時々 sources.json / source-candidates.json を見て手動で判断する運用） ─
+  const allActiveRaw = activeFeeds.map(f => ({ key: f.name, obj: f }));
+  // 過多カテゴリのソースを先頭に移動（優先除外のため）
   const allActive = sortActiveByOverrepresented(allActiveRaw, overRepresented);
 
   let currentActive = activeTotal;
 
-  for (const { type, key, obj } of allActive) {
+  for (const { key, obj } of allActive) {
     if (obj.pinned) {
-      log(`  📌 固定 ${key}: 自動入れ替え対象外`);
+      log(`  📌 固定 ${key}: 自動除外対象外`);
       continue;
     }
 
@@ -254,47 +233,27 @@ function analyzeCity(cityKey, history, sources, candidates) {
 
     // 最低アクティブ数チェック
     if (currentActive <= THRESHOLDS.minActiveTotal) {
-      warnings.push(`${key}（最低${THRESHOLDS.minActiveTotal}ソース確保のため停止保留）`);
-      log(`  → 停止保留（最低ソース数のため）`);
+      warnings.push(`${key}（最低${THRESHOLDS.minActiveTotal}ソース確保のため除外保留）`);
+      log(`  → 除外保留（最低ソース数のため）`);
       continue;
     }
 
-    // 同種の候補を探す（多様性考慮済みのソート順）
-    let candidate = null;
-    if (unusedFeedCands.length > 0) {
-      candidate = unusedFeedCands.shift();
-      cityConf.feeds.push({
-        url: candidate.url, name: candidate.name,
-        status: 'active', addedAt: new Date().toISOString().slice(0, 10),
-        ...(candidate.options ? { options: candidate.options } : {}),
-      });
-      activated.push({ label: candidate.name, reason: candidate.reason || '', contentFocus: candidate.contentFocus });
-    } else {
-      warnings.push(`${key}（採用率${rateStr}・候補ソースなし）`);
-      log(`  → 停止保留（候補ソースなし）`);
-      continue;
-    }
-
-    // 停止処理
-    obj.status       = 'paused';
-    obj.pausedAt     = new Date().toISOString().slice(0, 10);
-    obj.pausedReason = analysis.allZero
+    obj.status         = 'rejected';
+    obj.rejectedAt     = new Date().toISOString().slice(0, 10);
+    obj.rejectedReason = analysis.allZero
       ? `${analysis.windowRuns}回連続0件採用`
       : `採用率${rateStr}（直近${analysis.windowRuns}回平均）`;
 
-    paused.push({ label: key, reason: obj.pausedReason });
+    rejected.push({ label: key, reason: obj.rejectedReason });
     currentActive--;
-    log(`  → 停止: ${key} → 追加: ${activated[activated.length - 1].label}（${activated[activated.length - 1].contentFocus}）`);
+    log(`  → 永久除外: ${key}（${obj.rejectedReason}）`);
   }
 
-  // ─ Step2: rawTotal 不足時に候補を追加（多様性優先） ─
-  // 2026-09-03: 従来はInstagram候補のみで量補充していたが、IG取り込み自体を廃止したため本ステップも削除。
-  // rawTotal不足の検知自体は不要になったため、代替のRSS候補による補充ロジックは実装していない。
   if (latestRawTotal !== null && latestRawTotal < THRESHOLDS.targetRawMin) {
-    warnings.push(`rawTotal ${latestRawTotal}件（目標${THRESHOLDS.targetRawMin}件）・自動量補充は廃止済み`);
+    warnings.push(`rawTotal ${latestRawTotal}件（目標${THRESHOLDS.targetRawMin}件）・ソース追加を検討してください`);
   }
 
-  return { paused, activated, warnings, rejected, latestRawTotal, activeTotal, typeDist, mostNeeded, overRepresented };
+  return { warnings, rejected, latestRawTotal, activeTotal, typeDist, mostNeeded, overRepresented };
 }
 
 // ─── LINE 通知用レポート生成 ──────────────────────────────────────
@@ -305,7 +264,7 @@ function buildReport(results) {
     const cityName = CITY_NAMES[cityKey] || cityKey;
     const rawLabel = r.latestRawTotal != null ? `raw ${r.latestRawTotal}件` : 'rawデータなし';
 
-    if (r.paused.length === 0 && r.activated.length === 0 && r.warnings.length === 0 && r.rejected.length === 0) {
+    if (r.rejected.length === 0 && r.warnings.length === 0) {
       lines.push(`✅ ${cityName}: 変更なし（${rawLabel} / アクティブ${r.activeTotal}ソース）`);
       continue;
     }
@@ -313,20 +272,15 @@ function buildReport(results) {
     lines.push(`\n【${cityName}】${rawLabel}`);
 
     // 変更内容
-    for (const { label, reason } of r.rejected)   lines.push(`🚫 永久除外: ${label}（${reason}）`);
-    for (const { label, reason } of r.paused)     lines.push(`❌ 停止: ${label}（${reason}）`);
-    for (const { label, reason, contentFocus } of r.activated) {
-      const focus = contentFocus && contentFocus !== 'mixed' ? ` [${TYPE_LABELS[contentFocus] || contentFocus}]` : '';
-      lines.push(`➕ 追加: ${label}${focus}（${reason}）`);
-    }
+    for (const { label, reason } of r.rejected) lines.push(`🚫 永久除外: ${label}（${reason}）`);
     for (const w of r.warnings) lines.push(`⚠️ 要確認: ${w}`);
 
-    // コンテンツ構成の偏り
+    // コンテンツ構成の偏り（参考情報のみ、自動対応はしない）
     if (r.overRepresented) {
-      lines.push(`📊 ${TYPE_LABELS[r.overRepresented]}が過多 → ${TYPE_LABELS[r.overRepresented]}ソースを優先停止`);
+      lines.push(`📊 ${TYPE_LABELS[r.overRepresented]}が過多`);
     }
     if (r.mostNeeded) {
-      lines.push(`📊 ${TYPE_LABELS[r.mostNeeded]}が不足 → ${TYPE_LABELS[r.mostNeeded]}ソースを優先追加`);
+      lines.push(`📊 ${TYPE_LABELS[r.mostNeeded]}が不足 → 手動でのソース追加を検討してください`);
     }
   }
 
@@ -346,7 +300,6 @@ async function main() {
 
   const history    = loadJson(PATHS.history, {});
   const sources    = loadJson(PATHS.sources, {});
-  const candidates = loadJson(PATHS.candidates, {});
 
   const results = {};
 
@@ -363,7 +316,7 @@ async function main() {
       log(`fetch-summary-${cityKey}.json が見つからないためスキップ`);
     }
 
-    results[cityKey] = analyzeCity(cityKey, history, sources, candidates);
+    results[cityKey] = analyzeCity(cityKey, history, sources);
   }
 
   // 変更を保存
@@ -381,9 +334,8 @@ async function main() {
     for (const [cityKey, r] of Object.entries(results)) {
       const activeFeeds = (sources[cityKey]?.feeds || []).filter(f => f.status === 'active').length;
       analysisResult.cities[cityKey] = {
-        changed:     r.paused.length > 0 || r.activated.length > 0 || r.rejected.length > 0,
-        added:       r.activated.map(a => a.label),
-        removed:     [...r.paused.map(p => p.label), ...r.rejected.map(r => r.label)],
+        changed:     r.rejected.length > 0,
+        removed:     r.rejected.map(r => r.label),
         activeCount: activeFeeds,
       };
     }
