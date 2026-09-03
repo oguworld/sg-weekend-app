@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // scripts/fetch-events.js
-// RSS + Instagram からイベント・セール情報を取得し、
+// RSSからイベント・セール情報を取得し、
 // Claude APIでフィルタリングして data/{city}/events.json に保存する
+// （2026-09-03: Instagram取り込みは全アカウントが停止中で実質未使用だったため削除済み）
 // 使い方: node fetch-events.js [--city=sg|bkk|syd]
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
@@ -19,7 +20,6 @@ const CITY_CONFIG = {
   sg: {
     nameJa: 'シンガポール', timezone: 'Asia/Singapore',
     eventsPath: path.join(__dirname, '..', 'data', 'sg', 'events.json'),
-    instagramAccounts: ['gardensbythebay', 'jewelchangiairport', 'capitalandmallssg'],
     feeds: [
       { url: 'https://thesmartlocal.com/feed',             name: 'The Smart Local' },
       { url: 'https://expatliving.sg/feed',                name: 'Expat Living' },
@@ -35,45 +35,11 @@ const CITY_CONFIG = {
   bkk: {
     nameJa: 'バンコク', timezone: 'Asia/Bangkok',
     eventsPath: path.join(__dirname, '..', 'data', 'bkk', 'events.json'),
-    instagramAccounts: [
-      // モール・商業施設（イベント・セール・グランドオープン）
-      'iconsiam',
-      'centralworld',
-      'centralembassy',
-      'siamparagonshopping',
-      'emporium_emquartier',
-      'theemsphere',
-      'terminal21asok',
-      'one_bangkok',
-      // フード・グルメメディア
-      'bangkokfoodies',
-      'bangkok.foodie',
-    ],
     feeds: [],
   },
   syd: {
     nameJa: 'シドニー', timezone: 'Australia/Sydney',
     eventsPath: path.join(__dirname, '..', 'data', 'syd', 'events.json'),
-    instagramAccounts: [
-      // 観光・文化施設（イベント）
-      'sydneyoperahouse',
-      'royalbotanicgarden',
-      'artgalleryofnsw',
-      'vividsydney',
-      // 公式・行政（イベント全般）
-      'cityofsydney',
-      // モール・商業施設（セール・グランドオープン）
-      'westfieldsyd',
-      'westfieldbondijunction',
-      // イベント・グルメメディア
-      'timeoutsydney',
-      'broadsheet_syd',
-      'concreteplayground',
-      'goodfoodau',
-      'placesinsydney',
-      'tasteofsydney',
-      'secretfoodies',
-    ],
     feeds: [],
   },
 };
@@ -91,7 +57,7 @@ const SOURCES_PATH = path.join(__dirname, '..', 'data', 'sources.json');
 function loadActiveSources(cityKey) {
   const conf = CITY_CONFIG[cityKey];
   if (!fs.existsSync(SOURCES_PATH)) {
-    return { feeds: conf.feeds || [], instagramAccounts: conf.instagramAccounts || [] };
+    return { feeds: conf.feeds || [] };
   }
   const sourcesJson = JSON.parse(fs.readFileSync(SOURCES_PATH, 'utf8'));
   const cityConf = sourcesJson[cityKey] || {};
@@ -100,12 +66,8 @@ function loadActiveSources(cityKey) {
     .filter(f => f.status === 'active')
     .map(f => ({ url: f.url, name: f.name, ...(f.options || {}) }));
 
-  const instagramAccounts = (cityConf.instagramAccounts || [])
-    .filter(a => a.status === 'active')
-    .map(a => a.username);
-
-  console.log(`  📋 sources.json から読み込み: feeds ${feeds.length}件 / IG ${instagramAccounts.length}件`);
-  return { feeds, instagramAccounts };
+  console.log(`  📋 sources.json から読み込み: feeds ${feeds.length}件`);
+  return { feeds };
 }
 
 // ─── CLI引数解析 ─────────────────────────────────────────────────
@@ -276,72 +238,6 @@ function deduplicateItems(newItems, eventsPath) {
   return deduplicated;
 }
 
-// ─── ステップ4: Instagram投稿取得 ───────────────────────────────
-async function fetchInstagramPosts(accounts = []) {
-  const pageToken = process.env.INSTAGRAM_PAGE_TOKEN;
-  const igUserId  = process.env.INSTAGRAM_IG_USER_ID;
-
-  if (!pageToken || !igUserId || accounts.length === 0) return [];
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 4);
-
-  const allItems = [];
-
-  for (const username of accounts) {
-    try {
-      console.log(`\n  📸 取得中: @${username}`);
-      const url = new URL(`https://graph.facebook.com/v25.0/${igUserId}`);
-      url.searchParams.set(
-        'fields',
-        `business_discovery.username(${username}){media{caption,media_url,thumbnail_url,media_type,timestamp,permalink,children{media_url,thumbnail_url}}}`
-      );
-      url.searchParams.set('access_token', pageToken);
-
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
-      const data = await res.json();
-
-      if (!data.business_discovery?.media?.data) {
-        console.log(`  ⚠️  @${username}: 取得失敗`);
-        continue;
-      }
-
-      const posts = data.business_discovery.media.data;
-      let count = 0;
-
-      for (const post of posts) {
-        if (new Date(post.timestamp) < cutoff) continue;
-        if (!post.caption) continue;
-
-        // キャプション内の外部URL（instagram.com以外）を抽出
-        const urlMatch = post.caption.match(/https?:\/\/(?!(?:www\.)?instagram\.com)[^\s\n,!<>"]+/);
-        const externalLink = urlMatch ? urlMatch[0].replace(/[.,;:!?)]+$/, '') : null;
-
-        const firstLine = post.caption.split('\n')[0].slice(0, 80);
-        allItems.push({
-          title:       firstLine,
-          description: post.caption.slice(0, 800),
-          link:        externalLink || post.permalink,
-          pubDate:     post.timestamp,
-          image:       post.media_type === 'VIDEO'
-            ? (post.thumbnail_url || null)
-            : post.media_type === 'CAROUSEL_ALBUM'
-              ? (post.children?.data?.[0]?.media_url || post.media_url || null)
-              : (post.media_url || null),
-          source:      `Instagram / @${username}`,
-        });
-        count++;
-      }
-
-      console.log(`  ✅ ${count}件取得`);
-    } catch (e) {
-      console.log(`  ⚠️  @${username}: エラー (${e.message})`);
-    }
-  }
-
-  return allItems;
-}
-
 // ─── 取得結果をファイルに保存（8:00のサマリー通知で集計）────────
 function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, rawTotal, uniqueTotal, sourceStats }) {
   const summaryPath = path.join(__dirname, '..', 'logs', `fetch-summary-${cityKey}.json`);
@@ -412,16 +308,13 @@ async function main() {
 
   purgeExpiredData(conf.eventsPath);
 
-  const { feeds, instagramAccounts } = loadActiveSources(cityKey);
+  const { feeds } = loadActiveSources(cityKey);
 
   console.log('\n📡 RSSフィード取得中...');
   const rssItems = await fetchRssItems(feeds, cityKey);
 
-  console.log('\n📸 Instagram投稿取得中...');
-  const igItems = await fetchInstagramPosts(instagramAccounts);
-
-  const rawItems = [...rssItems, ...igItems];
-  console.log(`\n  合計取得: ${rawItems.length}件（RSS: ${rssItems.length}件 / IG: ${igItems.length}件）`);
+  const rawItems = [...rssItems];
+  console.log(`\n  合計取得: ${rawItems.length}件（RSS: ${rssItems.length}件）`);
 
   if (rawItems.length === 0) {
     console.log('\n✅ 新着なし。終了します。\n');

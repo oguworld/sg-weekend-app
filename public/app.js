@@ -1786,16 +1786,7 @@
           if (!label || !id) return;
           const n = counts[id] || 0;
           label.textContent = n > 0 ? ` (${n})` : '';
-          // コメントが付いているカードは、当面は投稿数が少ない見込みのため目立つよう
-          // デフォルトで展開表示する（同一DOM要素につき1回だけ。ユーザーが後で閉じた場合は
-          // その場では再度開かない。News画面のように再描画されると再度自動展開されうる）
-          if (n > 0 && !btn.dataset.autoExpanded) {
-            btn.dataset.autoExpanded = '1';
-            const box = document.getElementById(_commentDomId(itemType, id));
-            if (box && (box.style.display === 'none' || !box.style.display)) {
-              toggleCardComments(itemType, id);
-            }
-          }
+          // コメント欄は常に折りたたみをデフォルトとする（2026-09-03、自動展開を撤回）
         });
       } catch (_) {}
     }

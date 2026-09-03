@@ -1,8 +1,8 @@
-# おでかけNavi (dosuru.app) - CLAUDE.md
+# SG在住Navi (dosuru.app) - CLAUDE.md
 
 ## プロジェクト概要
 シンガポール在住日本人向け週末おでかけ情報PWA。
-ブランド名: Willoa / アプリ名: おでかけNavi
+ブランド名: Willoa / アプリ名: SG在住Navi（旧名: おでかけNavi）
 
 ## ターゲットユーザー
 シンガポール在住の日本人駐在員・家族（30〜40代中心）
@@ -33,25 +33,28 @@ pm2 status
 - インフラ: nginx / PM2 / Let's Encrypt
 - データ: events.json / sales.json（ファイルベース、DBなし）
 
-## フォルダ構成
+## フォルダ構成（2026-09-03時点）
 sg-weekend-app/
 ├── server.js
 ├── scripts/
-│   ├── fetch-events.js
-│   ├── filter-events.js
-│   ├── generate-model-courses.js  ← モデルコース生成（Claude API + Unsplash）
-│   ├── fill-images.js             ← 既存イベントへの画像補完
+│   ├── fetch-events.js             ← おでかけイベント取り込み
+│   ├── filter-events.js            ← イベントのHaiku分類・Sonnet記事生成
+│   ├── fetch-life-info.js          ← 生活情報・ニュースのRSS取り込み（設計書172/175）
+│   ├── fill-images.js              ← 既存イベントへの画像補完
 │   └── lib/
-│       └── unsplash.js            ← Unsplash API ユーティリティ
+│       └── unsplash.js             ← Unsplash API ユーティリティ
 ├── data/
 │   ├── sg/
 │   │   ├── events.json
-│   │   ├── model-courses.json     ← AIプリセットコース
-│   │   └── community-courses.json ← ユーザー公開コース
+│   │   ├── life-info.json          ← 生活情報・ニュース（gitignore対象）
+│   │   ├── comments.json           ← コメント機能
+│   │   ├── model-courses.json / community-courses.json / affiliate-links.json / stamp-spots.json
+│   │   │   ← コース・探訪機能削除済み（設計書178）の残置データ、`server.js`側API未クリーンアップのため現存
+│   │   └── school-calendar.json / sponsored-cards.json 等
 │   ├── bkk/ (同様)
 │   └── syd/ (同様)
 ├── public/
-│   ├── index.html
+│   ├── index.html                  ← ボトムナビ4タブ: ホーム/ニュース/ピン留め/設定
 │   └── sw.js
 ├── ios-app/                       ← iOSアプリ化（Capacitor）2026-07-03追加
 │   ├── package.json
@@ -76,572 +79,21 @@ sg-weekend-app/
 カテゴリ: event / gourmet / sale / edu
 主要フィールド: title, date, url, who, age, major_score
 
-## ⚠️ コース機能は2026-09-02フェーズ1（フロントエンドのみ）で削除済み（設計書178、下記「コース機能・探訪機能・予定表機能の完全削除」節参照。本セクション以下は歴史的経緯として残置、実態と大きく乖離）
-- コース生成シート・コース詳細シート・タイトル編集シート・「モデルコース」タブ・コース関連JS関数一式（`initCourseScreen()`が探訪初期化を兼ねていた部分のみ残置）・i18nキー一式は**フロントエンド（`public/`配下）から完全に削除済み**
-- `server.js`側の`POST /api/courses/*`等のAPIエンドポイント・データファイル（`data/{city}/model-courses.json`/`community-courses.json`）・関連スクリプト（`scripts/generate-model-courses.js`等）は**次フェーズ以降の対応、2026-09-02時点ではまだ削除していない**（フロントエンドから呼ばれなくなっているだけ）
-- 探訪（スタンプラリー）機能・予定表機能・共有カレンダー機能は今回のフェーズ1では一切変更していない（次フェーズ以降の対象）
-
-## コース機能（2026-06-22実装・2026-06-25 BKK/SYD対応・2026-06-26 候補3択対応・2026-06-27 予定表連携対応）
-- ナビ: イベント（2026-07-10改名、旧称「期間限定」） / コース / 予定表 / 設定 の4タブ
-- コース画面タブ: 人気（popular） / 公開コース（community） / マイコース（mylist）の3タブ
-  - 人気: いいね数降順 上位5件
-  - 公開コース: 登録日降順（新しい順）
-  - マイコース: 作成日昇順（作った順）
-- コース作成フロー: FABタップ → 条件選択シート → [Haiku] POST /api/courses/candidates で候補3件生成 → カード選択 → [Sonnet] POST /api/courses/generate でフルコース生成
-  - 候補シート: `#course-step-candidates`。タイトル・タグライン・説明のみ。「← 条件に戻る」で戻れる
-  - selectedCandidate を generate エンドポイントに渡すと候補のコンセプトに沿って生成（後方互換: 未指定時は従来動作）
-- ユーザー公開コース: `data/{city}/community-courses.json`（sg/bkk/syd 全都市対応）
-- マイコース: localStorage `{city}_my_courses`（published フィールドで公開管理）
-- API: GET /api/courses, POST /api/courses/chat, POST /api/courses/generate, POST /api/courses/candidates, POST /api/courses/publish, POST /api/courses/:id/like, GET /api/courses/image
-- 日付ピッカー統一: `openDatePickerSheet(opts)` で日付選択を共通化（コース追加・予定追加の両方）
-- 予定表連携: 空き週末日タップ → アクション選択シート（予定追加 / コース作成）。`window._coursePresetDate` で日付プリセットを共有
-- イベント → コース: 🗺 ボタン（イベントカード/ピン一覧/ピン詳細）から `openCourseSheetFromEvent()` でコースシートを起動
-- プロフィール連携: app_who（おでかけスタイル）/ app_age（子どもの年齢）をチャット・生成プロンプトに反映
-  - 旧キー sg_who / sg_age は読み取り時にフォールバック
-- 画像補完: `node scripts/fill-images.js --city=sg`（generate-model-courses.jsは参照なし）
-- コース生成プロンプト: 都市別食スポット選定ルール（sg: ホーカーセンター / bkk: タラート / syd: フードホール）
-- エリアチップ: CITY_COURSE_AREAS 定数で都市別に動的生成（sg/bkk/syd 各6エリア）
-- transportチップ: data-val=公共交通・バス（表示ラベルは都市別: SG=MRT・バス, BKK=BTS・MRT・バス, SYD=電車・バス）
-- コース詳細ボタン: 予定表追加（メイン）/ 公開+タイトル変更（横2列）/ 削除（テキストリンク）
-- マイコースカード: ❤️の代わりに公開状態バッジ（🌐公開中 / 🔒非公開）表示
-- タイトル編集シート（`#title-edit-sheet`）: 2026-07-09に `.plan-modal` クラス方式（`.visible`トグル）に統一。旧インラインstyle（display:block/none）方式は廃止
-- **コース詳細のスポット表示順は`spots`配列順そのまま（`time`昇順の自動ソートは行っていない）**（2026-07-13設計書26で判明）: `renderCourseDetail()`/`renderCourseResultHtml()`（`public/app.js`）はいずれも`(course.spots || []).map(...)`で配列順に描画する。そのため`community-courses.json`/`model-courses.json`のスポット時刻(`time`)を手動修正して訪問順序を変える場合、配列内の要素順序自体も`time`の昇順に合わせて並び替えないと、表示上の訪問順が時刻と矛盾する
-- **コース生成プロンプトへの品質ガード追加（2026-07-13実装、設計書27）**: 設計書25・26で判明した「営業時間・見学可能時間帯との不整合」「開店時間より前の訪問」「実在しない施設名の生成（ハルシネーション）」の再発防止として、`POST /api/courses/generate`（`server.js`）の【スポット選定ルール】末尾と、`scripts/generate-model-courses.js`のSG/BKK/SYD各SYSTEM_PROMPT（都市が現在停止中のBKK/SYDも一貫性のため対応済み）に、営業時間配慮・早朝訪問回避・実在確信スポット名限定を促す注意文を追加。`POST /api/courses/candidates`（タイトル・タグライン・説明のみ生成、時刻・スポット名を含まない設計）は対象外
-- **時刻重複の機械チェック（ログのみ、2026-07-13実装、設計書27）**: `POST /api/courses/generate`のレスポンス構築時、生成された`spots`配列を順に走査し、前のスポットの終了予定時刻（`time`+`duration`から算出）が次のスポットの開始時刻を超えている場合`console.warn()`で`[course-generate] time overlap detected: ...`ログを出力する。**APIレスポンス自体には一切影響しない（ログのみ、生成・保存フローを止めない）**。プロンプト側の注意文はあくまでAIへの努力目標であり強制力がないため、実際に重複が起きているかどうかを事後的に運用モニタリングできるようにする目的。`duration`のパース失敗時は例外を投げずスキップする
-- **コース生成プロンプトへの「意味・文脈」重視の視点追加（2026-07-15実装、設計書42）**: ユーザーが読んだAI時代のクリエイティビティ論（速さ・量産では戦えない、価値になるのは個人の文脈からくる「意味」）に触発され、`POST /api/courses/generate`（`server.js`）の【スポット選定ルール】末尾と、`scripts/generate-model-courses.js`のSG/BKK/SYD各SYSTEM_PROMPTの【注意】直後に、単なるカテゴリ網羅ではなく一貫したテーマ・スポット同士の組み合わせの意味を意識させる【視点】文言を追加。設計書27の既存ガードレール（営業時間配慮・早朝訪問回避・実在確信スポット名限定）は削除・弱体化させず、いずれの追加文言も「この視点を優先してガードレールを緩めてはならない」旨を明記している。`POST /api/courses/candidates`は対象外（候補タイトルが凝った表現に振れることで実際に生成されるコース内容との乖離リスクが増えるため、ユーザー承認のうえ見送り）
-
-## スタンプラリー機能（2026-07-19実装、設計書69）
-既存のコース機能（AIコース生成、みんなのコース/マイコースの2タブ）とは**データ・生成ロジックとも完全に独立**した、SG実在スポットを段階的に「制覇」していくリテンション用コンテンツ。UI（コース画面の3タブ目「スタンプマップ」）のみ入口を共有する。
-
-- **データ**: `data/sg/stamp-spots.json`（新規、人力キュレーション、`.gitignore`のままVPS直接編集方式・git管理下への例外化はしない）。現在14件（standard/local/niche各4件+special2件）。`level`（`standard|local|niche|special`）/`area`（既存`CITY_COURSE_AREAS.sg`の7値と統一）/`category`/`checkinRadiusM`/`active`等のフィールドを持つ。ユーザー進捗は`data/stamp-progress/{userId}.json`（`data/user-plans`と同じ`usr_[a-f0-9]{24}`バリデーション、gitignore対象）
-- **段階ゲート**: `standard`は常時解禁。`local`/`niche`/`special`は前レベルの総スポット数の半数（切り上げ）をチェックインすると解禁（`server.js`の`STAMP_LEVEL_GATES`定数・`computeUnlockedLevels()`関数。**2026-07-24実装の設計書142で固定2件から動的な半数方式に変更済み**、下記「探訪ティア解禁条件の変更」節参照）。`special`レベルのスポットは未解禁ユーザーには`GET /api/stamp-spots`のレスポンス自体から除外される（フロントのフィルタだけに頼らず、ピンの存在自体をサーバー側で隠す設計）
-- **API**: `GET /api/stamp-spots?city=sg`（認証不要、`verifyAppJwtOptional`で任意認証しspecial出し分け）、`GET /api/stamp-progress/me`（`requireAppAuth`必須）、`POST /api/stamp-progress/checkin`（`requireAppAuth`必須、`{spotId,lat,lng}`、`withFileLock`、冪等）。**v1時点ではサーバー側のGPS距離検証を行わずクライアント申告のlat/lngをそのまま信用する設計だったが、2026-07-21実装の設計書87でサーバー側のHaversine距離検証を追加済み（下記「スタンプチェックインのサーバー側GPS距離検証」節参照）。クライアント側GPS値自体の偽装（モック位置情報アプリ等）への対策は依然スコープ外**
-- **フロントエンド**: Leaflet 1.9.4を`public/vendor/leaflet/`にローカルバンドル（CDNではなくオフライン起動時の読み込み失敗リスクを回避）、OpenStreetMapタイル使用（APIキー不要）。フォグ・オブ・ウォーは新規イラスト素材なし、`#stamp-fog-overlay`に複数の`radial-gradient`を`background`として重ねてチェックイン済みスポット周辺だけ霧を薄くする方式（`mask-image`/`mask-composite`はブラウザ間差のリスクを考慮し不採用）。GPS近接判定+手動確認ボタンの2段階チェックイン（`@capacitor/geolocation`新規導入、Web版は`navigator.geolocation`フォールバック、Haversine距離計算で`checkinRadiusM`圏内のみボタン活性化）。ログイン必須（`getAuthToken()`で判定、未ログイン時は連携案内のみ表示）、パスフレーズ暗号化は無し（既存`requireAppAuth`保護で十分という設計判断）
-- z-index: `#stamp-spot-detail-overlay`3700/`#stamp-spot-detail-sheet`3701（設計書70で`#stamp-level-unlock-overlay`3702/`#stamp-level-unlock-modal`3703を追加、下記参照）
-- iOS: `ios-app/package.json`に`@capacitor/geolocation@^6.0.0`追加、`.github/workflows/ios-deploy.yml`に`NSLocationWhenInUseUsageDescription`のInfo.plist追加ステップを新設
-- スコープ外（v1未実装）: 位置情報プッシュ通知、既存AIコースのマップ統合、BKK/SYD対応、スポットデータの自動収集、進捗のゼロ知識暗号化バックアップ、SNSシェア・複数ユーザーランキング、Android対応
-- **App Store Connect「Appプライバシー」申告フォームの位置情報利用に関する更新はコード対応不可、ユーザー側の手動作業として次回審査提出前に必要**（設計書65のアカウント削除機能時と同様の注意点）
-- **未検証（次回TestFlightビルド後）**: 実機でのLeafletタッチ操作・フォグ演出の見た目とパフォーマンス・位置情報権限ダイアログの表示タイミング・実際のGPSでのチェックインフロー
-
-### スタンプラリー体験改善（2026-07-20実装、設計書70）
-設計書69実装後のユーザーフィードバック「ワクワク感・順番に制覇していく感・コンプ感がない」を受けた改善。3点実装。
-
-- **データ**: `data/sg/stamp-spots.json`の既存14件全件に`order`フィールド（各レベル内1始まりの連番）を追加。単純な配列順ではなく、**各レベル内で地理的に回りやすい順番**（緯度経度から見て近い場所同士が近い番号）を人力で検討して割り当てた（standard: merlion-park1→marina-bay-sands2→gardens-supertree3→singapore-zoo4、local: tiong-bahru1→chinatown2→tekka3→east-coast4、niche: haw-par-villa1→rail-corridor2→kampong-glam3→pulau-ubin4、special: istana1→labrador2）。`name`/`lat`/`lng`等の既存フィールドは無変更。サーバーコード変更なしで`GET /api/stamp-spots`のレスポンスに自動反映（`loadStampSpots()`がファイルをそのままパースして返すため）
-- **改善1（コレクション一覧ビュー）**: コース画面「スタンプマップ」タブ内に、地図⇄一覧の表示切り替えトグル（`#stamp-view-toggle-btn`）を新設。デフォルトは地図表示（`_stampViewMode='map'`、設計書69の「地図が主役」コンセプトを尊重）。一覧はレベルごとにグルーピングし各グループ内`order`昇順、制覇済み/未制覇/ロック中の3状態を視覚的に区別（`_renderStampCollectionList()`、新規CSS `.stamp-collection-*`）。マップ切替時はLeafletインスタンスを破棄せず`display:none`のみ、地図に戻る際は`invalidateSize()`を再呼び出し
-- **改善2（「順番」の示唆）**: `_computeStampNextTarget()`が解禁済みレベルを順に見ていき、レベル内で`order`最小から未チェックのスポットを探索して「次に狙うべきスポット」を算出（クライアント側実装のみ、サーバー側の対応関数は未実装）。マップ上のピンに番号バッジ（`.stamp-marker-badge`）追加、「次はここ」スポットは脈動アニメーション（`.stamp-marker-icon--next`）。一覧ビューにも同じ番号バッジと「次はここ！」タグを表示し、マップ・一覧で一貫した視覚的手がかりを使用
-- **改善3（レベル解禁演出モーダル）**: 新規`#stamp-level-unlock-overlay`(z-index 3702)/`#stamp-level-unlock-modal`(z-index 3703)。既存`.plan-modal`パターン（スライドイン、`.visible`トグル）を踏襲。`doStampCheckin()`内の`setTimeout(() => showToast(...), 1600)`を`openStampLevelUnlockModal(level)`呼び出しに置き換え（チェックイン成功トースト自体・1.6秒後のタイミングは維持）。レベル絵文字にCSSバウンスアニメーション。confetti等のライブラリは未導入
-- i18n: `stampViewToggleMap`/`stampViewToggleList`/`stampCollectionLockedNote`/`stampNextTargetLabel`/`stampLevelUnlockModalTitle`/`stampLevelUnlockModalClose`の6キーをja/en同時追加。既存`toastStampLevelUnlocked`キーは呼び出し元がなくなったが死にキーとして残置
-- キャッシュバスティング: `index.html` app.js?v=20260720a、app.css?v=20260720a、`sw.js` CACHE_NAME=sg-weekend-v630
-- スコープ外（今回未実装）: 完全制覇時のフィナーレ演出、段階ゲート閾値変更、BKK/SYD対応、GPS偽装対策（設計書69から持ち越しの既存未解決事項）
-- **未検証（次回TestFlightビルド後）**: iOS実機でのLeaflet地図上の番号バッジタップ精度・「次はここ」脈動アニメーション・レベル解禁モーダルのスライドイン滑らかさ・一覧⇄マップ切替の挙動
-
-### スタンプラリーUI調整: ロック中スポットの情報秘匿・タブ順序変更・デフォルト表示変更（2026-07-20実装、設計書71）
-設計書70実装後のユーザーフィードバック（「ロック中のスポットが見えてしまうと面白くない」「タブは一番左に」「デフォルトはリストで」）を受けた3点の調整。
-
-- **改善1（ロック中スポットの情報秘匿）**: `server.js`に`maskLockedStampSpot(spot)`を新設。`GET /api/stamp-spots`のレスポンス構築時、未解禁の`local`/`niche`レベルスポットの`name`/`nameJa`を固定文言`'？？？'`、`description`/`imageUrl`を空文字列に置き換える。`id`/`lat`/`lng`/`level`/`area`/`category`/`order`/`checkinRadiusM`/`active`はそのまま返す（チェックイン判定・マップ描画・番号バッジ表示に必須のため）。`special`レベルは既存仕様（未解禁時はスポット自体をレスポンスから除外）を維持し対象外。レスポンスのトップレベル構造・各スポット要素のフィールド名一覧は無変更（値のみ条件付きで置換）
-- **ユーザー承認済み方針（詳細シート側の作り込みは見送り）**: マップ上のロック中ピンをタップして開く詳細シート（`openStampSpotDetail()`）は、サーバーが返すマスク済みデータ（「？？？」等）をそのまま既存ロジックで描画するのみ。専用の「ロック中です」メッセージ・チェックインボタンの非表示化などの追加作り込みは行っていない（`_updateStampCheckinButton()`が既存の`unlocked`判定で「未解禁」ボタン文言〈`stampCheckinBtnLocked`〉を表示する既存ロジックがそのまま機能する）
-- **⚠️ 実装時に発見・修正した既存バグ（未ログイン時の解禁レベル算出誤り）**: `GET /api/stamp-spots`の未ログイン時フェイルセーフが従来`unlockedLevels = STAMP_LEVEL_ORDER.filter(l => l !== 'special')`（`['standard','local','niche']`）となっており、コード上のコメント「未解禁とみなす」の意図に反して実際には`local`/`niche`まで解禁済み扱いになっていた。これによりログイン前ユーザーには`local`/`niche`スポットの名前が平文で見えており、今回のユーザー報告（ロック中なのに名前が見える）の直接原因だったと推測される。`unlockedLevels = computeUnlockedLevels(allSpots, [])`（`standard`のみ解禁扱いに算出し直す）に修正した。ログイン済みユーザーの`unlockedLevels`算出ロジック（`computeUnlockedLevels(allSpots, progress.checkedInSpotIds)`）自体は無変更
-- **改善2（タブ順序変更＋初期表示タブの変更）**: `public/index.html`の`.course-tab-bar`内3ボタンの記述順を「スタンプマップ／みんなのコース／マイコース」に変更（`data-tab="map"`を先頭へ）。**設計書71本文は「初期表示タブは`everyone`のまま現状維持」としていたが、ユーザー承認により上書きし、初期表示タブもスタンプマップに変更した**（`class="course-tab active"`を`data-tab="map"`のボタンへ付け替え、`public/app.js`の`initCourseScreen()`が呼ぶ初期タブも`switchCourseTab('everyone')`→`switchCourseTab('map')`に変更）。「みんなのコース」「マイコース」はタブ切り替えで引き続きアクセス可能
-- **改善3（デフォルト表示をリストに変更）**: `public/app.js`の`let _stampViewMode = 'map'`を`'list'`に変更（コメントも実態に合わせて更新）。`toggleStampViewMode()`/`_applyStampViewMode()`本体・`initStampMapTab()`内の初期化順序（`_applyStampViewMode()`の後に無条件で`_ensureStampLeafletMap()`を呼ぶ既存挙動）は無変更のため、デフォルトがリストになっても地図初期化のタイムラグは発生しない
-- i18n新規キーなし（既存の`courseTabEveryone`/`courseTabMylist`/`courseTabStampMap`・`stampViewToggleMap`/`stampViewToggleList`をそのまま使用）
-- キャッシュバスティング: `index.html` app.js?v=20260720b、`sw.js` CACHE_NAME=sg-weekend-v631（`app.css`は無変更のため据え置き）
-- スコープ外（今回未実装）: `area`フィールドのマスク（暫定で「マスクしない」方針を採用、実機確認後に再検討の余地あり明記済み）、プレースホルダー文言のレベル別出し分け（「？？？」で統一）、`COURSE_TABS`定数（`['everyone','mylist']`、`map`を含まない）の整理（実装時の調査でこの定数自体がコード内で未使用〈宣言のみ〉と判明したため実害なし、今回は対応不要と判断）
-- **未検証（次回TestFlightビルド後）**: iOS実機でのロック中カード「？？？」表示によるレイアウト崩れの有無、マップ上のロック中ピンタップ時の詳細シート表示の見え方、コース画面初期表示・スタンプマップタブ初期表示がそれぞれ意図通りになっていること
-
-### スタンプラリー名称変更（ボトムナビ「制覇」・タブ「スタンプラリー」）＋一覧表示リセットバグ修正（2026-07-20実装、設計書72）
-設計書71実装後のユーザー追加フィードバック2件（一覧表示に戻らないバグ・名称変更要望）への対応。
-
-- **改善1（一覧表示リセットバグ修正）**: `public/app.js`の`initCourseScreen()`内、`await switchCourseTab('map')`の直前に`_stampViewMode = 'list';`を追加。ボトムナビ「コース」タップ経由の新規進入（`switchNav('course')`→`initCourseScreen()`）時のみリセットされる。**画面内タブ切り替え（`switchCourseTab()`本体の直接呼び出し、マイコース関連4箇所〈4866/4881/4953/5163行目〉含む）はこの代入を通らないため、地図/一覧選択が保持される**（`switchCourseTab()`本体自体には手を加えていない）
-- **改善2（名称変更）**: i18nキー`navCourse`（ボトムナビラベル、ja「コース」→「制覇」/en「Courses」→「Conquer」）・`courseTabStampMap`（コース画面内タブラベル、ja「スタンプマップ」→「スタンプラリー」/en「Stamp Map」→「Stamp Rally」）の**値のみ**変更（キー名は不変）。`public/app.js` STRINGS.ja/en、`public/index.html`のデフォルト直書きテキスト（511行目・148行目）の計4箇所を変更
-- `courseScreenTitle`（コース画面ヘッダータイトル「おでかけコース」）・他タブラベル（`courseTabEveryone`/`courseTabMylist`）・ナビアイコン画像は変更対象外のまま無変更
-- `server.js`・データファイル（`data/sg/stamp-spots.json`等）・APIレスポンス構造は無変更。純粋にフロントエンドのみの変更のため`pm2 restart`不要
-- キャッシュバスティング: `index.html` app.js?v=20260720c、`sw.js` CACHE_NAME=sg-weekend-v632
-- **未検証（次回TestFlightビルド後）**: iOS実機でのボトムナビ「制覇」ラベル表示、コース画面内タブ「スタンプラリー」ラベル表示、地図表示から他画面経由でコース画面に戻った際の一覧表示リセット、画面内タブ切り替え時の地図/一覧選択保持の4点
-- **既知の未解決事項**: 英語訳「Conquer」「Stamp Rally」の適切性は未検証（将来的な再検討の余地あり）
-
-### スタンプスポット画像追加（Unsplash）＋画面タイトル変更（2026-07-20実装、設計書73）
-設計書69〜72実装後のユーザー追加要望2件（スポット詳細モーダルへの写真追加・コース画面見出しの「スタンプラリー」化）への対応。
-
-- **新規スクリプト`scripts/fill-stamp-spot-images.js`**: `data/{city}/stamp-spots.json`の`imageUrl`が空のスポットにUnsplash画像を補完する。既存`scripts/lib/unsplash.js`の`fetchUnsplashImage(query)`をそのまま再利用し、`fill-images.js`と異なりClaude APIによるキーワード生成は行わない（スポット名は既に確定した固有名詞のため）。検索クエリは`spot.name`に地名"Singapore"を付加した文字列（スポット名が既に"Singapore"を含む場合は付加しない重複回避処理あり）。`--dry-run`・インクリメンタル実行（`imageUrl`が既に設定済みのスポットはスキップ）対応。手動実行のみ、cron化なし
-- **実行結果**: 2026-07-20実行、14件中12件の画像補完に成功。`tekka-market`・`labrador-secret-tunnel`の2件はUnsplash `/photos/random`検索でヒットなし（`fetchUnsplashImage()`が`null`を返す既存の失敗時挙動）のため`imageUrl`は空文字列のまま据え置き（既存`fill-images.js`と同じ「失敗時はスキップし既存値を変更しない」方針）
-- **フロントエンド**: `public/index.html`の`#stamp-spot-detail-sheet`（`.plan-modal-body`内、スポット名表示の直前）に`<img id="stamp-spot-detail-image">`を新規追加（初期`display:none`、`aspect-ratio:16/9`、`object-fit:cover`、`border-radius:14px`、`onerror`で自身を`display:none`にする簡易フォールバック）。`public/app.js`の`openStampSpotDetail(spotId)`に、`spot.imageUrl`の有無で`src`セット＋表示/非表示を切り替える分岐を追加。**シートの使い回し方式（`_stampSelectedSpot`を毎回更新し同一DOM要素へ再セットする既存パターン）のため、`imageUrl`が空の場合は`src`属性ごと明示的に除去し非表示化する**（前回開いたスポットの画像が次回の詳細表示に残留しないようにするための必須分岐、既存の`#stamp-spot-detail-checked`のdisplay制御と同じ設計思想）
-- **ロック中スポットとの整合性**: `server.js`の既存`maskLockedStampSpot(spot)`（設計書71で追加済み、無変更）が未解禁`local`/`niche`スポットの`imageUrl`を含む4フィールドを既にマスクしているため、データ投入・フロントエンド変更いずれの段階でもロック中スポットの画像が意図せず露出することはない。フロントエンド側に追加のロック中判定コードは書いていない（`imageUrl`が空という結果だけを見て非表示にする既存分岐がそのまま機能する）
-- **`courseScreenTitle`変更**: `public/app.js` STRINGS.ja（`おでかけコース`→`スタンプラリー`）・STRINGS.en（`Outing Courses`→`Stamp Rally`）、`public/index.html`のdata-i18nデフォルト直書きテキストの計3箇所を変更（キー名は不変）。この見出しはスタンプラリー／みんなのコース／マイコースの3タブ共通ヘッダーであり、他タブ表示中も「スタンプラリー」の見出しが出続ける・設計書72で既に「スタンプラリー」に変更済みの`courseTabStampMap`（タブラベル）と文言が重複することはユーザー確認済みで許容
-- `server.js`は無変更（`GET /api/stamp-spots`のレスポンス構造・マスキングロジックとも無変更、`imageUrl`フィールドへの実データ投入という値の変化のみ）。`pm2 restart`不要（`data/`配下JSONファイルの直接編集のため）
-- キャッシュバスティング: `index.html` app.js?v=20260720d、`sw.js` CACHE_NAME=sg-weekend-v633（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後）**: iOS実機でのスポット詳細モーダルの画像表示（アスペクト比・角丸・読み込み時のレイアウトシフト有無）、ロック中スポット詳細シートで画像が表示されないことの実機確認、見出し文言重複による見た目の違和感有無
-- **既知の未解決事項**: `tekka-market`・`labrador-secret-tunnel`の2件は画像取得失敗のまま空文字列（急ぎ対応不要、将来的な検索クエリ調整・手動URL設定の余地あり）。Unsplash URLの動的生成URLは将来失効・変更される可能性があり、既存`fill-images.js`によるイベント画像と同じ前提で運用（定期再取得の仕組みはスコープ外）
-
-### ⚠️ スタンプスポット画像が表示されない不具合修正（aspect-ratio→固定高さ方式へ変更）＋診断ログ追加（2026-07-20実装、設計書74。上記「スタンプスポット画像追加」節の`aspect-ratio:16/9`記述は本節により実態と乖離）
-設計書73実装後、実機で「スポット詳細モーダルの写真が一瞬表示されて消える（ずっと空白のまま）」不具合が報告された。状況証拠として、コードベース内で`#stamp-spot-detail-image`だけが`aspect-ratio:16/9`という書き方をしており、他の類似箇所（`public/app.js`のマイコースカード画像等）は`height:固定px + object-fit:cover`という既存の確立されたパターンで統一されていた。確実な原因究明はできていない（`aspect-ratio`が直接原因という確証はなく状況証拠からの推測）が、既存パターンへの統一を優先して修正した。
-
-- `public/index.html` 807行目: `#stamp-spot-detail-image`のインラインstyleから`aspect-ratio:16/9`を削除し`height:200px`に変更。`width:100%`・`object-fit:cover`・`border-radius:14px`・`margin-bottom:12px`・`display:none`（初期状態）・HTML属性`onerror="this.style.display='none';"`は維持
-- `public/app.js`の`openStampSpotDetail(spotId)`: 画像`src`セット時に`imgEl.onload`/`imgEl.onerror`をJSプロパティとして追加。`onload`時`_sendDebugLog('stamp_image_load_success', { spotId })`、`onerror`時は`imgEl.style.display='none'`実行後`_sendDebugLog('stamp_image_load_error', { spotId, url: spot.imageUrl })`を送信（JSプロパティ代入によりHTML属性の同名`onerror`は上書きされるため、非表示化処理をJS側ハンドラ内に統合する形で維持）。`spot.imageUrl`が空（ロック中スポット、`server.js`の`maskLockedStampSpot()`で担保・無変更）の場合は`imgEl.onload`/`imgEl.onerror`をともに`null`クリアし`src`もセットしないため、いずれのハンドラも発火しない
-- **診断ログは使い捨て**（CLAUDE.mdの実機デバッグ用ログ収集機能の既存運用ルール通り）: `stamp_image_load_success`/`stamp_image_load_error`は次回TestFlightビルド後、`logs/debug-nav.log`で症状再発の有無を確認したのち削除してよい
-- `server.js`・データファイル（`data/sg/stamp-spots.json`等）は無変更。キャッシュバスティング: `index.html` app.js?v=20260720e、`sw.js` CACHE_NAME=sg-weekend-v634
-- **未検証（次回TestFlightビルド後）**: スポット詳細モーダルの画像が安定して表示され続けるか（症状再発の有無）、固定高さ`200px`の実機レイアウトバランス、Web版ブラウザでの見た目回帰有無
-
-### スタンプスポット画像が引き続き読み込み失敗する不具合の恒久修正（Service Worker早期return＋innerHTML新規生成方式へ統一）（2026-07-20実装、設計書75。上記「aspect-ratio→固定高さ方式」修正は効果なく症状再発だったための追加対応。**根本原因は設計書76でユーザー環境要因〈VPN〉と判明済み、下記参照**）
-設計書74の修正後も実機で画像読み込み失敗（`stamp_image_load_error`）が継続したため、investigatorが読み取り専用で原因調査を実施。単一の確定原因は特定できなかったが、(1)Service Workerがクロスオリジン画像リクエストを意味なく中継しておりfetch実装の不安定性リスクを負っていたこと、(2)スタンプスポット詳細画像だけが既存3箇所（イベントカード・コース詳細・マイコースカード）と異なり「静的`<img>`要素への`src`後代入」方式で、同一URLを連続して開いた場合にload/errorイベントが発火しない既知のブラウザ挙動リスクを抱えていたこと、の2点を修正方針として実装した（ユーザー承認済み）。**結果的にこの2つは真因ではなかったが、既存の確立されたパターンへの統一として有用なため、設計書76判明後もロールバックせず維持している。**
-
-- **`public/sw.js`（Service Workerのクロスオリジン早期return）**: 最後のfetchハンドラ先頭に、クロスオリジンリクエスト（`url.origin !== self.location.origin`かつ`url.hostname !== 'fonts.googleapis.com'`）を一切インターセプトせずブラウザのネイティブfetchに完全に委ねる早期`return`を追加。旧実装は`caches.match`→`fetch`→（`response.ok && url.origin===self.location.origin`条件を満たさないため）そのまま返す、という**キャッシュ機構として何のメリットもない中継**になっており、SW fetch実装の不安定性リスク（WKWebView固有のno-cors+Range処理不安定性の可能性、一次情報未確認の推測）だけを負っていた。`/api/`・HTMLナビゲーション・同一オリジン静的アセットの既存3分岐は全て同一オリジンのため、この早期returnの影響を受けず無変更のまま機能する
-- **`public/app.js`の`openStampSpotDetail()`（画像生成方式の統一）**: 既存3箇所（イベントカード`public/app.js`1355行目付近・コース詳細`renderCourseDetail()`4411行目付近・マイコースカード`renderCourseResultHtml()`4861行目付近）と同じ「モーダル/カードを開く・生成するたびに`<img>`要素を新規生成する」パターンに統一。`spot.imageUrl`があれば`imgContainer.innerHTML`で新規`<img>`を都度生成する。`imageUrl`が空（ロック中スポット）の場合は`imgContainer.innerHTML = ''`で何も生成しない
-- **`public/index.html`（静的`<img>`要素→空コンテナへ変更）**: `#stamp-spot-detail-image`（静的`<img>`要素、初期`display:none`）を`<div id="stamp-spot-detail-image-container"></div>`（空コンテナ）に置き換え。旧要素へのHTML属性`onerror`フォールバックは、`<img>`自体が都度生成されなくなったため撤去（JS側の`onerror`ハンドラで代替）
-- **`server.js`は無変更**（画像URL生成・マスキングロジックとも今回のスコープ外、`GET /api/stamp-spots`のレスポンス構造は不変）。キャッシュバスティング: `index.html` app.js?v=20260720f、`sw.js` CACHE_NAME=sg-weekend-v635
-- **影響範囲の限定**: `openStampSpotDetail()`関数のみ変更、既存3箇所（イベントカード・コース詳細・マイコースカード）のUnsplash画像表示ロジックは無変更（回帰なし）。SWのクロスオリジン早期returnは`images.unsplash.com`だけでなく他の全クロスオリジンリクエスト（Instagram embed等）にも及ぶが、これらも元々SWでキャッシュされていなかったため機能的な後退はない
-
-### スタンプスポット詳細画像が表示されない不具合の根本原因判明・解決（ユーザー環境のVPN起因、コード側の不具合ではなかった）＋診断ログ削除（2026-07-20実装、設計書76）
-設計書74・75と2段階のコード側修正を試みた後も実機で画像読み込み失敗が継続していたが、investigatorの読み取り専用調査（サーバー・CDN側はcurlで一貫して200、原因不明のまま保留）を経て、メインエージェントがユーザーに直接確認したところ、**根本原因はコード側の不具合ではなく、ユーザーのiPhoneで有効になっていたVPNが、Unsplash CDN（`images.unsplash.com`）へのリクエストを妨げていたことだった**と判明した。ユーザーがVPNを切った結果、画像が正常に表示されるようになったことを確認済み。curlによるサーバー・CDN側の検証（設計書74・75）が常に成功していた理由も、curlがVPNを経由しないためと完全に説明がつく。
-
-- 確認環境はWeb版（Safari等でdosuru.appを開いていた）。ユーザーが報告していた「コースの画像」は、設計書71〜72でボトムナビ「コース」→「制覇」に改称された「スタンプラリー」機能のスポット詳細画像を指していた（既存AIコース機能ではない）
-- 設計書74（`aspect-ratio`→固定高さ）・設計書75（Service Worker早期return・`innerHTML`新規生成方式への統一）の修正自体は原因ではなかったが、既存の確立されたパターンへの統一として有用なため**ロールバックしていない**
-- 役目を終えた診断ログを削除: `public/app.js`の`openStampSpotDetail()`から`_sendDebugLog('stamp_image_load_success', { spotId })`・`_sendDebugLog('stamp_image_load_error', { spotId, url })`の呼び出し2箇所を削除。**画像読み込み失敗時に画像を非表示にする`imgEl.onerror`のフォールバック処理自体は維持**（ログ送信の部分のみ削除）。`_sendDebugLog`関数自体・`POST /api/debug-log`エンドポイント自体は恒久ユーティリティのため無変更のまま残置（他機能の計装〈`auth_prefs_init`/`push_*`/`backup_*`等〉も無変更）
-- `server.js`は無変更。キャッシュバスティング: `index.html` app.js?v=20260720g、`sw.js` CACHE_NAME=sg-weekend-v636
-- **教訓（再発防止策として記録）**: 「サーバー側は正常なのに実機だけ失敗する」系の不具合では、ユーザー環境要因（VPN・Private Relay・広告ブロッカー・キャリアの通信最適化プロキシ等）を疑うタイミングを早めるべきだった。「サーバー・CDN側は正常」「特定の1URLだけでなく全スポットで一貫して失敗」という状況証拠が揃った時点（設計書75の時点）で、追加のコード修正より先にユーザー環境の確認を行うべきだった
-- **このタスクをもってスタンプスポット詳細画像の不具合調査（設計書73〜76）は解決済み**。未検証事項なし
-
-### エリア制覇バッジ機能＋スポットデータ拡充（2026-07-20実装、設計書77）
-ユーザー要望「スタンプラリーにもっとハマる仕掛けを」を受け、既存のレベル制（定番/ローカル/ニッチ/スペシャル）とは別軸の「エリア制覇バッジ」を追加した。あわせて、既存14スポットのエリア分布の偏り（Central 8件・West 3件・North/East/North-East各1件・Island-wide/Sentosa各0件）を是正するため9件の新規スポットを追加した。
-
-- **`data/sg/stamp-spots.json`に9件追加（14件→23件）**: `bird-paradise`（standard/North）・`siloso-beach`（standard/Sentosa）・`sea-aquarium`（standard/Sentosa）・`katong-joo-chiat`（local/East）・`punggol-waterway-park`（local/North-East）・`sembawang-hot-spring`（niche/North）・`changi-chapel-museum`（niche/East）・`lorong-halus-wetland`（niche/North-East）・`fort-siloso`（niche/Sentosa）。追加後のレベル別内訳は`standard`7件・`local`6件・`niche`8件・`special`2件（変更なし）。追加後のエリア分布はCentral 8/West 3/North 3/East 3/North-East 3/Sentosa 3（Island-wide 0件は変更なし）。`order`は各レベル内の既存最大値の続きから採番（standard新規3件=order5-7、local新規2件=order5-6、niche新規4件=order5-8）、重複なしを確認済み。`imageUrl`は9件とも空文字列のまま（`scripts/fill-stamp-spot-images.js`の再実行は別タスク）。座標はユーザー提示の概算値をそのまま採用、実装時に既知の実在地と照合し大きなズレがないことを確認済み
-- **`data/sg/stamp-spots.json`は`.gitignore`対象のためVPS上で直接編集する既存運用方針を踏襲**（設計書69〜70と同様）。`server.js`は無変更・`pm2 restart`不要（既存の`fs.readFileSync`都度読み込みアーキテクチャのため）
-- **「Island-wide」エリアはバッジ対象外**: GPSチェックイン前提の1地点スポットと概念的に相性が悪いため、対象エリアはCentral/East/West/North/North-East/Sentosaの6エリアに限定。同エリアへのスポット追加も行っていない
-- **新規定数`STAMP_BADGE_AREAS`**（`public/app.js`、`STAMP_LEVEL_META`直後）: 上記6エリアの`{val, label}`配列。既存`CITY_COURSE_AREAS`（AIコース生成用、Sentosa含む7区分）には依存しない独立定数として新設（スタンプラリー機能は既存コース機能と完全独立という設計書69からの方針を踏襲）
-- **新規関数`_computeStampAreaProgress()`**: `_stampSpots`・`_stampProgress.checkedInSpotIds`から各エリアの`{area, label, checked, total, achieved}`をクライアント側のみで算出（サーバー側APIは無変更）。ロック中`local`/`niche`スポットも`area`フィールド自体はサーバー側`maskLockedStampSpot()`でマスク対象外のため分母に含まれる（意図通りの仕様、全スポット制覇が達成条件のため）
-- **新規関数`_renderStampAreaBadges()`**: `#stamp-area-badges`（`#stamp-map-content`内、進捗サマリ行の直後・地図/一覧コンテナの手前に新設）へ`.stamp-area-badge`チップ形式で6エリア分の進捗（例: 「🏙 Central 2/8」）を描画。達成時は`.stamp-area-badge--achieved`（`background:var(--caramel);color:white`）＋チェックマーク接頭辞を付与
-- **表示は常時（マップ/一覧どちらのビューでも消えない）**: `_applyStampViewMode()`の`display`切替対象（`mapEl`/`legendEl`/`listEl`）に`#stamp-area-badges`を含めていない。一覧ビュー中にエリアバッジが消える回帰を防ぐための実装上必須の対応（設計書77 §7-3で明記済みのリスク）
-- **呼び出し漏れ防止**: `initStampMapTab()`・`doStampCheckin()`両方の既存描画関数呼び出し列（`_renderStampMarkers()`/`_renderStampFog()`/`_renderStampLevelLegend()`/`_renderStampProgressSummary()`/`_renderStampCollectionList()`）に`_renderStampAreaBadges()`を追加済み
-- **CSS新規クラス**: `.stamp-area-badge`（`.stamp-level-chip`ベース、`public/app.css`）・`.stamp-area-badge--achieved`・`.stamp-area-badge-check`
-- **i18n**: 新規キー`stampAreaBadgesTitle`（ja「エリア制覇バッジ」/en「Area Badges」）をja/en同時追加、バッジ行直上のセクション見出しとして使用。エリア名自体（`Central`/`East`等）は既存`CITY_COURSE_AREAS`と同じ絵文字付き英語表記のまま新規i18nキー化せず流用（既存パターンとの一貫性を優先）
-- **APIエンドポイント（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`）は無変更**。レスポンス構造の変更なし、後方互換性への影響なし
-- **達成時の専用演出（レベル解禁演出`#stamp-level-unlock-overlay`相当のモーダル等）は今回スコープ外**。進捗表示と達成マークの視覚変化のみ
-- キャッシュバスティング: `index.html` app.js?v=20260720h・app.css?v=20260720h、`sw.js` CACHE_NAME=sg-weekend-v637
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのエリアバッジの見た目・折り返しレイアウト・チェックイン後の進捗更新アニメーション、新規9スポットの座標精度（現地訪問でのチェックイン可否）は2026-07-20時点でWeb版API検証のみ完了、実機未確認。設計書69〜76自体もまだTestFlightビルド未実施のため、これらは次回一括リリース時にまとめて確認する想定
-
-### スタンプ帳（パスポート）風デザインへの刷新（2026-07-20実装、設計書78）
-設計書70（コレクション一覧ビュー）・設計書77（エリア制覇バッジ）の見た目に対するユーザーフィードバック「ダサい」を受け、「スタンプ帳（パスポート風の物理的なスタンプラリー冊子）」のメタファーで両箇所を全面刷新した。データモデル・API・集計ロジックは無変更、フロントエンドの見た目のみの変更。
-
-- **`STAMP_BADGE_AREAS`定数の構造変更**（`public/app.js`）: `{val, label}`（絵文字+英語ラベルの結合文字列）から`{val, emoji, labelText}`（分離）に変更。円形スタンプの中身に絵文字だけを表示するための対応。参照箇所は`_computeStampAreaProgress()`のみで、この関数の戻り値にも`emoji`/`labelText`を追加済み
-- **新規ヘルパー`_stampRotateDeg(str)`**: 文字列（スポットID等）から`-5〜+5`度の範囲の回転角を決定的にハッシュ算出する（`hash = hash*31 + charCode`を`|0`で32bit整数化し`Math.abs(hash) % 11 - 5`）。制覇済みスタンプの「はんこらしい」わずかな傾きを、再描画のたびに角度が変わらないよう一貫させるために使用
-- **`_renderStampAreaBadges()`刷新**: 丸ピルチップ（旧`.stamp-area-badge`）から円形スタンプ（`.stamp-circle.stamp-circle--area`、40px）に変更。達成時は塗りつぶし+チェックマーク（`--checked`修飾子）、未達成時はエリア絵文字を表示。X/Y進捗はスタンプ下に小さく併記
-- **`_renderStampCollectionList()`刷新**: 「レベル＝ページ（`.stamp-book-page`）、スポット＝円形スタンプグリッド（`.stamp-book-grid`内の`.stamp-stamp-cell`、56px円+スポット名2行折り返し）」に変更。**レベル別グルーピングという既存の情報構造自体は維持**（エリア別への再グルーピングは意図的に行っていない。レベル解禁ゲート表現・「次はここ」判定〈`_computeStampNextTarget()`〉がレベル軸で動作する既存ロジックのため、構造変更すると破綻するリスクがあった。設計書78 §7-1参照）。各スタンプ円の`onclick`に`if(!_touchCapableDetected)`ガードを新規付与（CLAUDE.md必須パターンへの準拠、旧実装はガードなしだった）
-- **スタンプ円のCSS（`.stamp-circle`とその修飾子、`public/app.css`）**:
-  - デフォルト（未制覇・解禁済み）: 点線円（`border:2px dashed var(--sand-dark)`）+ スポット番号（`order`）を薄く表示
-  - `--locked`（ロック中）: より薄い点線（`var(--sand)`）+ `opacity:0.5` + 🔒アイコン
-  - `--checked`（制覇済み）: レベルカラー塗りつぶし + `box-shadow`の多重指定による二重リング（内側`var(--cream)`の白縁+外側同色濃淡リング+ずれた影）+ `_stampRotateDeg()`による決定的回転（中の絵文字は逆回転させ正立表示）
-  - `--next`（「次はここ」）: 実線の点線→ソリッド枠に切り替え+新規`@keyframes stampNextPulseRing`によるパルスリング（既存マップピンの`@keyframes stampNextPulse`＝拡大縮小パルスとは別の新規アニメーション、統一感のある表現として追加）
-  - `--area`: 上記本体スタイルを共通化しサイズのみ40pxに縮小した併記用クラス（`.stamp-circle.stamp-circle--area`のように両クラスを併記して使用）
-- **「ページ」らしい紙質感の背景**: `.stamp-book-page`（`var(--cream)`背景+`var(--sand-dark)`枠線+角丸16px）、`.stamp-area-badges-page`（`var(--sand)`背景、同様の枠線・角丸）を新規追加。`public/index.html`の`#stamp-area-badges`のインラインstyleを`class="stamp-area-badges-page"`に置き換え済み
-- **ダークモード対応**: 新規クラスはすべて`var(--cream)`/`var(--sand)`/`var(--sand-dark)`/`var(--midnight)`/`var(--warm-gray)`ベースで実装し、`html[data-theme="dark"]`ブロックでの変数再定義により自動追従する設計にした。旧`.stamp-collection-card`が抱えていた`background: white`直書き（ダークモード非対応の既存の見落とし、設計書78 §3-4で指摘済み）は今回再発させていない
-- **既存ロジックへの影響なし**: `_applyStampViewMode()`（マップ⇄一覧切替）・`_computeStampNextTarget()`（「次はここ」判定）・`doStampCheckin()`のチェックイン成功後の再描画呼び出し列はいずれも無変更。`#stamp-area-badges`は引き続き`_applyStampViewMode()`の`display`切替対象に含まれず、マップ/一覧どちらのビューでも常時表示される制約を維持（設計書77の実装上必須事項を踏襲）
-- 旧CSS（`.stamp-area-badge`系・`.stamp-collection-group`/`.stamp-collection-card`系）は削除済み、参照残存なし
-- `server.js`・`data/`配下は無変更（pm2 restart不要）。i18n新規キーなし（既存の`stampAreaBadgesTitle`/`stampCollectionLockedNote`/`stampNextTargetLabel`を再利用）
-- スコープ外（今回未実装）: スポット詳細モーダル自体・マップビュー（Leafletピン）自体・レベル解禁演出モーダルのデザイン変更、新規イラスト・画像アセット追加、コレクション一覧のエリア別再グルーピング、完全制覇時の特別演出
-- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720i`、`sw.js` CACHE_NAME=`sg-weekend-v638`
-
-### コレクション一覧にチェックイン日時・説明文を追加（2026-07-20実装、設計書79）
-ユーザー要望「チェックインした時間や場所の簡単な説明も保存・表示したい」「コレクターを意識した作りにしたい」を受け、コレクション一覧ビュー（`_renderStampCollectionList()`）の各スタンプの下に、**制覇済みスポットのみ**チェックイン日時・説明文をコンパクト表示する機能を追加した。データモデル・API変更なし、既存の`checkinLog`（サーバー側で既に記録済み）と`spot.description`（既存フィールド）を利用するのみ。
-
-- **`_stampProgress`の状態拡張**（`public/app.js`）: `let _stampProgress = { checkedInSpotIds: [], unlockedLevels: ['standard'] };`に`checkinLog: []`を追加。`_loadStampSpotsAndProgress()`（`GET /api/stamp-progress/me`のレスポンスを反映）・`doStampCheckin()`（`POST /api/stamp-progress/checkin`のレスポンスを反映）の代入箇所2箇所とも`checkinLog`を含めるよう修正
-- **`POST /api/stamp-progress/checkin`のレスポンスに`checkinLog`は含まれない**（`GET /api/stamp-progress/me`側は既に含まれている、`server.js`実ファイルで確認済み）。そのため`doStampCheckin()`ではクライアント側で自前のチェックインエントリ（`{spotId, checkedInAt: 現在時刻のISO文字列, lat, lng}`、重複防止の`some()`チェック付き）を`_stampProgress.checkinLog`にpushする方式を採用（**`server.js`は無変更**、pm2 restart不要）
-- **新規ヘルパー`_stampCheckinDateFor(spotId)`**（`_stampSpotIsChecked()`直後）: `_stampProgress.checkinLog`から該当`spotId`のエントリを検索し、`checkedInAt`（ISO文字列）を既存の日付フォーマットパターン踏襲の「M/D」形式（`${d.getMonth()+1}/${d.getDate()}`）に整形して返す。該当エントリなし・不正な日付は空文字列を返す
-- **`_renderStampCollectionList()`の改修**: `checked`（制覇済み、既存変数を再利用）が真の場合のみ、スポット名（`.stamp-stamp-cell-name`）の直後に`.stamp-stamp-cell-meta`ブロック（`.stamp-stamp-cell-date`＝チェックイン日時＋`.stamp-stamp-cell-desc`＝`spot.description`）を追加。未制覇・ロック中セルは変更なし（空文字列のまま、既存の`circleCls`/`isNext`/「次はここ」タグ判定ロジックには一切変更なし）
-- **CSS（`public/app.css`）**: `.stamp-stamp-cell-meta`（`display:flex;flex-direction:column;align-items:center;`）・`.stamp-stamp-cell-date`（9px、`var(--caramel)`）・`.stamp-stamp-cell-desc`（9px、`var(--warm-gray)`、`-webkit-line-clamp:2`で2行省略）を新規追加。`.stamp-stamp-cell`は`width:74px`固定のため、追加テキストもこの幅に収まる前提で実装
-- i18n新規キーなし（日時は数値のみのラベルなし表記、説明文は既存`spot.description`をそのまま表示。英語モードでも日本語のまま表示される、多言語対応はスコープ外）
-- スコープ外（今回未実装）: スポット詳細モーダル自体への日時表示、新規タブ・新規画面、チェックイン日時の編集・削除、`checkinLog`の`lat`/`lng`表示、データモデル・API変更、BKK/SYD対応
-- `server.js`・`data/`配下は無変更（pm2 restart不要）
-- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720j`、`sw.js` CACHE_NAME=`sg-weekend-v639`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのグリッドセル縦方向の高さ不揃い（制覇済み/未制覇混在時、`.stamp-book-grid`はflex-wrap方式のため崩れリスクは低いと想定）、長い説明文の2行省略後の可読性、日時ラベルの視認性は2026-07-20時点でWeb版目視確認のみ、実機未確認
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での円形スタンプグリッドの表示密度・スクロール量（23件）、長い英語スポット名での2行折り返しレイアウト崩れの有無、エリアバッジ（40px）の二重リング表現が潰れて見えないか、回転角のばらつきが実機で不自然に見えないか、ダークモード切り替え時の実機での見た目、`box-shadow`多重指定によるiOS WKWebView実機でのレンダリング負荷は、いずれも2026-07-20時点でWeb版目視確認のみ完了、実機未確認
-
-### AI生成エリアバッジイラストの統合（2026-07-20実装、設計書80）
-設計書78でエリアバッジ（`.stamp-circle.stamp-circle--area`）をCSSのみの印章風デザインに刷新していたが、ユーザーから「もっとちゃんとデザインしたバッジにしたい」との要望があり、Nano Banana（Google Gemini画像生成）で生成したエナメルピン風のイラスト画像6エリア分（Central/East/West/North/North-East/Sentosa）を**達成時のみ**表示するよう統合した。データモデル・API変更なし、`public/images/stamp-badges/`配下の静的PNG（256×256px・透明背景、各15〜37KB）を`STAMP_BADGE_AREAS`定数にパスとしてハードコードする方式。
-
-- **画像アセット**: `public/images/stamp-badges/badge-{central,east,west,north,north-east,sentosa}.png`（6枚）。**`public/images/`は`.gitignore`対象外の通常git管理対象**（`data/`配下と混同しないこと）。エリア↔画像の対応: Central=マーライオン、East=プラナカン様式ショップハウス、West=ドラゴン像＋楼門（Haw Par Villaモチーフ）、North=枝にとまる鳥（Bird Paradiseモチーフ）、North-East=水路の木造ボート（カンポン風景）、Sentosa=ヤシの木＋ケーブルカー
-- **`STAMP_BADGE_AREAS`定数の拡張**（`public/app.js`）: 各要素に`img`フィールド（サイトルート相対パス、例: `/images/stamp-badges/badge-central.png`。`API_BASE`は付与しない。Capacitor環境はローカルバンドル方式のためアプリ内に同梱される）を追加。`_computeStampAreaProgress()`の分割代入・戻り値オブジェクトの両方に`img`を通した（片方だけの見落としに注意して両方確認済み）
-- **`_renderStampAreaBadges()`の分岐**: `achieved`時のみ`<img src="${img}" class="stamp-area-badge-img">`を表示。**未達成（ロック中含む）時のHTML生成ロジックは設計書78実装時から完全に無変更**（点線円＋絵文字のCSS印章表現のまま）
-- **CSS印章演出（塗りつぶし・二重リング・回転）とイラストは併用しない**（結論確定、理由3点）: (1) 画像自体が既に「完成した1枚絵」（金属リムの縁取り・光沢・立体感を含む）であり、CSSの二重リング`box-shadow`や塗りつぶし背景を重ねると視覚的に競合する、(2) `.stamp-circle--checked`の`background`プロパティと`<img>`要素は共存の意味がない（背後に隠れるだけ）、(3) 回転演出（`_stampRotateDeg()`）は「はんこ」メタファー由来だが、画像側は「エナメルピン」という固定形状物のメタファーのため無理に継承する必然性がない。達成時のHTML生成では`.stamp-circle--checked`クラス自体を付与せず、新規CSS修飾子`.stamp-circle--area-img`（`border:none;background:transparent;box-shadow:none`）のみ付与する
-- **CSS（`public/app.css`）**: `.stamp-circle--area-img`と`.stamp-area-badge-img`（`width/height:100%;object-fit:contain`＝画像は正方形PNGのため円形コンテナ内で欠けずに収まるようcontainを採用、`filter:drop-shadow(...)`で軽い影を付与）を新規追加。`.stamp-circle--area`のコンテナサイズ（40px）はそのまま踏襲（拡大等の微調整は今回見送り）
-- **ダークモード対応**: 画像自体はライト/ダーク共通の1種類のみ（専用画像は生成していない、透明背景のため背景色`var(--sand)`のダーク変種の上にそのまま乗る）。視認性は次回TestFlightビルド後の実機確認が必要
-- **画像読み込み失敗時のフォールバック**: 今回は追加していない（6ファイルとも配置済み確認済みのため必須要件外と判断。将来ファイル名変更等でパスが壊れた場合は`<img>`の`onerror`で`.stamp-circle--area-img`を外す等の追加が可能）
-- スコープ外（今回未実装）: レベルバッジ（`STAMP_LEVEL_META`）へのイラスト適用、コレクション一覧（`.stamp-stamp-cell`）個別スポットへのイラスト適用、未達成時のイラスト表示、画像の追加生成・差し替え、マップビュー（Leafletピン）へのイラスト適用、BKK/SYD対応
-- `server.js`・`data/`配下は無変更（pm2 restart不要だが今回は実施済み）。i18n新規キーなし（`<img>`の`alt`属性には既存の非i18n対象`labelText`をそのまま使用）
-- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720j`→`20260720k`、`sw.js` CACHE_NAME=`sg-weekend-v639`→`v640`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのイラストバッジ表示（40pxコンテナとのフィット感）、ダークモード時の視認性、6エリアとも達成時に正しい画像が表示されること、CSS印章→イラストへの切り替えの見た目は2026-07-20時点でWeb版目視確認のみ、実機未確認
-
-### AI生成レベルバッジイラストの統合（2026-07-20実装、設計書81）
-設計書80のエリアバッジ統合と同じ方針を、別軸の「レベルバッジ」（`STAMP_LEVEL_META`、定番/ローカル/ニッチ/スペシャル）に適用した。エリアバッジと異なり「達成/未達成の二値」がそのまま当てはまらない複数箇所（凡例・演出モーダル・一覧見出し・詳細バッジ・マップピン等、計6箇所）があるため、ユーザーが**実装対象を2箇所のみに確定**（レベル解禁演出モーダル・コレクション一覧「ページ」見出し）。他4箇所は絵文字表示のまま維持。
-
-- **画像アセット**: `public/images/stamp-badges/badge-level-{standard,local,niche,special}.png`（4枚、256×256px・透明背景）。**`public/images/`は`.gitignore`対象外の通常git管理対象**（設計書80のリスク7と同一の注意点、コミット対象に含めた）。レベル↔画像の対応: 定番=ヴィンテージカメラ、ローカル=自転車＋ショップハウス、ニッチ=虫眼鏡＋宝の地図、スペシャル=宝箱
-- **`STAMP_LEVEL_META`定数の拡張**（`public/app.js`）: 各要素（4レベル）に`img`フィールド（サイトルート相対パス）を追加。**`emoji`フィールドは削除せず維持**（凡例チップ・スポット詳細バッジ・マップピン・個別スポットスタンプの4箇所が引き続き参照するため）
-- **適用箇所1: レベル解禁演出モーダル**（`openStampLevelUnlockModal()`、`#stamp-level-unlock-emoji`）: `emojiEl.textContent = meta.emoji`を`emojiEl.innerHTML = '<img src="${meta.img}" class="stamp-unlock-img">'`に変更。既存の`@keyframes stampUnlockPop`ポップインアニメーション（`style.animation`の`none`→空文字リセットによる強制再生トリガー）はコンテナ要素`#stamp-level-unlock-emoji`自体に付いたまま無変更のため継続動作（テキストか画像かは`transform`/`opacity`アニメーションにとって無関係）。`public/index.html`の静的初期値`✨`は空文字列に変更（JS実行前のちらつき防止、画像はJSで都度生成）
-- **適用箇所2: コレクション一覧「ページ」見出し**（`_renderStampCollectionList()`内`.stamp-book-page-title`）: `${meta.emoji}`を`<img class="stamp-level-title-img">`（20×20px、`object-fit:contain`）に置き換え。ロック中ページ（`.stamp-book-page--locked`、opacity:0.6）でも画像は変わらず表示される
-- **CSS印章演出とは併用しない**（設計書80と同じ判断根拠）: `.stamp-unlock-img`（96×96px、`object-fit:contain`、`filter:drop-shadow`）・`.stamp-level-title-img`（20×20px）を新規追加
-- **対象外として明示的に維持**: レベル凡例チップ（`_renderStampLevelLegend()`、`#stamp-level-legend`）・スポット詳細シートのレベルバッジ（`openStampSpotDetail()`、`#stamp-spot-detail-level-badge`、`textContent`＋インラインstyle方式のまま）・マップ上のピン（`_renderStampMarkers()`、`.stamp-marker-icon`、30px雫形ピンの回転構造とイラストの相性が悪いため技術的制約により対象外）・コレクション一覧の個別スポットスタンプ中身（`.stamp-circle-mark`、ユーザー指定スコープ外）は、いずれも`meta.emoji`のまま完全無変更
-- i18n新規キーなし（`alt`属性は既存の`stampLevelStandard`等ラベルキーを流用）
-- `server.js`・`data/`配下は無変更（pm2 restart不要だが今回は実施済み）
-- キャッシュバスティング: `index.html` app.css/app.js `?v=20260720k`→`20260720l`、`sw.js` CACHE_NAME=`sg-weekend-v640`→`v641`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのレベル解禁演出モーダル画像サイズ（96px）・コレクション一覧見出し画像サイズ（20px）のフィット感、ダークモード時の視認性は2026-07-20時点でWeb版目視確認のみ、実機未確認
-- **スコープ外（将来検討）**: レベル凡例チップ・スポット詳細シートのレベルバッジへのイラスト適用は今回見送り。将来ユーザーが希望すれば別設計書で再検討（`.claude/plan.md`「設計書81 §4-3・§4-4」に実装方針の概略あり）
-
-### スタンプサイズの拡大（2026-07-20実装、設計書82）
-設計書81で追加したコレクション一覧のレベル見出しアイコン（20px）が、ユーザーが実機スクリーンショットを確認したところ「変わっていない」と誤解するほど小さく目立たなかった。レベル見出しアイコンだけでなく、既存のエリアバッジ（設計書77/78/80）・コレクション一覧の個別スポット円（設計書69/70/78）も含めた3種類のスタンプ表現サイズをまとめて拡大した。`public/app.css`のみの変更（`public/app.js`はクラス名出力のみでサイズ数値を持たないためJS変更不要と確認済み、`server.js`・`data/`配下も無変更）。
-
-- **個別スポット円**（`.stamp-circle`本体）: 56px→72px、font-size 20px→24px。連動して`.stamp-circle-order`/`.stamp-circle-lock`（円内番号・鍵アイコン）のfont-size 16px→20px、`.stamp-circle--checked`の二重リング`box-shadow`（`0 0 0 3px/5px`＋影`2px 3px 6px`→`0 0 0 4px/6.5px`＋影`2.5px 4px 8px`）、`.stamp-stamp-cell`（コレクション一覧の1セル分の固定幅）74px→90pxを比例調整
-- **エリアバッジ**（`.stamp-circle--area`）: 40px→56px、font-size 14px→18px（設計書§7-3の案A採用、`.stamp-circle`本体とは別の「縮小オーバーライド」構造自体は維持したまま数値のみ書き換え）。連動して`.stamp-circle--area.stamp-circle--checked`の二重リング（`0 0 0 2px/3.5px`＋影`1px 2px 4px`→`0 0 0 3px/5px`＋影`2px 3px 6px`）、`.stamp-area-stamp`/`.stamp-area-stamp-label`（バッジ全体のラッパー幅・ラベル最大幅）62px→72px、`.stamp-area-badge-img`（設計書80の達成時イラスト）の`drop-shadow`オフセット`0 2px 4px`→`0 3px 5px`を調整。`.stamp-circle--area-img`自体はサイズ指定を持たずコンテナ側（`.stamp-circle--area`）の56pxにCSSカスケードで自動追従する構造のため、`-img`クラス自体の変更は不要
-- **レベル見出しアイコン**（`.stamp-level-title-img`）: 20px→32px
-- キャッシュバスティング: `index.html` app.css `?v=20260720l`→`20260720m`、`sw.js` CACHE_NAME=`sg-weekend-v641`→`v642`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での拡大後の表示密度・スクロール量増加、エリアバッジ拡大に伴う`.stamp-area-badges-page`の折り返しレイアウト変化、ダークモード時の見た目は2026-07-20時点でWeb版目視確認のみ、実機未確認
-
-### スタンプラリー画面の大幅リデザイン（2026-07-21実装、設計書83）
-円形スタンプグリッド（設計書78）のコレクション一覧を実機で確認したユーザーから見直し要望があり、(1)エリア制覇バッジの一時停止、(2)マップ表示の簡素化、(3)コレクション一覧の全面リデザイン、の3点をまとめて実施した。データモデル・API変更なし、`public/`配下（index.html/app.js/app.css）のみの変更。
-
-- **エリア制覇バッジの一時停止**: `public/index.html`のエリアバッジ見出し行＋`#stamp-area-badges`を新規`<div style="display:none;">`ラッパーで包んで非表示化。**CLAUDE.mdの既存「稼働停止中」パターン（Klookアフィリエイトリンク等）を踏襲**、`_renderStampAreaBadges()`関数・`STAMP_BADGE_AREAS`定数・`initStampMapTab()`/`doStampCheckin()`からの呼び出し・関連CSS（`.stamp-area-badges-page`/`.stamp-circle--area`/`.stamp-circle--area-img`/`.stamp-area-badge-img`等）は一切削除せず残置。復活時はHTML側の`display:none`を解除するのみ
-- **マップ表示の簡素化**: `_renderStampMarkers()`に`.filter(spot => _stampProgress.unlockedLevels.includes(spot.level))`を追加し、ロック中（未解禁）の`local`/`niche`スポットのピンをマップ生成ループから除外（`standard`は`STAMP_LEVEL_GATES.standard===null`により常に解禁済みのため全件表示のまま、`special`は既存仕様でAPIレスポンス自体から除外済みのため無関係）。**進捗サマリー（`#stamp-progress-summary`）・レベル凡例チップ（`#stamp-level-legend`）はHTML要素ごと削除し、`_renderStampLevelLegend()`/`_renderStampProgressSummary()`関数定義も削除**（復活を前提としない恒久的な削除として扱う、エリアバッジとは異なる方針）。`initStampMapTab()`・`doStampCheckin()`双方の呼び出し列から該当2関数の呼び出しを削除（計4行）。`_applyStampViewMode()`内の`legendEl`関連コードも削除
-- **コレクション一覧の全面リデザイン（`_renderStampCollectionList()`書き換え）**: 円形スタンプグリッド（`.stamp-book-page`＋`.stamp-book-grid`）を廃止し、`STAMP_LEVEL_ORDER_CLIENT`の順でレベルごとに以下3状態のいずれかで描画する構成に変更（**`spotsInLevel.length === 0`のガードが`totalCount===0`の誤判定〈`special`未解禁時に`0/0`の全制覇バッジが出るバグ〉を防ぐ必須の防御線**、totalCount算出より前に配置）
-  - **状態A（ロック中）**: `_renderStampLevelRowLocked()`。「🔒＋レベル名＋`checkedCount`/`totalCount`」のコンパクトな1行のみ、個別スポットのカードは一切表示しない（新規`.stamp-level-row`系CSS）
-  - **状態B（解禁中・未全制覇）**: `_renderStampLevelRowInProgress()`。レベル見出し（`meta.img`＋ラベル、既存`.stamp-level-title-img`クラスを継続利用）の下に`order`昇順の横長カード一覧。制覇済みは塗りつぶし✓円（`meta.color`背景）＋チェックイン日時（`_stampCheckinDateFor()`）・説明文（`spot.description`、既存設計書79ロジックを流用）をカード内に配置、未制覇は番号円のみ。現在の次ターゲット（`_computeStampNextTarget()`）には「次はここ！」タグを表示（新規`.stamp-level-section`/`.stamp-card`系CSS）。このレベル内の全カードは無条件で`onclick="if(!_touchCapableDetected) openStampSpotDetail(...)"` を付与（状態Bは定義上`unlocked===true`のみのため旧実装の三項分岐は不要）
-  - **状態C（解禁中・全制覇済み）**: `_renderStampLevelRowComplete()`。個別カード一覧は表示せず、`meta.img`（96px、設計書81で導入済みのレベルイラスト画像を再利用）＋「{レベル名} 制覇！」＋「{件数}/{件数} スポット達成」の大きなバッジを常時表示（新規`.stamp-level-complete-badge`系CSS）。タップ不可の純粋な表示要素（`onclick`なし）。既存のレベル解禁演出モーダル`openStampLevelUnlockModal()`（一度きりの祝いポップアップ）とは別物として無変更のまま共存
-- **旧CSSクラスの削除**: `.stamp-level-chip`系（凡例チップ）・`.stamp-book-page`系・`.stamp-stamp-cell`系（旧コレクション一覧グリッド）・`.stamp-circle-order`/`.stamp-circle-lock`/`.stamp-circle--locked`/`.stamp-circle--next`＋`@keyframes stampNextPulseRing`（旧コレクション一覧専用の円修飾子）を削除。**`.stamp-circle`本体・`.stamp-circle--checked`・`.stamp-circle--area`・`.stamp-circle--area-img`・`.stamp-area-badge-img`はエリアバッジ側（`_renderStampAreaBadges()`）が引き続き共有使用するため削除せず維持**（同名クラスがコレクション一覧側とエリアバッジ側の両方から参照されていたための必須の注意点、設計書83 §10リスク1）
-- **i18n**: 新規2キー（ja/en同時追加）: `stampLevelCompleteLabel`（制覇！/Complete!）・`stampLevelCompleteSpotsLabel`（スポット達成/spots collected）。死にキー化した既存`stampProgressSummary`/`stampCollectionLockedNote`は実害がないため削除せず残置
-- キャッシュバスティング: `index.html` app.js/app.css `?v=20260721a`、`sw.js` CACHE_NAME=`sg-weekend-v643`
-- `server.js`・`data/`配下は無変更（pm2 restart不要）。設計書69〜82自体もまだTestFlightビルド未実施のステータスのため、本リデザインも含めて次回一括リリースの想定
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での横長カード一覧（23件想定）のスクロール量・タップ精度、状態B/C切り替わり時の見た目のジャンプ、状態A/B/Cの視覚的統一感（制覇済み/未制覇混在時のカード高さ不揃い）、ダークモード時の見た目は2026-07-21時点でWeb版目視確認のみ、実機未確認
-
-### スタンプ一覧の不具合修正（タップ不発）＋見た目調整（2026-07-21実装、設計書84）
-設計書83実装直後のユーザー確認で見つかった不具合1件・見た目調整2点を修正した。データモデル・API変更なし、`public/app.js`・`public/app.css`のみの変更（`public/index.html`はキャッシュバスティングのみ）。
-
-- **【最優先・不具合修正】`.stamp-card`タップ不発**: `_renderStampLevelRowInProgress()`（状態B、`public/app.js`）が生成する`.stamp-card`のonclick属性が`onclick="if(!_touchCapableDetected) openStampSpotDetail('${spot.id}')"`となっていたが、対応する`touchend`ハンドラが一切登録されていなかった（CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知アンチパターンに該当）。実機タッチ操作では一度でも画面に触れると`_touchCapableDetected`が`true`になり、以降ガードが常に偽と評価されて`openStampSpotDetail()`が呼ばれずタップ不発になっていた（PCマウス操作では`_touchCapableDetected`が`false`のままのため問題なく動いていた）。`onclick="openStampSpotDetail('${spot.id}')"`に単純化し、新規`touchend`ハンドラは追加していない（ゴーストクリックが実証されていない要素にガードを付けるべきではないという既存方針通り）
-- **見出しアイコンを絵文字に戻す（状態Bのみ）**: `_renderStampLevelRowInProgress()`内`.stamp-level-section-title`の中身を、設計書81で導入した`<img src="${meta.img}" ... class="stamp-level-title-img">`（イラスト画像）から`${meta.emoji}`（絵文字）に戻した。**状態C（`_renderStampLevelRowComplete()`の`.stamp-level-complete-badge-img`）・レベル解禁演出モーダル（`openStampLevelUnlockModal()`の`.stamp-unlock-img`）・エリアバッジ画像（`.stamp-circle--area-img`/`.stamp-area-badge-img`、非表示中だがコード残置）はいずれも変更していない**（別クラス・別関数、`grep`で無変更を確認済み）。`.stamp-level-title-img`というCSSクラス自体は参照元がなくなり死にクラス化したが、実害がないため削除せず残置
-- **全制覇バッジ（状態C）の拡大**: `public/app.css`の`.stamp-level-complete-badge`（padding `24px 16px`→`32px 20px`）・`.stamp-level-complete-badge-img`（`96px`→`150px`、drop-shadowオフセットも`0 3px 6px`→`0 4px 8px`に微調整）・`.stamp-level-complete-badge-title`（`15px`→`19px`）・`.stamp-level-complete-badge-count`（`12px`→`14px`）を拡大。border-radius・background（`var(--sand)`）・border・text-align・flexレイアウトは無変更のまま流用、新規の直書き色は追加していない（ダークモード自動追従を維持）
-- `server.js`・データファイルは無変更（pm2 restart不要だが今回は実施済み）。キャッシュバスティング: `index.html` app.js/app.css `?v=20260721a`→`20260721b`、`sw.js` CACHE_NAME=`sg-weekend-v643`→`v644`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのタップ精度（onclickガード除去後の安定性）、絵文字見出しの見た目バランス（イラスト画像との統一感がやや失われる可能性、ユーザー明示要望に基づく意図的選択）、全制覇バッジ拡大後のコレクション一覧全体のスクロール量増加は2026-07-21時点でWeb版目視確認のみ、実機未確認
-
-### バッジ画像の透明化修正（チェッカーボード焼き込みバグ）＋Centralエリアバッジの画像差し替え（2026-07-21実装、設計書85）
-`.stamp-level-complete-badge-img`（設計書83〜84）を確認したところ、円形にくり抜かれるはずのバッジ画像が実際には四角いチェッカーボード柄ごと表示される不具合が見つかった。`public/images/stamp-badges/`配下の静的PNG10枚のピクセルデータのみを書き換える対応で、`server.js`・`public/app.js`・`public/app.css`・`public/index.html`のコード変更は一切なし。
-
-- **不具合1（本質的なバグ）: 全10枚が透明背景になっていなかった**。設計書80・81は「256×256px・透明背景」と記録していたが、実際には全10枚ともアルファチャンネルが全ピクセル255（完全不透明）だった。Nano Bananaが「透明背景」生成時、画像編集ツールが透明領域のプレビューに使うチェッカーボード柄（白と薄灰色の格子）を本物のピクセルとしてそのまま焼き込んで出力していたことが原因。CSS側（`.stamp-level-complete-badge-img`等）は`object-fit:contain`のみで円形マスクを掛けていないため、正方形のチェッカーボードがそのまま見えていた
-- **不具合2（無関係の別バグ）: `badge-central.png`が別画像に差し替わっていた**。Centralエリアバッジ（本来はマーライオンのイラスト）が、設計書80検討時にユーザーが参考画像として送ったPikmin Bloomのバッジ画面のスクリーンショットになっていた。`git log`で確認したところ設計書80のコミット時点から一貫してこの誤った画像のままで、直近の作業で壊れたものではない。他9枚は目視確認の結果いずれも正しいイラストだった
-- **修正方法（自動透明化、ユーザーが3択中「自動で透明化」を選択）**: (1) 画像四辺を起点に「チェッカーボード色」（`max(R,G,B)-min(R,G,B)<=30`かつ`max(R,G,B)>=140`の無彩色・明色判定）のピクセルをアルファ0にしながらBFSフラッドフィルで伝播、(2) 残った不透明ピクセルの4近傍連結成分を求め最大の連結成分（＝バッジ本体のイラスト）以外を全て透明化する後処理、の2段階。`badge-central.png`のみ新規画像（ユーザー提供の1024×1024マーライオンイラスト）を256×256にリサイズしてから同じ処理を適用し差し替え。他9枚（East/West/North/North-East/Sentosa・レベル4種）は既存ファイルに透明化処理のみ適用し絵柄自体は無変更
-- **検証**: 10枚全てで`sharp`によりアルファ値0のピクセルが存在すること（透明化ピクセル比率49〜61%、円形イラスト＋透明背景として妥当）を機械的に確認。加えてsand色背景に合成した150px相当のコンタクトシート・透明化前後の比較画像を生成し目視確認した結果、白色を含みリスクが高いとされていたEast（建物の白壁）・North（鳥の白い羽毛）を含む全画像でイラストの欠損なし。`badge-level-special.png`の外周ギザギザ模様は透明化前の元画像から存在する意図的な発光エフェクト（意匠）であり、チェッカーボードの残骸ではないことも比較確認済み
-- **教訓（再発防止、CLAUDE.md記録）**: (1) AI画像生成ツール（Nano Banana等）で「透明背景」を指定しても、実際には編集ツールのチェッカーボードプレビュー柄がそのまま焼き込まれて出力される場合がある。今後新規バッジ画像等の透明背景アセットを追加する際は、生成直後に`sharp`でアルファ値のヒストグラム確認（全ピクセル255=不透明になっていないか）を行う習慣を持つこと。(2) 参考画像として会話に送付した画像と、実際に採用すべき生成画像を取り違えて配置してしまうミスが1年近く（設計書80のコミット以降）気づかれずに残っていた実例があるため、新規画像アセットをコミットする際は行数の少ない差分でも一度は目視でサムネイル確認する価値がある
-- `server.js`・データファイル・APIレスポンス構造は無変更（`pm2 restart`不要）。iOS版はCapacitorのローカルバンドル方式のため次回TestFlightビルドでの反映が必要
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのバッジ表示（設計書69〜84自体がまだTestFlightビルド未実施のため、本修正も次回一括リリース時に確認）
-
-### スタンプ詳細モーダルを閉じた後、画面上部（ステータスバー付近）がグレーアウトされたまま残る不具合の修正（2026-07-21実装、設計書86）
-Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダル（`#stamp-spot-detail-sheet`）を開いて閉じると、画面最上部（iOSステータスバー付近）がグレーアウトされたまま残る不具合が報告された。メインエージェントが実機スクリーンショット2枚（不具合再現時・正常時）の比較とPlaywrightでの状態検証を実施し原因を特定した。
-
-- **原因**: `#stamp-spot-detail-overlay`が使う共有クラス`.chat-overlay`は`opacity`のみで表示/非表示を切り替えており（`display`は常に`block`のまま）、`opacity:0`になった後も要素はレイアウト・コンポジットツリーに残り続ける実装だった。`.chat-overlay`の背景色`rgba(44,36,32,0.45)`をクリーム色（`#FFF9F2`）にアルファブレンド計算すると`rgb(160,153,148)`相当となり、ユーザーのスクリーンショットで確認されたグレーの帯の色味とほぼ一致した。Playwrightでの検証では`opacity:0`・`pointer-events:none`ともJS/CSSの論理的な状態は正しく更新されていることを確認済みで、iOS Safariが`position:fixed`かつ半透明の要素をopacityがゼロになった後もステータスバー付近（safe-area-inset-top付近）の再描画で「古いペイントとして」焼き付かせる既知のWebKit挙動が最有力仮説（一次情報による確証はなく、色の一致・症状の再現条件から導いた推測）
-- **影響範囲**: `.chat-overlay`クラスは`#stamp-spot-detail-overlay`以外に7箇所で共有されている（`#title-edit-overlay`/`#backup-passphrase-overlay`/`#cal-passphrase-overlay`/`#stamp-level-unlock-overlay`/`#pin-picker-overlay`/`#emoji-picker-overlay`/`#schedule-action-overlay`）。いずれも同一構造（`opacity`のみのトグル、`display`は常に`block`のまま）のため同種の不具合を潜在的に抱えている可能性が高く、8箇所全てに横展開して修正した
-- **修正1（CSS）**: `public/app.css`の`.chat-overlay.visible`ルールに`display: block !important;`を追加
-- **修正2（JS）**: `public/app.js`（`_touchCapableDetected`検出リスナー直後、ページ初期化時に一度だけ実行）に、`.chat-overlay`要素全てへ一括で`transitionend`リスナーを登録。`opacity`のトランジション完了時に`.visible`クラスが無ければ`el.style.display = 'none'`を設定し、フェードアウト完了後にDOM上から実質的に除去する。再度開く際はCSS側の`display:block !important`がJSの残留インラインスタイルを確実に上書きするため、開く側の8箇所の`open〜()`関数は一切変更不要（CSSカスケードで解決）
-- **`#schedule-action-overlay`との相互作用確認済み**: この要素のみ他7箇所と異なり`classList.add/remove('visible')`ではなく`overlay.style.display='block'/'none'`を直接操作する独自実装（`background:transparent`のインタラクションブロック専用オーバーレイ、`opacity`は常に`.chat-overlay`既定の`0`のまま変化しない）。新規`transitionend`リスナーは`opacity`の値が変化しないため発火せず、既存の`closeScheduleActionSheet()`内`display='none'`設定と衝突しないことを確認済み
-- **診断ログ（使い捨て、原因仮説が外れていた場合の保険）**: `closeStampSpotDetail()`に、閉じた直後と400ms後（`transitionend`発火想定後）の2時点で`_sendDebugLog('stamp_detail_close_state', {...})`を追加し、`#stamp-spot-detail-overlay`の`getComputedStyle()`（`opacity`/`display`/`pointerEvents`）を記録する。**実装直後の実機検証で`immediate`時点`{opacity:"1",display:"block"}`→`after_400ms`時点`{opacity:"0",display:"none"}`という想定通りの遷移を`logs/debug-nav.log`で確認済み**。CLAUDE.md既存運用ルール上は原因確定後に削除してよい使い捨てログだが、**今回は削除せず残置した**（次回症状再発の有無を継続確認するため）
-- スコープ外（今回未実装）: `.chat-overlay`以外の別カテゴリのオーバーレイ（`.plan-modal-overlay`・`.cal-popup-overlay`・`.pin-detail-overlay`等）への同種修正の横展開、WebKit側の根本原因の完全な特定
-- `server.js`・`data/`配下・`public/index.html`のマークアップは無変更（`?v=`キャッシュバスティングのみ）。`pm2 restart`不要
-- キャッシュバスティング: `index.html` app.css/app.js `?v=20260721c`、`sw.js` CACHE_NAME=`sg-weekend-v645`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS App Store版（Capacitor/WKWebView）での同種のグレーアウト残留有無（今回はWeb版報告に基づく修正）。フェードイン（開く動作）が引き続き正常にアニメーションすること・8箇所全ての開閉が壊れていないことはWeb版で確認済みだが、iOS実機は未確認
-
-### スタンプチェックインのサーバー側GPS距離検証（不正対策）（2026-07-21実装、設計書87）
-`POST /api/stamp-progress/checkin`は設計書69以来「v1はサーバー側の距離検証を行わず、クライアント申告のlat/lngをそのまま信用する」暫定方針だった（クライアント側`_haversineDistanceM()`によるボタンdisabled制御はUIの制御でしかなく、APIを直接叩けば任意の座標で無条件にチェックイン実績を記録できる状態だった）。ユーザーへの「位置情報以外の追加入力で不正対策をしたい」という相談に対し、メインエージェントが「まずサーバー側の既存の穴（距離検証の欠如）を塞ぐのが最優先」と提案し合意、実装した。
-
-- **`server.js`にHaversine距離計算ヘルパー`haversineDistanceM(lat1, lng1, lat2, lng2)`を新規追加**（STAMP RALLYセクション冒頭、`STAMP_PROGRESS_DIR`定義直後）。`public/app.js`の`_haversineDistanceM()`と同一の計算式（地球半径6371000m、標準的なHaversine公式）をサーバー側に移植したもの
-- **`POST /api/stamp-progress/checkin`の新規チェックイン分岐（`else`側、`alreadyCheckedIn`でない場合）にのみ距離検証を追加**。`lat`/`lng`がともに`number`型でなければ距離を`Infinity`扱いにし、`spot.checkinRadiusM || 200`（クライアント側と同じフォールバック値200m）を超える場合は`tooFar`フラグを立てて`return`し、`withFileLock`内の書き込み（`checkedInSpotIds`・`checkinLog`・`updatedAt`いずれも）を一切行わない。ロック解放後、`tooFar`なら`403 { error: 'too far from spot' }`を返す
-- **既にチェックイン済みスポットへの再リクエスト（`alreadyCheckedIn`分岐）は距離検証の対象外のまま**、既存の冪等動作（`updatedAt`更新・再書き込みして200 OKを返す）を変更していない（設計判断: 状態が変化しない冪等リプレイに距離検証を課す必要はないため）
-- **クライアント側（`public/app.js`/`public/index.html`/`public/app.css`）は無変更**。`doStampCheckin()`は既に`if (!res.ok) throw new Error('checkin failed')`で非2xxレスポンスを捕捉し既存の汎用エラートースト（`toastStampCheckinError`）を表示する実装のため、新規i18nキーの追加・専用エラーメッセージの出し分けは行っていない。正規のフロー（クライアントが既に距離チェック済みでボタンを押した場合）ではサーバー側検証で弾かれることは基本的に想定されない
-- **リクエスト・成功時レスポンス形式は無変更**（`{ok, alreadyCheckedIn, checkedInSpotIds, unlockedLevels}`のまま）。新規追加は「距離検証失敗時の403エラー」のみ。データモデル（`data/stamp-progress/{userId}.json`のスキーマ、`data/sg/stamp-spots.json`の`lat`/`lng`/`checkinRadiusM`）はいずれも無変更
-- 検証済み（curl）: (1)遠い座標での新規チェックイン試行→403、進捗ファイル未作成 (2)スポット実座標での正規チェックイン→200成功 (3)既チェックイン済みスポットへ遠い座標で再送信→距離検証スキップで200（冪等動作維持）
-- **既知の未解決事項（スコープ外として明記）**: クライアント側GPS値自体の偽装（モック位置情報アプリ等）への対策は依然残る。今回はサーバーがスポット実座標との距離を検証するのみで、送信されたlat/lng自体が本物かどうかまでは検証しない。拒否時のログ・監視（不正チェックインの試行ログ等）も今回は追加していない
-- `server.js`のみの変更のため`pm2 restart`実施済み。`public/`配下は無変更のためTestFlightビルド不要（Web版・iOS版とも次回`pm2 restart`時点でサーバー側の防御が即座に有効）
-
-### スタンプ一覧カードの見た目刷新（写真サムネイル＋レベル進捗バー＋制覇スタンプ印）（2026-07-21実装、設計書88）
-設計書83で実装したコレクション一覧の状態B（解禁中・未全制覇レベルの横長カード一覧）が「文字とダッシュ円だけで味気ない」というユーザー指摘を受け、モックアップ2回（v2/v3）のレビューを経て見た目を刷新した。データモデル・API変更なし、`public/app.js`・`public/app.css`のみの変更。
-
-- **写真サムネイル**: `_renderStampLevelRowInProgress()`の`circleHtml`生成部（旧36pxダッシュ円+番号/チェックマーク）を、56px角丸正方形の写真サムネイル（`.stamp-card-thumb`）に置き換え。`spot.imageUrl`があれば`<img class="stamp-card-thumb-img">`（`object-fit:cover`）、空文字列（2026-07-21時点`tekka-market`・`labrador-secret-tunnel`の2件が該当）ならsand背景+📍アイコンのプレースホルダー（`.stamp-card-thumb-placeholder`）を表示
-- **番号バッジの廃止**: 未制覇スポットは番号を一切表示しない（写真/プレースホルダーのみ）。「次はここ！」タグ（`.stamp-card-next-tag`）は現状維持
-- **制覇済みスタンプ印**: 制覇済みスポットは、サムネイル右下角に30px円形の「済」スタンプ印（`.stamp-card-done-mark`）を重ねて表示。背景色は`meta.color`（レベルカラー）、白い縁取り（`border:2px solid var(--cream)`）、`transform:rotate(-12deg)`で手押し感を演出。ラベルは新規i18nキー`stampCardDoneMark`（ja「済」/en「✓」、円のサイズに収めるため英語は記号表記）
-- **レベルごとの進捗バー**: `.stamp-level-section-title`の直後に、`checkedCount/totalCount`の割合を塗りつぶした横長バー（`.stamp-level-progress-row`、`var(--caramel-light)`〜`var(--caramel)`グラデーション。`--caramel-dark`はCSS変数として未定義だったため`--caramel-light`起点に変更）＋「X/Y」ラベル（`.stamp-level-progress-label`）を追加。`_renderStampCollectionList()`側で既に算出済みの`checkedCount`/`totalCount`を`_renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount)`の第5・6引数として渡す形に変更（呼び出し元1箇所のみ変更）
-- **旧CSS削除**: `.stamp-card-circle`・`.stamp-card-circle--checked`は他に参照箇所がないことを確認の上削除し、新規クラス（`.stamp-card-thumb`系・`.stamp-card-done-mark`・`.stamp-level-progress-*`）に置き換えた
-- スコープ外（今回未実装）: 状態A（ロック中1行表示）・状態C（全制覇バッジ）の見た目変更、マップビュー（Leafletピン）・エリアバッジ（非表示中）への写真サムネイル適用、`tekka-market`・`labrador-secret-tunnel`の画像再取得
-- `server.js`・`data/`配下は無変更（pm2 restart不要）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのサムネイル拡大（36px→56px相当）に伴うカード高さ増加・スクロール量、画像なしプレースホルダーの実機表示、制覇済みスタンプ印の視認性・回転演出の見た目は2026-07-21時点でWeb版のみ確認、実機未確認
-
-### ボトムナビ「制覇」→「探検」・コース画面共通見出し「スタンプラリー」→「シンガポール探訪」への名称変更（2026-07-21実装、設計書89）
-ユーザーから、ボトムナビ「制覇」（設計書72で命名）とコース画面共通見出し「スタンプラリー」（設計書73で命名）の組み合わせが「しっくりこない」との指摘があり、ネーミングブレスト（探検/冒険/攻略/探訪/探究/巡礼等を比較検討）を経て「ナビは短く衝動性のある言葉、見出しは深みのある言葉」という役割分担方針で確定した。
-
-- `navCourse`キーの値のみ変更（キー名不変）: ja「制覇」→「探検」、en「Conquer」→「Explore」
-- `courseScreenTitle`キーの値のみ変更（キー名不変）: ja「スタンプラリー」→「シンガポール探訪」、en「Stamp Rally」→「Explore Singapore」
-- `public/index.html`のデフォルト直書きテキスト2箇所（`data-i18n="courseScreenTitle"`・`data-i18n="navCourse"`）も同時変更
-- **`courseTabStampMap`（コース画面内のタブラベル、「スタンプラリー」/「Stamp Rally」）は変更していない**。3タブ共通見出し（`courseScreenTitle`）とは別物で、スタンプラリー機能そのものの呼称としては引き続き「スタンプラリー」を使う。`courseTabEveryone`（みんなのコース）・`courseTabMylist`（マイコース）も無変更
-- 見出しをタブごとに動的切り替える案も検討したが、ユーザーは全タブ共通で「シンガポール探訪」に固定する現状のアーキテクチャ維持を選択（AskUserQuestionで確認済み）。そのため「コース閲覧中も無関係な見出しが出続ける」という設計書73時点の既知の妥協点は、名称が変わっただけで構造的には残る
-- コード内の関数名・変数名・CSSクラス名（`stamp*`プレフィックス等）は無変更、表示文言（i18n値）のみの変更
-- `server.js`・`data/`配下は無変更（pm2 restart不要）
-- **既知の未解決事項**: 英語訳「Explore」「Explore Singapore」の適切性は未検証（既存の「Conquer」「Stamp Rally」も設計書72で同様の注記あり）
-
-設計書88・89は同一のcommitでまとめて実装。キャッシュバスティング: `index.html` app.css/app.js `?v=20260721c`→`20260721d`、`sw.js` CACHE_NAME=`sg-weekend-v645`→`v646`
-
-### ボトムナビラベルを「探検」→「探訪」に修正（見出しと表記統一）（2026-07-21実装、設計書91）
-設計書89でボトムナビ「制覇」→「探検」、コース画面共通見出し「スタンプラリー」→「シンガポール探訪」に変更した直後、ユーザーから「ボトムメニューも探訪でいいよ」との追加要望があり、ナビと見出しの表記を「探訪」に統一した。
-- `navCourse`キーの値のみ変更（キー名不変）: ja「探検」→「探訪」。en「Explore」は変更なし（据え置き）
-- `public/index.html`の`data-i18n="navCourse"`デフォルト直書きテキストも同時変更
-- `courseScreenTitle`（「シンガポール探訪」）・`courseTabStampMap`（「スタンプラリー」）は変更していない
-- `server.js`・`data/`配下は無変更（pm2 restart不要）
-- キャッシュバスティング: `index.html` app.js `?v=20260721e`→`20260721f`（`app.css`は無変更のため据え置き）、`sw.js` CACHE_NAME=`sg-weekend-v647`→`v648`
-
-### スタンプラリー地図の見た目改善（セピア調フィルター）＋一覧カードから地図ピンへのフォーカス導線（2026-07-21実装、設計書92）
-ユーザーから「地図の見せ方が微妙」との指摘を受け、地図タイルにCSSフィルターをかけてアプリの世界観（クリーム×キャラメル系）と馴染ませた。あわせて「一覧のカードと上手く紐付けられる？」との要望を受け、コレクション一覧のカードから地図上の該当ピンへジャンプできる導線を追加した。
-
-- **地図タイルのセピア調フィルター**: `public/app.css`の`.leaflet-tile-pane`に`filter: sepia(0.9) saturate(0.55) hue-rotate(-5deg) brightness(1.12) contrast(0.9)`を追加（羊皮紙調、ユーザーがPlaywrightモックアップのB案〈強めセピア〉を選択）。Leafletのペイン分離構造により、タイルペインのみに適用されマーカーアイコン（`.stamp-marker-icon`）・ズームコントロール（`.leaflet-control-zoom`）には影響しない
-- **マーカー参照の保持**: `public/app.js`に新規モジュールスコープ変数`_stampMarkerRefs`（`spotId→Leafletマーカー`のマップ、`_stampViewMode`と同じ並び）を追加。`_renderStampMarkers()`は従来`clearLayers()`で生成した`L.marker`をどこにも保持していなかったが、冒頭で`_stampMarkerRefs={}`にリセットしたうえで各マーカー生成時に`_stampMarkerRefs[spot.id]=marker`で保持するよう変更
-- **新規関数`focusStampSpotOnMap(spotId)`**: (1)`_stampViewMode`を`'map'`に切り替え`_applyStampViewMode()`で地図ビューを表示（既存`toggleStampViewMode()`と同じパターン）、(2)60ms後に`invalidateSize()`＋`flyTo([spot.lat,spot.lng],16,{animate:true,duration:0.8})`でパン&ズーム、(3)さらに850ms後に該当ピンへ`.stamp-marker-icon--focus-pulse`クラスを付与し1800ms後に除去（一度きりのパルス演出）。`flyTo()`アニメーション完了の待機は`moveend`イベントではなく固定`setTimeout`によるシンプルな実装（低スペック端末でズレる可能性は既知の未解決事項として許容）
-- **一度きりのフォーカスパルスCSS**: `.stamp-marker-icon--focus-pulse::after`＋`@keyframes stampFocusPulseRing`を新規追加。既存の「次はここ」ピンの継続的パルス（`.stamp-marker-icon--next`・`@keyframes stampNextPulse`、拡大縮小）とは別物で混同しないこと。マーカーdiv自体が既にインラインstyleで`position:relative`を持つため、`::after`の`position:absolute`が正しく基準化される
-- **カードへの「地図で見る」ボタン追加**: `_renderStampLevelRowInProgress()`が生成する各`.stamp-card`の右端に、新規`.spot-map-link`ボタン（📍、34px円形、`var(--sand)`背景。「次はここ」カードは`.spot-map-link--next`修飾子で`var(--caramel)`背景+白アイコンに強調）を追加。`onclick="event.stopPropagation(); focusStampSpotOnMap('${spot.id}')"`でカード全体のクリックハンドラ（`openStampSpotDetail`）との二重発火を防止
-- i18n新規キーなし（ボタンはアイコン〈📍〉のみ、既存の✕閉じるボタン等と同様のアイコンオンリーパターン）
-- `server.js`・`data/`配下・`public/index.html`の静的マークアップは無変更（新規ボタンはJS側`innerHTML`生成に含まれる）。キャッシュバスティング: `index.html` app.css `?v=20260721d`→`20260721e`、app.js `?v=20260721f`→`20260721g`、`sw.js` CACHE_NAME=`sg-weekend-v648`→`v649`
-- スコープ外（今回未実装）: ピンのクラスタリング（繁華街エリアでのピン密集解消）、地図からカードへの逆方向リンク（ピンタップ時に一覧側の該当カードへスクロール等）、タイル自体の別プロバイダ（Stamen/CARTO等）への差し替え
-- **未検証（次回TestFlightビルド後）**: セピアフィルターのiOS実機（WKWebView）での見え方、`flyTo()`アニメーション完了を固定`setTimeout`で待つ実装のタイミングずれ有無は2026-07-21時点でWeb版目視確認のみ、実機未確認
-
-### 「地図で見る」アイコンの色を全カード共通化（2026-07-21実装、設計書93）
-設計書92で追加した`.spot-map-link`ボタンは「次はここ」カードのみ`.spot-map-link--next`修飾子で`var(--caramel)`背景+白アイコンに強調していたが、ユーザーが実機スクリーンショットで色差に違和感を報告したため統一した。`public/app.css`の`.spot-map-link--next`ブロックを削除、`public/app.js`側の条件付きクラス付与も`class="spot-map-link"`のみに簡略化（対応CSSが無くなり無意味なため）。「次はここ」タグ（`.stamp-card-next-tag`）自体は無変更。`server.js`・`data/`配下は無変更。キャッシュバスティング: `index.html` app.css `?v=20260721e`→`20260721f`、app.js `?v=20260721g`→`20260721h`、`sw.js` CACHE_NAME=`sg-weekend-v649`→`v650`。
-
-### マイコースタブの非表示化＋コース作成FABを地図/一覧切り替えボタンに転用（2026-07-21実装、設計書94）
-ユーザーから「地図で見る／一覧を見る」ボタン（`#stamp-view-toggle-btn`、タブ下に単独表示）の見せ方変更相談から、「まだ誰にも使われていないマイコース機能をタブごと非表示にし、浮いていたコース作成FAB（`#course-fab`）を地図/一覧切り替えボタンとして転用する」統合案に発展、確定した。
-
-- **マイコースタブの非表示化**: `public/index.html`の`data-tab="mylist"`ボタンに`style="display:none;"`を追加（削除ではなく非表示化、既存パターン踏襲）。`switchCourseTab('mylist')`のロジック・`data-i18n="courseTabMylist"`は無変更のまま残置
-- **`#course-fab`の転用**: `onclick`を`openCourseSheet()`→`toggleStampViewMode()`に変更、固定「＋」テキストを動的アイコン（リスト表示中は🗺️、地図表示中は📖。既存i18nキー`stampViewToggleMap`/`stampViewToggleList`の絵文字を流用）に変更。`public/app.js`のtouchendデリゲーション登録（`{id:'course-fab', fn:...}`）もonclickと同じ関数に変更（対応関係を崩さない）。`_applyStampViewMode()`に`#course-fab`のアイコン更新処理を追加
-- **表示条件の反転**: `switchCourseTab()`内、`courseFabEl.style.display`の条件を反転（旧: mapタブで非表示・それ以外で表示 → 新: mapタブで表示・それ以外で非表示）。地図/一覧切り替えはスタンプラリータブでのみ意味を持つため
-- **旧・上部トグルボタンの非表示化**: `#stamp-view-toggle-btn`を包む行に`display:none`を追加（削除ではない、`toggleStampViewMode()`本体・要素自体は残置）
-- `server.js`・データファイル・`public/app.css`は無変更（フロントエンドの表示制御のみ）、`pm2 restart`不要
-- **スコープ外・既知の残課題（設計書94 §4で明示）**: イベントカードの「🗺 コース作成」ボタン（`openCourseSheetFromEvent()`）は今回変更していない。マイコースタブ非表示後もこのボタンは動作し生成コースは`localStorage`の`{city}_my_courses`に保存され続けるが、閲覧するタブが無いため「作っても見れない」状態になる。ユーザーから今回言及がなかったため未対応、再度指摘があれば別途対応
-- キャッシュバスティング: `index.html` app.js `?v=20260721h`→`20260721i`、`sw.js` CACHE_NAME=`sg-weekend-v650`→`v651`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのFABアイコン切り替えの見た目・タップ精度、マイコースタブが完全に見えなくなっていること、みんなのコースタブでFABが正しく非表示になっていることは2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### イベントカードの「コース作成」ボタンを非表示化（2026-07-21実装、設計書95）
-設計書94の残課題（マイコースタブ非表示後もイベントカードの「🗺 コース作成」ボタンからコースが作成できてしまい、閲覧するタブが無いため実質使えない状態）に対し、ユーザーから「気になります。こちらも非表示にして。等幅を使わず、予定表に登録・ピン留めのボタンを今と同じサイズにして残してください」と明示指示があり対応した。
-
-- `renderEventCard()`（`public/app.js`、`.card-action-row`内）の3つ目のボタン（🗺 コース作成、`onclick="openCourseSheetFromEvent('${e.id}')"`）を削除
-- 残る2ボタン（📌ピン留め／📅予定に追加）に、既存の確立済みパターン（マイコースカード等で使用済み、`public/app.js` 4658行目・6395〜6399行目）と同じインラインstyle`style="flex:none;width:calc(33% - 4px);"`を追加。`.card-action-btn`共有CSSクラス自体（`flex:1`で等幅に伸びる、`public/app.css`）は変更していないため、他画面（`#schedule-plan-action-add-btn`等）への影響はない。3つ目のボタンが消えた分は右側の空きスペースとして残り、2ボタンが引き伸ばされて等幅になることはない
-- `openCourseSheetFromEvent()`関数自体は削除していない（ピン詳細モーダル`public/app.js` 2561行目・予定詳細画面6053行目の2箇所から引き続き呼ばれている現役の関数）
-- **スコープ外・既知の残課題（設計書95 §4で明示、設計書94から持ち越し）**: ピン詳細モーダル（2561行目）・予定詳細画面（6053行目）の「コース作成」ボタンは今回のスコープ外で無変更のまま残っている。ユーザーの指示がイベントカードに限定されていたため。これらも同様に「作成はできるが閲覧するタブが無い」という同種の問題を抱えたまま残る。次回ユーザーから同様の指摘があれば別途対応
-- `server.js`・データファイル・`public/index.html`本体・`public/app.css`は無変更（フロントエンドJSの表示制御のみ）、`pm2 restart`は今回念のため実施したが本来不要な変更
-- キャッシュバスティング: `index.html` app.js `?v=20260721i`→`20260721j`、`sw.js` CACHE_NAME=`sg-weekend-v651`→`v652`（`app.css`は今回変更していないため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのボタン2つの見た目（等幅に伸びずサイズ維持されているか）・右側空きスペースのバランスは2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### ボトムナビ切り替え時にスタンプ関連モーダルが閉じ残るバグの修正（2026-07-21実装、設計書96）
-探訪（スタンプラリー）タブでスポット詳細モーダル（`#stamp-spot-detail-sheet`）を開いたままボトムナビで他画面に切り替えると、モーダルが閉じずに残る不具合をユーザーが報告。原因は`closeAllPopups()`（`public/app.js`、`switchNav()`冒頭で呼ばれる画面遷移時の一括クローズ関数）に、スタンプラリー機能（設計書69・70）のモーダルクローズ関数2つが未登録だったこと。
-- `closeAllPopups()`に`closeStampSpotDetail()`（スポット詳細シート）・`closeStampLevelUnlockModal()`（レベル解禁演出モーダル）の呼び出しを追加。後者はユーザー報告の直接対象ではないが同一原因構造のため再発防止であわせて対応
-- いずれも既に閉じている状態で呼んでも安全な既存関数のため副作用なし
-- `server.js`・データファイルは無変更（pm2 restart不要）
-- キャッシュバスティング: `index.html` app.js `?v=20260721j`→`20260721k`、`sw.js` CACHE_NAME=`sg-weekend-v652`→`v653`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での動作確認は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### 「地図で見る」ボタンをカードからスポット詳細モーダルへ移動（2026-07-21実装、設計書97）
-設計書92・93で一覧カード（`.stamp-card`）右端に追加した「地図で見る」ボタン（`.spot-map-link`）について、ユーザーから「カードじゃなくて、スポットを表示したときのモーダルの中にしようかな」と方針転換の申し出があり移設した。
-- `_renderStampLevelRowInProgress()`（`public/app.js`）が生成する`.stamp-card`から`.spot-map-link`ボタンを削除（設計書88時点のカード構成に戻った）
-- `#stamp-spot-detail-sheet`（`public/index.html`）の`#stamp-spot-detail-area`直後に、控えめなテキストリンク（`.card-detail-link`スタイル踏襲）「📍 地図で見る」を追加。タップで`focusStampSpotOnMap(_stampSelectedSpot.id)`を呼ぶ
-- `focusStampSpotOnMap(spotId)`（設計書92で実装済み）の冒頭に`closeStampSpotDetail();`を追加し、モーダル内から呼ばれた場合に地図へ切り替える前に確実にモーダルを閉じるようにした（`closeStampSpotDetail()`は既に閉じている状態で呼んでも安全、設計書96で確認済みの性質を再利用）
-- i18n新規キー`stampDetailMapLink`（ja「📍 地図で見る」/en「📍 View on map」）をja/en同時追加
-- `server.js`・データファイルは無変更（pm2 restart不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260721f`→`20260721g`、app.js `?v=20260721k`→`20260721l`、`sw.js` CACHE_NAME=`sg-weekend-v653`→`v654`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのモーダル内リンクの見た目・タップ後の地図遷移の挙動は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### レベル名・タブ名の文言変更／「地図で見る」不具合修正＋ピルボタン化／スペシャルレベルの「？？？」表示／イベントカードボタン中央寄せ（2026-07-21実装、設計書98〜101）
-4件の小粒改善をまとめて実装した。
-
-- **設計書98（在住歴ベースの命名への文言変更）**: アプリ全体のテーマ（限られた在住期間でどれだけ深くシンガポールを知れるか）に合わせ、スタンプラリーのレベル名を既存のイベントプロフィールバッジ語彙（`styleLabels`）と統一感のあるパターンに変更。`stampLevelStandard`（定番→移住したて/Standard→Newcomer）・`stampLevelLocal`（ローカル→定住/Local→Settled）・`stampLevelNiche`（ニッチ→シンガポール通/Niche→Singapore Expert）・`courseTabEveryone`（みんなのコース→モデルコース/Explore→Model Courses）の**値のみ変更**（キー名は不変）。`stampLevelSpecial`・`courseTabStampMap`・`courseTabMylist`は変更していない
-- **設計書99（「地図で見る」不具合修正＋ピルボタン化）**: 設計書97で追加した「地図で見る」リンクが押せない不具合を修正。原因はCLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知アンチパターン（設計書84の`.stamp-card`と同型）で、対応する`touchend`ハンドラが未登録のまま`onclick="if(!_touchCapableDetected) ..."`ガードだけが付いていたため。ガードを除去し単純な`onclick="focusStampSpotOnMap(...)"`に変更（新規touchendハンドラの追加はしない、CLAUDE.md既存ルールに従いゴーストクリックが実証されていない要素への個別ガードは付けない方針）。あわせて地味なテキストリンク（`.card-detail-link`）から、旧`#stamp-view-toggle-btn`で使っていたピル型ボタンスタイル（`.sort-btn`）に変更（「もう少し目立たせたい」というユーザー要望）。`.card-detail-link`自体・他の使用箇所（イベントカードの「🔗 元記事を見る」）は無変更
-- **設計書100（スペシャルレベルの「？？？」表示）**: `special`レベルは未解禁ユーザーには`GET /api/stamp-spots`のレスポンス自体から除外される既存サーバー仕様（設計書69）のため、コレクション一覧では該当スポットが0件となり`if (spotsInLevel.length === 0) return '';`ガード（設計書83 §10リスク3）により「スペシャル」の行自体が全く描画されない状態だった。`_renderStampCollectionList()`の当該分岐に、`special`かつ未解禁の場合のみ`_renderStampLevelRowLocked(STAMP_LEVEL_META['special'], null, null)`を返す特別処理を追加。`_renderStampLevelRowLocked(meta, checkedCount, totalCount)`は`checkedCount`/`totalCount`が`null`の場合、件数表示を実件数の代わりに「？？？」にする（**実件数〈2件〉は表示しない**、サーバーが件数も含めて存在を隠す設計と整合させるため）。local/niche等、実件数を渡す既存呼び出しは無影響。サーバー側（`GET /api/stamp-spots`）は無変更、あくまでフロント側の表示ロジックのみで完結。新規i18nキーは追加していない（「？？？」は既存サーバー側マスキング文言`maskLockedStampSpot()`と同じ文字列をハードコードで流用、他の「？？？」表示箇所も非i18n対応のため整合的）
-- **設計書101（イベントカードボタン中央寄せ）**: 設計書95でイベントカードの「コース作成」ボタンを削除し残る2ボタン（ピン留め・予定に追加）に`flex:none;width:calc(33% - 4px);`を指定して元のサイズを維持したが、`.card-action-row`自体に`justify-content`指定が無く既定値（`flex-start`）で左寄せになっていたのをユーザーが指摘。`.card-action-row`（`public/app.css`）に`justify-content: center;`を追加。同クラスは`public/app.js`内1箇所（イベントカード）のみで使用されているため、他画面への影響なし
-- `server.js`・データファイルは無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.css `?v=20260721g`→`20260721h`、app.js `?v=20260721l`→`20260721m`、`sw.js` CACHE_NAME=`sg-weekend-v654`→`v655`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での「地図で見る」ピルボタンのタップ動作・見た目、レベル名変更後の表示崩れ有無、スペシャル「？？？」行の見た目、イベントカードボタン中央寄せの見た目は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### 予定表「空き日タップ→コースを作る」ボタンを非表示化（2026-07-21実装、設計書102）
-マイコースタブ非表示化（設計書94）・イベントカードのコース作成ボタン削除（設計書95）に続く流れで、予定表画面の「空き週末日タップ→予定を追加/コースを作る」の2ボタン行にも同様の要望があり対応した。
-
-- `public/app.js`の`schedule-plan-actions-${dateKey}`ブロック内、「🗺 コースを作る」ボタン（`onclick="event.stopPropagation();_openCourseFromSchedule('${dateKey}')"`）を削除。コンテナ（`<div id="schedule-plan-actions-${dateKey}" style="...justify-content:center;...">`）は元々`justify-content:center`が設定済みだったため、ボタンを1つ削除するだけで残る「📅 予定を追加」ボタンが自動的に中央寄せになる。追加のCSS変更は不要だった（設計書101のような`.card-action-row`への`justify-content`追加は今回発生していない）
-- `_openCourseFromSchedule(dateKey)`関数自体は削除していない（呼び出し元が無くなり事実上呼ばれなくなるが、「機能は残しつつ表示だけ止める」既存パターンを踏襲し関数定義は残置）
-- **スコープ外（今回未対応の残課題）**: ピン留めイベント一覧の「コース作成」ボタン（`.plan-to-plan-btn`、`onclick="openCourseSheetFromEvent('${p.id}')"`、`.plan-card-actions`内）は縦並びレイアウトのため今回の「中央寄せ」要望と構造的に対応しない別箇所であり対象外。マイコース非表示化に伴う「作っても見れない」問題は依然残っている
-- **調査で判明した事実**: `#schedule-plan-action-sheet`/`#schedule-plan-action-course-btn`（`public/index.html`）は現在どこからも開かれない不使用（デッド）マークアップと判明。今回の変更対象とは無関係のため一切変更していない
-- `server.js`・データファイルは無変更（pm2 restart不要、実施済み）。キャッシュバスティング: `index.html` app.js `?v=20260721m`→`20260721n`、`sw.js` CACHE_NAME=`sg-weekend-v655`→`v656`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での「予定を追加」ボタン単独時の中央寄せの見た目は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### レベルラベルの文言再修正（「移住したて」→「新参者」、「定住」→「定住レベル」）（2026-07-21実装、設計書103）
-設計書98実装直後、ユーザーが「駐在の場合は移住とはいわない」と再検討。`public/app.js` `STRINGS.ja`の**値のみ**変更（キー名は不変）: `stampLevelStandard`（移住したて→新参者）・`stampLevelLocal`（定住→定住レベル）。英語値（`Newcomer`/`Settled`）・`stampLevelNiche`（シンガポール通）・`stampLevelSpecial`（スペシャル）は無変更。`public/index.html`にこれらキーのデフォルト直書きテキストは無いことを確認済み（変更不要）。
-- `server.js`・データファイルは無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.js `?v=20260721n`→`20260721o`、`sw.js` CACHE_NAME=`sg-weekend-v656`→`v657`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での新レベル名表示・文字数増加（「定住」→「定住レベル」）によるバッジ等のレイアウト崩れ有無は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### スペシャルレベルのラベルを「極めし者」に変更（2026-07-21実装、設計書104）
-設計書98・103で「新参者→定住レベル→シンガポール通」と在住歴ベースの命名に統一した流れで、最上位の`special`レベルにも「極めし者」案が採用された。他3段階の落ち着いたトーンに対し最後だけドラマチックな響きにすることで、隠し要素（該当2スポットのみ・条件も厳しい`special`）にふさわしい特別感を演出する狙い。`public/app.js` `STRINGS.ja`/`STRINGS.en`の`stampLevelSpecial`（設計書98・103では変更対象外だった箇所）の**値のみ**変更: ja「スペシャル」→「極めし者」、en「Special」→「Grandmaster」。設計書100で追加した「🔒 スペシャル ？？？」表示（`_renderStampLevelRowLocked()`経由、`t(meta.labelKey)`参照）もロジック変更不要で自動的に「🔒 極めし者 ？？？」に切り替わる。`public/index.html`にデフォルト直書きテキストは無いことを確認済み（変更不要）。
-- `server.js`・データファイルは無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.js `?v=20260721o`→`20260721p`、`sw.js` CACHE_NAME=`sg-weekend-v657`→`v658`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での「極めし者」表示・ロック中「🔒 極めし者 ？？？」表示は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### スペシャルレベル未解禁時、ラベル名自体も「？？？」でマスク（2026-07-21実装、設計書105）
-設計書100で「🔒 極めし者 ？？？」（レベル名は表示・件数のみ伏せ字）を実装していたが、ユーザーから「レベル名自体もロック中は？？？にしてほしい」との追加要望。`special`レベルは存在自体を隠す（設計書69以来の一貫方針、サーバー側でAPIレスポンスからスポット自体を除外）という設計思想に合わせ、レベル名も含めて完全に伏せる。`_renderStampLevelRowLocked(meta, checkedCount, totalCount, hideLabel)`に第4引数`hideLabel`（boolean、デフォルト`false`）を追加し、`true`時はレベル名表示も`t(meta.labelKey)`の代わりに「？？？」にする。`special`用の呼び出し箇所（`public/app.js` 4023行目付近）のみ第4引数に`true`を渡す。既存のローカル/ニッチ用の呼び出し箇所（4043行目付近）は第4引数を渡さず（`undefined`→falsy）レベル名は従来通り表示、無変更のまま動作する。
-- ローカル/ニッチのロック中表示・個別スポット名のマスキング（サーバー側`maskLockedStampSpot()`）は変更しない。新規i18nキーなし（既存の「？？？」文字列を流用）
-- `server.js`・データファイルは無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.js `?v=20260721p`→`20260721q`、`sw.js` CACHE_NAME=`sg-weekend-v658`→`v659`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのロック中「🔒 ？？？ ？？？」表示（レベル名・件数とも伏せ字）は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### レベル絵文字の変更（2026-07-21実装、設計書106）
-設計書98・103・104でレベルラベルを「新参者→定住レベル→シンガポール通→極めし者」に変更した流れで、各レベルの絵文字（`STAMP_LEVEL_META`の`emoji`フィールド）も変更した。`public/app.js`の`STAMP_LEVEL_META`定数の`emoji`フィールドのみ変更: standard `📍`→`🔰`、local `🏘`→`🏠`、niche `🔎`→`🦁`。special（極めし者）は`✨`のまま変更なし。`color`・`img`（設計書81のイラストバッジ画像）も変更なし。
-- `emoji`フィールドはマップピン（`_renderStampMarkers()`）・スポット詳細モーダルのレベルバッジ（`openStampSpotDetail()`）・レベル解禁演出モーダル（`openStampLevelUnlockModal()`）・コレクション一覧の状態Bレベル見出し（`_renderStampLevelRowInProgress()`）等、複数箇所から参照されるが、値の変更のみで全参照箇所に自動反映されるため個別コード変更は不要
-- `server.js`・データファイルは無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.js `?v=20260721q`→`20260721r`、`sw.js` CACHE_NAME=`sg-weekend-v659`→`v660`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での新絵文字表示は2026-07-21時点でWeb版のみ確認済み、実機未確認
-
-### レベル解禁演出モーダルの刷新（獲得スタンプ表示＋紙吹雪演出）＋全制覇バッジのスポット一覧展開機能（2026-07-21実装、設計書107・108）
-設計書107: 既存のレベル解禁演出モーダル（設計書70・81）は「新しく解禁されたレベル」のバッジを表示していたが、ユーザーから「スタンプは獲得したレベル（チェックインした側）を主役にすべき」との提案があり、モックアップ（紙吹雪演出込み）を経て承認。設計書108: 設計書83の状態C（全制覇済み）は大きなバッジのみでスポット一覧が見えなかったが、ユーザー要望を受け開閉トグル式のコンパクトカード一覧を追加。両設計書とも1回のbuilder実行でまとめて実装した。
-
-- **`openStampLevelUnlockModal(level)`→`(completedLevel, unlockedLevel)`にシグネチャ変更**: メインバッジ画像・レベル名表示（`${meta.emoji} ${t(meta.labelKey)}`）は`completedLevel`（チェックインしたスポット自身のレベル）のものを使用。新規`#stamp-level-unlock-subtext`要素（`public/index.html`、`#stamp-level-unlock-name`の直後）に、新しく解禁された`unlockedLevel`の情報を新規i18nキー`stampLevelUnlockSubtext`（「🔓 {level}のロックが解除されました」、`{level}`プレースホルダーを`.replace()`する既存パターン踏襲）で表示。呼び出し元`doStampCheckin()`は`openStampLevelUnlockModal(newlyUnlockedLevel)`→`openStampLevelUnlockModal(spot.level, newlyUnlockedLevel)`に変更（従来通りレベルが新しく解禁された場合のみモーダルを開く既存条件は無変更）
-- **新規関数`_burstStampConfetti(originEl)`**: バッジ画像`<img>`要素を中心に50個の色つき紙片（6色、円形/四角形ランダム、`.stamp-confetti`要素をJS動的生成）を四方に飛び散らせ、CSS `@keyframes stampConfettiFly`で1.1秒かけてフェードアウトさせる軽量演出。外部ライブラリ不使用。前回分の残骸は毎回`querySelectorAll('.stamp-confetti')`で除去、生成した各要素は1400ms後に個別`remove()`（DOM蓄積防止）。`openStampLevelUnlockModal()`内、バッジ画像`<img>`生成直後に呼び出す
-- **タイトルi18nキー値変更（`stampLevelUnlockModalTitle`）**: ja「新しいレベルが解禁されました！」→「スタンプ獲得！」、en「New level unlocked!」→「Stamp acquired!」（キー名は不変）
-- **`_renderStampLevelRowComplete(meta, totalCount)`→`(meta, spotsInLevel, totalCount, level, lang)`にシグネチャ変更**（状態C、全制覇済みレベルの描画）: 呼び出し元`_renderStampCollectionList()`も対応する引数を渡すよう変更。バッジタイトルに`meta.emoji`を追加（例: 「🔰 新参者 制覇！」）。バッジ下に開閉トグルボタン（新規関数`_toggleStampCompleteList(listId)`、文言は新規i18nキー`stampCompleteListShow`「スポット一覧を見る ▾」⇔`stampCompleteListHide`「閉じる ▴」を`textContent`で動的差し替え）を追加し、タップで当該レベルの全スポット（すべて制覇済み）をコンパクトカード形式で一覧表示。**デフォルトは閉じた状態**（`style="display:none;"`、既存の「バッジのみ」の見た目を維持）
-  - コンパクトカードは新規CSSクラス`.stamp-complete-card`系（状態Bの`.stamp-card`〈56pxサムネイル〉とは別クラス）で実装。サムネイル40px、説明文（`spot.description`）は表示せず名前・エリア・チェックイン日時のみ。「サムネイル左・テキスト右」のレイアウトは状態Bと共通。チェックイン日時取得は既存`_stampCheckinDateFor(spotId)`（設計書79）をそのまま再利用
-  - 複数レベルが同時に全制覇済みになるケース（例: 新参者と定住レベルが同時に制覇済み）を考慮し、開閉状態の管理・コンテナID（`stamp-complete-list-${level}`）はレベルごとに一意。各レベルの開閉トグルは独立して動作する
-- **`_renderStampMarkers()`は無変更**（地図上のピン表示は設計書108のスコープ外、状態Cになったスポットも含め解禁済みレベルのスポットは引き続き全て地図上にピン表示され続ける設計書83確立済みの既存挙動をそのまま維持）
-- **i18n新規キー3個・既存キー値変更1個（いずれもja/en同時）**: `stampLevelUnlockModalTitle`（値変更、上記）・`stampLevelUnlockSubtext`（新規）・`stampCompleteListShow`（新規）・`stampCompleteListHide`（新規）
-- `server.js`・データファイルは無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.css `?v=20260721h`→`20260721i`、app.js `?v=20260721r`→`20260721s`、`sw.js` CACHE_NAME=`sg-weekend-v660`→`v661`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのレベル解禁演出モーダル（紙吹雪含む）の見た目・アニメーション滑らかさ、全制覇バッジの開閉トグル動作・複数レベル同時全制覇時の独立開閉は2026-07-21時点でロジック単体検証のみ完了（本タスク実施環境のサンドボックス制約によりPlaywrightでの実ブラウザ確認ができなかったため）、実ブラウザ・実機とも未確認
-
-### 全制覇バッジを横並びレイアウトに変更＋地図/一覧切り替えFABのアイコンを記号に変更（2026-07-21実装、設計書109）
-設計書108で実装した全制覇バッジ（縦積み中央寄せ）について、ユーザーから「スタンプは左、タイトルは右の横並びにしたい」との要望。あわせて設計書94のFAB（地図/一覧切り替え）アイコンが「絵文字（🗺️/📖）だと＋ボタン時と統一感がない」との指摘を受け、記号（⇄）に統一した。
-
-- **`.stamp-level-complete-badge`のレイアウト変更**（`public/app.css`）: `flex-direction:column;align-items:center;text-align:center;padding:32px 20px`から`display:flex;flex-wrap:wrap;align-items:center;gap:16px;text-align:left;padding:16px 18px`に変更。バッジ画像（`.stamp-level-complete-badge-img`）は**150px×150pxのサイズ据え置き**（ユーザー明示指示）、`flex-shrink:0`を追加し左側に固定配置
-- **新規ラッパー`.stamp-level-complete-badge-body`**（`flex:1;min-width:0`）: タイトル・件数・トグルボタンの3要素をこのラッパーで包み右側に配置（`public/app.js`の`_renderStampLevelRowComplete()`のマークアップを対応するよう変更）。展開時のスポット一覧（`.stamp-complete-card-list`）はラッパーの外・バッジ全体の直接の子のまま`width:100%`を維持し、親`.stamp-level-complete-badge`が`flex-wrap:wrap`になったことで自動的にimg+bodyの行の下に折り返される（`margin-top`は`14px`→`0`に調整、バッジのgap/paddingで既に間隔が確保されるため）
-- **FABアイコンの固定化**: `_applyStampViewMode()`（`public/app.js`）の`fabEl.textContent = isMap ? '📖' : '🗺️'`を`fabEl.textContent = '⇄'`に変更（状態に応じた出し分け自体を廃止）。`public/index.html`の`#course-fab`初期テキスト（設計書94で設定）も`🗺️`→`⇄`に変更
-- スコープ外（今回未実装）: FABの表示/非表示ロジック（スタンプラリータブのみ表示、設計書94で確立済み）・全制覇バッジの開閉トグル機能自体のロジック（設計書108）はレイアウトのみの変更のため無変更
-- `server.js`・データファイルは無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.css `?v=20260721i`→`20260721j`、app.js `?v=20260721s`→`20260721t`、`sw.js` CACHE_NAME=`sg-weekend-v661`→`v662`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での横並びレイアウトの見た目バランス（バッジ画像150px＋テキストの折り返し具合）、FAB記号（⇄）の視認性・タップ精度は2026-07-21時点でロジック単体検証・配信ファイルの目視確認のみ完了、実ブラウザ・実機とも未確認
-
-### レベルラベルに在住年数の目安を追記（極めし者はロック中マスク維持）（2026-07-21実装、設計書110）
-各レベルラベル（新参者／定住レベル／シンガポール通／極めし者）に在住年数の目安を「レベル名（年数目安）」形式で併記した。`public/app.js`のみの変更。
-- **`STAMP_LEVEL_META`に`yearRange`（ja）・`yearRangeEn`（en）フィールドを追加**: standard=`1〜2年`/`1-2 years`、local=`3〜4年`/`3-4 years`、niche=`5年以上`/`5+ years`、special=`10年以上`/`10+ years`。新規ヘルパー`_stampLevelYearRange(meta)`（`getLang()`で現在言語のフィールドを返す）を追加
-- **併記した4箇所**: `_renderStampLevelRowInProgress()`（状態B、レベル見出し）・`_renderStampLevelRowComplete()`（状態C、全制覇バッジタイトル）・`openStampLevelUnlockModal()`（レベル解禁演出モーダルのレベル名）は無条件で年数を併記。`_renderStampLevelRowLocked()`（状態A、ロック中1行表示）は`hideLabel`引数が偽（ローカル/ニッチのロック中）のときのみ年数を併記し、`hideLabel`が真（**極めし者のロック中**、設計書105のマスキング方針）のときはレベル名同様に年数目安も一切表示せず「？？？」のみ表示する
-- **変更していない箇所（スコープ外、設計書で明記済み）**: スポット詳細モーダルのレベルバッジ（`openStampSpotDetail()`）はUIスペースの制約上、年数を追加していない
-- `server.js`・データファイル・`public/index.html`（キャッシュバスティング以外）・`public/app.css`は無変更（pm2 restart不要）。キャッシュバスティング: `index.html` app.js `?v=20260721t`→`20260721u`、`sw.js` CACHE_NAME=`sg-weekend-v662`→`v663`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での「レベル名（年数目安）」表記の見た目（文字数増加によるレイアウト崩れの有無）、極めし者ロック中の「？？？」表示に年数が一切混入していないことの実機確認は2026-07-21時点でロジック単体検証のみ完了、実ブラウザ・実機とも未確認
-
-### レベル進捗バーの視認性強化（2026-07-21実装、設計書111）
-状態B（解禁中・未全制覇）のレベル見出し下に表示される進捗バー（`.stamp-level-progress-row`系）が地味という指摘を受け、`public/app.css`のみを変更した。
-- `.stamp-level-progress-track`: 高さ6px→12px、`border:1px solid var(--sand-dark)`を追加
-- `.stamp-level-progress-fill`: グラデーション終端色を`var(--caramel-light)`→`var(--caramel)`に変更（設計書は`--caramel-dark`という未定義変数を指定していたため、既存の色変数体系に存在する`--caramel`〈濃色側〉に置き換えた。`--caramel-light`〈明色〉/`--caramel`〈濃色〉のペアのみが定義されており`--caramel-dark`は存在しない）、`box-shadow: inset 0 1px 2px rgba(255,255,255,0.3)`を追加
-- `.stamp-level-progress-label`: `font-size`11px→13px、`font-weight`700→900、`color`を`var(--warm-gray)`→`var(--caramel)`に変更（同上の理由で`--caramel-dark`から置き換え）
-- `public/app.js`・`server.js`・データファイルは無変更（HTML生成ロジック無変更、pm2 restart不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260721j`→`20260721k`、`sw.js` CACHE_NAME=`sg-weekend-v663`→`v664`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での太さ・色・枠線変更後の視認性向上効果、ダークモード時の見た目は2026-07-21時点でコード確認のみ完了、実ブラウザ・実機とも未確認
-
-### 年数ラベルに「目安」の接頭辞を追加（2026-07-21実装、設計書112）
-設計書110で追加したレベルラベルの年数表示（例:「新参者（1〜2年）」）が厳密な必須条件のように読めてしまう懸念があったため、「目安」（英語は"approx."）を接頭辞として追加した。
-- `_stampLevelYearRange(meta)`ヘルパー関数（`public/app.js`）の戻り値のみ変更: `getLang()==='ja'`のとき`目安${meta.yearRange}`、それ以外は`approx. ${meta.yearRangeEn}`を返す。表示は「新参者（目安1〜2年）」のようになる
-- この関数を呼ぶ4箇所（`_renderStampLevelRowLocked()`・`_renderStampLevelRowInProgress()`・`_renderStampLevelRowComplete()`・`openStampLevelUnlockModal()`）は無変更（関数1つを直すだけで全箇所に自動反映される設計）
-- `yearRange`/`yearRangeEn`の値自体（1〜2年等）は変更なし。`server.js`・データファイル・`public/app.css`は無変更（pm2 restart不要）
-- キャッシュバスティング: `index.html` app.js `?v=20260721u`→`20260721v`、`sw.js` CACHE_NAME=`sg-weekend-v664`→`v665`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での「目安」接頭辞追加後の見た目・文字数増加によるレイアウト崩れの有無は2026-07-21時点でコード確認・curlでの本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 「新参者」を「見習い」に変更＋年数表記に「在住」を追加（2026-07-22実装、設計書113）
-「新参者」がバカにしている感じに聞こえるとの指摘を受け、「見習い」（職人の世界の「見習い→一人前」という伝統的な対の言葉）に変更した。定住レベル等は変更なし。あわせて年数目安の表記に「在住」を追加した。
-- `stampLevelStandard`（`public/app.js` STRINGS.ja/en）: ja「新参者」→「見習い」、en「Newcomer」→「Apprentice」。`stampLevelLocal`・`stampLevelNiche`・`stampLevelSpecial`は変更なし
-- `_stampLevelYearRange(meta)`ヘルパー関数の戻り値を`目安${meta.yearRange}`→`目安：在住${meta.yearRange}`、`approx. ${meta.yearRangeEn}`→`approx. ${meta.yearRangeEn} in Singapore`に変更。表示は「見習い（目安：在住1〜2年）」のようになる。呼び出し元4箇所は無変更（関数1つの変更で全箇所に自動反映）
-- `public/index.html`にデフォルト直書きテキストは存在せず対応不要（grep確認済み）。`yearRange`/`yearRangeEn`の値自体は変更なし。`server.js`・データファイル・`public/app.css`は無変更（pm2 restart不要）
-- キャッシュバスティング: `index.html` app.js `?v=20260721v`→`20260722a`、`sw.js` CACHE_NAME=`sg-weekend-v665`→`v666`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での「見習い」「在住」表記追加後の見た目・文字数増加によるレイアウト崩れの有無は2026-07-22時点でコード確認・curlでのローカル配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### タブラベル「スタンプラリー」を「探訪スタンプ帳」に変更（2026-07-22実装、設計書115）
-ネーミングブレストで「探訪＝証、スタンプ＝集める行為、帳＝冊子」を全部乗せした「探訪スタンプ帳」に確定。既存のナビラベル「探訪」（`navCourse`、設計書89・91）・画面共通見出し「シンガポール探訪」（`courseScreenTitle`、設計書89）とトーンを合わせつつ、タブ単体としての「スタンプ」の具体性も残す狙い。
-- `public/app.js`の`STRINGS.ja`/`STRINGS.en`内`courseTabStampMap`の値のみ変更: ja「スタンプラリー」→「探訪スタンプ帳」、en「Stamp Rally」→「Discovery Stamp Book」
-- `stampMapLoginRequired`の値のみ変更（文中の呼称を置換）: ja「スタンプラリーの進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。」→「探訪スタンプ帳の進捗を記録するには、アカウント連携が必要です。設定画面から連携してください。」、en「To save your stamp rally progress, please link your account from Settings.」→「To save your progress in the Discovery Stamp Book, please link your account from Settings.」
-- `public/index.html`のデフォルト直書きテキスト2箇所（148行目`data-i18n="courseTabStampMap"`・165行目`data-i18n="stampMapLoginRequired"`）も同時変更。いずれもキー名は不変
-- コード内コメント（「スタンプラリー機能」等の開発者向け注記）・変数名・関数名・CSSクラス名（`stamp*`プレフィックス等）・データファイルは対象外、無変更。`courseScreenTitle`（「シンガポール探訪」）・`navCourse`（「探訪」）・`courseTabEveryone`（「モデルコース」）・`courseTabMylist`（非表示中）も対象外
-- `server.js`・データファイルは無変更（pm2 restart不要）
-- キャッシュバスティング: `index.html` app.js `?v=20260722b`→`20260722c`、`sw.js` CACHE_NAME=`sg-weekend-v667`→`v668`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新タブラベル・案内文の見た目、文字数増加によるレイアウト崩れの有無は2026-07-22時点でコード確認・`node --check`のみ完了、実ブラウザ・実機とも未確認
-
-## 広告表示機能フェーズ1: Klookアフィリエイトリンク（2026-07-13実装 → 同日設計書32でバックエンド埋め込み処理を一時停止）
-- コースのスポットに、Klookアフィリエイトプログラム（AID: 127020、サイト名 "Odekake Navi"）経由の予約リンクを条件付きで表示する機能。フェーズ2（PRカード）は下記セクション参照（2026-07-13実装済み）
-- ⚠️ **2026-07-13時点、稼働停止中（設計書32）**: ユーザー最終指示「裏側のロジックは消さなくていいけど止めてください」により、`GET /api/courses`（community/popularタブ）が`embedAffiliateLinks()`を呼ぶ処理・`loadAffiliateLinks(city)`を呼ぶ処理を停止した。レスポンスに`affiliateLink`フィールドが含まれなくなり、`public/app.js`側の既存の条件分岐（`s.affiliateLink ? ... : ''`）が自然に「リンクなし」側を通るため、フロントエンド無変更のままUI上「チケット情報」リンクは表示されなくなっている
-- **データモデル**: `data/sg/affiliate-links.json`（スポット名をキーにしたマッピング。`{provider, url, title, updatedAt, confirmedBy}`）。**削除していない**。コースJSON本体（`model-courses.json`/`community-courses.json`）は無変更、疎結合の別ファイル方式のためコース再生成後も同名スポットならリンクが維持される
-- **紐付けスクリプト**: `node scripts/match-affiliate-links.js [--dry-run]`。**削除していない**、実行自体は今も可能（`data/sg/affiliate-links.json`を更新するだけで、レスポンスへの反映は停止中のため実害なし）。全コースのユニークスポット名と`data/klook-catalog-sg.csv`（Klookアフィリエイトダッシュボードからエクスポートした商品カタログ、238件）を突き合わせる半自動フロー。マッチングはCSVの`Affiliate Link`列内`k_site`パラメータをデコードして得た英語スラッグとスポット名を単語単位でスコアリングする方式（日本語`Product Name`は確認表示用のみ）。**インクリメンタル実行**: 既存`affiliate-links.json`に登録済みのスポットは対象外。対話形式（番号選択で確定/Enterでスキップ/qで中断）で人力確認したもののみ書き込む。全自動マッチングは行わない（誤紐付けリスクのため）
-- **サーバー**: `loadAffiliateLinks(city)`/`embedAffiliateLinks()`（server.js 1650行目付近）は**関数定義として残置**しているが、`GET /api/courses`（community/popularタブ）からの呼び出しはコメントアウトして停止中（設計書32）。復活させる場合は、この2箇所の呼び出しコメントアウトを解除するだけでよい。新規`POST /api/affiliate-click`（`{spotName,provider,courseId,city}`、`withFileLock`で`data/affiliate-clicks.json`へ追記、認証なしfire-and-forget）は**エンドポイントとして引き続き稼働中**（呼び出し元のUIが無くなっただけでAPI自体は生きている）
-- **UI**: ボタンではなく、`course-timeline-meta`（住所表示）に地味なテキストリンク「チケット情報」（`affiliateInfoLink`キー）として住所と同じ行に併記する設計だった。目立つカラーボタン・アイコン・購入を煽る文言は不使用（「広告と結びつけたくない・さりげなく見せたい」というユーザー方針）。`renderCourseDetail()`と`renderCourseResultHtml()`（生成直後プレビュー）の両方に同じロジックが残っている（**コード自体は無変更・削除していない**、バックエンドが`affiliateLink`を返さなくなったことで自然に表示されなくなっているだけ）
-- `openAffiliateLink(url, provider, spotName)`: **関数定義は残置**（呼び出し元のリンクが表示されなくなったため実質未使用だが削除していない）。Capacitor環境は`Browser.open()`、Web環境は`window.open()`。開いた後`POST /api/affiliate-click`をfire-and-forget送信。既存の`_touchCapableDetected`ガードパターンを踏襲
-- コース生成AI（`generate-model-courses.js`・`POST /api/courses/generate`・`POST /api/courses/candidates`）には広告目的の変更は一切加えていない（設計書27〈営業時間・実在性の品質改善〉による変更は別件、無関係）。広告要素とコース生成ロジックは意図的に分離（ユーザー明確な方針）
-- 運用: `data/sg/affiliate-links.json`は2026-07-13時点で2件のみ登録（Gardens by the Bay – Supertree Grove、National Orchid Garden）。停止中のため今後`match-affiliate-links.js`を実行してデータを拡充してもUIには反映されない（復活時に備えたデータ蓄積は可能）
-- `data/affiliate-clicks.json`はサイズ上限・ローテーションなし（`_sendDebugLog`と同様の既知の注意点、定期確認が必要）。エンドポイント自体は稼働中のため、直接叩かれれば引き続き追記され得る
-
-### スタンプスポット詳細モーダルへのKlookチケットリンク追加（2026-07-22実装、設計書114）
-上記フェーズ1（コース機能向け）のアフィリエイトリンク基盤（`data/sg/affiliate-links.json`・`loadAffiliateLinks()`・`openAffiliateLink()`）は現状コース機能側の埋め込み呼び出しのみ停止中（設計書32）だが、これとは独立してスタンプラリー機能のスポット詳細モーダルに新規にチケットリンクを追加した。コース側の停止状態には一切触れていない。
-- **サーバー**: `GET /api/stamp-spots`のレスポンス構築時、`loadAffiliateLinks(city)`（既存関数、無変更で再利用）を呼び出し、`visibleSpots`計算の`map`内で**解禁済み（マスクされていない）スポットのみ**に対し`spot.name`をキーに検索、ヒットすれば`affiliateLink`フィールド（URLのみ）を追加する。ロック中スポットは`maskLockedStampSpot()`で`name`が「？？？」に置換済みのため検索してもヒットせず、追加の判定なしで自然に除外される。コース機能向けの`embedAffiliateLinks()`（配列ネスト構造向け）は今回のフラットなスポット配列には構造が合わないため使い回さず、`map`内で個別にシンプルな分岐を実装した（`embedAffiliateLinks()`自体は無変更のまま残置）
-- **フロントエンド**: `public/index.html`の`#stamp-spot-detail-sheet`、`#stamp-spot-detail-desc`（説明文）の直後・`#stamp-spot-detail-checked`（制覇済みバッジ）の手前に新規`#stamp-spot-detail-ticket-link`を追加。見た目は既存のコース機能「チケット情報」リンク（`course-timeline-meta`内の`<a>`）と統一（`color:var(--caramel);text-decoration:underline;cursor:pointer;font-size:12px`程度、ボタン・バッジ・アイコン装飾なし）。i18nキーは既存の`affiliateInfoLink`（ja「チケット情報」/en「Ticket info」）をそのまま再利用、新規キーは追加していない
-- `public/app.js`の`openStampSpotDetail(spotId)`内、imgContainer処理の直後に、`spot.affiliateLink`の有無で表示切替＋`.onclick`プロパティ代入（`() => openAffiliateLink(spot.affiliateLink, 'klook', spot.name)`）を追加。URLに含まれる可能性のある特殊文字のエスケープ問題を避けるため、コース機能のようなHTML文字列内`onclick`属性埋め込みではなく`.onclick`プロパティ代入方式を採用。**`_touchCapableDetected`ガードは付与していない**（このプロジェクトで複数回発生した「ガードのみ付与しtouchendハンドラ追加を忘れてタップ不能になる」既知アンチパターン〈設計書84・99〉を踏まえ、コース機能の既存パターンに倣いガードなしのシンプルなonclickにした）。`openAffiliateLink(url, provider, spotName)`は既存関数を無変更で再利用（Capacitor/Web分岐・`POST /api/affiliate-click`計測込み）
-- **データ拡充スクリプト**: `scripts/match-affiliate-links.js`に`STAMP_SPOTS_PATH`定数（`data/sg/stamp-spots.json`）を追加し、`loadUniqueSpotNames()`の名前収集対象にスタンプスポットの`name`も含めるよう1箇所拡張した（既存の対話フロー・書き込み形式・コース側ロジックは無変更）。既存3件の登録済みリンクのうち`Bedok Reservoir Park`は今回追加済みの定住レベル（local）スタンプスポットと同名のため、コード実装のみで即座にマッチ対象になる（ただし`local`は未解禁時はマスクされ`affiliateLink`は付与されない、解禁済みユーザーにのみ表示）
-- `data/sg/affiliate-links.json`への実データ追記（`match-affiliate-links.js`の対話実行によるKlookカタログとの半自動マッチング）は本タスクのスコープ外。ユーザーが別途直接実行する運用
-- スコープ外: コース機能側の`embedAffiliateLinks()`呼び出し停止状態（設計書32）の解除、ロック中スポットへのチケットリンク表示（サーバー側で自然に除外される設計のためフロント側の追加判定は不要）、クリック計測ロジックの変更（既存`POST /api/affiliate-click`をそのまま再利用）
-- `server.js`の変更を伴うため`pm2 restart`実施済み。curlでの動作確認済み: 解禁済み`standard`レベルの`Gardens by the Bay – Supertree Grove`は`affiliateLink`付与、未解禁`local`レベルの`Bedok Reservoir Park`（`unlockedLevels: ['standard']`の状態）はマスクされ`affiliateLink`なしを確認
-- キャッシュバスティング: `index.html` app.js `?v=20260722a`→`20260722b`（`app.css`は無変更のため据え置き）、`sw.js` CACHE_NAME=`sg-weekend-v666`→`v667`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのチケットリンクの見た目・タップ後のリンク遷移・クリック計測の実際の動作は2026-07-22時点でcurlによるAPI疎通確認のみ完了、実ブラウザ・実機とも未確認。設計書69〜113自体もまだTestFlightビルド未実施のため、本追加も含めて次回一括リリースの想定
-
-### 「探訪」「予定表」画面をアカウント連携必須にする（ぼかし＋設定誘導オーバーレイ）（2026-07-22実装、設計書116）
-ユーザーから「探訪と予定表の機能を使うにはまるっとアカウント連携が必要、という作りにしようかな。画面をぼかして、設定のアカウント連携に誘導する」との提案があり、AskUserQuestionで範囲を確認（探訪は2タブとも全ブロック、予定表も全ブロック・既存の匿名ローカルデータが見えなくなることも許容）した上でユーザー承認済み。
-
-- **実装方式**: コンテンツ側に直接blurを掛けず、`.screen`内に新規オーバーレイ要素（`position:absolute;inset:0`）を1枚重ね、そのオーバーレイ自体に`backdrop-filter:blur(8px)`＋半透明背景（`rgba(255,253,249,0.55)`）を適用する方式。ヘッダー・タブバー・コンテンツを問わず画面全体が一括でぼける（個々のコンテンツ要素〈Leaflet地図等〉の内部状態に触れない低リスクな実装）
-- **HTML**（`public/index.html`）: `#screen-course`内`.screen-content`直後（`#course-fab`の手前）に`#course-auth-gate`、`#screen-plan`内`.screen-scroll-content`直後に`#plan-auth-gate`を追加。両方とも`class="screen-auth-gate"`・初期`display:none`、中身は共通構造（アイコン🔒＋メッセージ〈新規i18nキー`authGateMessage`〉＋ボタン〈新規i18nキー`authGateBtn`、`onclick="goToAccountLinking()"`〉）
-- **CSS**（`public/app.css`）: `.screen-auth-gate`（`position:absolute;inset:0;z-index:250`＝FAB(200)より上・bottom-nav(9999)や各種モーダル(3000番台)より下、`backdrop-filter:blur(8px)`＋`rgba(255,253,249,0.55)`背景）・`.screen-auth-gate-card`/`-icon`/`-msg`/`-btn`の新規クラスと、`#screen-course, #screen-plan { position: relative; }`（オーバーレイの`absolute`配置の基準にするため）を追加。ダークモードは既存CSS変数（`--midnight`/`--caramel`）の自動追従に依存。**背景色の`rgba`値自体はライト固定で追加時はダーク時未対応だったが、2026-07-22設計書117で`html[data-theme="dark"] .screen-auth-gate { background: rgba(23, 17, 13, 0.6); }`（`--warm-white`のダークモード値`#17110D`相当の固定rgba）を追加し対応済み（下記参照）**
-- **JS**（`public/app.js`）: 新規関数`_applyScreenAuthGate(screenKey)`（`document.getElementById('${screenKey}-auth-gate')`の表示切替、`getAuthToken()`が無ければ`display:flex`にしtrueを返す）・`goToAccountLinking()`（`switchNav('settings')`後、`setTimeout`100ms遅延で`#login-section-logged-out`〈既存の未ログイン時表示ブロック、設計書64のアカウントセクション内〉へ`scrollIntoView({behavior:'smooth', block:'center'})`）を追加。`switchNav()`の`screen==='plan'`・`screen==='course'`各分岐末尾に呼び出しを追記し、gated（未ログイン）時はplan画面の`fab-plan-group`・course画面の`#course-fab`（設計書94で地図/一覧切り替えに転用済み）も追加で非表示にする
-- **既存ロジックには一切手を加えていない**: `initCourseScreen()`・`renderScheduleTab()`・`#stamp-map-login-required`（探訪スタンプ帳タブ単体の従来ログイン誘導、設計書69）はいずれも無変更のまま裏側で動き続ける。ゲート判定は画面全体に後乗せするオーバーレイのみで、既存のデータ読み込み・タブ切り替えロジックの複雑な内部状態（Leaflet地図初期化タイミング等）には触れない安全側の実装判断
-- i18n新規キー（ja/en同時）: `authGateMessage`（この機能を使うにはアカウント連携が必要です/Please link your account to use this feature）・`authGateBtn`（設定で連携する/Link Account in Settings）
-- スコープ外: ホーム画面・設定画面（無変更）、予定表画面の共有カレンダー機能（パスフレーズ方式）も「予定表全体」の指示のためまとめてブロック対象に含む（個別除外なし）、ログイン状態のリアルタイム反映（同一画面滞在中に裏で連携完了した場合の即時解除。画面遷移〈`switchNav`〉のたびに再評価される設計のため、設定画面から連携後にナビで戻れば解除される）
-- `server.js`・データファイルは無変更のため`pm2 restart`不要（未実施）。キャッシュバスティング: `index.html` app.css `?v=20260721k`→`20260722a`、app.js `?v=20260722c`→`20260722d`、`sw.js` CACHE_NAME=`sg-weekend-v668`→`v669`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのぼかし演出の見た目・タップ後のスクロール挙動・ダークモード時の背景色視認性は2026-07-22時点でcurl＋コード読解による整合性確認のみ完了、実ブラウザ・実機とも未確認
-
-### アカウント連携ゲートオーバーレイのダークモード背景色を修正（2026-07-22実装、設計書117）
-設計書116で追加した`.screen-auth-gate`の背景色`rgba(255, 253, 249, 0.55)`がCSS変数を使わないハードコード値になっており、ダークモード時にもライトモードの明るいクリーム色の半透明背景がそのまま使われ、`.screen-auth-gate-msg`（`color:var(--midnight)`でダークモード自動追従）と見た目が不整合になっていた問題をメインエージェントがセルフレビューで発見・修正。
-- `public/app.css`の`html[data-theme="dark"]`ブロック内（`color-scheme: dark;`直後）に`html[data-theme="dark"] .screen-auth-gate { background: rgba(23, 17, 13, 0.6); }`を追加。`--warm-white`のダークモード値`#17110D`に相当する固定rgbaを直接指定、既存の要素別上書きパターン（`html[data-theme="dark"] .spot-card, ...`等）に倣った
-- `.screen-auth-gate-card`/`-icon`/`-msg`/`-btn`・JS・HTML・i18nはスコープ外で無変更
-- `server.js`・データファイルは無変更のため`pm2 restart`不要（未実施）。キャッシュバスティング: `index.html` app.css `?v=20260722a`→`20260722b`（app.jsは無変更のため据え置き）、`sw.js` CACHE_NAME=`sg-weekend-v669`→`v670`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのダークモード時の見た目は2026-07-22時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
-
-### 探訪ティア解禁条件の変更（固定2件→そのティアの半数チェックイン）（2026-07-24実装、設計書142）
-これまで次のティアが解禁される条件は「前のティアを2件チェックインすると解禁」という固定値だった（設計書69時点、スポット総数が少なかった頃の設計）。ユーザーから「そのティアを半分制覇したら次のレベルに進める」形に変更したいとの要望を受けて実装した。
-
-- `server.js`の`STAMP_LEVEL_GATES`定数から固定`count`フィールドを削除。`computeUnlockedLevels()`が、対象ティアの総スポット数（`allSpots`から動的算出、`Math.ceil(総数 / 2)`）を閾値として解禁判定するよう変更。スポット総数は呼び出し元が渡す`allSpots`（`active !== false`フィルタ済み）から都度算出するため、今後スポット数が増減しても閾値が自動的に追従する（固定値ハードコードを避けた設計）
-- 2026-07-24時点のティア件数（見習い20/定住レベル20/シンガポール通10/極めし者5）では、見習い10件チェックインで定住レベル解禁、定住レベル10件チェックインでシンガポール通解禁、シンガポール通5件チェックインで極めし者解禁、となる
-- 呼び出し元3箇所（`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`）は`computeUnlockedLevels(allSpots, checkedInSpotIds)`のシグネチャが無変更のため修正不要
-- コレクション一覧の状態A（ロック中）/B（解禁中・未全制覇）/C（解禁中・全制覇）の表示ロジック（設計書83）は無変更（`unlockedLevels`の中身が変わるだけで、表示ロジックは既存の`unlocked`/`checkedCount < totalCount`判定をそのまま使う）
-- `server.js`のみの変更のため`pm2 restart`実施済み。データモデル・APIレスポンス構造は無変更（`unlockedLevels`配列という形式自体は変わらず、中身の解禁タイミングが変わるのみ）。Web版・iOS版とも即座に反映される（サーバー側ロジックのため、iOS版もアプリ更新不要でAPI呼び出し時点で新ロジックが適用される）
-- 実機curl検証済み: standardスポット9件チェックイン時点では`unlockedLevels:["standard"]`のまま（閾値10未満）、10件目のチェックインで`["standard","local"]`に切り替わることを確認。`GET /api/stamp-progress/me`のレスポンスとも一致、`GET /api/stamp-spots`で解禁済み`local`スポットがマスクなしで返ることも確認済み
-
-### アンロック演出を「スタンプ獲得」から本来の解禁演出に戻し、全制覇（コンプリート）専用モーダルを新設（2026-07-24実装、設計書143）
-設計書107で「アンロック演出モーダル」の主役を「新しく解禁されたレベル」から「チェックインしたスポット自身のレベル」に差し替え、タイトルも「スタンプ獲得！」に変更していた。ティア解禁条件が固定2件→ティア半数（設計書142）に変わり「アンロック＝通過点」「コンプリート＝完全制覇」の区別が重要になったため、ユーザー要望で設計書107以前の設計思想（設計書70・81）に戻しつつ、コンプリート専用の新モーダルを追加した。
-
-- **アンロックモーダルの再設計（単一パラメータに戻す）**: `openStampLevelUnlockModal(completedLevel, unlockedLevel)`（2引数）を`openStampLevelUnlockModal(unlockedLevel)`（1引数）に戻した。表示するバッジ・名前は「新しく解禁されたレベル自体」（設計書107以前の仕様）。`public/index.html`のタイトル要素に`id="stamp-level-unlock-title"`を新規付与しJSでタイトル文言を制御できるようにした。設計書107で追加した補足サブテキスト（🔓 {level}のロックが解除されました）は、バッジ・名前自体が解禁を表しているため重複表現として非表示化（`subtextEl.style.display='none'`）
-- **新設: 全制覇（コンプリート）モーダル**: 既存の`#stamp-level-unlock-overlay`/`#stamp-level-unlock-modal`のDOM・CSS（バッジ画像・紙吹雪演出）を共有する形で、新規関数`openStampLevelCompleteModal(completedLevel)`を追加。タイトルは新規i18nキー`stampLevelCompleteModalTitle`、サブテキストには`${total}/${total} ${t('stampLevelCompleteSpotsLabel')}`（既存キー、設計書83で追加済みの「スポット達成」/「spots collected」を再利用）を表示する。`closeStampLevelUnlockModal()`は両モーダル共通でそのまま使う（DOM共有のため無変更）
-- **`doStampCheckin()`の変更: コンプリート判定の追加とチェーン**: `_stampProgress`更新直後に、今回のチェックインでスポットのレベルが100%達成（全制覇）になったかを判定する`justCompletedLevel`を算出。`_openStampMemorySheet(spot, newlyUnlockedLevel, justCompletedLevel)`に第3引数を追加し、「思い出を残す」シートを閉じた後のチェーン処理（`_closeStampMemorySheetInternal()`）で、コンプリート演出とアンロック演出の両方が保留されている場合は「コンプリート（500ms後）→アンロック（3000ms後、コンプリート演出を見終えた後にずらして表示）」の順で連続表示する。片方のみの場合はそれぞれ500ms後に表示。両方が同時に発生するのは現在のティア件数（20/20/10/5）では実質起こらない想定だが念のため両対応した
-- `_stampMemoryPendingUnlock`（既存）を`{level, newlyUnlockedLevel}`から`newlyUnlockedLevel`単体保持に簡略化（`level`は今後使わないため）。新規`_stampMemoryPendingComplete`（`completedLevel`または`null`）を追加。いずれも既存の`_stampMemorySpotId`等と同じ並び（起動時同期フローより後方、ユーザー操作起点でのみ参照）に配置しTDZ対象外
-- i18n: `stampLevelUnlockModalTitle`の値変更（ja「スタンプ獲得！」→「🔓 新しいレベルが解禁されました！」、en「Stamp acquired!」→「🔓 New Level Unlocked!」）、新規`stampLevelCompleteModalTitle`をja/en同時追加（ja「🎉 全制覇！」/en「🎉 Fully Conquered!」）
-- コレクション一覧の全制覇バッジ（設計書108、状態C）自体は無変更（このモーダルとは別に、一覧を開くたびに常時表示され続ける既存の静的表示として共存する）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260724d`→`20260724e`、`sw.js` CACHE_NAME=`sg-weekend-v693`→`v694`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのアンロックモーダル（旧「スタンプ獲得」演出から解禁演出への表示変更）・コンプリートモーダル（新規、紙吹雪演出込み）の見た目、両方が連続表示されるケース（コンプリート→3000ms後にアンロック）の間隔の自然さは2026-07-24時点でコード確認・`node --check`構文検証・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-## 広告表示機能フェーズ2: PRカード（スポンサー広告枠）（2026-07-13実装、設計書29 → 2026-07-16設計書47でテストデータ削除・非表示化）
-- イベント一覧に、Klookアフィリエイトとは別枠のスポンサー広告カード（PRカード）を条件付きで1件差し込む機能。設計書23フェーズ2の元設計を、plannerが現在の行番号ベースで再検証・確定した内容
-- ⚠️ **2026-07-16時点、非表示（テストデータ削除済み・設計書47）**: 広告掲載準備が整うまでの一時停止として、`data/sg/sponsored-cards.json`のテスト用ダミー2件（`sponsor_test_001`・`sponsor_test_002`）を削除し**空配列`[]`**にした。`_pickSponsoredCardForToday([])`が`null`を返すため`splice`されず、DOM分岐も通らずPRカードは表示されない。**コード（`_pickSponsoredCardForToday()`/`renderSponsoredCard()`/`__sponsored`分岐/`GET /api/sponsored-cards`）は一切無変更・残置**。再開は`sponsored-cards.json`に本番掲載データ（`active:true`・有効期間内）を追記するだけ（`pm2 restart`不要、`data/`は都度readFileSync）
-- **データモデル**: `data/{city}/sponsored-cards.json`（配列。`data/`はgitignore対象）。各要素: `id`/`sponsorName`/`title`/`content`/`imageUrl`/`url`/`category`（`event/show/gourmet/opening/sale`のいずれか、または`null`=全カテゴリ共通枠）/`startDate`/`endDate`/`priority`（現状未使用、将来の重み付け抽選用に温存）/`active`。**本番運用時は空配列`[]`が正常状態**（2026-07-13実装完了時点でテストデータは削除済み、掲載する広告主が決まり次第人力で追記する運用）
-- **サーバー**: `GET /api/sponsored-cards?city=sg`（`server.js`、`GET /api/events`の直後）。ファイル不存在時は空配列を返す（エラーにしない）。既存`GET /api/events`は無変更
-- **選択ロジック**（`public/app.js`）: `_pickSponsoredCardForToday(cards)`が、有効期間（`startDate`/`endDate`）・`active`・`_matchesCurrentCategory()`（`category`がnullなら常時対象、値ありなら`filterCats`一致時のみ対象）で候補を絞り込み、当日日付をシードにした`候補配列[seed % length]`で日替わり固定選択する（リロードのたびに変わらない）
-- **表示**: `renderEventCards()`内、フィルタ・ソート確定後に、選ばれたPRカードを`filtered`配列の4番目あたり（0-indexed 3）に`{__sponsored:true, card}`マーカーとして挿入し、DOM構築ループ内で`renderSponsoredCard()`から生成した専用DOM要素（`_sponsoredCardTmpContainer`使い回し）を差し込む。`renderEventCard()`本体・`GET /api/events`・設計書21の`_cardElCache`（イベントIDベースのDOM差分キャッシュ）とは完全に別系統・無関係のデータソースとして分離実装（意図的に混在させない設計）
-- **おすすめモード中は非表示**（ユーザー承認済み方針）: `_recommendModeActive`が`true`の間は`_pickSponsoredCardForToday()`の呼び出し自体をスキップする
-- **見た目**: `spot-card`ベース、左上に半透明黒背景の「PR」バッジ（`prBadgeLabel`キー、ja/en共に"PR"）。タップでスポンサー先`url`を開く（`openSponsoredCardLink()`、フェーズ1の`openAffiliateLink()`と同じ`_isCapacitorApp`分岐: Capacitor環境は`Browser.open()`、Web環境は`window.open()`）
-- コース生成AI・アフィリエイトリンク機能（フェーズ1）には一切手を加えていない。両フェーズとも広告要素とコース/イベント生成ロジックは意図的に分離
-- スコープ外（今回未実装）: PRカードのクリック計測（フェーズ1の`POST /api/affiliate-click`相当の仕組み）、`priority`フィールドを使った複数カード同時掲載・重み付け抽選、広告主向け管理画面・入稿フロー（`sponsored-cards.json`の直接編集が現状唯一の運用手段）
-
-## 広告表示機能: Klookアフィリエイトウィジェット試験導入（2026-07-13実装、設計書30 → 同日設計書31で表示改善 → 2026-07-16設計書47で一時非表示化）
-- フェーズ1（アフィリエイトリンク）・フェーズ2（自前PRカード、`sponsored-cards.json`）とは別に、ユーザーが「Klookアフィリエイトダッシュボードで生成した公式アクティビティバナーウィジェットをそのまま埋め込みたい」と方針転換したことを受けて追加した軽量な試験導入。複数スポンサーのローテーション・カテゴリ一致判定・クリック計測などのフル実装は行っていない
-- ⚠️ **2026-07-16時点、非表示（マーカー挿入停止・設計書47）**: 広告掲載準備が整うまでの一時停止として、`renderEventCards()`内のKlookマーカー挿入`splice`（`if (!_recommendModeActive && filtered.length > 0) { ... filtered.splice(klookInsertAt, 0, { __klookWidget: true }); }`、1672-1675行付近）を**コメントアウト**した。`__klookWidget`が`filtered`に入らずDOM構築ループの`if (e && e.__klookWidget)`分岐が通らないため表示されない。**`_createKlookWidgetEl()`関数定義・DOM構築ループ側の分岐・`loadEventData()`のリセット処理（`_klookWidgetInserted`/`_klookWidgetEl`）は一切無変更・残置**。再開は該当コメントアウトを解除するだけ（Web版は配信＋キャッシュバスティング、iOS版は再ビルドが必要）
-- **実装**: `public/app.js`の`_createKlookWidgetEl()`関数が、Klook公式ダッシュボードが発行した埋め込みコード（`<ins class="klk-aff-widget" data-wid="127020" data-adid="1337601" data-actids="117,127,119" data-prod="mul_act" data-price="true" data-width="336" data-height="280" data-currency="SGD">` + `https://affiliate.klook.com/widget/fetch-iframe-init.js`を読み込む`<script>`）をそのまま`document.createElement`で動的生成し、`.klook-widget-card`（他のイベントカードと揃えた角丸・背景白・影のラッパー、`public/app.css`）の中に「PR」ラベル（`.klook-widget-card__label`、既存i18nキー`prBadgeLabel`を再利用）と共に格納する（設計書31、2026-07-13）
-- **見た目の方針（設計書31）**: `.spot-card`クラス自体は付与しない独立クラス（`fadeUp`アニメーション・`:active`時の`transform`等、iframeを含む要素に適用したくない既存ルールが多数付いているため）。目立つカラーボタン等は使わず、「PR」ラベルは11px・warm-gray色の控えめな表示に留める
-- **挿入位置・再利用方式（設計書31で最下部固定から変更）**: 設計書29のPRカード（自前PRカード）と同じ`filtered`配列への`splice`挿入パターンを転用し、新規マーカーキー`__klookWidget`を`Math.min(7, filtered.length)`（8番目あたり、カードの間）に差し込む。「1回だけ生成し使い回す」方式（`_klookWidgetEl`にDOM要素を保持し、以降は`insertBefore`で位置移動のみ、再生成しない）でiframeの意図しない再読み込みを防止。おすすめモード中（`_recommendModeActive`）はマーカー挿入自体をスキップし非表示（PRカードと同じ方針）。表示されない回は`display:none`にするのみでDOM/iframeは破棄しない
-- `loadEventData()`（都市切替・再フェッチ時の`grid.innerHTML`再代入）で`_klookWidgetInserted`フラグ・`_klookWidgetEl`変数を`_cardElCache.clear()`と同じ箇所でリセットする（リセットしないと都市切替後にウィジェットが二度と表示されなくなるバグがあったため設計書31で修正済み）
-- **フェーズ2との共存**: フェーズ2の`renderSponsoredCard()`/`_matchesCurrentCategory()`/`_pickSponsoredCardForToday()`/`openSponsoredCardLink()`は無変更のまま共存。`data/sg/sponsored-cards.json`が空配列のままなら実害なし。今回は両方式（自前PRカード＋Klook公式ウィジェット）が同時に有効な状態。両者の同時表示時の間隔調整は2026-07-13時点で未実施（ユーザー判断により、`sponsored-cards.json`に実データが入る段階で改めて調整する方針）
-- `_isCapacitorApp`による分岐は実装していない（ウィジェット自体のリンク処理はKlook側のiframe内で完結する想定のため独自クリックハンドラは追加せず）。**iOS版（Capacitor/TestFlight）でのカード風の見た目・PRラベル・カード間差し込み位置・iframe内リンクタップの挙動は2026-07-13時点で未検証**
-- スコープ外（今回未実装）: 複数スポンサーのローテーション、日替わり選択ロジック、カテゴリ一致判定、クリック計測、ウィジェット表示位置の詳細カスタマイズ（Klook側テンプレートの見た目自体はダッシュボード側の設定に依存）
+## 現在の主要機能構成（2026-09-03時点、コード確認済み）
+探訪（スタンプラリー）・コース・予定表・共有カレンダー機能は設計書178で完全削除済み（下記「探訪（スタンプラリー）機能・コース機能・予定表機能の完全削除」節参照）。現在`public/index.html`のボトムナビは以下4タブのみ（アイコン付き、`data-i18n`表示ラベル基準）:
+
+- **くらし** 🏛️（`#screen-news` / `#nav-news`）: 暮らしの情報＝日本人在住者向けニュースサイトのキュレーション表示。カテゴリ: 新着/SG政府/交通/医療・健康/天候・災害/コミュニティ/教育・子育ての7種。下記「シンガポール在住日本人向け生活情報・ニュースのキュレーション機能」節参照
+- **おでかけ** 🏖️（`#screen-home` / `#nav-home`）: イベント情報のキュレーション。カテゴリ: 新着/イベント/展示・公演/グルメ・フェア/プロモ・お得/新規オープン/**旅行**の7種（`data-cat="travel"`、設計書175→176でこの画面のカテゴリタブとして再配置済み）。**PRカード**（スポンサー広告枠、現状非表示中）もこの一覧に条件付きで挿入される。下記「イベント取り込みパイプライン構成」「広告表示機能」節参照
+- **ピン留め** 📌（`#screen-pins` / `#nav-pins`）: くらし・おでかけ両方の保存済みアイテムを1画面に統合表示（`#news-pin-list-content`/`#pin-list-content`の2セクション構成）。この機能を単独で説明したセクションは本ファイル内に存在しないため、詳細はコード（`public/index.html`の`#screen-pins`、`public/app.js`のpin関連関数）を直接参照すること
+- **設定** ⚙️（`#screen-settings` / `#nav-settings`）: プロフィール（ニックネーム・アバター。設計書157/158で一度非表示化されたが、設計書174〈CLAUDE.md未記録〉で再表示に戻っている）・アカウント連携（Google/Apple Sign-In）・データバックアップ・言語切替・アカウント削除等
+
+コメント機能（`postComment()`等）・全データバックアップ・Sign-Inは上記4タブ横断で現役。詳細は各セクション参照。
+
+## 広告表示機能（PRカード・Klookアフィリエイトウィジェット、2026-07-13実装 → 同月中に両方とも非表示化）
+2つの広告枠を実装したが、広告掲載準備が整うまでの一時停止として2026-07-16設計書47でいずれも非表示化した。**コード自体は削除しておらず、残置されたまま停止中**。
+- **PRカード**（スポンサー広告枠、設計書29）: `data/{city}/sponsored-cards.json`が空配列のため`_pickSponsoredCardForToday()`が`null`を返し非表示。再開は同ファイルに本番データを追記するだけ（`GET /api/sponsored-cards`・`renderSponsoredCard()`等は無変更）
+- **Klookアフィリエイトウィジェット**（設計書30/31）: `renderEventCards()`内のマーカー挿入`splice`をコメントアウトして停止中。再開はコメントアウト解除のみ（`_createKlookWidgetEl()`等は無変更）
+- 詳細な実装ロジックが必要な場合はコード（`public/app.js`の`_pickSponsoredCardForToday`/`_createKlookWidgetEl`周辺）を直接参照
 
 ## Google/Apple Sign-In認証基盤（2026-07-14 Google実装・2026-07-15 Apple追加、設計書20/35/36/44。iOS版+Web版。予定表紐づけは次回）
 `.claude/plan.md`の設計書20（元設計）・35（認証情報最小化・フェーズ再評価）・36（Web版追加）に基づきGoogle Sign-In（iOS+Web両方）を実装、設計書44でSign in with Apple（iOS+Web両方）を追加した。予定表データ/共有カレンダーのユーザー紐づけ（設計書37）は今回もスコープ外、未着手のまま。
@@ -655,7 +107,7 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
   - `verifyAppJwtOptional(req)`: ヘッダーなし/不正時は例外を投げずnullを返す（任意認証用の共通ヘルパー）
 - **コース関連エンドポイントの後方互換認証対応**: `POST /api/courses/publish`・`DELETE /api/courses/:id`・`POST /api/courses/:id/unpublish`に`verifyAppJwtOptional()`を追加。`Authorization`ヘッダーがあり有効なJWTなら、そのuserIdを`authorId`として使う（publishはリクエストボディの`authorId`より優先、delete/unpublishは対象コースの`authorId`と一致する場合のみ許可、不一致は403）。**ヘッダーがない場合は現状の挙動を完全維持**（無検証のまま動作、旧バージョンApp・未ログインユーザーの後方互換）
 - **CORS設定変更**: `/api`向けミドルウェアの`Access-Control-Allow-Headers`に`Authorization`を追加、`Access-Control-Allow-Methods`に`DELETE`を追加（既存の`Content-Type`のみの許可では`Authorization`ヘッダー付きリクエストがCapacitorアプリ等のクロスオリジンからブロックされるため）
-- **iOS版（Capacitor）**: `ios-app/package.json`に`@codetrix-studio/capacitor-google-auth@^3.4.0-rc.4`を追加（**注意**: 同パッケージの安定版3.3.6系はpeerDependencyが`@capacitor/core@^5.0.0`でCapacitor 6非対応。Capacitor 6に正式対応しているのは`3.4.0-rc.1`以降のプレリリース版のみで、`latest`npmタグも`3.4.0-rc.4`を指している。今後関連パッケージのバージョンを見直す際は必ず`npm view <pkg> peerDependencies`でCapacitorバージョンとの整合を確認すること）。`ios-app/capacitor.config.js`に`GoogleAuth`プラグイン設定（`scopes:['openid']`、`iosClientId`は2026-07-15にGoogle Cloud Console発行の実値`928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4.apps.googleusercontent.com`へ設定済み）を追加。**この`scopes:['openid']`設定コメント「email/profileは要求しない」は事実と異なる可能性がある（2026-07-15設計書39）**: ネイティブGoogle Sign-In SDKもWeb版と同根の「サインインスコープはバンドル」制約が及ぶ可能性が高いと推測されるが、iOS実機での同意画面表示内容は2026-07-15時点で未検証。次回TestFlightビルド時に実機確認が必要
+- **iOS版（Capacitor）**: `ios-app/package.json`に`@codetrix-studio/capacitor-google-auth@^3.4.0-rc.4`を追加（**注意**: 同パッケージの安定版3.3.6系はpeerDependencyが`@capacitor/core@^5.0.0`でCapacitor 6非対応。Capacitor 6に正式対応しているのは`3.4.0-rc.1`以降のプレリリース版のみで、`latest`npmタグも`3.4.0-rc.4`を指している。今後関連パッケージのバージョンを見直す際は必ず`npm view <pkg> peerDependencies`でCapacitorバージョンとの整合を確認すること）。`ios-app/capacitor.config.js`に`GoogleAuth`プラグイン設定（`scopes:['openid']`、`iosClientId`は2026-07-15にGoogle Cloud Console発行の実値`928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4.apps.googleusercontent.com`へ設定済み）を追加。**この`scopes:['openid']`設定コメント「email/profileは要求しない」について（2026-07-15設計書39で懸念提起 → 2026-09-03実機確認で解消）**: ネイティブGoogle Sign-In SDKもWeb版と同根の「サインインスコープはバンドル」制約が及ぶ可能性を懸念していたが、iOS実機で確認した結果、同意画面はopenidスコープのみでemail/profileへのアクセス許可表示は出ないことを確認済み。コメント通りの実装で問題なし
 - **iOS版URL Scheme設定（2026-07-15実装、設計書41）**: `.github/workflows/ios-deploy.yml`に「Set Google Sign-In URL scheme in Info.plist」ステップを新規追加（`Sync Capacitor`後・既存Info.plist操作3ステップ後・`Create App.entitlements`前に配置）。`@codetrix-studio/capacitor-google-auth`公式ドキュメント記載の必須手順で、認証フロー完了後にアプリへ復帰するためのURL Scheme（Reversed Client ID: `com.googleusercontent.apps.928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4`）を`Info.plist`の`CFBundleURLTypes`に登録する。`CFBundleURLTypes`は配列内に辞書、その中にさらに配列というネスト構造のため、既存のPlistBuddy `Add`/`Set`パターンではなくPython3（macOS runner標準搭載）の`plistlib`モジュールで、既存`CFBundleURLTypes`の有無を確認した上で安全に追記する方式を採用（既存配列があれば追記、無ければ新規作成の両対応）
 - **Web版**: `public/index.html`に Google Identity Services SDK（`https://accounts.google.com/gsi/client`）の`<script>`タグを追加
 - **`.env`新規変数（プレースホルダー状態、2026-07-14時点）**: `JWT_SECRET`（実際にランダム生成済み、`crypto.randomBytes(32).toString('hex')`）、`GOOGLE_WEB_CLIENT_ID`・`GOOGLE_IOS_CLIENT_ID`（いずれも`REPLACE_WITH_YOUR_...`のプレースホルダー、既存`OPENWEATHER_API_KEY`と同じ運用パターン。Google Cloud Consoleでの実発行はユーザーが別途行う）。値がプレースホルダーのままでもサーバーはクラッシュせず起動する設計（`POST /api/auth/google`は`audience`配列が空の場合500を返すのみ）
@@ -670,9 +122,9 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
 - **既知の制約・次回フォロー事項**:
   - 「Googleでログイン中」ラベルは現状固定文言（プロバイダがGoogleのみのため）。次回Sign in with Apple追加時は`provider`に応じた動的表示への変更が必要
   - iOS版のGoogle Sign-In用URL Scheme（`Info.plist`の`CFBundleURLTypes`）は2026-07-15設計書41でCIワークフローに追加済み（上記「iOS版URL Scheme設定」参照）。次回TestFlightビルドでentitlements等と合わせて反映される
-  - Google Cloud ConsoleでのOAuthクライアントID（Web用・iOS用の両方）実発行はユーザーが完了済み（iOS用: `928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4.apps.googleusercontent.com`）。`.env`のWeb用クライアントIDの実値設定状況は要確認。実際のGoogleログインのエンドツーエンド動作（特にiOS版）は次回TestFlightビルドでの実機確認が必要
+  - Google Cloud ConsoleでのOAuthクライアントID（Web用・iOS用の両方）実発行はユーザーが完了済み（iOS用: `928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4.apps.googleusercontent.com`）。`.env`のWeb用クライアントIDも実値設定済み（2026-09-03確認）。実際のGoogleログインのエンドツーエンド動作（iOS版含む）もTestFlight実機で確認済み・正常動作
 - **2026-07-15修正（設計書38）**: 「Googleでログイン」「ログアウト」ボタンがタッチ操作（スマホ・タブレット）で反応しない不具合を修正。CLAUDE.md下記「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節のパターンのうち、touchend側の登録が新規ボタン`#google-login-btn`/`#logout-btn`にのみ漏れていたのが原因。既存の設定画面touchendハンドラ（`public/app.js`）に2行追加して解消済み
-- **2026-07-15訂正（設計書39、コード変更なし・ドキュメント訂正のみ）**: 実機でGoogleの同意画面を確認した結果、「scopeは`openid`のみ要求し`email`・`profile`スコープは要求しない」という当初記述（上記「認証情報最小化方針」節）が誤りだったと判明。Google Identity Servicesの仕様上、「Sign In With Google」機能を使う限り同意画面への`email`・`profile`スコープのアクセス許可表示は技術的に回避不可能（`google.accounts.id.initialize()`に`scope`パラメータ自体が存在せず、より低レベルのAPIに切り替えても「サインインスコープ（openid, email, profile）はバンドル」という仕様上の制約が及ぶため）。ユーザーに説明したところ「しょうがないね。個人情報は当面持ちたくないです」との回答を得て、方針を「（Googleに）取得させない」から「（サーバー側で）保存・利用しない」に転換した（サーバー側は`sub`のみ保存する実装を維持、コード変更は不要）。Apple Sign-In（未実装）はGoogleと異なり`email`・`fullName`スコープを個別に許可/拒否でき、`email`は実アドレス共有かAppleプライベートリレーかを選択できる、という認識があるが、これは一次情報（Apple公式ドキュメント）で確認済みの事実ではなく、Apple Sign-In実装着手時に必ず再確認が必要な未検証事項。詳細は`.claude/plan.md`「設計書39」参照
+- **2026-07-15訂正（設計書39、コード変更なし・ドキュメント訂正のみ）**: 実機でGoogleの同意画面を確認した結果、「scopeは`openid`のみ要求し`email`・`profile`スコープは要求しない」という当初記述（上記「認証情報最小化方針」節）が誤りだったと判明。Google Identity Servicesの仕様上、「Sign In With Google」機能を使う限り同意画面への`email`・`profile`スコープのアクセス許可表示は技術的に回避不可能（`google.accounts.id.initialize()`に`scope`パラメータ自体が存在せず、より低レベルのAPIに切り替えても「サインインスコープ（openid, email, profile）はバンドル」という仕様上の制約が及ぶため）。ユーザーに説明したところ「しょうがないね。個人情報は当面持ちたくないです」との回答を得て、方針を「（Googleに）取得させない」から「（サーバー側で）保存・利用しない」に転換した（サーバー側は`sub`のみ保存する実装を維持、コード変更は不要）。Apple Sign-Inは（後日設計書44で実装、2026-09-03裏取り確認済み）Googleと異なり`email`・`fullName`スコープを個別に許可/拒否でき、`email`は実アドレス共有かAppleプライベートリレーかを選択できる、という認識が正しいことを確認済み。詳細は`.claude/plan.md`「設計書39」参照
 - **2026-07-15修正（設計書40）: Web版GoogleログインボタンをrenderButton方式に変更（One Tap再表示不可問題の修正）**。「一度ログイン→ログアウトすると、リロードせずに再度ボタンを押しても反応しなくなる」不具合を修正。原因はGoogle One Tap（`google.accounts.id.prompt()`）の仕様で、一度サインインに成功するとページリロードまで内部的に抑制状態が残り、再度`prompt()`を呼んでも表示されなくなるため（Google公式ドキュメント記載の意図的な仕様）。Google公式の推奨解決策である`google.accounts.id.renderButton()`（クリックのたびに確実にポップアップが起動する恒久的なボタン）に切り替えた
   - `public/index.html`: 自前デザインの`<button id="google-login-btn">`を空のコンテナ`<div id="google-login-btn-container">`に置き換え。ボタンの見た目・ラベルはGoogle側が描画するため、既存デザインへの完全一致は不可（許容済み）。`data-i18n="loginWithGoogle"`キー・翻訳文字列自体は死にキーとして残置（削除しない）
   - `public/app.js`: `_handleGoogleLoginWeb()`（`prompt()`呼び出し）を`_initGoogleButtonWeb()`（`renderButton()`呼び出し、`container.dataset.rendered`で多重描画防止）に置き換え。アプリ起動時の初期化フロー内で、GIS SDK（`<script async>`）のロード完了を最大20回×300msリトライで待ってから一度だけ呼ぶ。`handleGoogleLoginClick()`はiOS版分岐（`_handleGoogleLoginIOS()`）のみが残り、Web版では何もしない（ボタンクリック自体をGoogleが処理するため）
@@ -680,7 +132,7 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
   - **`disableAutoSelect()`追加**: `handleLogoutClick()`に`window.google?.accounts?.id?.disableAutoSelect?.()`を追加。GIS未ロード時・iOS環境実行時もオプショナルチェイニングでエラーにならない
   - `renderButton()`オプション: `type:'standard'` `theme:'outline'` `size:'large'` `text:'signin_with'` `shape:'pill'` `logo_alignment:'left'` `width:280`。ダークモード・言語切替への自動追従はしない（初回描画時に固定、スコープ外として許容）
   - iOS版（`_handleGoogleLoginIOS()`）は無変更
-  - **未検証事項（次回フォロー）**: 実機（TestFlight）でのログイン→ログアウト→再ログインの動作確認は2026-07-15時点で未実施。詳細は`.claude/next.md`参照
+  - **2026-09-03確認: 実機（TestFlight）でのログイン→ログアウト→再ログインの動作確認済み・正常動作**
 - **2026-07-15修正: iOS版「Googleでログイン」ボタンが表示されない不具合を修正**。原因は設計書40で`#google-login-btn`（自前ボタン）を`#google-login-btn-container`（Web版`renderButton()`専用の空コンテナ）に置き換えた際、iOS版向けの代替ボタン挿入処理を追加し忘れていたため（`_isCapacitorApp`時は元々`if (!_isCapacitorApp) {...}`のWeb版分岐のみで、iOS版は何も描画しないまま放置されていた）。`public/app.js`の初期化コードに`else`分岐を追加し、iOS版では`#google-login-btn-container`に自前ボタン（設計書40以前と同じスタイル）を`innerHTML`で動的挿入する方式に修正。設定画面touchendガード一覧にも`#google-login-btn`の判定行を復元した
 - **2026-07-15追加: Sign in with Apple（設計書44）**
   - **サーバー**: `apple-signin-auth`パッケージで`identityToken`を検証。`APPLE_SERVICE_ID`（Services ID、`.env`は2026-07-15時点プレースホルダー`app.dosuru.web`）・`APPLE_APP_ID`（App ID、確定値`app.dosuru`）のどちらか未設定なら`APPLE_AUTH_ENABLED=false`で機能を安全に無効化するフェイルセーフ（APNs実装と同パターン）。`verifyAppleTokenAndUpsert()`共通コアロジックがiOS/Web両経路から呼ばれ、`upsertUser('apple', sub)`で`data/users.json`をupsert（Googleと同じ`sub`のみ保存方針）
@@ -693,18 +145,18 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
 - **2026-07-16修正（設計書46）: iOS版ログインボタンのブランド化＋文言の「アカウント連携」化**
   - iOS版（`_isCapacitorApp`分岐、`public/app.js`）の自前Google/Appleボタンに公式ロゴのインラインSVGを付与しブランドガイドライン準拠にした。Google=公式4色「G」マーク（`viewBox="0 0 48 48"`の4パス）＋白背景・グレー枠・pill、Apple=公式Appleロゴ（`fill:#fff`）＋黒背景・白文字・pill。ロゴはインライン埋め込み（オフライン対応のため外部URL参照にしない）。`onclick`・`_touchCapableDetected`ガード・要素id（`#google-login-btn`/`#apple-login-btn`）・`data-i18n`構造は維持（設計書44のtouchendガードを壊さない）。CSSは`public/app.css`に`.oauth-btn`/`.oauth-btn--google`/`.oauth-btn--apple`/`.oauth-btn__logo`を切り出し。ダークモード（`html[data-theme="dark"]`）時、黒背景のAppleボタンが背景と溶けないよう薄い枠（`border:1px solid rgba(255,255,255,0.28)`）を付与。**Web版ボタン（`renderButton()`・Apple公式ボタン）は無変更**
   - 文言を「ログイン」から「アカウント連携」へ統一（匿名でも使えるアプリに対する予定表同期用の連携という位置づけを反映）。i18n 7キーをja/en同時変更: `secLogin`（アカウント連携/Link account）・`loginStatusGoogle`（Google連携中/Linked with Google）・`loginStatusApple`（Apple連携中/Linked with Apple）・`logoutBtn`（連携解除/Unlink）・`toastLoginSuccess`（連携しました/Account linked）・`toastLogoutSuccess`（連携を解除しました/Account unlinked）・`toastLoginError`（連携に失敗しました…/Linking failed…）。`loginWithGoogle`（Googleでログイン）・`loginWithApple`は公式ロゴ承認文言のため据え置き（`loginWithApple`のjaは「Appleでログイン」→「Appleでサインイン」にApple公式ローカライズ表記へ調整）。`index.html`の`data-i18n="secLogin"`/`data-i18n="logoutBtn"`のデフォルト直書きも更新
-  - **未検証（次回フォロー）**: iOS版ボタンの公式ロゴ表示・ダークモード時のAppleボタン（黒背景）の視認性・タップ挙動は次回TestFlightビルドでの実機確認が必要
+  - **2026-09-03確認: iOS版ボタンの公式ロゴ表示・ダークモード時のAppleボタン（黒背景）の視認性・タップ挙動、いずれもTestFlight実機で確認済み・問題なし**
 - **2026-07-16修正（設計書48・課題2/3）: 連携維持のトークン破棄条件緩和＋連携解除の確認ダイアログ**
   - **課題2（再起動で連携が切れる不具合の対策）**: `refreshLoginUI()`（`public/app.js`）は従来`GET /api/auth/me`が`!res.ok`またはfetch例外のとき無条件で`clearAuthToken()`していた。iOS版は起動直後にネットワーク未確立・サーバー一時エラー（500系）・タイムアウトが起きやすく、有効なトークンでも「連携が切れた」ように見えて破棄していた（実質ログアウト）。**`res.status === 401`（明確な失効）のときのみ`clearAuthToken()`**し、それ以外（500系など`!res.ok`）と`catch`（通信エラー）ではトークンを保持して`_showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl)`で「連携中」の楽観的表示を維持する。楽観的表示ではproviderが不明なためラベルは既存の`loginStatusGoogle`を汎用流用（新規i18nキーは追加せず）。provider確定は正常時（`res.ok`）経路のみ`data.provider`から正確に更新。**`@capacitor/preferences`へのトークン移行はスコープ外**（設計書48・課題2-2、まずcatch/status修正のみで様子見。localStorage方式のまま）
   - **課題3（連携解除の確認ダイアログ）**: `handleLogoutClick()`先頭に`if (!confirm(t('confirmLogout'))) return;`を追加。誤タップでの即解除を防止。i18n新規キー`confirmLogout`をja（`アカウント連携を解除しますか？`）/en（`Disconnect your linked account?`）に同時追加
-  - **未検証（次回フォロー）**: 実機（TestFlight）で「連携後にアプリ再起動して連携が維持されるか」「連携解除の確認ダイアログが出るか」の確認が必要
+  - **2026-09-03確認**: 「連携後にアプリ再起動して連携が維持されるか」はTestFlight実機で確認済み・維持される。「連携解除の確認ダイアログが出るか」は未確認のまま
 - **2026-07-16修正（設計書49）: JWT保存を`@capacitor/preferences`ハイブリッド方式に変更（再起動で連携が切れる根本解決）**
   - 設計書48の課題2は「有効なトークンを一時通信エラーで破棄しない」対策だったが、**トークン自体がiOS版WKWebViewの再起動でlocalStorageから消える**ケースには効かなかった。そのためJWTの保存先を`@capacitor/preferences`（iOSネイティブの`UserDefaults`にマップされる永続領域）をソースオブトゥルースとする**ハイブリッド方式**に変更した（`public/app.js`のトークン操作4関数＋起動時初期化のみ。`server.js`無変更＝pm2再起動不要）
   - 3層構造: `_authTokenCache`（JSモジュールスコープ変数、`getAuthToken()`を**同期のまま維持**するための同期読み取り元）／ `localStorage`（ミラー・Web版の主保存先）／ `@capacitor/preferences`（iOS版のソースオブトゥルース、非同期API）。`getAuthToken()`はキャッシュ優先→localStorageフォールバックの同期関数（`authedFetch()`の既存シグネチャを壊さない）。`setAuthToken`/`clearAuthToken`はキャッシュ・localStorageを即時更新し、Preferences書き込みはfire-and-forget（`.catch(()=>{})`、awaitしない）
   - プラグイン取得は`registerPlugin('Preferences')`優先→`window.Capacitor.Plugins.Preferences`フォールバックの防御的実装（Keyboard/PushNotifications既存パターン踏襲）。`_CapPrefs`は`_isCapacitorApp`時のみ非null。Web版は`_CapPrefs===null`で従来通りlocalStorage単独動作（挙動不変）
   - 起動時初期化 `_initAuthToken`（非同期IIFE、旧同期`refreshLoginUI()`呼び出しを置換）: iOS版は`await _CapPrefs.get({key})`でトークン読み出し→`_authTokenCache`セット＋localStorageミラー。Preferencesに無くlocalStorageにあれば（旧バージョン移行）Preferencesへ書き込む。**Preferences読み出し完了「後」に`refreshLoginUI()`を呼ぶことが必須**（非同期のため同期で先に呼ぶとキャッシュ未初期化で匿名表示になる）。`ios-app/package.json`に`@capacitor/preferences@^6.0.0`追加
   - 一時計装`_sendDebugLog('auth_prefs_init', { hasPrefs, hasToken })`を`_initAuthToken`末尾に埋め込み済み。**原因確定後に削除する使い捨て**（`.claude/next.md`参照）
-  - **未検証（次回フォロー）**: 実機（TestFlight）で「連携→アプリ完全終了→再起動して連携が維持されるか」、`logs/debug-nav.log`の`auth_prefs_init`で`hasPrefs:true`かつ再起動後も`hasToken:true`（Preferences永続化が機能しているか）の確認が必要
+  - **2026-09-03確認: 「連携→アプリ完全終了→再起動して連携が維持されるか」はTestFlight実機で確認済み・維持される（Preferences永続化は機能している）**
 - **2026-07-19実装（設計書65）: アカウント削除機能を追加（App Store Review Guideline 5.1.1(v)対応）**
   - **サーバー**: 新規`DELETE /api/auth/me`（`requireAppAuth`必須、`server.js`の`GET /api/auth/me`直後）。(1)`data/users.json`から該当`userId`のレコードを`withFileLock`で削除、(2)`data/user-plans/{userId}.json`が存在すれば`withFileLock`で削除（`getUserPlansFilePath()`の既存バリデーション使用）、(3)全都市（sg/bkk/syd）の`data/{city}/community-courses.json`を走査し該当`authorId`を`null`に匿名化（**コース自体・`spots`・`likes`・`isPublic`は変更しない**。公開コースは他ユーザーが既に閲覧・いいねしている可能性がある公開データのため、削除ではなく作成者情報のみ匿名化する設計。`authorId`は権限判定にのみ使われ画面表示には使われないため`null`化による表示崩れなし）。冪等（対象レコードが既に無くても200 `{ok:true}`を返す）。プッシュ通知トークン（`data/push-subscriptions.json`）・共有カレンダー参加情報（userIdと紐づく仕組みが存在しない）は対象外
   - **クライアント**: `public/app.js`の`handleDeleteAccountClick()`（`handleLogoutClick()`直後）が`confirm(t('confirmDeleteAccount'))`→`authedFetch(DELETE /api/auth/me)`→成功時`_clearAllAccountLocalState()`（JWT・バックアップ鍵material・saltの3点セットを一括クリア）→`refreshLoginUI()`/`renderBackupSection()`で未ログイン表示に戻す、という流れ。**500系エラー時はローカル状態を一切クリアしない**（サーバー側削除が確認できてから消す設計、`handleLogoutClick()`とは逆の慎重さ）。401時（トークン失効）はローカルクリアのみで完了トースト表示
@@ -712,287 +164,20 @@ Web版（iPhone Safari）でスタンプラリーのスポット詳細モーダ�
   - **touchendハンドラ追加漏れ対策**: 設定画面の`touchend`デリゲーション一覧（`public/app.js`、`#logout-btn`判定行の直後）に`#delete-account-btn`を追加済み。設計書46（iOS版Googleボタン表示漏れ）と同型のミスを踏まないための必須対応として実施
   - **i18n**: `deleteAccountBtn`（アカウントを削除/Delete account）・`confirmDeleteAccount`（取り消せない旨の強い警告文言）・`toastDeleteAccountSuccess`・`toastDeleteAccountError`の4キーをja/en同時追加
   - **リスク・スコープ外（設計書65 §11・§4に明記）**: 部分失敗リスク（3つの独立した`withFileLock`操作のため、途中クラッシュで一部だけ完了する可能性。既存の他マルチステップ処理と同水準のリスクとして許容）。「猶予期間」「復元（アンドゥ）」機能は実装せず即時削除のみ。Google/Appleサーバー側のOAuth連携解除（各プラットフォームの設定画面で行う操作）は範囲外。共有カレンダー参加情報の削除連動は、そもそも紐づけ機能自体が未実装（設計書37 §3・設計書54 §4）のためスコープ外
-  - **App Store Connect側「Appプライバシー」申告フォームの更新はコード変更では対応不可、ユーザーが審査提出前に手動対応が必要**（本タスクのスコープ外として明記）
-  - **未検証（次回フォロー）**: 削除ボタンのUIはクライアント側コードに依存するため、iOS版でこの機能を使えるようにするには次回TestFlightビルドが必須。実機でのタップ動作・削除フローのエンドツーエンド確認は未実施（Web版はcurl・目視で先行検証済み）
+  - **App Store Connect側「Appプライバシー」申告フォームの更新はコード変更では対応不可、ユーザーが審査提出前に手動対応が必要**（本タスクのスコープ外として明記。2026-09-03確認: ユーザー側で対応済み）
+  - **2026-09-03確認: iOS実機でのタップ動作・削除フローのエンドツーエンド確認済み・正常動作**（Web版はcurl・目視で先行検証済み）
 
 ## プライバシーポリシー更新（2026-07-19実装、設計書65）
 `public/privacy.html`第1章「収集する情報」に「Google/Appleアカウントの識別子（sub のみ保存、email/氏名/画像は保存しない。同意画面表示は各社仕様上回避不可能である旨も明記）」「予定表・マイコース等のバックアップデータ（ゼロ知識暗号化、パスフレーズはサーバー未送信）」「共有カレンダーのデータ（パスフレーズ暗号化）」の3項目を追記。第6章「情報の保管と削除」に「アカウントの削除」（設定画面からいつでも削除可能、公開コースは匿名化されるのみで削除されない旨）を追記。**章番号は変更せず既存章の拡張のみ**（第1〜8章の構成は維持）。最終更新日を2026年7月19日に更新。文言はCLAUDE.mdに記録された技術的事実の範囲でのみ記述（誇大な安全性主張はしない方針）。
 
-## データバックアップ（端末移行用、ゼロ知識暗号化）＋共有カレンダーのパスフレーズ方式化（2026-07-17実装 設計書54・55 → 2026-07-18 設計書58で全データ対応に拡張）
+## データバックアップ（端末移行用、ゼロ知識暗号化。2026-09-03時点でバックアップ対象は縮小済み）
+設定画面から任意でパスフレーズを設定すると、端末移行用に一部データをサーバーへゼロ知識暗号化（PBKDF2+AES-256-GCM、サーバーはパスフレーズ自体を保存しない）バックアップできるオプトイン機能（2026-07-17設計書54実装）。
 
-設計書37のフェーズ1.5-Aを確定させ、ユーザー新要件「個人予定のサーバーバックアップもパスフレーズでゼロ知識暗号化したい」（設計書54）・「共有カレンダーの鍵配布をランダム鍵のURLフラグメント方式からパスフレーズ方式に変更したい」（設計書55）を実装した。両方とも**サーバーはパスフレーズ自体を一切保存しない**（PBKDF2用の非秘密saltと暗号文のみ保持）ゼロ知識設計。2026-07-18の設計書58で、対象を「予定表のみ」から「マイコース・ジャンル設定・プロフィール・いいね・アバターを含む全データ」に拡張し、あわせてボタンのタッチ不発バグを修正した（下記「全データバックアップへの拡張＋タッチ不発バグ修正」節参照）。
+⚠️ **当初は「予定表・マイコース・共有カレンダー等を含む全データ」を対象にしていたが（設計書58）、その後の設計書178フェーズ1〜3（コース・探訪・予定表機能の削除）で対象フィールドが順次剥がされ、2026-09-03時点で`_collectBackupPayload()`が実際に送るのは`{version, genres, who, ageList, avatar}`（ジャンル設定・家族構成・年齢リスト・アバター絵文字のみ）に縮小している。** また「アカウント連携時にバックアップを必須にする」方針（設計書118）も後に撤回され、現在は完全にオプトインの任意機能（`app.js:3041`のコメント「アカウント連携だけで完結させる方針に変更。バックアップパスフレーズの必須化は廃止」参照）。
 
-### 共通鍵導出ヘルパー（`public/app.js`）
-`_deriveKeyFromPassphrase(passphrase, saltB64)`: PBKDF2（iterations:100000, SHA-256）→AES-256-GCM鍵（`CryptoKey`）を導出。個人データバックアップ・共有カレンダーの両方から呼ばれる**唯一の共通実装**。ただし**パスフレーズ自体・保存先キー・保存値は完全に分離**（同じパスフレーズを使い回さない設計）。付随ヘルパー: `_genSaltB64()`（salt生成）・`_exportKeyMaterial()`/`_importKeyMaterial()`（鍵material⇔Base64url変換、案X-B用）・`_encryptWithKey()`/`_decryptWithKey()`（`CryptoKey`を直接受け取る汎用暗号化・復号、IV12バイト先頭付与）。
-
-### データバックアップ（端末移行用）（設計書54 → 設計書58で全データ対応に拡張）
-- **データモデル**: `data/user-plans/{userId}.json`（新規、gitignore対象）。`{userId, salt, encryptedData, updatedAt}`のみ。平文フィールドは一切持たない（`encryptedData`はAES-256-GCM暗号化されたJSON文字列）。サーバーは暗号文を不透明なBlobとして保存・返却するのみで中身に一切関知しないため、下記のペイロード構造変更は`server.js`無変更で完結する
-- **暗号化ペイロード構造（`_collectBackupPayload()`、設計書58で`version:2`に刷新）**: `{version:2, customPlans, eventPlansByCity:{sg,bkk,syd}, myCoursesByCity:{sg,bkk,syd}, genres, who, ageList, likedCourses, avatar}`。`eventPlansByCity`/`myCoursesByCity`は`ACTIVE_CITIES`（現状`['sg']`のみ）ではなく固定`BACKUP_CITIES=['sg','bkk','syd']`で全都市分を対象にする（BKK/SYD再開時のデータ取りこぼし防止、停止中でも過去データが`localStorage`に残っていれば拾う）。共有カレンダー参加情報（`{city}_shared_cal_key`等）・`app_ios_push_token`・`cal_device_id`・`app_auth_token`・バックアップ機構自身の鍵material/saltは意図的にスコープ外（設計書58 §3-1・3-2）
-- **後方互換（`_applyRestoredBackup()`）**: 復号したJSONに`version`フィールドが無い場合は旧構造（`{customPlans, eventPlans}`のみ）とみなし、`eventPlans`を現在の都市の`eventPlansByCity[city]`に読み替える。マイコース等の新規フィールドは存在しないため空扱い（エラーにはならない）。復元後の次回同期で自動的に新構造（`version:2`）に上書きされる
-- **API**: `GET/PUT /api/user-plans/me`（`requireAppAuth`必須）。`getUserPlansFilePath(userId)`が`usr_[a-f0-9]{24}`形式のみ許可（パストラバーサル対策）。`PUT`は`salt`/`encryptedData`欠如時400、`withFileLock`で排他制御
-- **オプトイン方式**: ログインしただけでは自動的にバックアップは開始されない。設定画面「データバックアップ」セクション（設計書58でセクション名を「予定表のバックアップ」から変更）で明示的にパスフレーズを設定した場合のみ有効化される（`isBackupEnabled()`は`localStorage`の鍵material有無で判定）
-- **同期フロー**: `saveCustomPlans`/`saveEventPlans`に加え、設計書58でマイコース保存箇所（タイトル編集・削除・公開・非公開・新規保存）、ジャンル設定（`saveGenreList`）、プロフィール（`toggleSettingsWho`/`selectSettingsAge`）、いいね（`toggleLike`）、アバター（`selectAvatar`）の各保存箇所からも`_syncBackupToServer()`が呼ばれるようになった（未ログイン・バックアップ未設定なら即return、実害なし）。設計書22パターン（5秒タイムアウト、失敗しても静かに諦めてUIをハングさせない）を踏襲
-- **鍵の保持方式（案X-B、2026-07-17ユーザー承認）**: 導出済み鍵material（`CryptoKey`をraw export→Base64url化した文字列）を`localStorage`（キー`app_backup_key_material`）＋`_CapPrefs`（iOS版、設計書49と同じハイブリッド方式）に保存し、次回起動時は自動復元。パスフレーズ自体は保存しない。端末が盗まれた場合のリスクは既存の共有カレンダー鍵保存方式と同じトレードオフとして許容（ユーザー確認済み）
-- **UI**: `renderBackupSection()`（未ログイン/未設定/設定済みの3状態を出し分け）。パスフレーズ入力シート（`#backup-passphrase-sheet`、`.plan-modal`パターン、z-index:3601/3602）は`setup`（初回、確認欄あり）/`change`（変更、確認欄あり）/`restore`（別端末での復元、確認欄なし）の3モードを1つのマークアップで共有。別端末での既存バックアップ検知は`checkExistingBackupOnOpen()`（設定画面を開いたタイミングで`GET /api/user-plans/me`を叩き、`salt`/`encryptedData`があれば復元導線を表示）
-- **失敗時の挙動**: 誤ったパスフレーズはAES-GCMタグ検証エラーとして捕捉し、ローカルデータを一切変更せずエラートースト表示のみ（`_doBackupRestore()`）
-- **既知の未解決事項（設計書54 §8に明記済み、設計書58時点も未解決のまま）**: パスフレーズを忘れた場合はサーバー側の救済手段なし（ゼロ知識設計の必然）。ログアウト時に鍵material・端末ローカルデータをクリアするかは未解決のまま「クリアしない」保守的挙動を採用（次回要検討）。バックアップ無効化時にサーバー側ファイルを削除するかも未設計
-
-### 全データバックアップへの拡張＋タッチ不発バグ修正（2026-07-18実装、設計書58）
-- **バグの原因**: `renderBackupSection()`/`checkExistingBackupOnOpen()`が生成するボタンは`onclick="if(!_touchCapableDetected) 関数呼び出し(...)"`パターンだったが、設定画面のタッチデリゲーション側（`#backup-section-content button`分岐）が`btn.click()`でDOM合成clickイベントを発火させる実装になっていた。`touchend`発火時点では`_touchCapableDetected`が既に`true`のため、`.click()`によって呼ばれた`onclick`属性内のガードが常に偽と評価され、実際の関数が一切呼ばれず「自分自身のガードで自分をブロックする」状態になっていた（このセクションのボタン全てが影響を受けていた）
-- **修正**: `renderBackupSection()`/`checkExistingBackupOnOpen()`が生成するボタンの`onclick`属性を`data-backup-action`属性（`setup`/`change`/`restore`/`disable`）に置き換え、`ontouchend=""`の無害だが不統一な残骸も削除。タッチデリゲーション側は`btn.click()`ではなく新設の`_runBackupAction(action)`を直接呼ぶよう変更。PC/マウス操作環境向けに、`#backup-section-content`への専用`click`イベントリスナーを新規追加し、`_touchCapableDetected`が`true`の場合は何もしない（タッチ環境ではtouchend側で処理済みのため二重発火しない）という要素スコープの対応に留めた（CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴーストクリック」節の確立パターンを踏襲、グローバルなclickブロックは追加していない）
-- **バックアップ対象の拡張**: 上記「データバックアップ（端末移行用）」節に統合済み（`version:2`ペイロード構造・`BACKUP_CITIES`・同期呼び出し追加箇所）
-- **i18n**: `secBackup`（「予定表のバックアップ」→「データバックアップ」）・`backupDisabledDesc`/`backupEnabledDesc`の文言を「予定表」から「予定表・マイコースなどのデータ」に変更（既存キーの値変更のみ、キー追加なし）。新規キー`backupExcludesCalendarNote`（「共有カレンダーへの参加状態は引き継がれません」の注意書き）をja/en同時追加、`renderBackupSection()`の未設定時の説明文の直後に表示
-- **スコープ外（設計書58 §3-9で明示）**: 共有カレンダー参加情報のバックアップ対応、ログイン確定直後の自動バックアップ有無チェック、`sg_lang`/`sg_theme`/`app_city`の同期対象化、パスフレーズ強度チェック、複数デバイス間のリアルタイム同期
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのタッチ操作によるボタン反応確認、全データバックアップ→別端末での復元（マイコース・ジャンル設定等が正しく復元されるか）は2026-07-18時点でWeb版での単体ロジック検証のみ完了、実機確認は未実施
-
-### 共有カレンダーのパスフレーズ方式化（設計書55）
-- **データモデル変更**: `data/shared-calendars/{groupId}.json`に`salt`フィールドを追加（既存フィールドの削除・型変更なし、追加のみ）。`salt`ありグループ=新方式（パスフレーズ由来の鍵）、`salt`なしグループ=旧方式（ランダム鍵をURLフラグメントに埋め込み）として共存する
-- **サーバー**: `POST /api/calendar/create`が`salt`を追加受信・保存するのみ（既存`city`/`encryptedData`受信ロジックに1フィールド追加）。`GET /api/calendar/:groupId`は無変更で`salt`を含めてレスポンス（既存コードがオブジェクト全体を返すため自動対応）。`POST`/`PUT`両エンドポイントに`withFileLock`を新規適用（旧実装は素の`fs.writeFileSync`だった）
-- **クライアント（`public/app.js`）**: `getCalSalt()`/`setCalSalt()`新規（`{city}_shared_cal_salt`）。既存`getCalKey()`/`setCalKey()`は新方式では「パスフレーズから導出した鍵materialのBase64url」を保存する用途に変更（`setCalKey`にも`_CapPrefs`ミラーを追加）
-  - `doCreateGroup()`: 「グループを作成する」ボタン押下で即座にグループ作成せず、まずパスフレーズ設定シート（`openCalPassphraseSheet('create')`）を開く。実処理は`_doCalCreateGroup(passphrase)`に分離
-  - `loadCalQR()`/`copyJoinLink()`/`shareViaLine()`: `getCalSalt()`の有無で新方式（フラグメントなしURL）/旧方式（フラグメント付きURL、従来通り）に分岐
-  - `doJoinGroup()`: `_pendingJoinKey`（URLフラグメント由来）があれば旧方式として即座に`_doJoinGroupWithKey()`へ。フラグメントが無い場合はサーバーから該当グループの`salt`有無を確認し、`salt`ありなら新方式としてパスフレーズ入力シート（`openCalPassphraseSheet('join')`）へ誘導、`salt`なし（無暗号化グループ）ならそのまま`_doJoinGroupWithKey(gid, null)`。新規`_doJoinGroupWithPassphrase(gid, passphrase)`が新方式の復号・マージ・再暗号化・アップロードを担う
-  - `handleScannedQR()`/`checkJoinParam()`は無変更（既存の「URLに`join`パラメータ＋`#`フラグメント」抽出ロジックがそのまま新旧判定の入口として機能する）
-  - パスフレーズはQR・招待リンク・LINE共有メッセージのいずれにも含めない（設計書55 §2-7、鍵とグループIDを意図的に分離したままにする）。招待相手には別チャネル（口頭・LINE本文とは別）でパスフレーズを伝える運用を前提とする
-- **UI**: パスフレーズ入力シート（`#cal-passphrase-sheet`、z-index:3603/3604）は作成用（確認欄あり）・参加用（確認欄なし）を`_calPassphraseMode`で出し分け、個人予定表バックアップ側と同じマークアップパターンだが別要素・別変数で完全に分離
-- **⚠️ 後方互換性の重要な制約（2026-07-17ユーザー承認済みで受け入れ済みのリスク）**: 既存（デプロイ前作成済み）の`salt`なしグループは引き続き従来通りURLフラグメント鍵方式でアクセス可能。**しかし新方式（`salt`あり）で作られたグループには、旧バージョンApp（またはこの変更が未反映のWeb版/iOS版）から参加できない**（旧バージョンはパスフレーズ入力UIを持たず、フラグメントなしURLから鍵を取得する手段がないため）。Web版・iOS版のリリースタイミングがずれる期間は、新方式グループへの参加が片方のプラットフォームでのみ機能する状態が一時的に発生し得る
-- **2026-07-19訂正（ソースコード確認により判明）**: 設計書55 §9は「`doManualJoin()`（6桁グループID手入力）への新方式パスフレーズ対応はスコープ外」としていたが、実際のコードを確認したところ既に対応済みだった。`doManualJoin()`は`handleScannedQR(id)`を経由し、フラグメント鍵（`joinKey`）が無い6桁ID単体入力では`_pendingJoinKey`が`null`になるため、QRスキャン（フラグメントなし）と全く同じ`doJoinGroup()`の分岐（サーバーの`salt`有無を見て新方式ならパスフレーズ入力シートへ誘導）を通る。手入力専用の分岐は存在せず、既存ロジックの副産物として新方式に対応している。**ただしこの経路の実機での動作確認（手入力→パスフレーズシート表示→参加成功）は未実施**、次回TestFlightビルド後に確認が必要
-- **既知の未解決事項**: PBKDF2のiterations値（100000固定）のモバイル実機でのパフォーマンスは次回TestFlightビルドでの実機確認が必要
-
-### パスフレーズ入力シートのレイアウト修正（2026-07-18実装、設計書59）
-実機バグ報告: `#backup-passphrase-sheet`でパスフレーズ入力欄→確認用入力欄とフォーカス移動すると、キャンセル/確定ボタン行がボトムナビとわずかに重なって表示される不具合（setup直後は正常）。原因は2点: (1) `#backup-passphrase-sheet`・`#cal-passphrase-sheet`が他の`.plan-modal`インスタンスと異なり`.plan-modal-body`ラッパーを持たず、ボトムナビ分の余白確保を`.plan-modal`自身のインラインpaddingのみに依存していた、(2) 下記`_scrollFocusedIntoViewOnKb()`の`scrollIntoView`フォールバックが、`overflow-y:auto`祖先を持たないこの2シートで必ず発火し、iOS WKWebViewの`position:fixed`要素の位置ズレを誘発していた可能性（一次情報による確証はなく理論的推測）。
-- **案A（構造統一）**: `#backup-passphrase-sheet`・`#cal-passphrase-sheet`両方に、他の`.plan-modal`インスタンス（`#date-picker-modal`等）と同じ`.plan-modal-body`ラッパーを追加。タイトル行は`.plan-modal`直下に残し、警告文・入力欄2つ・ボタン行を`.plan-modal-body`（インラインstyleで`padding:0 0 calc(84px + safe-area)`、左右0は`.plan-modal`側の既存20px paddingとの二重加算を避けるため）で包む。既存id（`backup-passphrase-warn`/`-confirm-row`/`-input`/`-confirm-input`/`-submit-btn`、`cal-`側同様）はラッパー内に移動するのみで変更なし
-- **案C（副作用の除去）**: `_scrollFocusedIntoViewOnKb()`（下記）の`if (!foundContainer) { focused.scrollIntoView(...) }`フォールバック分岐を削除。`overflow-y:auto`祖先が見つからない場合は何もしない
-- **未検証（次回TestFlightビルド後にフォロー）**: `scrollIntoView`削除の効果は理論的推測であり実機確認必須。`#backup-passphrase-sheet`の`change`モードでフィールド間フォーカス移動してもボタン行がボトムナビと重ならないこと、`#feedback-text`/`#nickname-input`が引き続きキーボードに隠れないこと（`.screen-scroll-content`という`overflow-y:auto`祖先を持つため`foundContainer`が見つかり影響を受けないはず）、`course-sheet`（`#course-note`）等の既存`.plan-modal-body`持ちシートに回帰がないことの3点を確認する
-
-### 両機能共通
-- **TDZ回避**: 新規モジュールスコープ変数（`_backupKeyCache`/`_backupSyncInFlight`/`_backupSheetMode`/`_calPassphraseMode`/`BACKUP_CITIES`）はいずれもオプトイン機能（ユーザーが設定画面を開いて明示的に操作するまで一切呼ばれない）のため、起動時同期フロー（`loadEventData()`/`initPushState()`等）から参照されず、TDZ対象外
-- **キャッシュバスティング**: `index.html` app.js?v=20260718b、`sw.js` CACHE_NAME=sg-weekend-v621（設計書59時点）
-- **未検証事項（次回TestFlightビルド後にフォロー）**: パスフレーズ設定→サーバーバックアップ→別端末での復元、共有カレンダーのQR読み取り→パスフレーズ入力での参加、の両フローとも実機での動作確認が未実施（Web版でのAPI疎通・暗号化ロジックの単体検証のみ完了）。設計書58のタッチ不発バグ修正・全データバックアップ拡張、設計書59のレイアウト修正も同様に実機未検証
-
-### アカウント連携時にバックアップパスフレーズ入力を必須化（2026-07-22実装、設計書118）
-上記のデータバックアップは元々「アカウント連携」とは独立したオプトイン機能で、連携後に設定画面から別途パスフレーズを設定しないとバックアップは有効にならなかった。ユーザー要望「アカウント連携する時に必ずパスフレーズの入力をしてもらって、基本バックアップはそれでオンになる。ただしアカウント連携した後もパスフレーズを変えられる作りにしてほしい」を受け、「アカウント連携している以上バックアップをしない状態はない」という不変条件を持たせた。
-
-- **フック箇所**: Google/Apple連携の完了経路は4パターン（Web Google=`renderButton`+`_submitGoogleIdToken`、iOS Google=`_handleGoogleLoginIOS`+`_submitGoogleIdToken`、iOS Apple=`_handleAppleLoginIOS`+`_submitAppleIdentityToken`、Web Apple=`_consumeAppleAuthTokenFromHash`のリダイレクト受信）あるが、いずれも最終的に`refreshLoginUI()`に収束する（Web Appleのみ`_initAuthToken`起動時IIFE経由で間接的に）。`refreshLoginUI()`のトークン検証成功パス末尾（`catch`直前）に、新規関数`_checkMandatoryBackupSetup()`のfire-and-forget呼び出しを追加し、この1箇所で全経路をカバーする
-- **`_checkMandatoryBackupSetup()`**: この端末にバックアップ鍵materialが無ければ（`isBackupEnabled()`が偽）、`GET /api/user-plans/me`でサーバーの既存バックアップ有無を確認し、`salt`/`encryptedData`があれば`restore`モード、無ければ`setup`モードで必須パスフレーズシートを開く。新規連携（サーバーに未設定→setup）・別端末での再連携（サーバーに設定済み→restore）・フロー中断からの再試行（次回`refreshLoginUI()`実行時に鍵materialが無ければ再度開く）が同じロジックで自然にカバーされる
-- **必須モードのシート**: `openBackupPassphraseSheet(mode, mandatory=false)`に第2引数`mandatory`を追加。`true`時は✕ボタン（`#backup-passphrase-close-btn`）・キャンセルボタン（`#backup-passphrase-cancel-btn`）を`display:none`にする。`closeBackupPassphraseSheet()`先頭の`if (_backupSheetMandatory) return;`ガードが、オーバーレイタップ・✕・キャンセルの3経路全てを一括で防ぐ（3経路がいずれもこの1関数を通る既存構造を利用）。`_doBackupSetup`/`_doBackupChange`/`_doBackupRestore`の各成功パスは`closeBackupPassphraseSheet()`呼び出し直前に`_backupSheetMandatory = false`を設定してから閉じる（成功時に必須モードのまま閉じられなくなる事故を防ぐための実装上必須の対応、設計書に明示コードはなかったがbuilderが追加）
-- **既存呼び出し元は全て`mandatory`省略（=false）のまま無変更**: `_runBackupAction()`内のsetup/change/restore 3箇所、`checkExistingBackupOnOpen()`が生成する動的ボタン（`_runBackupAction()`経由）。設定画面から任意にパスフレーズ変更する既存フローは今回のロジックに一切影響を受けない
-- **「パスフレーズを忘れた場合」のリセット導線**: `restore`かつ`mandatory`時のみ、送信ボタンの下に`#backup-passphrase-reset-link`を表示。タップで`_resetBackupAndSetupFresh()`（`confirm()`で「既存バックアップは復元できなくなり新しいパスフレーズで作り直される」旨を警告後、シートを閉じずに`setup`モードへその場で切り替え）。サーバー上の暗号化データは`_doBackupSetup`が新しいsalt+暗号文で無条件PUT上書きするため、この関数自体はUI切り替えのみでよい
-- **設定画面「無効にする」ボタンの削除**: `renderBackupSection()`のログイン済み・バックアップ有効時の分岐から「🚫 無効にする」ボタン（`data-backup-action="disable"`）を削除（「連携している以上バックアップをしない状態はない」という不変条件のため、ユーザーが自発的に無効化する導線を無くした）。「🔑 パスフレーズを変更」ボタンのみ残る。`disableBackup()`関数自体・`_runBackupAction()`内`'disable'`ディスパッチは削除せず残置（既存の「使わなくなった導線は残置」方針を踏襲、ボタンが無くなるため実質到達不能になるだけ）
-- **i18n**: `backupForgotPassphraseLink`（パスフレーズを忘れた場合はこちら/Forgot your passphrase?）・`confirmBackupReset`（既存バックアップの復元不可＋再作成の警告文）をja/en同時追加
-- **スコープ外**: ログアウト時の鍵material・端末ローカルデータのクリア可否（設計書54 §8-5で既に「クリアしない」を採用、未解決事項として明示済み。今回変更なし）、複数アカウントの切り替え時の鍵material整合性（既存の未検討事項のまま）、スタンプ進捗のバックアップ対応（サーバー側直接保存＋ログイン必須化済みのため調査の結果対応不要と判明）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260722d`→`20260722e`、`sw.js` CACHE_NAME=`sg-weekend-v670`→`v671`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での必須パスフレーズシート表示・✕/キャンセル非表示・リセット導線の動作は2026-07-22時点でcurl・コード読解による整合性確認のみ完了、実ブラウザ・実機とも未確認
-
-### バックアップパスフレーズ入力欄が反応しない不具合の診断ログ追加（2026-07-22実装、設計書119）
-設計書118を含むTestFlightビルドで、ユーザーが実機スクリーンショットとともに「このモーダル入力できません」と報告（`#backup-passphrase-sheet`のrestoreモード）。メインエージェントがサンドボックス内Playwright（iPhoneタッチエミュレーション含む）で再現を試みたが再現せず原因未確定だったため、CLAUDE.md既定の実機デバッグ用ログ収集機能（`_sendDebugLog()`/`POST /api/debug-log`/`logs/debug-nav.log`）を使った診断ログのみを仕込んだ（機能ロジック変更なし）。
-- `openBackupPassphraseSheet(mode, mandatory=false)`冒頭（`getAuthToken()`ガード直後）に`_sendDebugLog('backup_passphrase_sheet_open', { mode, mandatory, isCapacitor, ua })`を追加
-- 新規IIFE`_initBackupPassphraseInputDiag()`（`closeBackupPassphraseSheet()`直後に配置）で`#backup-passphrase-input`要素に`touchstart`/`touchend`/`focus`/`blur`/`input`の5イベントリスナーを登録し、`_sendDebugLog('backup_passphrase_input_event', { evt, valueLength, activeElementIsInput, isCapacitor })`を送信。**入力内容（パスフレーズ本文）自体は一切ログに含めない**（`input.value`そのものは送信せず`valueLength`のみ記録）
-- 診断方針: 次回TestFlightビルド配信後、実機再現時に`logs/debug-nav.log`で「シート自体が開いているか」「タップで`touchstart`/`touchend`/`focus`が記録されるか（記録なければCSS/z-index/pointer-events問題を疑う）」「`focus`はあるが`input`が記録されないか（IME/キーボード問題を疑う）」「`input`は記録されるが`valueLength`が0のまま変化しないか（多重初期化を疑う）」を切り分ける
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260722e`→`20260722f`、`sw.js` CACHE_NAME=`sg-weekend-v671`→`v672`
-- この診断ログ自体は原因確定後に削除してよい使い捨てコード（CLAUDE.md既定の運用ルール通り）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での再現・ログ収集による原因特定は2026-07-22時点で未実施（本タスクは診断ログの仕込みのみ）
-
-### 探訪マップに現在地マーカーを表示（2026-07-22実装、設計書120）
-ユーザー要望「探訪スタンプ帳のマップに現在地も出せる？」を受け、Leaflet地図（`initStampMapTab()`）に現在地マーカーを追加した。既存のチェックイン距離判定用に取得済みの`_stampCurrentPos`（`_getCurrentPositionOnce()`、`initStampMapTab()`/`openStampSpotDetail()`から呼ばれる）をそのまま再利用するため、追加の位置情報許可プロンプトは発生しない。
-- **新規モジュールスコープ変数`_stampUserLocationMarker`**（`public/app.js`、`_stampLeafletMap`等の宣言と同じ並び）
-- **新規関数`_renderStampUserLocation()`**: 現在地マーカーを描画・更新する。マーカーが既に存在すれば`setLatLng()`で位置更新のみ（スポットピン層のような`clearLayers()`による再生成はしない、ちらつき防止）。`L.marker(latlng, { icon, zIndexOffset: 1000, interactive: false })`と`interactive:false`を指定し、スポットピンのタップ判定に影響しない
-- **呼び出し箇所**: `initStampMapTab()`の`_ensureStampLeafletMap()`/`_renderStampMarkers()`直後（既に位置情報があれば即反映）、および`_getCurrentPositionOnce().then(...)`コールバック内（取得完了後に反映）。`openStampSpotDetail()`の位置情報再取得コールバックにも追加
-- **CSS新規クラス**（`public/app.css`）: `.stamp-user-location-dot`（Googleマップ等でおなじみの「青い点」`#4285F4`を踏襲、アプリのブランドカラー〈caramel系〉ではなく地図アプリの共通言語として認識されやすい青系を採用）・`@keyframes stampUserLocationPulse`（box-shadowによる波紋パルスアニメーション）
-- スコープ外（今回未実装）: 「現在地に戻る」ボタン等のマップ操作UI（表示のみ）、位置情報の継続監視（`watchPosition`導入なし、既存の一回取得方式`_getCurrentPositionOnce()`をそのまま踏襲）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260722b`→`20260722c`、app.js `?v=20260722f`→`20260722g`、`sw.js` CACHE_NAME=`sg-weekend-v672`→`v673`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での現在地マーカー表示・パルスアニメーションの見た目は2026-07-22時点でcurl・コード読解による整合性確認のみ完了、実ブラウザ・実機とも未確認
-
-### 探訪チェックイン時の「思い出」機能（写真ローカル保存＋メモ）＋思い出フレーム（Cパターン）（2026-07-22実装、設計書121）
-ユーザーとの会話で「シンガポールでの限られた生活は振り返らないとすぐ忘れる」という課題意識から、探訪チェックイン時に写真・一言メモを残せる機能を追加した。**写真は一切サーバーに送信せず端末内のみに保存**、メモ（テキスト）は既存のゼロ知識暗号化バックアップ（設計書54/118）に統合し複数端末対応させる方針。既存のコース機能・レベル制・エリアバッジとは独立した追加レイヤーで、既存の探訪機能（設計書69〜120）のデータ・API構造には一切手を加えていない。
-
-- **データモデル（写真、ローカルのみ）**: 新規IndexedDBデータベース`dosuru_stamp_memories`（オブジェクトストア`photos`、keyPath: `spotId`）にリサイズ済みJPEG Blobを保存。**サーバーへのアップロード経路は一切実装しない**（`fetch`/`authedFetch`のいずれの呼び出しにも写真データは含まれない設計）。1スポットにつき1枚のみ（上書き保存）、複数枚対応・訪問ごとの個別記録はスコープ外
-- **データモデル（メモ、既存バックアップに統合）**: `localStorage`新規キー`sg_stamp_memos`（`{[spotId]:{text,updatedAt}}`）。`_collectBackupPayload()`（設計書58）に新規フィールド`stampMemos`を追加（`version:2`のまま据え置き）。`_applyRestoredBackup()`に`updatedAt`比較によるマージロジックを追加（ローカルに同じspotIdが無い、またはリモート側が新しい場合のみ採用）
-- **新規ヘルパー（`public/app.js`）**: `_openStampMemoryDB()`/`_saveStampMemoryPhotoBlob()`/`_getStampMemoryPhotoBlob()`/`_getAllStampMemoryPhotoBlobs()`（IndexedDB操作、いずれも純粋にローカルのみでネットワーク呼び出しを含まない）・`_resizeImageBlob()`（canvas経由、最大辺1080px・quality0.8のJPEG圧縮、iOS/Web両方の取得結果に適用）・`_getStampMemos()`/`_setStampMemoText()`（メモのlocalStorage操作）・`_getCapCameraPlugin()`（`@capacitor/camera`、`_getCapGeoPlugin()`と同じ`registerPlugin`優先→`Plugins`フォールバックの防御的パターン）・`_pickStampMemoryPhotoBlob()`（iOS: `getPhoto({resultType:'dataUrl', source:'PROMPT', quality:80})`、Web: 動的`<input type=file accept="image/*" capture="environment">`）
-- **チェックイン後「思い出を残す」ミニシート**: 新規`#stamp-memory-overlay`/`#stamp-memory-sheet`（z-index 3704/3705、既存`.chat-overlay`/`.plan-modal`パターン踏襲）。`_openStampMemorySheet(spot, newlyUnlockedLevel)`/`_closeStampMemorySheetInternal()`/`_skipStampMemory()`/`_pickStampMemoryPhoto()`/`_resetStampMemoryPhotoBox()`/`_saveStampMemory()`を新規実装。写真プレビュー・メモ入力（`maxlength=300`）・「🔒 写真は端末内にのみ保存されます」の明示表示・スキップ/保存の2ボタン
-- **`doStampCheckin()`の変更**: 旧「新規解禁レベルがあれば1600ms後にレベル解禁演出モーダルを直接開く」実装を、「常に900ms後に思い出シートを開く（`newlyUnlockedLevel`はnullの場合あり）。レベル解禁演出は、思い出シートを閉じた後に`_closeStampMemorySheetInternal()`内で500ms後にチェーンして開かれる」実装に置き換えた。**`openStampLevelUnlockModal()`本体のロジックは無変更**（呼び出しタイミング・呼び出し元のみ変更）
-- **一覧・詳細シートでの見返し表示**: `_renderStampLevelRowInProgress()`/`_renderStampLevelRowComplete()`のサムネイル生成部分で、個人の思い出写真（`_stampMemoryPhotoUrlCache[spot.id]`、インメモリキャッシュ）があればスポット画像（`spot.imageUrl`）より優先して使用。InProgressカードの説明文表示は、個人メモがあれば「📝 」プレフィックス付きで優先表示、無ければ既存通り`spot.description`を表示。新規関数`_renderStampDetailMemorySection(spot)`（`openStampSpotDetail()`から呼び出し）が、未チェックインならセクション非表示、チェックイン済みで記録なしなら「📷 思い出を追加」ボタン（`stampMemoryAddRetroactiveBtn`）、記録ありなら「あなたの記録」セクションに表示する
-- **思い出フレーム（Cパターン、ポラロイド風）**: スポット詳細シート「あなたの記録」セクションの個人写真表示**のみ**に適用（`.stamp-detail-memory-photo-frame`、白台紙固定・`transform:rotate(-4deg)`・box-shadow、キャプションはスポット名ではなくチェックイン日付〈`_stampCheckinDateFor()`再利用〉）。**ミニシート内の写真プレビュー・コレクション一覧のサムネイルには意図的に適用しない**（編集操作〈✕削除ボタン〉との相性・小サイズでの表現の潰れを考慮した設計判断、設計書で明示的に切り分け済み）。ダークモードでも白台紙（`background:#fff`固定）を意図的に維持（ポラロイド＝物理的な白い台紙という比喩を保つため、他要素と異なりCSS変数へ追従させない）
-- **インメモリキャッシュ**: `_stampMemoryPhotoUrlCache`（`{spotId: objectURL}`、IndexedDB非同期読み込み結果）。`initStampMapTab()`で`_getAllStampMemoryPhotoBlobs()`を一括fire-and-forget実行しキャッシュ構築後`_renderStampCollectionList()`を再実行。`_saveStampMemory()`成功時は`_refreshStampMemoryCacheForSpot()`で該当spotIdのみ個別更新（全件再取得はしない）
-- **`closeAllPopups()`に`_closeStampMemorySheetForNav()`を追加**（設計書96と同型の対策）: ボトムナビでの画面遷移時に思い出シートが開き残らないようにする。`_closeStampMemorySheetInternal()`と異なり、保留中のレベル解禁演出チェーン（`_stampMemoryPendingUnlock`）は画面遷移時には発火させず破棄する設計判断（別画面で突然モーダルが開く体験を避けるため）
-- **iOS**: `ios-app/package.json`に`@capacitor/camera@^6.0.0`追加。`.github/workflows/ios-deploy.yml`の既存`NSCameraUsageDescription`ステップの説明文を更新（QRコード読み取り用途に加え「探訪スタンプ帳での思い出の写真撮影」を追記）＋新規`NSPhotoLibraryUsageDescription`ステップを追加（既存PlistBuddyパターン踏襲）。**⚠️ この時点では「`saveToGallery`オプションは使用しないため`NSPhotoLibraryAddUsageDescription`は不要」と判断していたが誤りだった。`@capacitor/camera`の`getPhoto()`は`saveToGallery`未使用でもこのキーの存在を起動時に検査する仕様であり、欠落しているとカメラピッカー自体が一切起動しない不具合を引き起こしていた。2026-07-23設計書137で`NSPhotoLibraryAddUsageDescription`をCIに追加し修正済み（詳細は下記「カメラピッカー起動不能の根本原因判明・修正」節参照）**
-- **i18n新規キー10個**（ja/en同時）: `stampMemorySheetTitle`/`stampMemoryPhotoAddLabel`/`stampMemoryPhotoLocalNote`/`stampMemoryTextPlaceholder`/`stampMemorySkipBtn`/`stampMemorySaveBtn`/`stampDetailMemoryLabel`/`stampMemoryAddRetroactiveBtn`/`toastStampMemorySaved`/`toastStampMemoryError`
-- スコープ外（設計時点で明示）: 写真の複数枚対応（1スポットにつき1枚のみ、上書き保存）、訪問ごとの個別記録、写真のトリミング・編集機能、年間振り返り・帰国前アルバム等のまとめ閲覧専用画面、BKK/SYD対応、IndexedDB非対応環境への特別なフォールバックUI（`window.indexedDB`が無い場合は写真機能を静かにスキップしメモ機能のみ動作）
-- `server.js`は無変更（`data/user-plans/{userId}.json`はサーバー側では暗号化Blobとして扱うのみのため対応不要）。`pm2 restart`不要。キャッシュバスティング: `index.html` app.css `?v=20260722c`→`20260722d`、app.js `?v=20260722g`→`20260722h`、`sw.js` CACHE_NAME=`sg-weekend-v673`→`v674`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのカメラ/フォトライブラリ権限ダイアログ表示、撮影/選択→リサイズ→IndexedDB保存のフロー、思い出シート→レベル解禁演出のチェーン表示タイミング、詳細シートのポラロイド風フレーム表示、コレクション一覧のサムネイル・メモ優先表示は2026-07-22時点でWeb版のロジック・配線確認のみ完了、実機未確認
-
-### 思い出写真を最大3枚まで対応（複数枚保存・散らし配置表示）（2026-07-24実装、設計書144）
-上記「探訪チェックイン時の『思い出』機能」節（設計書121）は当初1スポットにつき写真1枚のみ（明示的にスコープ外だった「複数枚対応」）だったが、ユーザーから「卒業アルバム（design 141ブレスト）をいい感じにするため、最大3枚まで保存できるようにしたい」との要望を受け拡張した。モック（詳細シートは3枚のポラロイドを散らして重ねる配置、思い出を残すシートは3スロット横並び）を提示し承認済み。
-
-- **IndexedDBスキーマ変更（後方互換込み）**: `_openStampMemoryDB()`自体（`STAMP_MEMORY_DB_NAME`/`STAMP_MEMORY_STORE_NAME`/`keyPath:'spotId'`）は無変更。レコードの値を`{spotId, blob, updatedAt}`（1枚固定）から`{spotId, photos: Blob[], updatedAt}`（配列、最大3件）に変更。旧`_saveStampMemoryPhotoBlob()`/`_getStampMemoryPhotoBlob()`/`_getAllStampMemoryPhotoBlobs()`を`_saveStampMemoryPhotos()`/`_getStampMemoryPhotos()`/`_getAllStampMemoryPhotos()`に置き換え。**既存ユーザーが設計書121時点で保存済みの旧スキーマレコード（`blob`フィールドのみ）を読み取り時に自動的に`[blob]`として扱う後方互換処理を必須で含む**（マイグレーション処理は無し、読み取り時のフォールバックのみで自然に対応）
-- **インメモリキャッシュ配列化**: `_stampMemoryPhotoUrlCache`（`{spotId: objectURL}`）を`{spotId: objectURL[]}`（配列）に変更。利用箇所3つを配列対応: `initStampMapTab()`の一括読み込み（`_getAllStampMemoryPhotos()`）・`_refreshStampMemoryCacheForSpot(spotId)`（個別更新）・`_renderStampLevelRowComplete()`（状態C、design 108由来。design 136の対象外だった箇所で個人写真優先ロジックが残っていた。配列の`[0]`のみ使用、表示ロジック自体は無変更）・`_renderStampDetailMemorySection()`（配列全体を使い散らし配置で表示）
-- **「思い出を残す」シートを3スロット化**: `public/index.html`の`#stamp-memory-photo-box`（単一ボックス）を`#stamp-memory-photo-slots`（3スロット横並び、`data-slot="0/1/2"`）に置き換え。`_stampMemoryPickedBlob`（単一）→`_stampMemoryPickedBlobs`（配列、最大3、空きスロットは`null`）。旧`_showStampMemoryPhotoPreview()`/`_resetStampMemoryPhotoBox()`を、3スロット全体を一括再描画する共通関数`_renderStampMemoryPhotoSlots()`と`_resetStampMemoryPhotoSlot(slotIndex)`に統合・置き換え。`_pickStampMemoryPhoto()`は`_pickStampMemoryPhoto(slotIndex)`に変更（`_pickStampMemoryPhotoBlob()`本体はBlob1枚を返すだけの既存ヘルパーのため無変更）。`_openStampMemorySheet()`は既存写真（最大3枚）を配列で取得し各スロットへプリロード、`_saveStampMemory()`は`_stampMemoryPickedBlobs.filter(b => b)`（nullを除いた配列）を保存する
-- **スポット詳細シート「あなたの記録」: 散らし配置での複数枚表示**: `_renderStampDetailMemorySection(spot)`に、写真配列の枚数（1〜3）に応じたプリセット配置で表示する新規定数`STAMP_MEMORY_SCATTER_LAYOUTS`＋新規関数`_buildStampMemoryPhotoScatterHtml(photoUrls)`を追加。チェックイン日付キャプション（`_stampCheckinDateFor()`）は個々の写真ではなく、スタック全体の下に1回だけ表示する形に変更（写真ごとに同じ日付を繰り返す冗長さを避けるため）
-- **CSS**: 新規`.stamp-memory-photo-slots`（`display:flex`3分割）/`.stamp-memory-photo-slot`/`.stamp-memory-photo-slot--filled`、新規`.stamp-memory-polaroid-stack`/`.stamp-memory-polaroid`（散らし配置、`position:absolute`＋インラインstyleでレイアウトプリセットの`left`/`top`/`rotate`/`z-index`を個別指定）を追加。旧`.stamp-memory-photo-box`系（design 121の単一ボックス版）・`.stamp-detail-memory-photo-frame`系（design 121の1枚専用ポラロイド表示）は削除せず残置（参照元がなくなり死にクラス化するのみで実害なし）
-- **i18n**: `stampMemoryPhotoAddLabel`の**値のみ**変更（キー名は不変）: ja「写真を追加」→「追加」、en「Add a photo」→「Add」（3スロットで横幅が狭いため短縮。他に参照箇所がないことを確認済み）
-- onclick属性は既存の確立済みパターン（design 130で`_pickStampMemoryPhoto()`等のタッチガードを撤去し単純なonclick方式にしていた）をそのまま踏襲。新規スロット・削除✕ボタンとも新規touchendハンドラは追加していない
-- スコープ外（design 144時点で明示）: 写真の並び替え・特定の1枚だけ削除して他は残す高度な編集操作（3スロット全てへの個別✕ボタンで代替済み）、卒業アルバム機能自体（design 141ブレスト、まだ着手前）
-- データモデル・API（写真は引き続き端末内IndexedDBのみ、サーバー送信なし）は無変更。`server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260723d`→`20260724a`、app.js `?v=20260724e`→`20260724f`、`sw.js` CACHE_NAME=`sg-weekend-v694`→`v695`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での3スロット入力UI・散らし配置表示の見た目、design 121時点で既に1枚保存済みのユーザーが実際に3スロット化後も正しく読み込めるかの実機確認、複数枚同時保存→リロード後の表示は2026-07-24時点でロジック単体テスト・コード確認のみ完了、実機未確認
-
-### 探訪スタンプ帳の進捗バーに「解禁ライン」を視覚的に明示（2色セグメント＋🔓マーク）（2026-07-24実装、設計書145）
-コレクション一覧の状態B（解禁中・未全制覇）の進捗バー（design 83導入・design 111視認性強化）は単色フィルバーのみで、「あとどれだけチェックインすれば次のレベルが解禁されるか」（design 142のティア半数解禁）が視覚的に分からなかった。ユーザー要望「ロック解放と全制覇がポイントとして分かるようにしたい」を受け、モック3案（案1:マイルストーンドット／案2:2色セグメント／案3:progress以外の表現）を提示しユーザーが案2「2色セグメント」を選択・承認。
-
-- `_renderStampLevelRowInProgress(meta, spotsInLevel, nextTarget, lang, checkedCount, totalCount, level)`に第7引数`level`を追加（呼び出し元`_renderStampCollectionList()`の`.map(level => {...})`クロージャ内、既存呼び出しに`level`を渡すだけ）
-- 閾値計算はクライアント側で`server.js`の`computeUnlockedLevels()`と同じ式を再現: `STAMP_LEVEL_ORDER_CLIENT`内での位置から次のレベルが存在するか判定し（`special`は次レベルなし）、存在すれば`threshold = Math.ceil(total / 2)`（`total`はそのレベル自身の総数）。`thresholdPct = Math.min(100, Math.round((threshold / total) * 100))`
-- `thresholdPct !== null && thresholdPct < 100`のとき、`0〜閾値`区間を`.stamp-level-progress-seg1`（`var(--caramel-light)`）、`閾値〜現在値`区間を`.stamp-level-progress-seg2`（`var(--caramel)`濃色）の2色セグメントで塗り分け、閾値位置に`.stamp-level-progress-lockmark`（🔓、円形バッジ、`position:absolute;left:${thresholdPct}%`）を重ねる。それ以外（`special`＝次レベルなし、または`total=1`等の極小ケースで`thresholdPct=100`）は既存の単色`.stamp-level-progress-fill`表示のまま変更しない
-- **🔓マークは`.stamp-level-progress-track`の外（新規`.stamp-level-progress-track-wrap`の直接の子、trackと兄弟）に配置**: `.stamp-level-progress-track`は既存`overflow:hidden`（design 111由来）を持つため、track内部に配置すると15px前後のマーク円がtrackの高さ（12px）でクリップされてしまう。`-track-wrap`側は`position:relative;flex:1`（既存`.stamp-level-progress-track`が持っていた`flex:1`をこちらに移動）の単なるラッパーとし、マークはtrackの外側の絶対位置層に重ねる
-- 状態A（ロック中、`_renderStampLevelRowLocked()`）・状態C（全制覇済み、`_renderStampLevelRowComplete()`）は進捗バー自体を持たないため無変更。レジェンド文言（テキスト説明）は追加せず🔓アイコン単体で意味を伝えるミニマルな方針
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。閾値計算式はクライアント側で`server.js`の`computeUnlockedLevels()`と同じ式を再現するのみ（サーバー呼び出しの追加なし）
-- キャッシュバスティング: `index.html` app.css `?v=20260724a`→`20260724b`、app.js `?v=20260724f`→`20260724g`、`sw.js` CACHE_NAME=`sg-weekend-v695`→`v696`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での2色セグメント・🔓マークの見た目、`special`レベル（次レベルなし）で従来通り単色バーが表示されることは2026-07-24時点でNode単体ロジック検証・コード確認のみ完了、実ブラウザ・実機とも未確認
-- **⚠️ 本節（2色セグメント方式）はこの直後の設計書146により見た目部分のみ置き換えられている。以下「探訪スタンプ帳の進捗バーの解禁ライン表示を目盛り線＋🔓/🏁アイコンへ変更」節を参照。閾値計算ロジック自体（上記2〜3項目）はdesign 146でも変更なくそのまま有効**
-
-### 探訪スタンプ帳の進捗バーの解禁ライン表示を目盛り線＋🔓/🏁アイコンへ変更（2026-07-24実装、設計書146。設計書145の見た目部分のみを置き換え）
-設計書145実装・ローカルコミット直後、ユーザーが「すいません案1がいいです」とモック案1（目盛り線＋🔓ロックアイコン／🏁全制覇フラグ）への変更を希望。閾値計算ロジック自体（設計書145で実装済み、`server.js`の`computeUnlockedLevels()`と同じ半数切り上げ式をクライアント側で再現する部分）は無変更のまま流用し、バーの塗り方・マークの形（見た目）のみを差し替えた。
-
-- **バー本体は単色フィルに統一**: design 145で追加した2色セグメント（`.stamp-level-progress-seg1`/`.stamp-level-progress-seg2`）を削除し、design 83/111由来の単色`.stamp-level-progress-fill`（`linear-gradient(90deg, var(--caramel-light), var(--caramel))`）に一本化。design 145にあった「閾値なし時のみ単色」という条件分岐自体が不要になり削除
-- **解禁ライン＝目盛り線＋🔓アイコン**（トラック上部に配置）: 閾値位置（`thresholdPct`、design 145のロジックをそのまま再利用）に、新規`.stamp-level-progress-tick`（🔓アイコン＋縦線、トラックの上に浮かせて配置）を表示。`hasNextLevel`が偽（`special`）の場合はマーク自体を出さない（design 145から変更なし）
-- **全制覇ライン＝🏁アイコン**（トラック右端の上に常時表示、design 145にはなかった新規要素）: `hasNextLevel`の有無に関わらず、新規`.stamp-level-progress-flag`を無条件で表示する（`special`でも🏁のみは出る）
-- `_renderStampLevelRowInProgress()`のHTML生成部分（旧`trackInnerHtml`/`lockMarkHtml`分岐）を、`tickHtml`（🔓＋縦線、条件付き）＋固定の`.stamp-level-progress-fill`＋固定の`.stamp-level-progress-flag`（🏁）に置き換え
-- **CSS**: `.stamp-level-progress-seg1`/`.stamp-level-progress-seg2`/`.stamp-level-progress-lockmark`（design 145）を削除し、`.stamp-level-progress-tick`/`.stamp-level-progress-tick-icon`/`.stamp-level-progress-tick-line`/`.stamp-level-progress-flag`を新規追加。`.stamp-level-progress-track-wrap`に`padding-top:16px`を追加（トラック上部の目盛り線・🔓・🏁アイコン分の余白確保のため）。`.stamp-level-progress-track`自体（`overflow:hidden`、design 111由来）は無変更のまま維持（マークは`-track-wrap`側の絶対位置層に配置するためtrackのクリップの影響を受けない、design 145から続く設計）
-- `-track-wrap`のpadding追加に伴い、`.stamp-level-progress-row`の`align-items`を`center`→`flex-end`にbuilderの裁量で微調整（トラック本体とラベルの視覚的な下端を揃えるため。設計書に確定値の指定はなく実装時の調整方針として明示委任されていた）
-- 状態A（ロック中）・状態C（全制覇済み）・レジェンド文言なしの方針はdesign 145から無変更
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。閾値計算ロジックは`server.js`の`computeUnlockedLevels()`と同じ式をクライアント側で再現するのみで無変更
-- キャッシュバスティング: `index.html` app.css `?v=20260724b`→`20260724c`、app.js `?v=20260724g`→`20260724h`、`sw.js` CACHE_NAME=`sg-weekend-v696`→`v697`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での目盛り線・🔓/🏁アイコンの見た目、`align-items:flex-end`変更後のラベルとバーの視覚的な整列、`special`レベルで🔓が出ず🏁のみ表示されることは2026-07-24時点でNode単体ロジック検証・コード確認のみ完了、実ブラウザ・実機とも未確認（本タスク実施環境のサンドボックス制約によりPlaywrightでの実ブラウザ確認ができなかった）
-- **⚠️ 本節の「全制覇ライン＝🏁アイコン（目盛り線なし）」は直後の設計書147により置き換えられている。以下「進捗バーの全制覇マークにも目盛り線を追加＋絵文字をトロフィーに変更」節を参照。解禁ライン側（🔓・目盛り線・閾値計算）はdesign 147でも無変更のままそのまま有効**
-
-### 進捗バーの全制覇マークにも目盛り線を追加＋絵文字をトロフィーに変更（2026-07-24実装、設計書147。設計書146の全制覇マーク部分のみを置き換え）
-design 146実装後、ユーザーがスクリーンショット付きで「全制覇のメモリ（目盛り）あった方がよくない？」「絵文字はトロフィーで」とフィードバック。解禁ライン（🔓）側は目盛り線つきなのに全制覇ライン（🏁）側だけ目盛り線なしで見た目の統一感が欠けていたのを解消した。
-
-- `_renderStampLevelRowInProgress()`（`public/app.js`）の`.stamp-level-progress-flag`（🏁単独アイコン）を、`tickHtml`（🔓側）と同じ構造（アイコン＋目盛り線の`<span>`2つ）を持つ新規`flagHtml`に置き換え。絵文字は🏆（トロフィー）に変更、位置は`left:100%`（トラック右端）、`hasNextLevel`の有無に関わらず常時表示（design 146から変更なし）
-- **CSS**: `.stamp-level-progress-flag`（design 146）を削除し、新規`.stamp-level-progress-tick--end { transform: translateX(-100%); }`を追加。`.stamp-level-progress-tick`本体（design 146、`transform:translateX(-50%)`で中央揃え）は解禁ラインの目盛り線位置指定のままそのまま流用し、全制覇マーク側は`--end`修飾子で右揃えにオーバーライドすることでトラック右端からアイコンがはみ出さないようにした（新要素は`class="stamp-level-progress-tick stamp-level-progress-tick--end"`の2クラス併記）
-- **解禁ライン側（🔓アイコン・`tickHtml`・閾値計算ロジック`hasNextLevel`/`threshold`/`thresholdPct`）は一切変更していない**
-- `server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724c`→`20260724d`、app.js `?v=20260724h`→`20260724i`、`sw.js` CACHE_NAME=`sg-weekend-v697`→`v698`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での全制覇ライン目盛り線・🏆アイコンの見た目、右端でのはみ出し有無は2026-07-24時点でコード確認・curlによる本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-- **⚠️ 本節（目盛り線＋浮遊アイコン方式）は直後の設計書148により置き換えられている。以下「進捗バーを『アイコン直接乗せ＋数字は下に小さく』のコンパクト表示に変更」節を参照。閾値計算ロジック自体（設計書145から流用、`idx`/`hasNextLevel`/`threshold`/`thresholdPct`）はdesign 148でも無変更のままそのまま有効**
-
-### 進捗バーを「アイコン直接乗せ＋数字は下に小さく」のコンパクト表示に変更（案C）＋絵文字拡大（2026-07-24実装、設計書148。設計書146・147の見た目部分のみを置き換え）
-design 147のスクリーンショットに、ユーザーが「スマートじゃない」とフィードバック。🔓/🏆アイコン＋右の数字ラベルが密集して見える問題があった。モック3案（A: 数字を下に／B: アイコンをバーに直接乗せる／C: 両方合わせたコンパクト版）を提示し、ユーザーが案Cを選択、加えて「絵文字を少し大きく」と指定。
-
-- **「目盛り線＋浮遊アイコン」方式を廃止**: design 146・147で追加した`.stamp-level-progress-tick`（アイコン＋縦線がトラック上部に浮く構造）を削除し、アイコンをトラック内に直接重ねて配置する新規`.stamp-level-progress-icon`（`position:absolute;top:50%`でトラック中央に垂直センタリング）に統一。縦線（`-tick-line`）自体を廃止
-- **数字ラベルをバー下・右寄せの小さな表示に変更**: `.stamp-level-progress-row`（トラックと数字ラベルを横並びにしていた行）を廃止し、トラック→数字ラベル（`.stamp-level-progress-count`、`<b>チェック数</b> / 総数`形式）の縦積みレイアウトに変更
-- `_renderStampLevelRowInProgress()`（`public/app.js`）の`tickHtml`/`flagHtml`を、目盛り線を持たないシンプルな`<span class="stamp-level-progress-icon">`（🔓、閾値位置）・`<span class="stamp-level-progress-icon stamp-level-progress-icon--end">`（🏆、トラック右端、`hasNextLevel`の有無に関わらず常時表示、design 146・147から変更なし）に置き換え
-- **閾値計算部分（`idx`/`hasNextLevel`/`threshold`/`thresholdPct`、design 145から流用のロジック）は一切変更なし**
-- **CSS**: design 146・147の`.stamp-level-progress-row`/`.stamp-level-progress-tick`/`.stamp-level-progress-tick-icon`/`.stamp-level-progress-tick-line`/`.stamp-level-progress-tick--end`/`.stamp-level-progress-label`を削除し、`.stamp-level-progress-track-wrap`（`position:relative;margin-bottom:4px`）・`.stamp-level-progress-track`（`height:16px`）・`.stamp-level-progress-icon`（22px円、`font-size:14px`。design 147時点のアイコン`font-size:11px`より拡大＝ユーザーの「絵文字を少し大きく」要望への対応）・`.stamp-level-progress-icon--end`（`translate(-100%,-50%)`で右端はみ出し防止）・`.stamp-level-progress-count`（`text-align:right;font-size:11px`、`margin-bottom:10px`で`.stamp-card-list`との間隔をdesign 147時点と同程度に維持）に置き換え
-- 状態A（ロック中）・状態C（全制覇済み）・`special`レベル（次レベルなし、🔓は出ず🏆のみ表示）の既存挙動は無変更のまま維持
-- `server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724d`→`20260724e`、app.js `?v=20260724i`→`20260724j`、`sw.js` CACHE_NAME=`sg-weekend-v698`→`v699`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのアイコン直乗せ表示・数字ラベルの視認性、絵文字拡大後のバランスは2026-07-24時点でコード確認・`node --check`のみ完了、実ブラウザ・実機とも未確認（本タスク実施環境のサンドボックス制約によりPlaywrightでの実ブラウザ確認ができなかった）
-
-### 進捗バーのアイコン背景を透過に変更（2026-07-24実装、設計書149）
-design 148で導入した`.stamp-level-progress-icon`（🔓/🏆アイコン）は白い円形バッジ背景（`background:var(--warm-white)`＋リング状`box-shadow`）を持っていたが、ユーザーが「大きさは大丈夫、絵文字透過にできる？」と要望。サイズ（22px/font-size 14px）は変更せず、背景装飾のみ撤去した。
-
-- `public/app.css`の`.stamp-level-progress-icon`: `background`を`var(--warm-white)`→`transparent`に変更、`box-shadow`（リング＋落ち影）を削除し、代わりに`filter:drop-shadow(0 1px 2px rgba(44,36,32,0.35))`を追加（バー地色〈sand/caramel系〉の上でも絵文字の輪郭が沈まないようにする最小限の対応）。`border-radius:50%`は背景が透明になった今は実質意味を持たないが、実害がないため削除せず残置（設計書の裁量指定通り）
-- サイズ（22px/font-size 14px、design 148で確定済み）・アイコンの配置ロジック（`.stamp-level-progress-icon--end`含む）・数字ラベルの位置・閾値計算ロジックはいずれも無変更
-- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724e`→`20260724f`、`sw.js` CACHE_NAME=`sg-weekend-v699`→`v700`（`app.js`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での透過アイコン表示・drop-shadowによる可読性は2026-07-24時点でCSS構文確認のみ完了、実ブラウザ・実機とも未確認
-
-### 進捗バーの絵文字をもう一段階拡大（2026-07-24実装、設計書150）
-design 149（透過化）直後、ユーザーが「絵文字もうちょい大きくしてもいいかな」と追加要望。
-
-- `public/app.css`の`.stamp-level-progress-icon`: `width`/`height`を22px→26px、`font-size`を14px→17pxに拡大。他プロパティ（`position`/`transform`/`background:transparent`/`filter`/`z-index`、design 149時点）は無変更
-- 配置ロジック（`left`のインラインstyle・`.stamp-level-progress-icon--end`修飾子）・数字ラベル（`.stamp-level-progress-count`）・閾値計算ロジックはいずれも無変更
-- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724f`→`20260724g`、`sw.js` CACHE_NAME=`sg-weekend-v700`→`v701`（`app.js`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での拡大後の視認性・バランスは2026-07-24時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
-
-### 進捗バーのアイコンの縦位置をバー下端に揃える（2026-07-24実装、設計書151）
-design 150（絵文字拡大）直後、ユーザーが「絵文字は下に合わせて。もしくは上下を合わせて」と追加要望（第一希望の「下に合わせる」で実装）。トラック中心基準（`top:50%`）だとCSSボックス上は数値的に中央揃えでも、絵文字グリフ自体の視覚的重心が上寄りになりやすいフォント特性のため、見た目上バーの上に浮いて見えていたと推測される。
-
-- `public/app.css`の`.stamp-level-progress-icon`: `position/top:50%`→`bottom:0;top:auto`、`transform:translate(-50%,-50%)`→`translateX(-50%)`に変更（アイコンの下端をトラックの下端に揃える）。`.stamp-level-progress-icon--end`も`transform:translate(-100%,-50%)`→`translateX(-100%)`にX軸のみへ変更
-- 他プロパティ（width/height/border-radius/background/display/align-items/justify-content/font-size/line-height/filter/z-index、design 150時点のまま）・サイズ・透過背景（design 149）・水平方向の配置ロジック（`left`のインラインstyle）は無変更
-- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724g`→`20260724h`、`sw.js` CACHE_NAME=`sg-weekend-v701`→`v702`（`app.js`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での下端揃え後の見た目バランスは2026-07-24時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認
-
-### 卒業アルバム機能 フェーズ1: 帰国予定日フィールド＋入口ゲート＋アルバム画面（実データ表示、保存・共有は次フェーズ）（2026-07-24実装、設計書152）
-design 141ブレストで確定した「卒業アルバム」構想の実装第一弾。design 122の「来星日」フィールドと対をなす「帰国予定日」フィールドを追加し、帰国が近づいたタイミングで探訪の記録を振り返る「卒業アルバム」画面を新設した。データモデル・生成ロジックは既存の探訪スタンプ帳（design 69〜151）・思い出機能（design 121・144）の蓄積データをそのまま流用し、新規データ収集は行っていない。
-
-- **帰国予定日フィールド（`app_departure_date`、来星日と完全に対称の実装）**: `public/index.html`の来星日欄の直後に同一構造で追加（ピル型カスタム表示`#departure-date-display`＋透明化した`<input type="date" id="departure-date-input">`）。`public/app.js`に`_formatDepartureDateDisplay(value, lang)`（来星日版と同じ日付整形＋▼インジケーター付与）・`_saveDepartureDate(value)`（`localStorage`書き込み→表示更新→`_renderGraduationAlbumLink()`→`_syncBackupToServer()`）を追加。`initSettingsProfile()`に初期値セット処理を追加、`min`属性（当日日付、過去日付選択不可。来星日の`max`属性と対称）を設定。**来星日の記念日通知（design 128）のような通知機能は帰国予定日には付けていない**（スコープ外）
-- **バックアップ統合**: `_collectBackupPayload()`に`departureDate`フィールドを追加、`_applyRestoredBackup()`に`arrivalDate`と同じ「ローカル未設定時のみ採用」パターンでマージロジックを追加
-- **i18n**: 新規キー`labelDepartureDate`（ja「帰国予定日」/en「Departure Date」）・`graduationAlbumLinkLabel`（ja「🎓 卒業アルバムを見る」/en「🎓 View Graduation Album」）をja/en同時追加
-- **探訪画面ヘッダーへの入口リンク（表示条件: 帰国予定日の1ヶ月前〜）**: `#stamp-residency-counter`の直後に`#graduation-album-link`（初期`display:none`）を新規追加。新規関数`_isGraduationAlbumUnlocked()`（`daysUntil <= 30`で`true`。**帰国日を過ぎた後も非表示に戻さない仕様〈下限なし〉**、過去に遡って記録を振り返れなくなるのは不自然なための意図的な設計）・`_renderGraduationAlbumLink()`（表示切替のみ）を追加。`initCourseScreen()`内`_renderResidencyCounter();`の直後に`_renderGraduationAlbumLink();`を追加し、画面に入るたびに再評価
-- **卒業アルバム画面（新規フルスクリーンオーバーレイ、実データ表示）**: `#graduation-album-screen`（`position:fixed;inset:0;z-index:3720`、既存の探訪関連モーダル群3700〜3710番台の直後）。ユーザー承認済みモックアップ（v2）のCSS/HTML構造をそのまま実装: 5セクション構成（`.sec-cover`表紙／`.sec-badges`実績バッジ／`.sec-photos`思い出フォト／`.sec-area`エリアの事実／`.sec-closing`クロージング、各間に`.sec-divider`区切り）。モックアップのCSSクラスのうち`.section-title`は既存クラス（20px serif見出し、別用途）と衝突するため`.ga-section-title`に改名して移植。`.share-btn-row`/`.share-btn`（画像保存・シェアボタン）は**今回実装しない**（フェーズ2スコープ、html2canvas等の新規ライブラリが必要なため）
-- **新規関数`_computeGraduationAlbumData()`**（async）: 表紙用の在住日数・年月（`_renderResidencyCounter()`と同じ計算式）、実績バッジ（`STAMP_LEVEL_ORDER_CLIENT`の各レベルで`total>0`のもののみ、checked/total）、思い出フォト（`_stampProgress.checkinLog`を時系列順に見て写真が存在するスポットを`_getAllStampMemoryPhotos()`〈design 144で実装済み〉から最大3件収集、`URL.createObjectURL()`で一時URL化）、メモの引用（`_getStampMemos()`から最新更新1件）、エリアの事実（チェック済みスポットのエリア別集計から最多エリア、および最初にチェックインしたスポット名）を算出して返す
-- **画像URLの後始末**: `photoUrls`は`URL.createObjectURL()`による一時URL。既存の使い回しキャッシュ`_stampMemoryPhotoUrlCache`とは別の、アルバム表示専用の一時変数`_graduationAlbumPhotoUrls`で保持し、`closeGraduationAlbum()`で`URL.revokeObjectURL()`を呼んで解放する。`openGraduationAlbum()`冒頭にも念のための解放処理を追加済み（連続オープン時の取りこぼし対策）
-- **データが少ない場合のフォールバック**: 実績バッジ0件・写真0枚（`.sec-photos`ごと非表示）・メモ0件（`.photo-quote`のみ非表示）・エリア情報なし（`.sec-area`ごと非表示）はそれぞれセクション単位で非表示化。来星日未設定時は表紙の日数・年月表示に既存`genreStatusUnset`（未設定）キーを流用
-- **`closeAllPopups()`に`closeGraduationAlbum()`の呼び出しを追加**（design 96と同型の必須対応、探訪タブでアルバムを開いたままボトムナビで他画面に切り替えた際に閉じ残るバグを防止）
-- **スコープ外（フェーズ2以降）**: 保存・共有機能（画像として保存/シェア、html2canvas等の新規ライブラリが必要）、帰国予定日の記念通知、BKK/SYD対応、アルバムの複数バージョン保存・閲覧履歴、エリア制覇バッジ（design 77、現在非表示中）データの利用
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。全て`public/`配下のフロントエンドのみの変更
-- キャッシュバスティング: `index.html` app.css `?v=20260724h`→`20260724i`、app.js `?v=20260724k`（末尾, `?v=20260724j`から連番）、`sw.js` CACHE_NAME=`sg-weekend-v702`→`v703`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での帰国予定日入力欄の見た目、卒業アルバム入口リンクの表示切替タイミング、アルバム画面の5セクション表示（実績バッジのグラフ・思い出フォトのコラージュレイアウト・エリアの事実の文言）、画面を開閉した際のメモリリーク有無は2026-07-24時点でロジック検証（`node --check`・簡易日数計算シミュレーション）のみ完了、実ブラウザ・実機とも未確認
-
-### 探訪スタンプ帳のレベル見出しとカードをデコンパクト化（見出し=案1、カード=案2）（2026-07-24実装、設計書153）
-design 144〜152の積み重ねで探訪スタンプ帳のレベル見出し・カードが視覚的に重くなったとのユーザーフィードバックを受け、見出しは「メインラベル（絵文字＋レベル名）とサブラベル（年数目安）を視覚階層で分離」、カードは「サムネイル・余白・フォントを縮小し枠線を除去してフラット化」する軽量化を行った。モック3案（見出し軽量化＋フラットカード／見出しミニマル＋圧縮カード／余白拡大のみ）からユーザーが「案1の見出しと案2のリストカードで」と組み合わせを選択。
-
-- **レベル見出し（`_renderStampLevelRowInProgress()`、状態Bのみ対象）**: `public/app.js`の`.stamp-level-section-title`生成部分を、絵文字＋レベル名の`.stamp-level-title-main`（15px・太字）と年数目安の`.stamp-level-title-sub`（10px・グレー）の2パーツに分離。`_stampLevelYearRange(meta)`の戻り値自体（design 112・140で確定済みの「目安：在住歴◯年」等の文言）は無変更、括弧`（）`は付けずサブラベルの視覚的な弱さで補足情報であることを表現
-- **カード（`.stamp-card`、状態Bのカード一覧のみ対象）**: `public/app.css`でサムネイル56px→40px、カードpadding `12px 14px`→`8px 10px`、枠線`1px solid var(--sand-dark)`を除去しフラット化、`border-radius` 14px→12px、リスト間隔`gap` 8px→6px。連動して`.stamp-card-thumb-placeholder`（22px→17px）・`.stamp-card-done-mark`（38px→26px、font-size 15px→11px、border 2.5px→2px）・`.stamp-card-name`（14px→13px）・`.stamp-card-area`（11px→10px）・`.stamp-card-date`（13px→12px）を比例縮小
-- **既存機能はすべて維持**: 制覇済みスタンプ印（`.stamp-card-done-mark`）・チェックイン日付表示（`.stamp-card-date`）・次はここタグ（`.stamp-card-next-tag`）・チェック済み背景色（`.stamp-card--checked`）はいずれもクラス・ロジックとも削除せず、サイズ・余白のみ縮小
-- **状態A（`_renderStampLevelRowLocked()`）・状態C（`_renderStampLevelRowComplete()`、`.stamp-complete-card`系）・全制覇バッジの展開カード一覧は今回のスコープ外、無変更**
-- `server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724i`→`20260724j`、app.js `?v=20260724k`→`20260724l`、`sw.js` CACHE_NAME=`sg-weekend-v703`→`v704`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での見出し2段組み表示・カードのフラット化後の見た目バランス（枠線除去による他要素との境界の視認性）は2026-07-24時点で`node --check`構文検証・CSS波括弧バランス確認・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 探訪スタンプ帳の見出し・カードのサイズを少し拡大（2026-07-24実装、設計書154。design 153が縮めすぎだったための調整）
-design 153実装直後、ユーザーが「ちょっと細かくなりすぎたかな。デザインは今のままでいいので文字サイズとスポットのカードを少し大きくして見やすくして」とフィードバック。レイアウト構造（見出し2階層構成・カードのフラット化）自体は維持し、`public/app.css`のサイズ数値のみ引き上げた。
-
-- 変更14項目（design 153時点→design 154）: `.stamp-level-title-main`(15px→16px)・`.stamp-level-title-sub`(10px→11px)・`.stamp-card`(padding 8px 10px→10px 12px、gap 10px→11px)・`.stamp-card-list`(gap 6px→7px)・`.stamp-card-thumb`/`.stamp-card-thumb-img`/`.stamp-card-thumb-placeholder`(40px→46px、border-radius 9px→10px、プレースホルダーfont-size 17px→19px)・`.stamp-card-done-mark`(26px→30px、font-size 11px→13px、border-width 2px→2.2px、位置オフセット-5px→-6px)・`.stamp-card-name`(13px→14px)・`.stamp-card-area`(10px→11px)・`.stamp-card-date`(12px→13px)
-- `public/app.js`は無変更（HTML生成ロジック自体はdesign 153で確定済みのため今回は触っていない）。状態A（`_renderStampLevelRowLocked()`）・状態C（`_renderStampLevelRowComplete()`）・全制覇バッジの展開カード一覧はdesign 153から継続してスコープ外、無変更
-- `server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724j`→`20260724k`、`sw.js` CACHE_NAME=`sg-weekend-v704`→`v705`（`app.js`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での拡大後の見た目バランス（カード高さ増加によるスクロール量変化含む）は2026-07-24時点で`git diff`による表との突き合わせ・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 探訪スタンプ帳カードのエリア表記をカード右端に配置（2026-07-24実装、設計書155）
-design 154直後、ユーザーが「エリアはカードの右端で」と指定。`_renderStampLevelRowInProgress()`（`public/app.js`）内のカード生成HTMLを変更し、エリア表記（`.stamp-card-area`）を`.stamp-card-body`内の`.stamp-card-area-row`から取り出し、`.stamp-card`の直接の子要素として右端に配置（新規`<span class="stamp-card-area-right">`）した。チェックイン日付（`.stamp-card-date`）は`.stamp-card-body`内、名前の下に残る（`.stamp-card-area-row`ごと廃止）。
-
-- `public/app.css`: `.stamp-card-area-row`・`.stamp-card-area`（旧クラス、他に参照箇所なし）を削除し、新規`.stamp-card-area-right`（flex-shrink:0, font-size:11px, color:var(--warm-gray), margin-left:auto, padding-left:8px, text-align:right, white-space:nowrap）を追加。`.stamp-card`は既存`align-items:center`のため右端のエリア表記はカード縦方向中央に自然に揃う
-- 状態A（`_renderStampLevelRowLocked()`）・状態C（`_renderStampLevelRowComplete()`）・全制覇展開カード一覧は対象外（他に`.stamp-card-area-row`の参照箇所がないため無影響）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724k`→`20260724l`、app.js `?v=20260724l`→`20260724m`、`sw.js` CACHE_NAME=`sg-weekend-v705`→`v706`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのカード右端エリア表記の見た目バランスは2026-07-24時点で`git diff`によるコード照合・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 卒業アルバム画面の下端がボトムナビに隠れて見切れる不具合を修正（2026-07-24実装、設計書156）
-design 152実装後、ユーザーがスクリーンショットで「一番下切れてるね」と報告。クロージングセクションのブランドライン（「おでかけNavi と歩いたシンガポール暮らし」）がボトムナビの裏に隠れて見えなくなっていた。
-
-- `public/index.html`の`#graduation-album-content`の`padding-bottom`を`calc(40px + env(safe-area-inset-bottom,0px))`→`calc(84px + env(safe-area-inset-bottom,0px))`に変更し、既存`.plan-modal-body`と同じボトムナビ回避パディング値に統一した。`#graduation-album-screen`はz-index:3720の全画面オーバーレイだが、本プロジェクトの既存方針（CLAUDE.md「z-index方針」節）によりbottom-nav（z-index:9999）は常に最前面に表示され続けるため、スクロール末尾のコンテンツがbottom-navの高さ分隠れないよう十分な下部余白が必要だった
-- アルバム画面の他のレイアウト・データ生成ロジック（design 152〜155）は無変更。`public/app.js`・`public/app.css`・`server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.js `?v=20260724m`→`20260724n`、`sw.js` CACHE_NAME=`sg-weekend-v706`→`v707`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での下部余白拡大後のクロージングセクション表示は2026-07-24時点で`git diff`によるコード照合・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 設定画面のニックネーム欄を非表示化（2026-07-24実装、設計書157）
-ユーザー「ニックネーム入らなくなったので非表示にして」。マイコース非表示化（design 94）等により、ニックネームの実用上の出番が薄れたための対応と推測。既存の「機能は残しつつ表示のみ止める」プロジェクト方針（design 94/95/102等）を踏襲し、削除ではなく非表示化した。
-
-- `public/index.html`のみ変更。設定画面「プロフィール」セクションの「ニックネーム＋アバター」`.settings-item`ブロックのうち、ラベル（`data-i18n="labelNickname"`）と`#nickname-input`に`style="display:none;"`を追加。**アバター選択ボタン（`#avatar-preview`）はそのまま表示維持**（ユーザーの発言はニックネームのみを指しているため）
-- `oninput`/`onblur`ハンドラ、`#avatar-picker`アバター選択パネル、`toggleAvatarPicker()`/`selectAvatar()`は無変更のまま残置（復活時は`display:none`を外すだけでよい）
-- `public/app.js`・`public/app.css`・`server.js`・データファイルは無変更（`initSettingsProfile()`内のニックネーム初期化処理・`getUserName()`も無変更のまま残置。`getUserName()`の呼び出し元〈コース公開機能等〉のロジックも無変更、`user_name`未設定時は既存の`|| '匿名'`フォールバックがそのまま機能する）。`pm2 restart`不要
-- キャッシュバスティング: `index.html` app.js `?v=20260724n`→`20260724o`、`sw.js` CACHE_NAME=`sg-weekend-v707`→`v708`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのレイアウト崩れ有無（アバターボタンのみが右寄せで残る見た目バランス）は2026-07-24時点で`git diff`によるコード照合・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 設定画面のアバター選択も非表示化（ニックネーム欄ごと1行を非表示に統一）（2026-07-24実装、設計書158）
-design 157〈ニックネーム非表示〉直後、ユーザー「アバターも非表示で」。ニックネーム・アバターは同じ`.settings-item`1行に同居しており、両方を個別に非表示化すると行全体が空になるため、個別要素ではなく行自体を非表示にした。
-
-- `public/index.html`のみ変更。「ニックネーム＋アバター」の`.settings-item`ブロック（design 157時点の中身、239-253行目付近）自体に`style="gap:10px;display:none;"`を追加（個別要素への`display:none`の重ね掛けではなく、行全体を1箇所で非表示にすることで空のパディング行が残る見た目の問題を避ける）
-- ブロック内部（ニックネーム欄・アバターボタン等）は design 157 実装時点のまま無変更。`toggleAvatarPicker()`・`#avatar-picker`アバター選択パネル・`selectAvatar()`は削除せず残置（復活時はこの1箇所の`display:none`を外すだけでよい）
-- `public/app.js`・`public/app.css`・`server.js`・データファイルは無変更（`initSettingsProfile()`・`getUserName()`も無変更のまま残置）。`pm2 restart`不要
-- キャッシュバスティング: `sw.js` CACHE_NAME=`sg-weekend-v708`→`v709`（`app.js`/`app.css`は内容変更なしのため`?v=`据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのレイアウト崩れ有無（行全体非表示後のプロフィールセクション余白バランス）は2026-07-24時点で`git diff`によるコード照合のみ完了、実ブラウザ・実機とも未確認
-
-### 予定表の予定タイトル・探訪スタンプ帳のスポット名を見出しフォント（Kaisei Opti）に統一（2026-07-24実装、設計書159）
-フォント全体整理の会話の中で、ユーザーが予定表の予定タイトル（スクリーンショットで「体操教室」を例示）を指摘。調査の結果、`.plan-card-title`（予定表の予定タイトル）・`.stamp-card-name`（探訪スタンプ帳のスポット名）はいずれも他の見出し類（`.plan-modal-title`・`.course-timeline-name`・`#stamp-spot-detail-name`等）と異なりNoto Sans JP（ゴシック）のままで、Kaisei Opti（明朝系セリフ）が適用されていないことが判明。ユーザーが統一を選択した。
-
-- `public/app.css`の2箇所に`font-family: 'Kaisei Opti', serif;`を追加（他の設定値・プロパティは一切無変更）: `.plan-card-title`（`font-size:16px; font-weight:700; color:var(--midnight); margin-bottom:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;`はそのまま）、`.stamp-card-name`（`display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:14px; font-weight:700; color:var(--midnight);`はそのまま）
-- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.css `?v=20260724l`→`20260724m`、`sw.js` CACHE_NAME=`sg-weekend-v709`→`v710`（`app.js`は内容変更なしのため`?v=`据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新フォント表示・文字幅変化によるタイトル省略（`text-overflow:ellipsis`）位置への影響は2026-07-24時点で`git diff`によるコード照合・curlでのWeb版配信反映確認のみ完了、実ブラウザ・実機とも未確認
+- **API**: `GET/PUT /api/user-plans/me`（`requireAppAuth`必須、`data/user-plans/{userId}.json`に`{userId, salt, encryptedData, updatedAt}`のみ保存）
+- **UI**: 設定画面「アカウント」セクション内、`renderBackupSection()`＋パスフレーズ入力シート（`#backup-passphrase-sheet`）
+- 実装の詳細経緯（タッチ不発バグ修正・パスフレーズシートのレイアウト修正・必須化とその撤回等）はコード内コメント・git履歴を参照
 
 ### アプリ全体のフォント統一感チェック（見出し役割のテキストにKaisei Optiを横展開）（2026-07-24実装、設計書160）
 design 159（予定タイトル・スタンプ名のフォント統一）の流れで、ユーザーが「全体的にチェックして統一感を持たせて」と依頼。`public/app.css`内の「タイトル/名前」系クラス26個を全件洗い出し、既存の確立済みルール（本文=Noto Sans JP、見出し・固有名詞タイトル=Kaisei Opti明朝系セリフ）に沿っていないものを特定し、6箇所を追加対応した。
@@ -1003,261 +188,6 @@ design 159（予定タイトル・スタンプ名のフォント統一）の流�
 - `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）
 - キャッシュバスティング: `index.html` app.css `?v=20260724m`→`20260724n`、`sw.js` CACHE_NAME=`sg-weekend-v710`→`v711`（`app.js`は内容変更なしのため`?v=`据え置き）
 - **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での6箇所の新フォント表示・文字幅変化によるレイアウト崩れ有無は2026-07-24時点で`git diff`によるコード照合・curlでのWeb版配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 来星日登録＋探訪画面での在住日数カウンター表示（2026-07-23実装、設計書122）
-ゲーミフィケーション拡張ブレスト（デイリーストリーク議論）の中で出た案の一つ「在住日数カウンター常時表示」を実装。ユーザー要望「来星日を登録して、今日で何日！という表示をどこかにしたい」を受け、探訪画面ヘッダーに「在住 2年3か月（xx日）」の形式で表示することで確定。
-
-- **データモデル**: 新規`localStorage`キー`app_arrival_date`（ISO日付文字列`"YYYY-MM-DD"`）。既存バックアップ機構に統合: `_collectBackupPayload()`に`arrivalDate`フィールドを追加、`_applyRestoredBackup()`に`who`/`avatar`と同じ「ローカル未設定時のみ採用」パターンでマージロジックを追加（単一スカラー値のプロフィール項目のため`updatedAt`比較マージは不要）
-- **設定画面での入力**: プロフィールセクション「都市」選択行の直後にネイティブ`<input type="date" id="arrival-date-input">`を新規追加。既存`openDatePickerSheet()`（週末プランニング用の近未来週チップ）は過去の任意日付選択に不向きなため再利用せず、Web・iOS Capacitorとも標準サポートのネイティブ`<input type=date>`を新規採用。`initSettingsProfile()`に初期値セット処理と、`max`属性（当日日付を動的セット、未来日付選択をUI側でも防止）を追加。新規関数`_saveArrivalDate(value)`（`localStorage`書き込み→`_renderResidencyCounter()`再描画→`_syncBackupToServer()`同期の3ステップ、未入力への変更＝クリアはネイティブ日付入力のクリア操作にそのまま委ね専用ボタンは追加していない）
-- **探訪画面ヘッダーでのカウンター表示**: `.course-screen-header`内`.course-tab-bar`の直後に`#stamp-residency-counter`（初期`display:none`、未設定時はそのまま非表示。設定を促す誘導文言は今回追加せずスコープ外）を新規追加。新規関数`_formatResidencyYM(years, months, lang)`（ja「{年}年{月}か月」〈0年時は年を省略〉/en「{年}yr(s) {月}mo」）・`_renderResidencyCounter()`（`_getStampMemos()`/`_setStampMemoText()`の直後に配置）。`initCourseScreen()`の`await switchCourseTab('map');`直後に`_renderResidencyCounter();`を追加し、画面に入るたびに最新の日数へ再計算（日付またぎにも自然に対応）
-- **日付計算ロジック**: 経過日数（`Math.round((todayMid - arrivalMid) / 86400000)`、実日数差）と年月表記（`getFullYear()`/`getMonth()`/`getDate()`ベースのカレンダー境界計算、`today.getDate() < arrival.getDate()`のとき`months--`、`months<0`のとき`years--; months+=12`という繰り下げロジック）を独立して算出。未来日付（`days<0`）はフェイルセーフとして非表示扱い
-- **i18n新規キー2個**（ja/en同時）: `labelArrivalDate`（来星日/Arrival Date）・`residencyCounterLabel`（在住 {ym}（{days}日）/{ym} in Singapore ({days} days)）。`{ym}`は`_formatResidencyYM()`内でJS側で組み立てた複合文字列を`.replace()`する設計（`{y}`/`{m}`個別キーは作らない、既存`stampLevelUnlockSubtext`と同様の前例踏襲）
-- **既存の探訪レベル解禁条件（チェックイン数ベースの`STAMP_LEVEL_GATES`）への影響なし**（本カウンターは表示専用）。ホーム画面など他画面への表示・未設定時の入力誘導バナー・年間振り返り機能はスコープ外
-- `server.js`・データファイルは無変更（フロントエンドのみ、`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260722h`→`20260723a`、`sw.js` CACHE_NAME=`sg-weekend-v674`→`v675`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での来星日入力欄・在住日数カウンター表示・日付計算結果の実機表示は2026-07-23時点でWeb版のロジック検証（8ケースの手計算照合含む）のみ完了、実機未確認
-
-### 来星日入力欄の表示崩れ修正（カスタムフォーマット表示への切り替え）（2026-07-23実装、設計書123）
-設計書122実装後、実機（TestFlight）で来星日入力欄が「1/10/15」のような判読しづらい圧縮表示になる不具合が確認された。保存データ自体（`app_arrival_date`）・在住日数カウンターの計算結果は正常だったため、ネイティブ`<input type="date">`の「閉じた状態」表示がWKWebView上でカスタムCSS（`border:none`/`text-align:right`等）と干渉し、OS標準のロケール依存フォーマットが圧縮された形で表示されていたのが原因と推測される（ネイティブdate input表示のブラウザ内部レンダリングでテキストコンテンツとして直接制御できないため確証はないが、CSS競合の可能性が高いと判断）。
-
-- **方針**: ネイティブ`<input type="date">`表示のフォーマットに依存せず、アプリ側で完全にフォーマットを制御するカスタム表示ラベルに切り替え。`<input type="date">`自体は透明化（`position:absolute;inset:0;opacity:0`）して「タップで日付ピッカーを開く」ためだけの機能レイヤーとして残す（既存の`.city-select-wrapper::after`と同系統の「ネイティブ要素を透明化し独自表示を重ねる」パターン）
-- **マークアップ変更**: `public/index.html`の来星日入力行を、`position:relative`ラッパーの中に`<span id="arrival-date-display">`（表示用、`pointer-events:none`）＋透明化した`<input id="arrival-date-input" type="date">`（タップ領域）を重ねる2層構成に変更
-- **新規関数`_formatArrivalDateDisplay(value, lang)`**（`public/app.js`）: ja「2015年10月1日」形式、en「Oct 1, 2015」形式で整形。未設定・不正値（`isNaN`判定）は既存`genreStatusUnset`（「未設定」/「Not set」）キーを再利用（新規i18nキー追加なし）
-- **反映箇所**: `initSettingsProfile()`の来星日初期値セット処理（`max`属性のセットも既存`fmtDateKey(new Date())`ヘルパーを使う形に統一）・`_saveArrivalDate(value)`の両方から`#arrival-date-display`のテキストを更新
-- **`_renderResidencyCounter()`本体は無変更**（既に正しく動作していたため対象外）。バックアップpayload・復元ロジックも無変更（保存データ自体は最初から正しかったため）
-- `server.js`・データファイルは無変更（フロントエンドのみ、`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723a`→`20260723b`、`sw.js` CACHE_NAME=`sg-weekend-v675`→`v676`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: 来星日入力欄のカスタム表示が正しいフォーマットで表示されること、タップで日付ピッカーが開くこと、選択後に表示が正しく更新されることは2026-07-23時点でWeb版の配信確認のみ完了、実機未確認
-
-### ⚠️ 来星日を未設定に戻すリセットボタンを追加（2026-07-23実装、設計書124 → 同日設計書126で削除済み。本節は歴史的経緯として残置）
-設計書123で来星日入力欄を「透明化した`<input type="date">` + カスタム表示span」構成に変更した結果、ネイティブdate inputの「閉じる（クリア）」操作の見た目（ブラウザ標準の✕アイコン等）も透明化されて見えなくなり、一度設定した来星日をクリアする手段が事実上失われた。ユーザーから「設定でも未設定に戻せるようにしたい」との要望を受け対応した。
-
-- `public/index.html`: 来星日表示の隣に、値が設定されている時のみ表示される✕リセットボタン（`#arrival-date-reset-btn`、初期`display:none`）を追加。既存の`position:relative`ラッパー（`#arrival-date-display`＋`#arrival-date-input`）を`display:flex;align-items:center;gap:8px;`の外側コンテナで包み直した
-- `public/app.js`: 新規関数`_resetArrivalDate()`（`#arrival-date-input`の値をクリアし`_saveArrivalDate('')`を呼ぶ）を追加。`initSettingsProfile()`の来星日初期化箇所・`_saveArrivalDate(value)`の両方にリセットボタンの表示切り替え（`value ? 'flex' : 'none'`）を追加
-- **設定画面のtouchendデリゲーション一覧（`public/app.js`、`#delete-account-btn`等と同じ並び）に`#arrival-date-reset-btn`の判定行を追加済み**（CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知アンチパターン——ガードのみ付与しtouchendハンドラ登録を忘れると実機タップが機能しなくなる——を踏まえた必須対応）
-- リセット時の確認ダイアログ（`confirm()`）は付けない設計判断（バックアップ無効化等と異なりデータ喪失の重大性が低い単一プロフィール項目のため）。「未設定」表示ロジック自体（`_formatArrivalDateDisplay('')`）は設計書123で実装済みのため変更なし。新規i18nキー追加なし
-- `server.js`・データファイルは無変更（フロントエンドのみ、`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723b`→`20260723c`、`sw.js` CACHE_NAME=`sg-weekend-v676`→`v677`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での✕ボタンのタップ精度・表示/非表示切り替えの見た目は2026-07-23時点でWeb版の配信確認のみ完了、実機未確認
-
-### 来星日表示を他のプロフィール項目と同じピルボタン風に統一（2026-07-23実装、設計書125）
-「都市」（`.city-select`）・「一緒に行く人」（`#settings-who-summary`）・「ジャンル・興味」は全て縁取りのある丸ボタン風の見た目で統一されているが、「来星日」（設計書123・124）は素のテキスト＋透明化した`<input type="date">`という構成のため見た目だけ浮いていた。ユーザーが実機スクリーンショットで「他と揃えられないか、ボタンみたいな感じで」と指摘し対応した。
-
-- `public/index.html`: `#arrival-date-display`に`#settings-who-summary`と同じピルスタイル（`display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);pointer-events:none;`）のインラインスタイルを追加。`<input type="date">`（透明化してタップ領域として重ねる構成、設計書123）・✕リセットボタン（設計書124）の構造・機能はいずれも無変更、見た目のみの調整
-- `public/app.js`: `_formatArrivalDateDisplay(value, lang)`を、末尾に「▼」インジケーター（`<span style="font-size:11px;color:var(--warm-gray);">▼</span>`、`#settings-who-summary`内`#settings-who-arrow`相当の装飾）を付加したHTML文字列を返すよう変更。来星日はタップで直接ネイティブピッカーが開く一段構成のため、`#settings-who-arrow`のような開閉トグルに応じた`transform`回転アニメーションは追加していない（固定表示のみ）。既存の日付フォーマットロジック自体（ja「2015年10月1日」/en「Oct 1, 2015」/未設定は`genreStatusUnset`キー再利用）は無変更、IIFEで包む形に再構成のみ
-- 戻り値にHTMLタグが含まれるようになったため、呼び出し元2箇所（`initSettingsProfile()`の来星日初期値セット処理・`_saveArrivalDate()`）の代入方法を`textContent`から`innerHTML`に変更。`value`はネイティブ`<input type="date">`が返す値のためユーザー自由入力ではなくXSSリスクはない
-- 新規i18nキー追加なし（「▼」は既存`#settings-who-arrow`と同様シンボル表示のためi18n対象外）
-- `server.js`・データファイルは無変更（フロントエンドのみ、`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723c`→`20260723d`、`sw.js` CACHE_NAME=`sg-weekend-v677`→`v678`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのピルスタイル表示・▼インジケーターの見た目バランスは2026-07-23時点でWeb版の配信確認のみ完了、実機未確認
-
-### 来星日の✕リセットボタンを削除（2026-07-23実装、設計書126）
-設計書124で追加した✕リセットボタンについて、ユーザーが実機で確認した結果「要らない、リセットあるので」と判断（ピル自体をタップして日付を選び直せば事実上の変更・リセット手段になるため、専用の✕ボタンは不要という判断）。
-
-- `public/index.html`から`#arrival-date-reset-btn`要素（設計書124で追加）を削除
-- `public/app.js`から`_resetArrivalDate()`関数、`initSettingsProfile()`・`_saveArrivalDate()`内のリセットボタン表示切り替え処理、設定画面touchendデリゲーション一覧内の`#arrival-date-reset-btn`判定行を削除
-- ピルボタンのスタイル（設計書125）・「未設定」表示ロジック（設計書123）・透明化した`<input type="date">`は無変更のまま維持
-- `server.js`・データファイルは無変更（フロントエンドのみ、`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723d`→`20260723e`、`sw.js` CACHE_NAME=`sg-weekend-v678`→`v679`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での削除後のレイアウトバランスは2026-07-23時点でWeb版の配信確認のみ完了、実機未確認
-
-### 在住日数カウンターをタイトル行右上のバッジに変更（2026-07-23実装、設計書127）
-設計書122で追加した在住日数カウンター（`#stamp-residency-counter`）は探訪画面タブバーの下に全幅1行で表示される構成だったが、ユーザーから「変」との指摘があり、モック4案（A: 小ピルチップ／B: 年月+日数2段ピル／C: アイコン付きスタットバッジ／D: テキストのみ控えめ）を提示。**D案（タイトル行右上、控えめなテキスト2行）**を選択・実装した。
-
-- `public/index.html`: `#screen-course .course-screen-header`内、`.screen-title`を新規の横並びラッパー（`display:flex;align-items:flex-start;justify-content:space-between;`）で包み直し、その中に`#stamp-residency-counter`をタブバー直後の全幅1行版から移動。スタイルを`font-size:11px;color:var(--warm-gray);font-weight:600;text-align:right;line-height:1.5;margin-top:4px;flex-shrink:0;`に変更（初期`display:none`は維持）。`.course-screen-header`自体が`flex-direction:column`（`public/app.css`）のため、タイトル行の右側にバッジを配置するには`.screen-title`を包む新規ラッパーが必須だった
-- `public/app.js`: `residencyCounterLabel`のja/en値を、太字強調＋改行を含むHTML形式に変更（ja: `在住 <b>{ym}</b><br>（{days}日）`、en: `<b>{ym}</b> in Singapore<br>({days} days)`）。`_renderResidencyCounter()`末尾の描画行を`el.textContent = ...`から`el.innerHTML = ...`に変更（設計書123の`_formatArrivalDateDisplay`と同様のHTML化パターン）
-- **日数・年月の計算ロジック自体（`_formatResidencyYM()`含む）・`initCourseScreen()`からの呼び出しタイミングは無変更**（設計書122で実装済み、正しく動作確認済みのため）
-- `server.js`・データファイルは無変更（見た目のみの調整、`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723e`→`20260723f`、`sw.js` CACHE_NAME=`sg-weekend-v679`→`v680`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での2行バッジ表示・タイトル行右上の見た目バランスは2026-07-23時点でWeb版のロジック・マークアップ照合のみ完了、実機未確認
-
-### 来星記念日のローカル通知（毎年繰り返し、iOS版のみ）（2026-07-23実装、設計書128）
-ユーザー要望「一年の記念日に通知を送りたい」への対応。来星日（設計書122）はローカル（`localStorage`）にのみ保存されサーバー側は暗号文経由でしか間接保持しない設計のため、サーバー起点でのプッシュ配信は不可。代替として端末内で完結する`@capacitor/local-notifications`を新規採用した。**技術的にiOS版（Capacitor）のみの対応、Web版は対象外**（ブラウザの永続的なローカル通知スケジューリングは実用的でないため）。AskUserQuestionで頻度を確認し「毎年繰り返し」を選択・承認済み。
-
-- **スケジューリング方式**: `repeats:true, every:'year'`の単一繰り返し通知では「在住◯年目」という年数入りの動的文言をOS側の固定テキストで表現できないため、**向こう10年分の個別`schedule.at`通知をまとめて事前スケジュール**する方式を採用（10年超過時の自動延長はv1スコープ外、既知の制約として許容）
-- `public/app.js`: 新規`_getCapLocalNotifPlugin()`（`_getCapGeoPlugin()`/`_getCapCameraPlugin()`と同じ`registerPlugin('LocalNotifications')`優先→`Plugins.LocalNotifications`フォールバックの防御的パターン）、新規定数`ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID`(90100、既存通知IDと衝突しない予約帯)/`ARRIVAL_ANNIVERSARY_YEARS_AHEAD`(10)、新規`async function _scheduleArrivalAnniversaryNotifications(arrivalStr)`を追加。処理内容: Web版は即return→既存10年分の予約IDを`plugin.cancel()`で全キャンセル→`arrivalStr`が空ならキャンセルのみで終了→`requestPermissions()`で許可確認→向こう10年分ループし、既に過ぎた年はスキップして`plugin.schedule()`で一括予約（IDが固定のため再実行は冪等）
-- **呼び出し箇所**: `_saveArrivalDate(value)`末尾に`_scheduleArrivalAnniversaryNotifications(value);`を追加（来星日の保存・変更・クリアのたびに再スケジュール）。`initSettingsProfile()`の来星日初期化箇所に`if (savedArrival) _scheduleArrivalAnniversaryNotifications(savedArrival);`を追加（アプリ再インストール等でOS側の予約が失われているケースへの自己修復、設定画面を開くたびに`schedule()`を呼び直すコストは無視できるレベルと判断しフラグ管理等の複雑化はしていない）
-- **TDZ対応（設計書50/51と同一パターン）**: `_CapLocalNotif`（`let`）・`ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID`/`ARRIVAL_ANNIVERSARY_YEARS_AHEAD`（`const`）は、起動時同期フロー（`initSettingsProfile()`が`loadEventData();`直後に同期呼び出しされ、`_scheduleArrivalAnniversaryNotifications()`経由でこれらを間接参照する）より前に宣言する必要があるため、関数定義自体は`_getCapCameraPlugin()`直後（既存の「思い出」機能セクション付近）に置いたまま、変数宣言のみ`loadEventData();`直前（`_CapPush`宣言の直後）へ移動した
-- i18n新規キー2個（ja/en同時追加）: `arrivalAnniversaryNotifTitle`（ja「🎉 来星記念日です！」/en「🎉 Happy Arrival Anniversary!」）・`arrivalAnniversaryNotifBody`（ja「シンガポール生活{n}年目に突入しました。探訪の記録を振り返ってみませんか？」/en「You've reached {n} year(s) in Singapore! Take a look back at your journey.」、`{n}`は`.replace('{n}', n)`で年数を埋め込む既存パターン踏襲）
-- `ios-app/package.json`に`@capacitor/local-notifications@^6.0.0`を追加
-- **Info.plist追加設定は不要（npm packageの実ソース確認により裏付け済み）**: `@capacitor/local-notifications@6.1.3`のnpm tarballを直接取得しREADME・Podspec・iOS Swiftソース（`LocalNotificationsPlugin.swift`/`LocalNotificationsHandler.swift`）を確認。READMEはAndroid向け権限記述（`SCHEDULE_EXACT_ALARM`等）のみでiOS向けInfo.plistキーの言及なし、Podspecにも該当記述なし、Swiftソース内に`Info.plist`/`Bundle.main.infoDictionary`等への参照は0件（grep確認）。権限リクエストは標準の`UNUserNotificationCenter.current().requestAuthorization(options:[.badge,.alert,.sound])`のみで、これは既存の`@capacitor/push-notifications`と同じ`UserNotifications`フレームワーク系統のランタイム許可ダイアログ（Info.plist記述キー自体がAppleの仕様として存在しない）。そのため`.github/workflows/ios-deploy.yml`は無変更
-- `server.js`・データファイルは無変更（サーバーは一切関与しない設計、`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723f`→`20260723g`、`sw.js` CACHE_NAME=`sg-weekend-v680`→`v681`（`app.css`は無変更のため据え置き）
-- スコープ外（今回未実装）: Web版でのプッシュ通知連動（サーバー側に暗号化されていない来星日を持つ設計への転換を要する大きな変更のため別途検討）、10年を超えた在住者への自動延長スケジューリング、通知タップ時の遷移先制御（探訪画面への誘導等、OS標準のアプリ起動のみ）、記念日通知のオン/オフを来星日設定と切り離した専用トグル
-- **未検証（次回TestFlightビルド後にフォロー）**: 技術的にiOS版のみの機能のためTestFlightビルドが必須。実機での通知許可ダイアログ表示・実際の通知スケジューリング・発火確認（1年後のため即時確認は困難）は2026-07-23時点で未検証。設計書69〜127自体もまだTestFlightビルド未実施のため、本追加も含めて次回一括リリースの想定
-
-### ⚠️ 記念日通知の実機テスト用ボタン（使い捨て）（2026-07-23実装、設計書129）
-設計書128（来星記念日のローカル通知）は年単位で待たないと本物の記念日通知は発火せず、ユーザーはSafari Web Inspectorでのリアルタイムデバッグ手段も持たないため、動作確認用に「10秒後に発火するテスト通知」を即座に送れるボタンを設定画面に一時的に追加した。
-- `public/index.html`: 来星日入力行の直後に`#arrival-notif-test-row`（テキストリンク「🔔 テスト通知を送る（10秒後）」）を追加
-- `public/app.js`: 新規`async function _sendTestArrivalNotification()`を追加。設計書128の`_getCapLocalNotifPlugin()`をそのまま再利用し、専用固定ID（90099、`ARRIVAL_ANNIVERSARY_NOTIF_BASE_ID=90100`と非衝突）・即時（10秒後）の`schedule.at`でローカル通知を1件スケジュールする。既存`arrivalAnniversaryNotifTitle`/`arrivalAnniversaryNotifBody`キーを流用（`{n}`に「テスト」という文字列を埋め込む）、トースト文言は日本語ハードコード、新規i18nキーなし
-- touchendデリゲーション追加なし（onclickガードのみ、既存の同種テキストリンクパターン踏襲）
-- **⚠️ これは使い捨てコード。ユーザーが次回TestFlightビルドで実機テストを行い記念日通知が正常にスケジュール・発火することを確認できたら、`#arrival-notif-test-row`・`_sendTestArrivalNotification()`一式を削除する**（削除は別途指示があった際に対応、CLAUDE.md既定の「実機デバッグ用」使い捨てコード運用ルールに従う）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723g`→`20260723h`、`sw.js` CACHE_NAME=`sg-weekend-v681`→`v682`
-
-### 思い出機能・記念日テストボタンのタップ不発を修正（onclick属性ガード未対応touchend、7箇所）（2026-07-23実装、設計書130）
-ユーザーが実機で「テスト通知ボタンが押せない」「写真を追加ボタンも押せない」と報告。設計書121（思い出機能）・設計書129（記念日テストボタン）で追加した7箇所のonclick属性が、いずれも`if(!_touchCapableDetected) fn()`ガードのみを持ち、対応する`touchend`ハンドラの登録を伴っていなかった。CLAUDE.md「onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック」節の既知アンチパターン（設計書38・84・99と同型）の再発。
-- 確立済みの修正パターン（新規touchendハンドラを追加するのではなく、ガード自体を撤去する）に倣い、以下7箇所全てから`if(!_touchCapableDetected) `部分のみを削除（関数呼び出し自体・`event.stopPropagation();`は維持）: `public/index.html`側5箇所（`#arrival-notif-test-row`のテキストリンク→`_sendTestArrivalNotification()`、`#stamp-memory-overlay`背景タップ→`_skipStampMemory()`、`#stamp-memory-photo-box`→`_pickStampMemoryPhoto()`、「スキップ」ボタン→`_skipStampMemory()`、「保存する」ボタン→`_saveStampMemory()`）、`public/app.js`側2箇所（動的生成の写真削除✕ボタン→`_resetStampMemoryPhotoBox()`、スポット詳細シート内「思い出を追加」ボタン→`_openStampMemorySheet(_stampSelectedSpot, null)`）
-- `_stampMemoryPickedBlob`関連ロジック・IndexedDB周りのコード・記念日通知のスケジューリングロジック自体は無変更
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723h`→`20260723i`、`sw.js` CACHE_NAME=`sg-weekend-v682`→`v683`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのタップ動作確認は2026-07-23時点でコード修正・grep/git diffによる静的検証のみ完了、実機未確認。設計書121・129自体もTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### ⚠️ 思い出写真ピッカーの実機診断ログ追加＋既存の思い出を編集可能にする（2026-07-23実装、設計書131）
-設計書130（タップ不発修正）適用後もユーザーが実機で「カメラが押せない」と再報告。原因調査の結果、`_pickStampMemoryPhotoBlob()`が`catch (_) { return null; }`で全エラーを握りつぶし呼び出し元も無言で終了する実装のため、タップ自体は成功していても`@capacitor/camera`のプラグイン取得失敗・権限拒否・API呼び出しエラーのいずれが起きてもユーザーからは「何も起きない」ように見える状態だった。あわせてユーザーから「思い出情報は後からでも編集できるようにしたい」との要望があった。
-
-- **診断ログ追加（`_pickStampMemoryPhotoBlob()`、使い捨て）**: Capacitor分岐に`_sendDebugLog('stamp_memory_photo_pick_start', { hasPlugin, hasGetPhoto })`（プラグイン取得直後）・`_sendDebugLog('stamp_memory_photo_pick_result', { hasDataUrl })`（`getPhoto()`呼び出し直後）の2箇所、外枠のcatchブロックに`_sendDebugLog('stamp_memory_photo_pick_error', { errorName, errorMessage })`を追加。Web版の`<input type=file>`分岐は無変更
-- **既存の思い出を編集できるようにする**: 新規関数`_showStampMemoryPhotoPreview(blob)`に写真プレビュー表示ロジック（`URL.createObjectURL`→背景画像セット→✕ボタンHTML生成）を切り出し、`_pickStampMemoryPhoto()`・`_openStampMemorySheet()`の編集時プリロード両方から共用する。`_openStampMemorySheet(spot, newlyUnlockedLevel)`を`async`化し、シート表示直後にメモ欄へ既存メモ（`_getStampMemos()[spot.id]?.text`）を事前入力、`_getStampMemoryPhotoBlob(spot.id)`で既存写真（IndexedDB）を非同期取得できれば`_showStampMemoryPhotoPreview()`でプレビュー表示する（新規チェックイン時はIndexedDBに何もないため何も起きない。読み込み中に別スポット用にシートが開き直されていないか`_stampMemorySpotId === spot.id`で確認するガード付き）
-- **既存呼び出し元は変更不要**: `_openStampMemorySheet()`の呼び出し元2箇所（`doStampCheckin()`の`setTimeout`コールバック内、`_renderStampDetailMemorySection()`内の`onclick`属性）はいずれも`await`せず呼んでいるだけのため、`async`化しても変更不要（checkerで確認済み）
-- **スポット詳細シートに「編集」ボタンを追加**: `_renderStampDetailMemorySection()`の既存思い出ありの分岐末尾に`<button class="stamp-memory-edit-btn" onclick="_openStampMemorySheet(_stampSelectedSpot, null)">${t('stampMemoryEditBtn')}</button>`を追加。新規CSSクラス`.stamp-memory-edit-btn`（`public/app.css`）は既存の`.stamp-memory-add-retroactive-btn`と似た控えめなテキストリンク調（`background:transparent;border:none;color:var(--caramel)`）で統一
-- i18n新規キー1個（ja/en同時追加）: `stampMemoryEditBtn`（ja「✏️ 編集」/en「✏️ Edit」）
-- スコープ外（今回未実装）: 写真の「完全削除」（既存写真がある状態で編集シートを開き✕で消して「保存」しても、IndexedDB上の既存写真は上書きされないまま残る。写真の差し替えは可能だが完全削除は今回スコープ外、既存の「写真は1件のみ・上書き保存」というモデルの延長として許容）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723i`→`20260723j`、app.css `?v=20260722d`→`20260723a`、`sw.js` CACHE_NAME=`sg-weekend-v683`→`v684`
-- **未検証（次回TestFlightビルド後にフォロー）**: 実機での新規カメラピッカー診断ログ確認によるタップ不発の真因特定（原因確定後は使い捨てログとして削除する）、既存思い出の編集フロー（メモ・写真の事前入力、上書き保存）の実機動作確認は2026-07-23時点でコード修正・`node --check`・curlによる配信反映確認のみ完了、実機未確認。設計書69〜130自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 記念日通知テストボタンの削除＋思い出メモ欄のiOS自動ズーム修正（2026-07-23実装、設計書132）
-ユーザーが実機で記念日通知（設計書128）の動作確認完了（「完璧です」）。設計書129で明記していた通り、テスト専用の使い捨てボタンを削除した。あわせて、思い出を残すミニシート（設計書121）のメモ入力欄（`#stamp-memory-text`）にフォーカスすると画面がズームされる不具合が判明・修正した。
-- **⚠️ 上記「記念日通知の実機テスト用ボタン（使い捨て）」節（設計書129）は本節により役目を終え、コードは既に削除済み**: `public/index.html`から`#arrival-notif-test-row`要素を削除、`public/app.js`から`_sendTestArrivalNotification()`関数を削除。設計書130で行った同ボタンのtouchendガード修正も、要素ごと削除されたことで無関係になった（履歴として`plan.md`/`session-log.md`には残る）
-- **思い出メモ欄のフォントサイズ修正**: `public/app.css`の`.stamp-memory-textarea`の`font-size`を`14px`→`16px`に変更。iOS Safari/WKWebViewには、フォーカスされた`<input>`/`<textarea>`の`font-size`が16px未満だと自動的にズームインする既知の仕様があり、これに該当していた
-- **記念日通知本体のロジック（`_scheduleArrivalAnniversaryNotifications()`等、設計書128）・design 131で追加した思い出写真ピッカーの診断ログ（`stamp_memory_photo_pick_*`）は無変更のまま維持**
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723j`→`20260723k`、app.css `?v=20260723a`→`20260723b`、`sw.js` CACHE_NAME=`sg-weekend-v684`→`v685`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での思い出メモ欄フォーカス時にズームが発生しないことの確認、design 131の診断ログ（`stamp_memory_photo_pick_*`）が今回のビルドで初めて実機に反映されるため`logs/debug-nav.log`での確認は2026-07-23時点で未実施。設計書69〜131自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 「制覇済み」表示の重複解消・文言変更＋Web版フォトライブラリ選択対応（2026-07-23実装、設計書133）
-ユーザーが実機スクリーンショットで、スポット詳細シートに「✓ 制覇済み」が2箇所（独立バッジ`#stamp-spot-detail-checked`＋チェックインボタン無効化時テキスト）重複表示されていることを指摘（design 121で「あなたの記録」セクションが追加され画面が縦に伸びたことで初めて両方が同時に視認されやすくなったと推測）。あわせて「制覇済み」という文言が大げさ・不自然との指摘、Web版の写真選択が`capture="environment"`指定によりカメラ起動に固定されフォトライブラリから選べない点も指摘された。
-- `#stamp-spot-detail-checked`（`public/index.html`、独立した「✓ 制覇済み」パネル）を削除。チェックイン状態の表示はチェックインボタン自体の無効化＋テキスト変化（`_updateStampCheckinButton()`）のみに一本化した。`public/app.js`の`openStampSpotDetail()`・`doStampCheckin()`双方から`checkedEl`の取得・`display`切替処理を削除（`_stampSpotIsChecked()`関数自体は他の多数箇所で継続使用のため無変更）
-- `stampCheckedInBadge`のja/en値を変更（キー名は不変）: ja「✓ 制覇済み」→「✓ 訪問済み」、en「✓ Collected」→「✓ Visited」
-- `_pickStampMemoryPhotoBlob()`のWeb版`<input type="file">`生成部分から`input.setAttribute('capture', 'environment');`を削除。`accept="image/*"`のみ残し、OS標準の「写真を撮る／ライブラリから選ぶ」選択肢が出るようにした。iOS版（Capacitor Camera、`source:'PROMPT'`）は元々両方の選択肢を提示する設計のため変更不要（design 131の診断ログで調査中のiOS起動不具合の根本解決は今回のスコープ外）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723k`→`20260723l`、`sw.js` CACHE_NAME=`sg-weekend-v685`→`v686`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での重複バッジ解消・新文言「訪問済み」表示の確認。design 131のiOS起動不具合が解消していれば、フォトライブラリ選択自体はWeb版のみが対象のためiOS版への影響なし。設計書69〜132自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### コレクション一覧カードのメモ・説明文プレビューを削除、チェックイン日付のみ表示（2026-07-23実装、設計書134）
-design 121で訪問済みカードにメモ全文（無ければスポット説明文）をプレビュー表示するようにしたところ、カードごとに高さがバラつく問題が発覚。ユーザーがモック3案（現状=全文／案1=メモ1行省略／案2=済マークのみ）に対し「チェックイン日付だけ出そうかな」という第4の折衷案を選択した。
-- `_renderStampLevelRowInProgress()`（`public/app.js`）内のカード生成部分から、メモ・スポット説明文のプレビュー行（`memoText`/`descHtml`）を削除し、`metaHtml`は`checkinDate`（チェックイン日付）のみを表示する構成に変更。写真サムネイル（56px、個人の思い出写真を優先して使う`memoryPhotoUrl`/`thumbSrc`ロジック）は無変更のまま一覧に残る
-- `_renderStampLevelRowComplete()`（全制覇バッジの展開カード一覧、design 108）は元々チェックイン日付のみの表示だったため無変更。今回の変更により状態B（未全制覇時の横長カード）・状態C（全制覇時の展開カード）の表示ロジックが統一された
-- `.stamp-card-desc`CSSクラス（`public/app.css`）は参照元がこの変更で無くなり死にクラス化したが、実害がないため削除していない（既存の「使わなくなった導線は残置」方針を踏襲）
-- メモ全文・詳細な情報は既存のスポット詳細シート「あなたの記録」セクション（design 121・127、ポラロイド演出）に一本化する設計思想
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723l`→`20260723m`、`sw.js` CACHE_NAME=`sg-weekend-v686`→`v687`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのカード高さの安定化確認、チェックイン日付のみ表示時の視認性は2026-07-23時点でコード修正・`node --check`のみ完了、実機未確認。設計書69〜133自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 訪問済みバッジ・チェックイン日付を拡大（2026-07-23実装、設計書135）
-design 134のモック4案（A背景タイント/B左アクセントバー/C太ボーダー+大バッジ/Dチェックリボン）からC案をベースに、ユーザーが「太いボーダー等の装飾追加は不要、済バッジとチェックイン日付を大きくするだけでいい」とスコープを絞った。
-- `public/app.css`の`.stamp-card-done-mark`（訪問済みカードのサムネイル右下に重ねる円形「済」マーク）: `width/height 30px→38px`、`font-size 12px→15px`、`border 2px→2.5px solid var(--cream)`、位置オフセット`bottom/right -6px→-7px`、`box-shadow`をわずかに強化（`0 2px 4px rgba(44,36,32,0.25)`→`0 2px 5px rgba(44,36,32,0.3)`）
-- `public/app.css`の`.stamp-card-date`（チェックイン日付表示、design 134で追加）: `font-size 10px→13px`
-- 色・回転角（`rotate(-12deg)`）・配置ロジック・カード全体レイアウト・サムネイルサイズはいずれも無変更。太いボーダー・背景タイント等の追加装飾は行っていない
-- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260723b`→`20260723c`、`sw.js` CACHE_NAME=`sg-weekend-v687`→`v688`（`app.js`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのバッジ・日付表示拡大後のレイアウトバランス（カード内の他要素との干渉有無）は2026-07-23時点でcurl確認のみ、実機未確認。設計書69〜134自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 思い出写真のクロップ比率統一・一覧サムネイルを公式写真に固定・チェックイン日付にラベル追加してエリア行に統合（2026-07-23実装、設計書136）
-ユーザーが実機スクリーンショット2枚で3点を指摘。(1) 思い出を残すミニシートの写真プレビュー（`.stamp-memory-photo-box`）と保存後のポラロイド風フレーム（`.stamp-detail-memory-photo-frame img`、幅最大240px×高さ200px）とでクロップ比率が大きく異なり同じ写真なのに選択時と保存後で見た目が変わる、(2) design 121で導入した「個人の思い出写真があればスポット公式画像より優先」というコレクション一覧サムネイルの挙動を常にスポット公式写真を使う仕様に戻す（個人写真は詳細シート「あなたの記録」のみで見せる）、(3) チェックイン日付は独立行ではなくエリア表示と同じ行にまとめラベル（「訪問日: 」等）を付ける。
-- `public/app.css`の`.stamp-memory-photo-box`の`height`を160px→220pxに変更（ポラロイドフレーム側の比率1.2:1に近づける。コンテナ幅の違い〈ミニシート100%幅・ポラロイド最大240px〉によりピクセル単位の完全一致はできないが体感的なクロップ範囲のズレを縮める）
-- `public/app.js`の`_renderStampLevelRowInProgress()`（状態B、design 108）内、サムネイル選定ロジックを`const thumbSrc = spot.imageUrl || '';`のみに変更し、`memoryPhotoUrl`（design 121で導入した個人写真優先ロジック）を削除
-- 同関数内、`metaHtml`変数・`.stamp-card-meta`ブロック（design 134でメモ/説明文を削除しチェックイン日付のみに縮小済みだった）を削除し、新規`.stamp-card-area-row`（flexラッパー）で`.stamp-card-area`とチェックイン日付（`${t('stampCardVisitDateLabel')}${checkinDate}`）を同じ行にまとめた
-- `public/app.css`に新規クラス`.stamp-card-area-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }`を追加。既存`.stamp-card-area`（`margin-top:2px`のみ）はflexラッパーと衝突しないことを確認済み
-- i18nキー`stampCardVisitDateLabel`をja（訪問日: ）/en（Visited: ）同時追加
-- **`_stampMemoryPhotoUrlCache`・`_refreshStampMemoryCacheForSpot()`は削除していない**（スポット詳細シート「あなたの記録」表示で個人写真の取得に引き続き使用）。**`_renderStampLevelRowComplete()`（全制覇バッジの展開カード一覧、design 108）は設計書スコープ外のため無変更**（元々公式写真のみ・日付のみのシンプルな表示で個人写真優先ロジック自体を持っていなかったため）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260723c`→`20260723d`、app.js `?v=20260723m`→`20260723n`、`sw.js` CACHE_NAME=`sg-weekend-v688`→`v689`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのクロップ比率統一の見た目・エリア行レイアウトの崩れ有無は2026-07-23時点でcurl確認のみ、実機未確認。設計書69〜135自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### カメラピッカー起動不能の根本原因判明・修正（Info.plistに`NSPhotoLibraryAddUsageDescription`追加）（2026-07-23実装、設計書137）
-design 131で仕込んだ診断ログ（`stamp_memory_photo_pick_error`）を実機で確認したところ、`You are missing NSPhotoLibraryAddUsageDescription in your Info.plist file. Camera will not function without it.`というエラーが記録されていた。design 121実装時、`NSPhotoLibraryUsageDescription`（フォトライブラリの**読み取り**許可）はCIに追加済みだったが、`NSPhotoLibraryAddUsageDescription`（フォトライブラリへの**書き込み**許可、読み取りとは別のInfo.plistキー）が抜けていたことが根本原因と判明した。`@capacitor/camera`の`getPhoto()`は、`saveToGallery`オプションを使っていなくても内部実装上このキーの存在を起動時に検査しており、欠落しているとエラーを投げてピッカー自体が一切起動しない（撮影前もライブラリ選択前もいずれも失敗する）仕様だった。design 121完了報告時のchecker確認は「読み取り」用のキーのみを確認しており、「書き込み」用キーの必要性を見落としていた（上記「探訪チェックイン時の『思い出』機能」節の該当記述も訂正済み）。
-- `.github/workflows/ios-deploy.yml`の既存「Set photo library usage description in Info.plist」ステップに、`NSPhotoLibraryAddUsageDescription`のPlistBuddy設定（既存`NSPhotoLibraryUsageDescription`と同じAdd/Setフォールバックパターン）を同一ステップ内に追記
-- design 131の診断ログ（`stamp_memory_photo_pick_start`/`_result`/`_error`、`public/app.js`の`_pickStampMemoryPhotoBlob()`）は削除せず残置（次回実機確認で正常動作を確認できたら削除する）
-- `server.js`・`public/`配下・データファイルは無変更。CI設定ファイルのみの変更のため`pm2 restart`不要
-- **未検証（次回TestFlightビルド後にフォロー）**: カメラピッカーが正常起動しフォトライブラリから写真選択できるかの実機確認が必須。確認できたらdesign 131の診断ログを削除する。設計書69〜136自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 思い出写真ピッカーの診断ログを削除（design 131の後始末）（2026-07-24実装、設計書138）
-design 131で追加した診断ログ（`stamp_memory_photo_pick_start`/`_result`/`_error`）により、design 137でカメラピッカー起動不能の根本原因（`NSPhotoLibraryAddUsageDescription`欠落）を特定・修正できた。ユーザーが実機でカメラ/フォトライブラリ選択の正常動作を確認済みのため、CLAUDE.md既定の運用ルール通り役目を終えた使い捨て診断ログを削除した。
-- `public/app.js`の`_pickStampMemoryPhotoBlob()`から3箇所の`_sendDebugLog()`呼び出しを削除。関数本体のロジック（プラグイン取得・`getPhoto()`呼び出し・Web版`<input type=file>`分岐）は無変更のまま維持
-- `_sendDebugLog`関数自体・`POST /api/debug-log`エンドポイント自体は恒久ユーティリティのため削除していない（他機能の計装で引き続き使用）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260723n`→`20260724a`、`sw.js` CACHE_NAME=`sg-weekend-v689`→`v690`（`app.css`は無変更のため据え置き）
-- **このタスクをもってdesign 131〜138（思い出写真ピッカー実機診断）は解決済み**。設計書69〜137自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 探訪ティアの年数目安ラベルを変更（見習い0〜1年、定住レベル2〜4年）（2026-07-24実装、設計書139）
-ユーザー要望により、探訪ティアの年数目安表示を再調整した。シンガポール通・極めし者は変更なし。
-- `public/app.js`の`STAMP_LEVEL_META`定数、`standard`と`local`の`yearRange`/`yearRangeEn`の値のみ変更（キー名・構造は不変）: standard「1〜2年」→「0〜1年」/「1-2 years」→「0-1 years」、local「3〜4年」→「2〜4年」/「3-4 years」→「2-4 years」。`niche`（5年以上/5+ years）・`special`（10年以上/10+ years）は無変更
-- レベル名（見習い/定住レベル/シンガポール通/極めし者）・絵文字・色・画像・`_stampLevelYearRange(meta)`ヘルパー本体は無変更
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260724a`→`20260724b`、`sw.js` CACHE_NAME=`sg-weekend-v690`→`v691`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新しい年数目安表示は2026-07-24時点でコード確認・ローカル配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 年数目安の接頭辞を「在住」→「在住歴」に変更（2026-07-24実装、設計書140）
-設計書110〜113で確立した年数目安表示（「見習い（目安：在住0〜1年）」等）の接頭辞について、ユーザーとの会話で「在住歴」への変更が確定。
-- `public/app.js`の`_stampLevelYearRange(meta)`関数のja側戻り値のみ変更: `目安：在住${meta.yearRange}` → `目安：在住歴${meta.yearRange}`。表示は「見習い（目安：在住歴0〜1年）」のようになる。en側（`approx. ${meta.yearRangeEn} in Singapore`）は無変更
-- `yearRange`/`yearRangeEn`の値自体（設計書139で確定済み）・既存4箇所の呼び出し元は関数内実装のみの変更のため無変更のまま全箇所に自動反映（既存パターン踏襲）
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260724b`→`20260724c`、`sw.js` CACHE_NAME=`sg-weekend-v691`→`v692`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新しい接頭辞表示は2026-07-24時点でコード確認・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 探訪画面右上の在住日数バッジも「在住歴」表記に統一（2026-07-24実装、設計書141）
-design 140でティア見出しの年数目安接頭辞は「在住歴」化されたが、探訪画面右上の在住日数バッジ（design 127導入、`residencyCounterLabel`）は別i18nキーのため未反映だった。ユーザーが実機スクリーンショットで指摘。
-- `public/app.js`の`residencyCounterLabel`（320行目）のja値のみ変更: `在住 <b>{ym}</b><br>（{days}日）` → `在住歴 <b>{ym}</b><br>（{days}日）`（キー名不変）。en値（610行目、`<b>{ym}</b> in Singapore<br>({days} days)`）・`_renderResidencyCounter()`本体（4073行目）は無変更
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.js `?v=20260724c`→`20260724d`、`sw.js` CACHE_NAME=`sg-weekend-v692`→`v693`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新しい表記は2026-07-24時点でコード確認・本番配信反映確認のみ完了、実ブラウザ・実機とも未確認
-
-### 探訪スタンプ帳シェア機能（全制覇カード／チェックインカード／進捗スナップショットカード、X・Instagram向け）（2026-07-24実装、設計書163）
-「シェアしたくなる機能」ブレストから発展し、探訪スタンプ帳の3つの共有可能な瞬間（全制覇・チェックイン・在住歴タップの進捗スナップショット）をCanvas 2D APIで直接描画したシェアカード画像として生成し、X・Instagramへ共有できるようにした。html2canvas等の外部ライブラリは不使用。`server.js`・`data/`配下は無変更（`pm2 restart`不要）。
-
-- **カード生成（`public/app.js`、いずれも1080×1350のcanvasに描画→`canvas.toBlob('image/png')`）**: `_buildStampCompleteShareCardBlob(completedLevel)`（全制覇カード、バッジ画像＋レベル名＋「制覇！」＋件数ピル＋在住歴フッター）・`_buildStampCheckinShareCardBlob(spot)`（チェックインカード、個人の思い出写真優先→なければ`spot.imageUrl`→両方無ければ写真エリア自体を省略しレイアウトを詰める、「✓ 訪問済み」回転スタンプ、訪問日、メモ引用）・`_buildStampProgressShareCardBlob()`（進捗スナップショットカード、ダーク背景、在住日数の大きな数字、レベルごとの進捗バー）。いずれも`document.fonts.ready`（`_ensureShareCardFontsReady()`）を待ってからKaisei Optiフォントで描画する
-- **⚠️ 進捗スナップショットカードのマスキング方針（モックからの唯一の変更点）**: 未解禁レベルは、件数だけでなく**レベル名・絵文字も含めて「？？？」「🔒」でマスクする**（design 105の「サーバー側`maskLockedStampSpot()`と同じレベル名自体を伏せる」思想をこのカードにも適用。モック検討時点では件数のみ伏せる設計だったが、ユーザー指摘で「ラベル名も？？？に」と修正して実装した）
-- **CORS対策（必須、設計書163 §8で明記のリスク）**: `spot.imageUrl`（外部Unsplash画像等）を`drawImage()`した場合、提供元がCORSヘッダーを返さないと"tainted canvas"となり`toBlob()`が失敗しうる。新規`_isImageTaintedForCanvas(img)`（1x1の使い捨てcanvasへ`drawImage`→`getImageData()`を試し例外発生でtainted判定）と`_loadSafeImageForShareCard(url)`（`_loadImageForShareCard()`＋tainted判定の合成）で対策。tainted判定された画像は`null`扱いとなり、チェックインカードは自動的に「写真なし」レイアウト（`hasPhoto=false`）にフォールバックする。個人の思い出写真（IndexedDB由来のobjectURL）も同じ安全版ローダーで統一（同一オリジン相当のため実害はないがコストのみわずかに増える）
-- **共有先ディスパッチ**: `_saveShareCardToTempFile(blob)`（iOS用、`@capacitor/filesystem`で`Directory.Cache`へBase64書き込み→`file://` URI取得）・`_shareStampCardToInstagram(blob)`（Capacitor環境は`@koodos/share-to-insta-stories`の`shareToInstagram({base64Image, appId:'app.dosuru', topColor, bottomColor})`、Web環境および同プラグイン呼び出し失敗時はダウンロード＋トースト案内`toastShareSavedForIG`にフォールバック）・`_shareStampCardToX(blob, captionText)`（Capacitor環境は`@capacitor/share`の`Share.share({files:[uri]})`で画像保存ステップ→`Browser.open()`でXの投稿画面をテキスト付きで開く2ステップ方式、Web環境および失敗時はダウンロード＋`window.open()`の同種フォールバック）
-- **Instagram Stories共有プラグインの選定（設計書163 §2で必須とされた事前確認）**: `npm view @koodos/share-to-insta-stories peerDependencies`で`{"@capacitor/core":"^6.0.0"}`を確認しCapacitor 6対応済みと判断（候補のもう一方`ionic-share-to-instagram-stories`はnpmに実体が存在せず不採用）。ソースコード（`ShareToInstagramStoriesPlugin.swift`）を直接確認し、必須パラメータ`appId`は`instagram-stories://share?source_application={appId}`のURL Scheme呼び出しに使われる識別子で、Facebook Developer App IDの厳密な検証は行われない実装と判明したため、アプリのbundle ID（`app.dosuru`）をそのまま使用する設計にした（Facebook Developer App ID取得というユーザー側追加作業は不要と判断）
-- **UI・エントリーポイント（3箇所いずれも共有プレビューミニモーダル`#stamp-share-preview-modal`を開く導線に統一。IG/Xの選択ボタン自体はこのプレビューモーダル内に集約し、各エントリーポイント側は「シェアする」の単一ボタン/タップ導線とした。設計書163 §5-4の「3つのカード生成元はいずれもこの共通モーダルを呼び出す」という記述と整合させる実装判断）**:
-  - 全制覇モーダル（`#stamp-level-unlock-modal`、design 143とDOM共有）: 新規`#stamp-share-complete-btn-row`。`openStampLevelCompleteModal()`実行時のみ`display:''`にし`dataset.level`に`completedLevel`を保持、`openStampLevelUnlockModal()`（単なる解禁演出）では`display:'none'`にする。ボタンタップで`_shareStampCompleteBtnClick()`→`dataset.level`を読んで`shareStampCompleteCard(level)`
-  - スポット詳細シート（`#stamp-spot-detail-sheet`）: 新規`#stamp-share-detail-btn-row`。`openStampSpotDetail()`・`doStampCheckin()`成功時の両方で`_stampSpotIsChecked(spot.id)`（訪問済み）の場合のみ`display:''`にする。ボタンタップで`shareStampCheckinCard()`
-  - 在住歴カウンター（`#stamp-residency-counter`、design 122・127）: `onclick="shareStampProgressCard()"`を追加。**タッチガード（`if(!_touchCapableDetected)`）は付けていない**（design 84・99・130で繰り返し発生した「ガードのみ付けてtouchendハンドラ登録を忘れタップ不能になる」既知アンチパターンを踏まえた設計判断、design 152の`#graduation-album-link`と同じ既存の「ガードなしonclick」パターンを踏襲）
-- **共有プレビューミニモーダル（新規`#stamp-share-preview-overlay`/`#stamp-share-preview-modal`、z-index 3730/3731）**: 生成したカード画像を`<img>`でプレビュー表示し、下にIG/Xボタン2つ（`_shareStampPreviewToInstagram()`/`_shareStampPreviewToX()`）を配置。生成済みBlobは`_currentShareCardBlob`（モジュールスコープ変数、5314行目付近＝起動時同期フロー`loadEventData();`〈2317行目〉より完全に後方のためTDZ対象外）に保持。閉じる際（`closeStampSharePreview()`）に`URL.revokeObjectURL()`でプレビュー用objectURLを解放。`closeAllPopups()`に`closeStampSharePreview()`を追加済み（design 96・152と同型の画面遷移時クローズ漏れ対策）
-- **i18n新規キー6個（ja/en同時）**: `stampShareToInstagram`（Instagramでシェア/Share to Instagram）・`stampShareToX`（Xでシェア/Share to X）・`stampSharePreviewTitle`（シェアする/Share）・`toastShareSavedForIG`・`toastShareSavedForX`・`toastStampShareGenError`（画像生成失敗時の汎用エラートースト）。キャプション文言（X投稿時のテキスト、「シンガポール探訪で『{レベル名}』を制覇しました！ #おでかけNavi #シンガポール」等）はJS内で組み立てる文字列のためi18nキー化せず`getLang()`分岐で直接構築（既存の`scripts/post-to-x.js`ペルソナとは無関係の独立文言）
-- **iOS新規依存3パッケージ（`ios-app/package.json`）**: `@capacitor/filesystem@^6.0.0`・`@capacitor/share@^6.0.0`・`@koodos/share-to-insta-stories@^0.0.18`（いずれもnpm確認によりCapacitor 6対応済み）
-- **CI（`.github/workflows/ios-deploy.yml`）**: 新規ステップ「Add instagram-stories to LSApplicationQueriesSchemes in Info.plist」（`NSLocationWhenInUseUsageDescription`ステップの直後）。iOS 9以降、`LSApplicationQueriesSchemes`に登録していないURL Schemeは`canOpenURL()`が常に`NO`を返す仕様のため、このキーが無いと`@koodos/share-to-insta-stories`内部の`UIApplication.shared.canOpenURL(instagram-stories://...)`判定が常に失敗しInstagramインストール有無に関わらず常にフォールバック扱いになる。`LSApplicationQueriesSchemes`は配列のため、既存のGoogle Sign-In URL Scheme設定（設計書41）と同じくplistlibで安全に追記する方式を踏襲
-- キャッシュバスティング: `index.html` app.css/app.js `?v=20260724p`→`20260724q`、`sw.js` CACHE_NAME=`sg-weekend-v713`→`v714`
-- **検証状況**: `node --check public/app.js`で構文確認済み。node-canvas（サーバーサイドCanvas実装）を用いた実際の描画ロジック検証を実施し、全制覇カード・進捗スナップショットカード（未解禁レベルのマスキング含む）・チェックインカード（写真なしフォールバック）とも意図通りのレイアウトでPNG生成できることを確認済み（フォント・絵文字はサーバー環境の制約でシステムフォールバック表示だが、レイアウト・色・配置・マスキングロジック自体は正しく動作）。この検証を通じて、進捗スナップショットカードのレベルラベル（「シンガポール通」等4〜5文字）が進捗バーと重なる問題を発見し、`trackX`を300→340・トラック幅560→520・ラベルフォントサイズ26px→22pxに調整して解消した
-- **未検証（次回TestFlightビルド後にフォロー）**: Playwright等の実ブラウザでの動作確認はサンドボックス環境の共有ライブラリ制約（`libatk-1.0.so.0`欠如）によりできなかった。iOS実機でのInstagram Storiesプラグイン実際の動作（`@koodos/share-to-insta-stories`は2026-07-24時点で本プロジェクトでの実機検証歴なし）・X共有の2ステップフロー（画像保存→投稿画面）の実際の使用感・Web版でのダウンロード＋案内フォールバックの見た目・生成カードのフォント描画（Kaisei Opti・絵文字）の実機での見た目は、いずれも次回TestFlightビルド後の確認が必要。設計書163実装時点でCLAUDE.mdに未記録だった設計書142〜162相当の実装（探訪ティア解禁条件の動的化・アンロック/コンプリートモーダルの分離・思い出写真の3枚化等、既にコードには反映済み）の遡及記録は今回のスコープ外
-
-### シェアカードのデザインを「卒業アルバムの1ページ風」に統一（2026-07-26実装、設計書164）
-design 163実装後、ユーザーがカードデザインに「なんか違う」とフィードバック。複数ラウンドのモック提示（旅行者向けモチーフ複数種）を経て、アプリ自体が既に持つ世界観（スタンプ帳のはんこ表現・卒業アルバム・日記）を延長する方向で「卒業アルバムの1ページ風（リボン＋手書き風メッセージボックス）」に確定した。`_buildStampCompleteShareCardBlob`/`_buildStampCheckinShareCardBlob`/`_buildStampProgressShareCardBlob`（design 163で実装済み）のcanvas描画ロジック**内部のみ**を変更し、関数シグネチャ・呼び出し元・共有ディスパッチ処理（`_shareStampCardToInstagram`/`_shareStampCardToX`）・エントリーポイント（3箇所のシェアボタン）は無変更。`server.js`・データファイルも無変更（`pm2 restart`不要）。
-
-- **共通装飾ヘルパー3つを新規追加（`public/app.js`、`SHARE_CARD_COLORS`定数の直後）**: `_drawShareCardRibbon(ctx, canvasW)`（右上の紙のリボン/しおり風三角形カットアウト、モックの`clip-path:polygon(...)`をcanvas上で`ctx.beginPath()`/`ctx.lineTo()`の多角形パスに変換。モック300×375pxに対しcanvas1080×1350pxのためスケール係数3.6を掛けて座標換算）・`_drawShareCardMessageBox(ctx, text, W, y, opts)`（`var(--caramel-pale)`背景・角丸・左上に装飾的な引用符「"」・中央寄せ複数行テキストの手書き風メッセージボックス、戻り値は描画後のyオフセット）・`_drawShareCardEyebrow(ctx, text, W, y)`（小さくレタースペース広めのeyebrow文言、1文字ずつ描画してスペーシングを表現）
-- **`SHARE_CARD_COLORS`に`caramelPale: '#FDF0E6'`を追加**（`app.css`の`--caramel-pale`変数値をJS側定数として踏襲、design163時点では未使用だった色）
-- **3カード共通で背景を単色`warmWhite`に変更**（design163時点のグラデーション背景・進捗カードのダーク背景グラデーションから変更）、右上に`_drawShareCardRibbon()`、上部に`_drawShareCardEyebrow(ctx, 'GRADUATION ALBUM PAGE', W, y)`を追加
-- **全制覇カード（`_buildStampCompleteShareCardBlob`）**: バッジ画像を円形クリップで描画（design163は正方形描画）。タイトル=レベル名、サブ=「制覇しました」/「Conquered!」（固定文言、既存i18nキー`stampLevelCompleteLabel`「制覇！」とは別表現のため直書き）、メッセージボックス「シンガポールの暮らし、{total}スポットを歩きました。」、下部メタ情報「{total}/{total} スポット達成・在住歴{X年Yか月}」（design163の件数ピル＋別行フッターを1行のメタテキストに統合）
-- **チェックインカード（`_buildStampCheckinShareCardBlob`）**: 円形バッジの代わりに角丸横長写真（`W-160×460px`、design121のポラロイド演出と統一感のあるアスペクト比）。design163の「✓ 訪問済み」回転スタンプ演出は削除。タイトル=スポット名、サブ=「訪問しました」/「Visited!」、メッセージボックスは思い出メモがあれば引用表示、**無ければメッセージボックス自体を省略**（`y += 20`のみでレイアウトを詰める）、下部メタ情報=訪問日のみ
-- **進捗スナップショットカード（`_buildStampProgressShareCardBlob`）**: タイトル「探訪の記録」/「My Exploration Record」（固定文言）を追加。在住日数の大きな数字は色を`caramelLight`→`caramel`に変更しつつ`warmWhite`背景の上に配置。メッセージボックス「シンガポール探訪、続けています。」を追加（design163はフッターに同文言を配置していたのをメッセージボックス化）。進捗バーのトラック色は視認性のため`sand`を維持（ダーク背景前提の半透明白`rgba(255,255,255,0.15)`から変更）。**⚠️ 未解禁レベルの「？？？」「🔒」マスキング判定ロジック（`isMasked`算出式・分岐構造）自体はdesign 163から一切変更していない**（色・座標等のスタイルのみ変更）
-- **リボンとタイトルの衝突対策（実装時に発見・対応した課題）**: リボンは右上（y:0〜252px、x:900〜994px相当）を占有するため、(1)チェックインカードで写真が無い場合、タイトル（スポット名）の描画開始y座標をリボン下端を超える300pxまで強制的に下げる、(2)進捗カードのタイトル「My Exploration Record」（英語版、幅772px）が中央寄せでリボン左端と重なっていたため、テキスト幅がリボン左端の内側に収まるまでフォントサイズを60pxから32pxまで4px刻みで動的に縮小するロジックを追加。日本語版「探訪の記録」（幅300px）は元々余裕があるため縮小されない
-- キャッシュバスティング: `index.html` app.js `?v=20260724q`→`20260726a`、`sw.js` CACHE_NAME=`sg-weekend-v714`→`v715`（`app.css`は今回変更していないため据え置き）
-- **検証状況**: `node --check public/app.js`OK。node-canvasで実際の描画ロジックを実行し8パターン（全制覇カードja/en、チェックインカード写真なし×メモなし/あり、チェックインカード画像URL破損時のフォールバック、進捗カードja/en・部分マスク状態、進捗カード在住歴未設定）のPNGを生成して目視確認。この検証中にリボンとタイトルの衝突（上記）を2件発見し対応した。マスキングロジックがdesign163から変更されていないことを`git diff`で確認済み。関数シグネチャ・呼び出し元も`grep`で無変更を確認済み
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での新デザイン（リボン・eyebrow・メッセージボックス）の見た目、絵文字・Kaisei Optiフォントの実際の描画、実際のバッジ画像（`meta.img`、同一オリジンPNG）でのCORS非発生確認は、node-canvas検証環境の制約（絵文字フォント未搭載・`file://`プロトコルでのtainted判定など）により2026-07-26時点で未確認。design 69〜163自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 探訪スタンプ帳「テーマ別バッジ」機能（Kopi巡り／バクテー巡り／チキンライス巡り）（2026-07-26実装、設計書165）
-既存の「見習い→定住レベル→シンガポール通→極めし者」という在住期間ベースの縦の進行軸とは別に、食文化テーマ別（☕Kopi巡り／🍲バクテー巡り／🍗チキンライス巡り、各3スポット・計9件）の横の軸を新設した。UIは案2「グリッド型トロフィーケース」（3列グリッド、制覇済みは色付き丸、未制覇はグレーアウト＋点線）。新規スポット9件は`data/sg/stamp-spots.json`にユーザーが直接追加済み（既存23件→64件、design 142以降のスポット追加分含む）。
-
-- **データモデル**: 新規スポットは既存構造に準拠しつつ`categoryId`フィールド（`"kopi"`/`"bkt"`/`"chickenrice"`のいずれか、既存スポットには付与しない）を追加。`level`は全件`"standard"`に統一（`GET /api/stamp-spots`の既存マスキングロジックが`standard`を常時解禁扱いするため、誤ってマスクされる心配がない）。`order`フィールドは付与しない（テーマ別バッジは「次はここ」表示等のレベル進行系ロジックの対象外のため不要）
-- **⚠️ サーバー側必須対応: `computeUnlockedLevels()`（`server.js`）に`if (s.categoryId) continue;`を1行追加**し、テーマ別バッジのスポットを既存レベル進行の集計（`totalByLevel`/`countByLevel`）から除外した。これがないと新規9件（すべて`level:"standard"`）が「見習い」レベルの総数に加算され、design 142で確立した「そのレベルの半数チェックインで次レベル解禁」の閾値が10→15に変わる重大な回帰バグになるところだった。Node単体テストで、修正後も見習いレベルの総数が20件のまま（テーマ別9件は含まれない）・9件チェックインでは定住レベルが解禁されず10件目で解禁されること・テーマ別9件全部をチェックインしても定住レベルの解禁に一切影響しないことを確認済み。`GET /api/stamp-spots`・`GET /api/stamp-progress/me`・`POST /api/stamp-progress/checkin`はいずれも`computeUnlockedLevels()`を呼ぶだけの既存コードのため追加変更不要（自動的に正しく動作）
-- **クライアント側: 既存レベル別集計ロジックへの重複混入を防ぐため、`s.level === level`パターンを持つ4箇所すべてに`&& !s.categoryId`を追加**（`public/app.js`）: `_renderStampCollectionList()`（設計書§5-2で明記済みの必須対応、これを忘れると新規9件が「見習い」の横長カード一覧に紛れ込み二重表示になる）・`_computeStampNextTarget()`（「次はここ」判定、`order`未設定の新規スポットが誤って次ターゲットに選ばれることを防止）・卒業アルバム画面（design 152）の実績バッジ集計・シェアカード（design 163・164）の進捗バー集計。後半2箇所は設計書165本文に直接の記載はなかったが、既存レベル進行への影響を完全に排除するという設計書の趣旨に基づきbuilderが横展開して対応した
-- **新規定数`STAMP_CATEGORY_META`/`STAMP_CATEGORY_ORDER`**（`public/app.js`、`STAMP_BADGE_AREAS`直後）: カテゴリーごとのラベル（ja/en）・絵文字・色を保持。カテゴリー名は「コピー屋」ではなく「Kopi」表記で確定（日本語の「コピー」＝copy machineとの混同を避けるため）
-- **新規関数3つ**（`public/app.js`）: `_computeStampThemeBadgeProgress()`（カテゴリーごとのchecked/total/achieved算出）・`_renderStampThemeBadges()`（`#stamp-theme-badges`へグリッド描画、`_renderStampCollectionList()`の呼び出し列に追加済みのため`initStampMapTab()`・`doStampCheckin()`からの再描画フローに自動的に乗る）・`_toggleStampThemeBadgeSpots(catId)`（バッジタップでカテゴリー内スポット一覧を開閉トグル、design 108の`_toggleStampCompleteList()`と同じパターンを踏襲。design 108と異なりHTML側に事前の空コンテナを持たないため、初回タップ時に`#stamp-theme-badge-spot-lists`内へ`.stamp-card-list`クラスの一覧要素をJSで動的生成する実装とした）。**新規onclickにタッチガード（`if(!_touchCapableDetected)`）は付けていない**（design 84・99・130の既知アンチパターンを踏まえた意図的な判断）
-- **HTML**（`public/index.html`）: `#stamp-map-view-inner`（マップ本体）と`#stamp-collection-list`（レベル別カードリスト）の間に新規`#stamp-theme-badges-section`（見出し「🏅 テーマ別バッジ」＋`#stamp-theme-badges`グリッド＋`#stamp-theme-badge-spot-lists`展開コンテナ）を配置。design 77のエリアバッジと同様、`_applyStampViewMode()`のdisplay切替対象に含めていないため、マップ/一覧どちらのビューでも常時表示される
-- **CSS**（`public/app.css`）: モック`mock-theme-badges.html`の「案2」（`.grid2`/`.badge2`系）を、既存の色変数（`--sand`/`--caramel`/`--caramel-pale`/`--midnight`/`--warm-gray`/`--warm-white`/`--sand-dark`）で再実装した新規クラス`.stamp-theme-badges-grid`（3列グリッド）・`.stamp-theme-badge`/`--done`・`.stamp-theme-badge-circle`/`--done`/`--locked`・`.stamp-theme-badge-label`・`.stamp-theme-badge-count`/`--locked`
-- **i18n**: 新規キー`stampThemeBadgesTitle`（ja「テーマ別バッジ」/en「Theme Badges」）をja/en同時追加。カテゴリーラベル自体（Kopi巡り等）は`STAMP_CATEGORY_META`定数内にja/en直接埋め込み（既存`CITY_COURSE_AREAS`と同様のパターン）のため`STRINGS`への追加は不要
-- **検証**: `node --check server.js`/`node --check public/app.js`OK。`computeUnlockedLevels()`のロジックをNode単体テストで検証（0件/9件/10件チェックイン・テーマ別9件のみチェックインの4パターン）。curlで`GET /api/stamp-spots`が未認証時（`unlockedLevels:['standard']`）でもテーマ別9件をマスクなしで返すこと、`special`除外ロジック（既存5件）に影響がないことを確認済み。`_toggleStampThemeBadgeSpots()`の開閉トグルロジックをNode上でシミュレートし3回連続トグルで正しく状態遷移することを確認済み
-- スコープ外（design 165 §7で明記）: エリア別バッジ（design 77、現在非表示中）との統合、テーマ別バッジ達成時の専用演出（紙吹雪・解禁モーダル等、進捗表示の視覚変化のみ）、卒業アルバム画面（design 152）・シェアカード（design 163・164）へのテーマ別バッジ表示統合、4つ目以降の追加カテゴリー
-- `data/sg/stamp-spots.json`は`.gitignore`対象のためVPS上で直接編集する既存運用方針を踏襲（今回のスポットデータ9件追加はユーザーが直接編集済み、git管理外）。`server.js`の変更を伴うため`pm2 restart`実施済み。キャッシュバスティング: `index.html` app.css `?v=20260724q`→`20260726b`、app.js `?v=20260726a`→`20260726b`、`sw.js` CACHE_NAME=`sg-weekend-v715`→`v716`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのグリッド型トロフィーケースの見た目・タップ時の開閉トグル動作・達成時の色付き丸表現は2026-07-26時点でcurl・Node単体テストによるロジック検証のみ完了、実ブラウザ・実機とも未確認。design 69〜164自体もまだTestFlightビルド未実施のため、本追加も含めて次回一括リリースの想定
-
-### 探訪レベル（見習い〜極めし者）もテーマ別バッジと同じ折り畳みバッジ形式に統一（2026-07-26実装、設計書166）
-design 165で新設したテーマ別バッジ（グリッド型トロフィーケース、タップで開閉）の見た目をユーザーが気に入り、既存のレベル別セクション（見習い/定住レベル/シンガポール通/極めし者）にも同じ見た目を適用した。design 83以来の3状態バラバラの表示（ロック中=1行のみ／解禁中未全制覇=見出し+進捗バー+横長カード常時表示／全制覇=大きな祝賀バッジ+開閉トグル）を、design 165と同じグリッド型バッジ＋タップ開閉のカード一覧に統一した「姉妹実装」。
-
-- 見出し文言は「🏅 探訪の記録」（design 152の卒業アルバム実績セクションと同じ言葉遣いで統一）
-- ロック中の表現は🔒アイコンのみのシンプル表示に簡略化（`special`のみ既存のdesign 105マスキング方針〈ラベル・件数とも「？？？」〉を維持）
-- 既存の進捗バー（🔓/🏆アイコン、design 146〜151）・全制覇時の大きな祝賀バッジ（150pxのバッジ画像＋大きなタイトル、design 108・109・135）は、通常サイズのバッジタイル1つに一本化された（celebratory感は縮小するトレードオフをユーザー承認済み）
-- **新規関数3つ**（`public/app.js`）: `_renderStampLevelBadges()`・`_renderStampLevelBadgeSpotList(level)`・`_toggleStampLevelBadgeSpots(level)`。design 165の`_renderStampThemeBadges()`/`_renderStampThemeBadgeSpotList()`/`_toggleStampThemeBadgeSpots()`と全く同じ構造の姉妹実装（`catId`→`level`に置き換え）。**レベル版は既存の「次はここ！」タグ機能（`_computeStampNextTarget()`との連携、design 70・83のコア機能）を`_renderStampLevelBadgeSpotList()`内に維持している点がテーマ版との唯一の差分**（design 165のテーマ版カードリストにはこのタグが無い）
-- **`_renderStampCollectionList()`を`_renderStampThemeBadges(); _renderStampLevelBadges();`の2行に置き換え**。旧`STAMP_LEVEL_ORDER_CLIENT.map(level => {...})`による状態A/B/C（`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`）の呼び分けロジックは削除。**`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`関数自体は削除せず残置**（呼び出し元がなくなるだけ、既存の「使わなくなった関数は残置」方針を踏襲）
-- **HTML**（`public/index.html`）: `#stamp-theme-badges-section`（design 165）の直前に新規`#stamp-level-badges-section`（見出し「🏅 探訪の記録」＋`#stamp-level-badges`グリッド＋`#stamp-level-badge-spot-lists`展開コンテナ）を追加。既存`#stamp-collection-list`（design 165時点で`_renderStampThemeBadges()`が直接別要素へ描画する形になったため実質空のレイアウトコンテナ化していた）はそのまま残置、新セクションとは独立配置のまま
-- **CSS**（`public/app.css`）: `.stamp-theme-badges-grid`（design 165、3列グリッドのベーススタイル）を共通利用しつつ、新規`.stamp-level-badges-grid`で`grid-template-columns`のみ4列に上書き。新規`.stamp-level-badge`/`--done`/`--progress`・`.stamp-level-badge-circle`/`--done`/`--progress`/`--locked`・`.stamp-level-badge-label`・`.stamp-level-badge-count`/`--locked`・`.stamp-level-badge-spot-list`を追加（3状態locked/inProgress/completeの色分けがテーマ版〈2状態のみ〉との差分）
-- **⚠️ 設計書§2-6の廃止対象CSS（進捗バー関連design 145-151、全制覇バッジ関連design 108・109・135）は削除しなかった**: 設計書は「削除してよい、他に参照がないことを確認の上」としていたが、実際にgrepしたところ、いずれも残置される`_renderStampLevelRowLocked`/`_renderStampLevelRowInProgress`/`_renderStampLevelRowComplete`（design 166 §2-3で明示的に「削除せず残置」と指定）から現役で参照されていた。これらの関数を残置する以上、対応するCSSを削除すると出力HTMLのスタイルが壊れるため、矛盾を避け安全側に倒して残置と判断（実害のない死にCSSとして残る。既存の「使わなくなった導線は残置」方針とも整合）。design 153の見出しスタイル（`.stamp-level-section-title`）は元々「削除しない」指定であり新セクション見出しでも再利用している
-- **i18n**: 新規キー`stampLevelBadgesTitle`（ja「探訪の記録」/en「Exploration Record」）をja/en同時追加
-- 新規onclickにタッチガード（`if(!_touchCapableDetected)`）は付けていない（design 84・99・130の既知アンチパターンを踏まえた意図的な判断、design 165と同じ方針）
-- **検証**: `node --check public/app.js`OK。実サーバーの`GET /api/stamp-spots`レスポンス（未ログイン状態、`unlockedLevels:['standard']`）をNode.js上でクライアント側ロジックと同じ計算式で再現し、`standard`=inProgress（`categoryId`持ち9件除外後20件）、`local`/`niche`=locked（件数は表示）、`special`=locked かつ `hideLabel:true`（design 105マスキング方針通り「？？？」表示）という想定通りの状態遷移を確認。サンドボックス環境に`libatk-1.0.so.0`等の共有ライブラリが無くPlaywrightでの実ブラウザ起動ができなかったため、静的解析・grep横断確認・Node.js上でのロジック再現・実APIレスポンスとの突き合わせで代替検証した
-- `server.js`・`data/`配下は無変更（`pm2 restart`不要）。全制覇時の紙吹雪演出モーダル（`openStampLevelCompleteModal()`、design 143）はバッジタイル化とは別物のチェックイン時ポップアップ演出のため無変更のまま
-- キャッシュバスティング: `index.html` app.css `?v=20260726b`→`20260726c`、app.js `?v=20260726b`→`20260726c`、`sw.js` CACHE_NAME=`sg-weekend-v716`→`v717`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での4列グリッドバッジの見た目・タップ時の開閉トグル動作・「次はここ！」タグの表示・3状態（locked/inProgress/complete）の色分け表現は2026-07-26時点でNode.jsによるロジック検証のみ完了、実ブラウザ・実機とも未確認。design 69〜165自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
-
-### 探訪の記録バッジを4列グリッドから3列グリッドに変更（2026-07-26実装、設計書167）
-design 166実装直後、ユーザーから「バッジの横並びは三つまでお願いします」とのフィードバックを受けた小粒修正。
-- `public/app.css`の`.stamp-level-badges-grid`（design 166で追加）の`grid-template-columns`を`repeat(4, 1fr)`→`repeat(3, 1fr)`に変更。4つ目のバッジ（極めし者）はCSS Gridの標準折り返し挙動により自動的に次の行の左端に配置される（追加の条件分岐ロジックは不要、ユーザー提示の2案「非表示」「次の行」のうち後者をCSSの自然な挙動で実現）
-- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）。バッジの内容・タップ挙動（`_renderStampLevelBadges()`等）自体は変更していない
-- キャッシュバスティング: `index.html` app.css `?v=20260726c`→`20260726d`、`sw.js` CACHE_NAME=`sg-weekend-v717`→`v718`（`app.js`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での3列グリッド表示・4つ目バッジの次行配置の見た目は2026-07-26時点でcurlによる配信内容確認のみ完了、実ブラウザ・実機とも未確認。design 69〜166自体もまだTestFlightビルド未実施のため、本修正も含めて次回一括リリースの想定
 
 ### ⚠️ 設定画面セクション構成の変更（2026-07-19実装、設計書64、上記の`secBackup`/`secLogin`関連記述は歴史的経緯として一部実態と乖離）
 設定画面が「プロフィール→ログイン→予定表のバックアップ（HTMLコメント上「2.5」）→アプリ設定→その他」という5セクション構成になっていたのを、「プロフィール→**アカウント**（ログイン+バックアップ統合）→アプリ設定→**サポート・情報**→**フィードバック**」の5セクションに再編成した（機能・ロジック変更は一切なし、`.settings-item`内部のid/onclick/classは無変更、見た目上の再編成のみ）。
@@ -1299,11 +229,6 @@ v1.5 build 111のApp Store審査提出が、Apple自動バイナリ検証エラ�
 - `server.js`・`public/`配下・`data/`配下は無変更。Web版（dosuru.app）には一切影響しない、`pm2 restart`不要
 - 代替案として検討した「`@codetrix-studio/capacitor-google-auth`から別プラグインへの乗り換え」は、既存の安定化済み認証フロー（設計書20/35/36/38/44/46/48/49/50/51/52）を壊すリスクが高く、緊急対応としては不釣り合いに大きいため見送り。将来的な技術的負債解消タスクとして分離
 
-## AIチャット機能の廃止（2026-07-09）
-- AIチャットFAB（`fab-ai`）とチャットシート（`#chat-overlay`/`#chat-sheet`）はUIごと削除済み
-- `server.js` の `/api/chat` エンドポイントは旧App Store版の後方互換のため残置（新規呼び出し元なし）
-- `.chat-overlay` / `.chat-sheet-handle` / `.chat-mic-btn` クラスは pin-picker/emoji-picker/コースメモ音声入力（`course-note-mic-btn`）が共有するため引き続き使用
-
 ## PWAインストール・更新バナーの廃止（2026-07-09）
 - 「ホーム画面に追加」誘導バナー（`#install-banner`）とService Worker経由の「アプリが更新されました」バナー（`#update-banner`）はUIごと削除済み（iOSアプリ（App Store配信）を正式な運用形態とするため）
 - 削除対象だった `handleInstall()` / `showInstallBanner()` / `dismissInstallBanner()` / SW登録処理ブロック（`navigator.serviceWorker.register()`含む）はすべて撤去済み
@@ -1313,7 +238,7 @@ v1.5 build 111のApp Store審査提出が、Apple自動バイナリ検証エラ�
 
 ## iOSアプリ化（Capacitor）2026-07-03実装
 - 方式: ローカルバンドル（webDir: `../public`）。Web版と同じHTMLをアプリ内に同梱
-- appId: `app.dosuru`（2026-07-10訂正: 以前`app.dosuru.odenavi`と誤記していたが、実際にApple Developer Portalに登録され署名・TestFlight配信に使われている値は`ios-app/capacitor.config.js`の`app.dosuru`） / appName: `おでかけNavi`
+- appId: `app.dosuru`（2026-07-10訂正: 以前`app.dosuru.odenavi`と誤記していたが、実際にApple Developer Portalに登録され署名・TestFlight配信に使われている値は`ios-app/capacitor.config.js`の`app.dosuru`） / appName: `SG在住Navi`（`ios-app/capacitor.config.js`で確認済み、旧名`おでかけNavi`から改名）
 - `_isCapacitorApp`: `window.Capacitor?.isNativePlatform?.()` で検出。app.js 先頭で定義
 - `API_BASE`: Capacitor環境では `https://dosuru.app`、Web環境では空文字列。全fetchに付与済み
 - GA4スキップ: `_isCapacitorApp` 時に `window.gtag = function(){}` でnoop化
@@ -1346,7 +271,7 @@ v1.5 build 111のApp Store審査提出が、Apple自動バイナリ検証エラ�
   - ⚠️⚠️ **【最重要・恒久】起動時フローから「間接参照」される変数もTDZ対象。個別変数ごとに対処すると必ず漏れる（同種バグ3回）**: TDZの真の危険は「直接参照している行」ではなく、**起動時の初期化フロー（`loadEventData();`＝現2049行付近以降でトップレベル同期実行される`loadEventData`/`initPushState`/`initSettingsProfile`/`initSettingsGenres`/`_initAuthToken` IIFE、およびそれらが最初の`await`より前の同期実行部で呼ぶ関数）が、関数呼び出しを跨いで間接的に参照する`let`/`const`モジュールスコープ変数**にある。設計書49→50→51はいずれも「変数を1つ移したら、同じ経路で参照される兄弟変数を移し忘れた」パターン。**今後この付近を触る際は、個別変数を場当たり的に移動するのではなく、起動時フローが辿る全関数の同期実行部で参照される全`let`/`const`変数を`grep -n`で洗い出し、その全宣言行が初期化フロー行（`loadEventData();`）より前にあるかを一括で総点検すること。** 判定のコツ: (a) 関数宣言（`function foo(){}`）はhoistされるので定義位置が後でも呼び出し可、(b) `let`/`const`変数は宣言行が実行位置より後だとTDZ、(c) 最初の`await`より後で参照される変数はマイクロタスクで後から実行されるためTDZ非対象（ただし判断が難しければ安全側で前方移動）
   - **一時計装（原因確定後に削除）**: `_initNativePush()`に`push_init_start`/`push_init_perm`/`push_init_register_call`/`push_init_exception`の`_sendDebugLog`を追加済み。起動時自己回復（perm=granted時のregister再登録）が実機で実際に動いているか（真因がlocalStorage揮発か否か）を`logs/debug-nav.log`で確認するための使い捨て計装。原因確定後に削除する
   - `_hasActivePushSub()`/`_shouldShowPushPrompt()`: Web版・iOS版共通のプッシュ状態判定ヘルパー。iOS版は`Notification`（Web API）がWKWebView上で信頼できないため使わず、ネイティブプラグインの許可状態（`_nativePushDenied`）を使う
-  - 通知タップ時: `pushNotificationActionPerformed`リスナーで共有カレンダー参加ダイアログ表示 or `switchNav('home')`
+  - 通知タップ時: `pushNotificationActionPerformed`リスナーで`switchNav('home')`（共有カレンダー参加ダイアログへの誘導は設計書178フェーズ3の共有カレンダー機能削除に伴い撤去済み、`public/app.js:3575`のコメント参照）
   - 新規UI文言は追加していない（既存の`pushOn`/`pushOff`/`pushDenied`/`toastPush*`キーを流用）
 - iOS/CI: `ios-app/package.json`に`@capacitor/push-notifications@^6.0.0`追加。`.github/workflows/ios-deploy.yml`に以下2ステップを追加
   1. `App.entitlements`を新規生成しPlistBuddyで`aps-environment: production`を設定（Info.plist向けPlistBuddyパターンと同様の手法だが、対象ファイルが異なる新規ファイル）
@@ -1379,25 +304,8 @@ iOS版で「プッシュ通知」トグルをONにしても権限許可後に通
   - **後方互換**: 意思フラグ未設定（`null`）でトークンありなら「以前ON」とみなしON扱い。設計書52以前からのONユーザーが勝手にOFFにされることはない。
   - 新規モジュールスコープ変数は追加していない（`_setPushIntent`は関数宣言で巻き上げ、`pushIntent`は`_initNativePush`内ローカル変数。設計書49/50/51のTDZ教訓に従う）。`_updatePushBtn()`のON判定・Web版`togglePush()`/`_pushSubscription`系・設計書49のJWT永続化は無変更。
 
-## ジャンル・興味機能（2026-07-02実装、おすすめモード周りは2026-07-11刷新）
-- ジャンルマスター: GENRE_LIST 定数（13種）。id / emoji / label を持つ
-- ユーザー設定: localStorage `app_genres`（選択ジャンルIDの配列）
-- 設定場所: 設定画面「ジャンル・興味」セクション（`#genre-chips-container`）
-- おすすめモード: 「すべて」チップとは別の独立した「おすすめ」チップ（`data-cat="recommend"`）を`toggleCatFilter('recommend')`でトグルして`_recommendModeActive`をON/OFFする。ジャンルマッチのイベントのみ表示（`genreMatch()`）
-  - 「おすすめ」チップはジャンル未設定時（`getGenreList().length === 0`）は`display:none`で非表示（`_syncRecommendChip()`が制御）。ジャンルを1つ以上設定すると表示される
-  - ジャンル未設定時のおすすめモード誘導は`#recommend-setup-banner`（5秒バナー）ではなく、`renderEventCards()`内のグリッド内インライン案内（⭐+説明文+「ジャンルを設定する」ボタン）。旧記載の5秒バナーは実態と乖離していたため訂正（2026-07-11）
-  - `toggleCatFilter('recommend')`はジャンル未設定時、そもそも`_recommendModeActive`をONにせず入口で早期`return`する（2026-07-11、下記バグ修正で導入）
-- 「すべて」チップは`filterCats.clear(); _recommendModeActive=false`する純粋な全件表示リセット専用ボタン。「おすすめ」チップとラベルが連動して変化する仕様ではない（旧記載「おすすめモードON時は⭐おすすめに変化」は誤り。訂正済み）
-- イベントデータ: `genres` フィールド（文字列配列）。filter-events.js の filterBatch() で付与
-- 遡及タグ付け: `node scripts/fill-genres.js --city=sg [--dry-run]`（Haiku、バッチ20件）
-
-### ⚠️ チップ・タブの表示/非表示制御と、固定配列でのインデックス操作の相互作用に注意（2026-07-11教訓）
-「おすすめ」チップをジャンル未設定時に`display:none`で非表示化した際、同じUI要素を対象にした**別の機構**（ホーム画面のカード領域スワイプでカテゴリを前後に切り替える機能、`public/app.js`）が、表示/非表示を考慮しない固定配列`CAT_ORDER`でインデックス計算していたため、「すべて」から右スワイプしても非表示の`recommend`が経路上に居座り続けて先のカテゴリへ進めなくなるバグが発生した（さらに`toggleCatFilter('recommend')`を一度ONにしてから`_syncRecommendChip()`が事後的にOFFへ戻す「二段構え」実装だったため、非表示チップに`.active`が誤って付与される副次的リスクもあった）。
-
-**再発防止策**:
-- チップ・タブ等のUI要素を`display:none`で動的に出し分ける変更を行う際は、その要素を対象にした「固定配列でのインデックス操作」「`querySelectorAll`での一覧取得」が他に無いか、変更前に`grep`等でコードベース全体を横断確認する
-- 「非表示化」と「状態を強制的に戻すガード」を同じcommitで同時に導入する場合、両者の呼び出し順序・再入（同一関数呼び出しの流れの中で状態が書き換わって戻る）が無いか、変更後にシミュレーションする
-- 上記スワイプ機構は2026-07-11に修正済み: `CAT_ORDER`固定配列を廃止し、`_visibleCatOrder()`（`#filter-row-category .filter-chip`をDOM順・`offsetParent !== null`でフィルタして動的算出）に置き換え。`toggleCatFilter('recommend')`もジャンル未設定時は入口で早期returnする方式に変更し、「一度ONにしてから戻す」二段構えを廃止
+## ジャンル・興味機能（2026-07-02実装、2026-09-03時点でUI非表示・実質不使用）
+設定画面「ジャンル・興味」セクションは`display:none`で非表示化済み（未記録の変更、`public/index.html`のコメント「ユーザー要望により非表示化。ロジック・関数は残置」参照）。ジャンルを設定する手段がないため、連動する「おすすめ」フィルターチップ（`data-cat="recommend"`、ジャンル未設定時は自動非表示）も実質常に非表示。ロジック（`GENRE_LIST`定数13種・`saveGenreList`/`getGenreList`・`genreMatch()`・`scripts/fill-genres.js`等）は削除されていないため、再開時はUI非表示を解除するだけで動く。
 
 ## イベントカードのDOM差分更新（2026-07-12実装、設計書21）
 `renderEventCards()`（`public/app.js`）は、カテゴリタブ切り替え等のたびにInstagram埋め込み（`<blockquote>` → `embed.js`が`<iframe>`化）が再読み込みされる問題を解消するため、`grid.innerHTML`一括再代入をやめ、**イベントID+言語をキーにしたDOM要素キャッシュによる差分更新**方式を採用している。
@@ -1478,40 +386,8 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - JS変数: `filterCats` / `filterWeek` / `filterWho` / `filterAreas` / `filterKeyword` / `filterEnding`
 - プロフィールの who フィルターは廃止。filterWho（シート選択）で統一
 
-## 都市対応状況（2026-06-28更新、2026-07-12パイプライン構成変更に伴い記述更新）
-- **SG（シンガポール）**: 稼働中
-- **BKK（バンコク）**: 一時停止中（イベント数少ないため）
-- **SYD（シドニー）**: 一時停止中（イベント数少ないため）
-
-BKK/SYD 停止箇所:
-1. `scripts/run-fetch-all.sh` — BKK/SYD fetchをコメントアウト済み
-2. `scripts/run-source-analysis.sh` — discover/analyzeは `--city=sg` 固定
-3. crontabの `refresh-courses.js --city=sg` 呼び出し（都市別）
-4. `public/index.html` — `ACTIVE_CITIES = ['sg']` 定数で都市セレクトを制御
-
-**復活手順:**
-1. `index.html` の `ACTIVE_CITIES = ['sg']` → `['sg', 'bkk', 'syd']`
-2. `run-fetch-all.sh` のコメントアウトを外し `--city=all` に戻す
-3. `run-source-analysis.sh` の `--city=sg` を `--city=all` に戻す
-4. crontabの `refresh-courses.js --city=sg` を `--city=all` に戻す
-
-### 設定画面の都市選択欄を非表示化（2026-07-24実装、設計書161）
-`ACTIVE_CITIES = ['sg']`により実質シンガポール固定のため、選択肢が1つしかない都市セレクタ（設定画面「都市」項目）をユーザー要望により非表示にした。
-- `public/index.html`の都市選択`.settings-item`ブロックのインラインstyleに`display:none;`を追加（`style="padding:12px 18px;display:none;"`）。中身（`labelCity`ラベル・`#city-select`セレクタ・`selectCity()`呼び出し）は無変更
-- **ロジックは削除していない**（`ACTIVE_CITIES`/`getCity()`/`selectCity()`/`#city-select`の選択肢生成処理はすべて無変更のまま残置。既存の「機能は残しつつ表示のみ止める」プロジェクト方針を踏襲。`getCity()`は`localStorage`未設定時`sg`にフォールバックする既存動作のため、セレクタ非表示でも動作に影響なし）
-- BKK/SYD再開時の復活手順（上記「復活手順」参照）には今回触れていない。`public/app.js`・`public/app.css`・`server.js`・`data/`配下は無変更（`pm2 restart`不要）
-- キャッシュバスティング: `index.html` app.js `?v=20260724o`→`20260724p`、`sw.js` CACHE_NAME=`sg-weekend-v711`→`v712`（`app.css`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機での都市選択欄非表示・他プロフィール項目とのレイアウトバランスは2026-07-24時点でコード確認のみ完了、実機未確認
-
-### 探訪スタンプ帳の全制覇展開カード・次はここタグのフォントサイズ調整（2026-07-24実装、設計書162）
-「全体的にフォントバランスを整えて」の依頼を受け、design 154でメインのカード一覧側（`.stamp-card-area-right`=11px/`.stamp-card-date`=13px）が拡大された際に追従していなかった2箇所を統一した。`public/app.css`のみの変更。
-- `.stamp-complete-card-area`（全制覇済みレベルの展開カード内エリア表記、design 108由来）: font-size 10px→11px（`.stamp-card-area-right`と統一）
-- `.stamp-complete-card-date`（同、チェックイン日付表記）: font-size 10px→13px（`.stamp-card-date`と統一）
-- `.stamp-card-next-tag`（「次はここ！」タグ、design 154でカード自体が拡大されたのに追従していなかった）: font-size 10px→11px
-- 上記3クラスとも`font-size`以外のプロパティ（color/font-weight/margin/background/padding/border-radius等）は無変更
-- スコープ外: `.cal-count-badge`（8px）、他の9〜10px台の装飾・補助テキスト（区切り線・ミニラベル・マップピンバッジ等）はユーザーが対象外選択
-- `public/app.js`・`server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css `?v=20260724n`→`20260724o`、`sw.js` CACHE_NAME=`sg-weekend-v712`→`v713`（`app.js`は無変更のため据え置き）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのフォントサイズ調整後の視認性・レイアウトバランスは2026-07-24時点でコード確認のみ完了、実機未確認
+## 都市対応状況（2026-09-03時点）
+現状SG（シンガポール）のみ稼働中。BKK/SYDはイベント数が少なく一時停止中（`public/index.html`の`ACTIVE_CITIES = ['sg']`、`scripts/run-fetch-all.sh`・`scripts/run-source-analysis.sh`がSG固定）。設定画面の都市選択欄も選択肢が1つしかないため非表示化済み（設計書161、ロジック自体は残置）。再開時は`ACTIVE_CITIES`とスクリプトのcity指定を戻す作業になる。
 
 ## SGエリア区分に「Sentosa」追加（2026-07-13実装、設計書24）
 SGのエリア区分がCentral/East/West/North/North-East/Island-wideの6区分から、**Sentosa追加で7区分**になった。Sentosaはケーブルカー・モノレールで渡る独立した「行き先」であり、ユニバーサル・スタジオ／S.E.A.水族館（→Singapore Oceanarium）／ビーチ等、単独でコース1本分埋まる濃さのエリアのため独立区分化。
@@ -1520,136 +396,43 @@ SGのエリア区分がCentral/East/West/North/North-East/Island-wideの6区分�
 - `server.js`にエリア値のホワイトリスト検証は存在せず（`conditions.area`はAIプロンプトへの自由文字列埋め込みのみ）、追加にあたりサーバー側の変更は不要だった
 - BKK/SYDのエリア区分は無変更（Sentosaはシンガポール固有地名のため対象外）
 
-## イベント取り込みパイプライン構成（2026-07-12改訂・設計書18）
+## イベント取り込みパイプライン構成（2026-09-03時点、crontab・コード確認済み）
 
-RSS/Instagram取得から`events.json`保存までのバッチ処理は、実行頻度の異なる3つのジョブに分離してcron管理している（旧: `run-fetch-all.sh`1本に全処理が同居していたが、フィード取得の取りこぼし対策として毎日実行化する際、頻度を変えるべきでない処理を分離した）。
+システムcrontabで動いているジョブは実質2本のみ:
 
-| ジョブ | 内容 | 頻度（システムcrontab） | ログ |
-|---|---|---|---|
-| `scripts/run-fetch-all.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `notify-fetch-summary.js`（LINE通知のみ） | 毎日 6:30 SGT | `logs/run-fetch-all.log` |
-| `scripts/run-source-analysis.sh`（新規） | `discover-sources.js --city=sg --no-notify` → `analyze-sources.js --city=sg --no-notify` | 水・日 7:30 SGT | `logs/run-source-analysis.log` |
-| `refresh-courses.js --city=sg`（cronから直接node実行） | システムコース2件削除→3件新規生成 | 水・日 8:00 SGT | `logs/refresh-courses.log` |
+| ジョブ | 内容 | 頻度 |
+|---|---|---|
+| `scripts/run-fetch-all.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `fetch-life-info.js --city=sg` → `notify-fetch-summary.js`（イベント＋生活情報をまとめて1通のLINE通知） | 毎日 6:30 SGT |
+| `scripts/run-source-analysis.sh` | `discover-sources.js --city=sg --no-notify` → `analyze-sources.js --city=sg --no-notify` | 水・日 7:30 SGT |
 
-- **ハイウォーターマーク方式**（`scripts/fetch-events.js` `fetchRssItems()`）: 新規`data/source-fetch-state.json`（gitignore対象、コミットしない）にソースごとの`lastSeenGuids`（`item.guid`優先、無ければ`item.link`）と`lastFetchedAt`を保存し、前回取得時に見た記事を新着として再送しない。初回（該当ソースの状態未保存）は既存の`daysBack=7`カットオフにフォールバック。フィード取得自体が失敗したソースは状態を更新しない（次回また試行される）
-- **Haiku採否基準**: `scripts/filter-events.js`の`scoreThreshold`は6（2026-07-12に5→6へ引き上げ）。カテゴリ補完の緩和基準は5（4→5に引き上げ、新閾値に対する相対的な緩和幅は維持）
-- **ユーザー向けWebプッシュ通知は完全停止済み**（2026-07-12）: `notify-fetch-summary.js`は開発者向けLINE通知のみ送信し、`sendPushToAll()`を呼ぶ`/api/notify-events-updated`へのfetch呼び出しは削除済み。`server.js`側の同エンドポイント・`sendPushToAll()`関数自体は将来の手動再送信用に残置（呼び出し元がなくなっただけ）
-- 上記変更の経緯・実測データ（8ソースの投稿ペース等）は`.claude/plan.md`「設計書18」参照
+BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市対応状況」参照）。**旧`refresh-courses.js`のcronエントリはコース機能削除（設計書178）に伴い完全に削除済み**（旧CLAUDE.mdに記載があったが実態と乖離していたため訂正）。生活情報取得も当初は独立cronエントリ（毎日7:15 SGT）だったが、後日`run-fetch-all.sh`内に統合され独立エントリは廃止済み（詳細は下記「生活情報・ニュースのキュレーション機能」参照）。
 
-### `data/sources.json`の`status`フィールド運用（2026-07-14確定、設計書33）
-`scripts/fetch-events.js`の`loadActiveSources()`は`status === 'active'`の1フィールドのみで取得可否を判定する（`feeds`・`instagramAccounts`共通）。`pausedAt`/`pausedReason`/`rejectedAt`/`rejectedReason`は記録用メタデータのみで、`fetch-events.js`からは一切参照されない（設定しても`status`自体を変えなければ取得は止まらない）。
-- 正規サポート値は3つ: `"active"`（取得対象）/ `"paused"`（一時停止、将来の復活余地あり）/ `"rejected"`（永久除外）。`analyze-sources.js`側の命名慣習と統一されている
-- `analyze-sources.js`の自動停止ロジックは`status`と`pausedAt`/`pausedReason`を**同時に**セットする実装になっている。`data/sources.json`を人力編集する際も、この3値+付随メタデータのセット漏れがないよう必ず両方同時に更新すること（過去に`pausedAt`のみ追記され`status`が`active`のまま残り、実際には停止していなかった不整合が発生した実例あり。`pinned:true`のソースは`analyze-sources.js`の自動停止対象外のため、この種の人力編集漏れが特に起きやすい）
-- IGアカウント運用（2026-07-14時点）: `uniqlosg`は累計採用率4%のため`status:"rejected"`で永久除外。`mujisg`は`status:"paused"`（既存`pausedAt`/`pausedReason`はそのまま活用、値の再設定は不要だった）。`singaporezoo`→`mandaiwildlifereserve`、`nationalgallerysg`→`nationalgallerysingapore`、`TheProjectorSG`→`theprojectorsg`はユーザー名の誤り（実際の公式ハンドルと不一致）と判明し訂正。`artscience_museum`・`birdparadise_sg`は正しいユーザー名が特定できず配列から削除済み
+- **ハイウォーターマーク方式**（`fetch-events.js`）: `data/source-fetch-state.json`にソースごとの`lastSeenGuids`/`lastFetchedAt`を保存し新着記事のみ抽出。初回は`daysBack=7`カットオフにフォールバック。取得失敗ソースは状態未更新（次回また試行）
+- **Haiku採否・記事生成**（`filter-events.js`）: `scoreThreshold=6`（`BATCH_SIZE=10`件ずつ、`max_tokens:6000`、失敗時1回リトライ）。カテゴリ比率が薄いカテゴリはscore5以上に緩和。採用イベントはSonnetで日本語/英語記事を生成（`ENRICH_BATCH_SIZE=8`、`max_tokens:6000`、同じく1回リトライ）
+- **`data/sources.json`のstatus運用**: `active`/`paused`/`rejected`の3値のみが実際の取得可否を左右する。`pausedAt`/`pausedReason`等は記録用メタデータのみで`fetch-events.js`は参照しない
+- **ユーザー向けWebプッシュ通知は完全停止済み**（`notify-fetch-summary.js`は開発者向けLINE通知のみ、`sendPushToAll()`自体は将来の手動再送信用に関数として残置）
+- 画像URL疎通確認・discover-sources.jsのAPIエラー握りつぶし修正等の細かい改修履歴はgit履歴を参照
 
-### `scripts/filter-events.js` Sonnet記事生成失敗時のリトライ・除外ロジック（2026-07-14実装、設計書33）
-`enrichBatch()`呼び出しループ（Sonnetでのバッチ記事生成）が失敗した場合、同じバッチで1回だけリトライする。リトライも失敗した場合、そのバッチに含まれるイベントは`enriched` Mapに登録しない。
-- 結合ループ側は`enriched.get(f._enrichPos) || {}`（空オブジェクトへの無条件フォールバック）ではなく`enriched.has(f._enrichPos)`で判定し、登録されていない（＝記事生成に最終的に失敗した）イベントは`newItems`に追加せず`events.json`へ保存しない。バッチ丸ごと失敗・一部indexだけの部分的欠落のどちらのケースも同じ経路で除外される
-- 除外件数は`⚠️ 記事生成に失敗したため${n}件のイベントを除外しました`としてログ出力する
-- 既知の副次効果: `notify-fetch-summary.js`のLINE通知「◯件採用」の合計値はHaikuフィルタ通過数（`totalAccepted`）ベースのままで、この除外分は反映されない（通知ロジック自体は今回変更対象外）。ソース別内訳（`accepted/sent`）の方はSonnet失敗分がカウントされなくなり、より正確になった
+**2026-09-03削除（コード変更）**:
+- **カテゴリ上限機能を完全削除**: `filter-events.js`から`CATEGORY_TARGET_RATIO`/`CATEGORY_CAP_BUFFER`定数・`enforceTypeCap()`関数・その呼び出しを削除。カテゴリ超過分の自動削除は行わなくなった（採用側のスコア緩和ロジック`categoryStats`/`thinCategories`は別機能のため維持）
+- **Instagram取り込みを完全削除**（`fetch-events.js`/`discover-sources.js`/`analyze-sources.js`の3ファイル）: 削除前時点でSGの全24アカウントが`paused`/`rejected`/`retired`で実際には1件も取得されていなかった（APIトークンは`.env`に設定済みだったが対象0件のため常にスキップ）。
+  - `fetch-events.js`: `fetchInstagramPosts()`関数・`CITY_CONFIG`各都市の`instagramAccounts`配列・`loadActiveSources()`のIG読み込みを削除
+  - `discover-sources.js`: `probeInstagram()`関数・`probeCity()`/`buildCandidates()`/`buildReport()`内のIG候補プローブ・スコアリング・レポート生成ロジックを削除（RSS候補のプローブ・分析機能は無変更で存続）
+  - `analyze-sources.js`: `activeIG`集計・IG停止済みソースの永久除外判定・IG候補への入れ替えロジックを削除。**Step2「rawTotal不足時の量補充」はIG候補のみで実装されていたため機能ごと削除**（RSS候補による代替実装は行っていない、rawTotal不足は警告ログのみになった）
+  - 3ファイルとも`node --check`・`--dry-run`実行で正常動作確認済み（Instagram関連の出力が一切出ないこと、RSS側の処理は従来通り動くことを確認）
+  - `data/sources.json`/`data/source-pool.json`/`data/source-candidates.json`内の既存`instagramAccounts`データ自体は削除していない（コードから参照されなくなっただけで、意図的にファイルには残置）
 
-### `scripts/filter-events.js` 画像URL疎通確認（2026-07-17実装、設計書57）
-Alvinology（RSSソース）由来のイベントで、CDNオフロードプラグインのサブドメイン（`media.alvinology.com`）が記事公開直後の伝播遅延により403を返し、壊れた画像URLがそのまま`events.json`に保存される不具合が発生したため対策を追加した。
-- 新規関数`isImageUrlReachable(url)`（HTTP HEAD優先、405/501ならGETにフォールバック、3秒タイムアウト、AbortControllerで打ち切り、例外はtry/catchで握りつぶし`false`を返す）を追加
-- 既存のOGP画像フォールバック発火条件（`item.image === null` または Instagram CDN URL）に「疎通確認に失敗した場合」を追加。疎通確認・OGP取得の両方が失敗した場合は`item.image = null`にし、既存のUnsplash補完ロジックに委ねる
-- RSS/Instagram問わず全ソースの新規イベントに汎用的に適用（Alvinology固有の特殊対応ではない）。Instagram由来の署名付きURL（有効期限切れが主リスク）は取得直後のバッチ内で疎通確認するため通常は問題を検知しない点に留意（詳細は`.claude/plan.md`「設計書57」参照）
-- データパッチ: 2026-07-17時点で既に`events.json`へ保存されていたAlvinology由来2件（`im-qalb-by-pun-im.png`・`Fujifilm-quicksnap-kv.jpg`）の`image`を、CDNサブドメインではなくオリジンサーバー（`alvinology.com/wp-content/uploads/...`）のURLへ手動書き換え済み
-- 同種の「URLはあるが実際には壊れている」既存イベントの全件スキャン・一括修復は今回のスコープ外（今後発覚した個別ケースごとに対応）
+## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172。2026-09-03時点でコード確認済み）
+週末おでかけイベント取り込みパイプライン（`fetch-events.js`/`filter-events.js`）とはデータ・API・UIとも独立した機能。ボトムナビ「くらし」タブ（表示ラベル、内部id`#nav-news`）の中身。
 
-### `discover-sources.js`がAPIエラーを「投稿0件」として握りつぶす不具合の修正＋SGソース棚卸し（2026-07-19実施）
-`data/source-history.json`（`fetch-events.js`が日次で蓄積する採用率データ、上表`run-fetch-all.sh`が毎日6:30 SGTに実行）をもとにSGソースを採用率順に確認したところ、`Alvinology`が送信数173件に対し採用率9%と効率が低かったため`status:"paused"`に変更した。
+⚠️ 「旅行」カテゴリは設計書175で一度この機能に追加されたが、同日中に設計書176でロールバックされ、**現在は「おでかけ」画面（イベント一覧）のカテゴリタブとして再配置されている**（上記「イベント取り込みパイプライン構成」の`CATEGORY_TARGET_RATIO`参照）。以下は現在のコード基準の記述。
 
-その過程で`data/source-candidates.json`（`discover-sources.js`が水・日7:30 SGTに生成する新規ソース候補）が長期間`potentialYield:0, avgScore:0`ばかりだったため実際にInstagram Graph APIで1件ずつ検証したところ、候補プール（`data/source-pool.json`）のユーザー名7件（`mandaiorchid`/`singartmuseum`/`futureworld.sg`/`fortcanningpark`/`singaporemuseums`/`sentosadevelopmentcorp`/`orchardroad`）が実際には存在しないアカウント名だったと判明。うち3件は実際の正しいハンドル（`singaporeartmuseum`/`nhb_sg`/`artsciencemuseumsg`、いずれも美術館・博物館系で`show`カテゴリ）を特定できたため`data/sources.json`に`active`で追加し、残り4件は正しいハンドルが特定できず`source-pool.json`から削除した。
-- **根本原因**: `scripts/discover-sources.js`の`probeInstagram()`が、Graph APIが返すエラー（`data.error`、例:「ユーザーが見つかりません」）を無視し`data.business_discovery?.media?.data`が無い場合は無条件で投稿0件として扱っていたため、「存在しないアカウント」と「実在するが最近投稿が無いアカウント」が区別できず、壊れた候補がログにもLINE通知にも一切現れないまま候補プールに残り続けていた。同様に`probeRss()`もフィード取得失敗時に`[]`を返すのみで、呼び出し元（`buildCandidates()`/`buildReport()`）からは正常時の「投稿0件」と区別がつかなかった（フィード側は`catch`節で`log()`自体は出していたため、まだ発見しやすい方だった）
-- **修正**: `probeInstagram()`/`probeRss()`の戻り値を`{ posts/items, apiError }`に変更し、APIエラー・フィード取得失敗時は`❌`ログで明示的に警告。`probeCity()`は`apiError`があれば`account.apiError`/`feed.apiError`として`source-pool.json`に永続化しスコアリングをスキップ。`buildCandidates()`は`apiError`ありの候補を「有望な候補」一覧から除外し新設の`_invalid`に分離、`buildReport()`（LINE通知本文）・`notify-fetch-summary.js`（日次summaryの候補探索セクション）双方に無効候補の件数・詳細を表示するようにした。これにより次回以降、壊れたユーザー名/URLが混入しても自動でLINE通知に出るようになり、今回のような手動API検証が不要になる
-- **cron頻度の訂正（口頭説明の誤りの記録）**: 上表の通り実イベントの`fetch-events.js`自体は**毎日**6:30 SGT実行であり、新規追加した3ソースの採用実績（`source-history.json`）は翌日の日次fetchから貯まり始める。水・日7:30 SGTの`discover-sources.js`/`analyze-sources.js`（本節で扱った候補探索・不良ソース自動判定）はこれとは別サイクルで、新規候補の発掘・既存ソースの自動停止判定のみを担当する
-- `server.js`・`public/`配下は無変更。`data/sources.json`/`data/source-pool.json`はgitignore対象のためgit管理外（`pm2 restart`不要）。`scripts/discover-sources.js`/`scripts/notify-fetch-summary.js`の変更はコミット・push済み（`main`のみ、cron専用スクリプトのためiOS/Web版への影響なし）
-
-### `scripts/filter-events.js` Haikuフィルタリングのmax_tokens不足＋リトライ欠如を修正（2026-07-27実装、設計書168）
-`filterBatch()`（Haikuでのイベント判定、BATCH_SIZE=10件ずつ）が、`max_tokens: 2000`不足によるレスポンス途中打ち切り（truncation）＋リトライ処理の欠如により、直近少なくとも1週間（2026-07-19〜07-27）毎日1〜4バッチの候補イベントを丸ごと不採用扱いで破棄していたことが`logs/run-fetch-all.log`の調査で判明した。
-- **原因1**: 判定結果スキーマは`who`/`age`/`style`/`genres`など複数の配列フィールドを含み1件あたりの出力が長く、10件分だと2000トークンを超えることがあった。超過するとレスポンスが途中で打ち切られ、続く正規表現ベースのJSON抽出（`clean.match(/\[[\s\S]*\]/)`、貪欲マッチで内側配列の`]`を外側の閉じ括弧と誤認）が壊れたJSON文字列を生成し`JSON.parse()`が失敗していた
-- **原因2**: 同ファイル内の`enrichBatch()`（Sonnet記事生成）呼び出し側は1回リトライする実装だったのに対し、`filterBatch()`側は`catch`した瞬間に`totalRejected += batch.length;`でバッチ全体を即座に諦める非対称な実装だった
-- **修正1**: `filterBatch()`内のHaiku API呼び出し（233行目）の`max_tokens`を`2000`→`4000`に変更。`enrichBatch()`側の`max_tokens: 6000`（301行目）はエラーが確認されていないため変更していない
-- **修正2**: `processBatch`内の`filterBatch()`呼び出しの`catch`ブロックに、`enrichBatch()`と同じ「1回だけリトライ」パターンを追加（リトライも失敗した場合のみ`totalRejected += batch.length;`でバッチを諦める）。`sourceStats`の`sent++`加算（`try`ブロックより前、リトライループの外側）は無変更のため、リトライしても二重加算は発生しない
-- スコープ外: 取得元（Instagram/RSS）の投稿数自体の変動要因調査、過去に誤って破棄された候補イベントの復元（ログにも本文は残っていないため復元不可）
-- `scripts/filter-events.js`のみの変更、`server.js`・`public/`配下は無関係。cron実行のバッチスクリプトのため`pm2 restart`不要。次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）から効果を確認できる
-
-### `scripts/filter-events.js` filterBatch()のmax_tokensを4000→6000に追加引き上げ（2026-07-28実装、設計書169）
-設計書168実装後の初回cron実行結果、9バッチ中1バッチが依然としてJSON解析エラー（リトライも失敗）になっていた。4/6→1/9件と大幅改善したが完全解消ではなかったため、ユーザー「少しだけ引き上げしておいて」との指示を受け対応した。
-- `filterBatch()`内のHaiku API呼び出し（233行目）の`max_tokens`を`4000`→`6000`に変更（`enrichBatch()`側の`max_tokens: 6000`、301行目と同値に統一）
-- スコープ外: リトライロジック（設計書168で追加済み）・`enrichBatch()`自体（既に6000）は変更していない
-- `scripts/filter-events.js`のみの変更、`server.js`・`public/`配下は無関係。cron実行のバッチスクリプトのため`pm2 restart`不要。次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）から効果を確認できる
-
-### テーマ別バッジ制覇時の軽量トースト演出を追加（2026-07-29実装、設計書170）
-design 165で追加したテーマ別バッジ（Kopi巡り／バクテー巡り／チキンライス巡り）は、3/3達成してもタイルの色が変わるだけで演出が一切なかった。ユーザーに2案（既存モーダル流用／軽量トースト）を提示し、軽量トースト案を選択して実装した。
-
-- `doStampCheckin()`（`public/app.js`）内、`_stampProgress`更新直後・既存の`justCompletedLevel`判定（design 143）と並行する形で、新規`justCompletedCategory`判定を追加。チェックインしたスポットが`categoryId`を持ち、そのカテゴリーが今回のチェックインで100%達成になった場合のみ値がセットされる（`categoryId`を持たない通常のレベル制スポットには一切影響しない）
-- 新規関数`_showStampThemeBadgeCompleteToast(catId)`: `STAMP_CATEGORY_META`（design 165）からラベル・絵文字を取得し、画面下部（bottom-navの直上、`bottom: calc(84px + safe-area)`）に絵文字＋2行テキストのトーストを表示する専用実装（既存の汎用`showToast()`とは別）。3.2秒表示後フェードアウトして300ms後にDOM除去。前回分が残っていれば除去してから再生成する防御的処理あり
-- `doStampCheckin()`内、既存の`showToast(t('toastStampCheckinSuccess'));`直後に`justCompletedCategory`があれば1200ms後にトーストを表示するトリガーを追加。**既存の「思い出を残す」シート（900ms後、design 121・143）とタイミングが重ならないよう意図的に1200msに設定**。レベル制の完了演出（`openStampLevelCompleteModal()`、思い出シートを閉じた後にチェーンされる別経路）とは完全に独立しており、双方が同時に発生しても互いのタイミングを妨げない
-- CSS新規クラス`.stamp-theme-badge-toast`系（`public/app.css`）: z-index 3740（既存の探訪関連モーダル群3700〜3730番台の直後、bottom-nav(9999)未満）
-- i18n新規キー`stampThemeBadgeCompleteLabel`（ja「制覇！」/en「Complete!」）をja/en同時追加。既存キー`stampLevelCompleteSpotsLabel`（design 83「スポット達成」/「spots collected」）はサブテキストにそのまま再利用（新規追加不要）
-- スコープ外（design 170 §4で明記）: 既存のレベル制完了演出（`openStampLevelCompleteModal()`、紙吹雪＋モーダル）は無変更。テーマ別バッジのシェア機能（design 163）との統合は今回スコープ外
-- `server.js`・データファイルは無変更（`pm2 restart`不要）。キャッシュバスティング: `index.html` app.css/app.js `?v=20260726d`/`20260726c`→`20260729a`、`sw.js` CACHE_NAME=`sg-weekend-v718`→`v719`
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機でのトースト表示タイミング・見た目（絵文字サイズ・2行テキストの折り返し）、思い出シートとの表示順序が意図通り重ならないことは2026-07-29時点でコード確認・curlによる配信反映確認・`node --check`のみ完了、実ブラウザ・実機とも未確認
-
-### `scripts/filter-events.js` Haiku採用スコアの保存と`enforceTypeCap`削除順のスコアベース化（2026-09-02実装、設計書177）
-`enforceTypeCap(eventsPath)`（カテゴリ上限超過時の削除ロジック）が削除順を`fetched_at`昇順のみで決めており、Haikuの採用スコア（記事の質・有益度、0〜10）が一切考慮されていなかった。ユーザーから「スコアの高いものは残るようにしたい」という要望を受けて対応した（きっかけ: TheSmartLocalのSanrio記事が会期の長さゆえに`enforceTypeCap`で削除されていた実例の発覚）。
-- `filterAndSave()`内の`item`オブジェクト構築部分に`score: typeof f.score === 'number' ? f.score : null,`を追加（`major_score`の直後）。Haikuが返す0〜10の採用スコア（既存プロンプトで指示済み、従来はログ出力のみで`events.json`には保存されていなかった）を新規保存するようにした
-- `enforceTypeCap()`内の`deletable`ソート条件を、「`fetched_at`昇順のみ」から「スコア昇順（未設定は`-1`扱いで最優先削除）→同点は`fetched_at`昇順（タイブレーク）」の2段階比較に変更。既存の「終了日が7日以内は保護」ロジック・`excess`件数算出・`toDelete`/`toKeep`構築は無変更
-- `major_score`（発見感・ニッチ度、1〜5、フロントエンド★表示等に使用）とは意味・用途が異なるため、削除順の判断材料としては使用していない
-- 後方互換: `score`フィールドを持たない既存`events.json`データは`scoreA = -1`となり、実在するどのスコアよりも必ず低く扱われる（＝スコア不明の古いデータから優先的に削除される）。マイグレーションスクリプトは実装していない、段階的にスコア付きデータへ入れ替わっていく設計
-- `opening`/`travel`タイプは`CATEGORY_TARGET_RATIO`の対象外という既存方針は変更していない（`score`フィールドの保存自体は全タイプ共通で付与される）
-- `scripts/filter-events.js`のみの変更。`server.js`・`public/`配下・データファイルは無変更。`pm2 restart`不要（cron経由の`filter-events.js`のみの変更のため）
-- 検証: `node --check`で構文確認OK。Node.js上でソートロジックを模した簡易ユニットテスト（スコアあり/なし混在の5件）を実行し、削除優先順が「スコア未設定→低スコア→高スコア」の期待通りの順序になることを確認
-- **未検証（次回のcron実行後にフォロー）**: 次回のcron実行（毎日6:30 SGT、`run-fetch-all.sh`経由）で実際にHaikuが返す`score`が`events.json`に保存されること、`enforceTypeCap`が実データで意図通りスコアベースの削除順になることは、本タスクではロジックシミュレーションのみで実データでの確認は未実施
-
-## 探訪（スタンプラリー）機能・コース機能・予定表機能の完全削除（設計書178、フェーズ制で段階実装）
-プロダクトオーナー判断により、もう使わない3つの大機能（探訪/スタンプラリー・コース・予定表、いずれも上記の各セクションに詳細記録あり）のコードを完全削除する計画。実装（HTML断片・CSSクラス・JS関数・i18nキー・サーバーAPI）が現役の他機能（イベント一覧・ピン留め・コメント・生活情報・ニュース・アカウント連携・全データバックアップ）と多数共有・混在しているため、`.claude/plan.md`「設計書178」の手順書に従いフェーズ分けして安全に削除する方針。推奨順序は「(1)コース機能→(2)探訪機能→(3)予定表・共有カレンダー機能→(4)server.js側API削除」。
-
-### フェーズ1: コース機能の削除（フロントエンドのみ）（2026-09-02実装）
-- **HTML**（`public/index.html`）: コース生成シート（`#course-sheet-overlay`/`#course-sheet`）・コース詳細シート（`#course-detail-overlay`/`#course-detail-sheet`）・タイトル編集シート（`#title-edit-overlay`/`#title-edit-sheet`）・共通日付ピッカー（`#date-picker-overlay`/`#date-picker-modal`、コース→予定表追加専用と確認済みのため安全に削除）を削除。`#screen-course`内「モデルコース」タブ（`courseTabEveryone`）・`#course-list`要素を削除。「マイコース」タブは既にdesign 94で`display:none`済みのため今回は対象外（変更なし）。**探訪タブ自体・`#screen-course`コンテナ・`#nav-course`ボタン・`#course-fab`（design 94で地図/一覧切替に転用済み）は次フェーズ対象のため今回は残置**
-- **CSS**（`public/app.css`）: `.course-card*`/`.course-condition-*`/`.course-chips`/`.course-chip*`/`.course-time-select`/`.course-loading-dots`/`.course-timeline-*`（コース機能専用クラス一式）を削除。`.chat-mic-btn`（コース音声メモ入力専用）を削除（`.chat-overlay`本体・`.chat-sheet-handle`はpin-picker/emoji-picker等が現役使用中のため残置）。`#date-picker-overlay`/`#date-picker-modal`のz-index個別指定（3400/3401）を削除。ダークモードの`.course-card`/`.course-chip`セレクタを削除（同じ行の`.toast`は現役のため残す）。`.course-tab`/`.course-tab-bar`（探訪スタンプ帳タブバーが現役使用中のため削除禁止）・`#screen-course`本体レイアウトCSSは残置
-- **JS**（`public/app.js`）: `initCourseScreen()`は探訪の初期化処理（`_stampViewMode`リセット・`_renderResidencyCounter()`・`_renderGraduationAlbumLink()`・PTR登録）のみ残し、コースタブ切替用のスワイプ機構（実際には対応する`touchmove`/`touchend`ハンドラが存在せず元々死んでいたコードと判明）を削除。`switchCourseTab(tab)`を`initStampMapTab()`を呼ぶだけのシンプルな実装に単純化（探訪スタンプ帳タブのみ残存のため常に`'map'`で呼ばれる）。コース機能関数群一式（`renderCourseList`/`getPersonalizedCourses`/`renderEveryoneTab`/`renderCompactCourseCard`/`renderCourseCard`/`renderPopularCourseCard`/`_lockCourseScroll`/`_unlockCourseScroll`/`openCourseDetail`/`renderCourseDetail`/`closeCourseDetail`/`openCourseSheetFromEvent`/`openCourseSheet`/`toggleCourseOptions`/`closeCourseSheet`/`showCourseStep`/`randomizeCourseConditions`/`startCourseGeneration`/`renderCourseCandidates`/`selectCourseCandidate`/`backToCourseConditions`/`renderCourseResultHtml`/`saveGeneratedCourse`/`saveAndPublishGeneratedCourse`/`openTitleEdit`/`closeTitleEdit`/`saveCourseTitle`/`deleteMyCourse`/`addCourseToScheduleById`/`addCourseToScheduleWithDate`/`isLiked`/`toggleLike`/`checkSimilarCourses`/`publishCourseById`/`unpublishCourseById`/`getUserId`/`saveMyCourse`）と「VOICE INPUT」セクション全体（`toggleCourseNoteVoice`/`stopVoiceInput`/`voiceRecognition`/`isVoiceRecording`、コース音声メモ専用と確認済み）・共通日付ピッカー4関数（`openDatePickerSheet`/`_selectPickerDate`/`_confirmDatePicker`/`closeDatePickerSheet`）を削除。**`openAffiliateLink()`は探訪スポット詳細（`openStampSpotDetail()`内）で現役使用中のため関数本体は削除せず残置**（コース側の呼び出し元2箇所は関数ごと削除されるため自動的に整合）。**`getUserName()`はコメント機能（`postComment()`）で現役使用中のため残置**、`getUserId()`のみ削除。`closeAllPopups()`から`closeCourseDetail();`/`closeCourseSheet();`/`closeDatePickerSheet();`の3行のみ削除（関数自体・他の行は残す）
-- **副作用対応（コース機能削除に伴うランタイムエラー防止のため実施）**: 予定表画面のピン詳細モーダル・ピン一覧の「🗺 コース作成」ボタン（`openCourseSheetFromEvent()`呼び出し）を2箇所削除。予定表の`_openCourseFromSchedule(dateKey)`（design 102で既に呼び出し元なしと判明済みの死んだ関数だが定義は残置されていた）と`handleScheduleRowTap(el)`のcourseId分岐（過去にコース経由で予定表に追加されたデータへの保険）を、存在しなくなった`openCourseSheet()`/`openCourseDetail()`を呼ばず何もしないよう無害化した
-- **i18n**: コース関連キー一式（`course*`プレフィックス。**`courseScreenTitle`/`courseTabStampMap`は探訪機能の画面共通見出し・タブラベルとして現役使用中のため残置**、`courseTabEveryone`/`courseTabMylist`はタブ削除に伴い削除）・`toastCourse*`一式・`titleEditLabel`/`titleEditSave`を削除。**`titleEditCancel`は`#backup-passphrase-sheet`/`#cal-passphrase-sheet`のキャンセルボタンで既に流用され現役使用中と判明したため残置**
-- **バックアップ機能**（`_collectBackupPayload()`/`_applyRestoredBackup()`）: `myCoursesByCity`/`likedCourses`フィールドを削除。**`customPlans`/`eventPlansByCity`は次フェーズ（予定表削除）まで残置**
-- スコープ外（フェーズ1時点）: 探訪（スタンプラリー）機能一式・予定表機能・共有カレンダー機能・`server.js`側の`POST /api/courses/*`等APIエンドポイント・データファイル（`data/{city}/model-courses.json`/`community-courses.json`）・関連運用スクリプト（`scripts/generate-model-courses.js`/`scripts/seed-courses.js`/`scripts/refresh-courses.js`/`scripts/match-affiliate-links.js`）はいずれも今回未着手のまま残置（次フェーズ対象）
-- `server.js`は無変更（`pm2 restart`不要）。全て`public/`配下フロントエンドのみの変更。キャッシュバスティング: `index.html` app.css `?v=20260902a`→`20260902b`、app.js `?v=20260902h`→`20260902i`、`sw.js` CACHE_NAME=`sg-weekend-v806`→`v807`
-- **未検証（次回フォロー）**: 本タスク実施環境ではPlaywrightがシステム共有ライブラリ不足（`libatk-1.0.so.0`欠如）のため実ブラウザ起動ができず、curlによるHTML/JS配信確認・構文チェック（`node --check`）・静的解析（HTML構造検証・CSS波括弧バランス確認）・主要API疎通確認で代替検証した。実ブラウザでの最終確認（ホーム/ニュース/ピン留め/設定画面の動作、探訪タブが引き続き開けること）・iOS実機確認（次回`release`ブランチへのpush・TestFlightビルドが必要）はいずれも未実施
-- **次フェーズ予告**: 設計書178の推奨順序に従い、次はフェーズ2（探訪/スタンプラリー機能の削除）またはフェーズ3（予定表・共有カレンダー機能の削除）の設計・承認・実装が想定される。いずれも2026-09-02時点で未着手
-
-## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172。2026-09-02設計書175で「旅行」カテゴリ追加）
-既存の「週末おでかけイベント」取り込みパイプライン（`fetch-events.js`/`filter-events.js`、上記「イベント取り込みパイプライン構成」参照）とはデータ・API・UIとも完全に独立した新機能。行政・ビザ手続き（admin）/天候・災害（weather）/交通・MRT（transport）/日本人コミュニティ（community）/医療・健康（health）/教育・子育て（education）/旅行（travel）の7カテゴリをキュレーション表示する（`health`/`education`は設計書172時点では未記録のタイミングで既に拡張済みだったカテゴリ、`travel`は設計書175で新規追加）。
-
-- **データ取得パイプライン**: 新規`scripts/fetch-life-info.js`。取得元RSS3件（CNA `https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10416`／Mothership.sg `https://mothership.sg/feed/`／JCCI `https://www.jcci.org.sg/feed/`）を`rss-parser`で取得。ハイウォーターマーク方式（新規`data/life-info-fetch-state.json`、既存の`data/source-fetch-state.json`＝イベント用とは分離）で新着記事のみ抽出。フィード取得自体が失敗したソースは状態を更新せず次回また試行する（既存`fetch-events.js`と同じフォールトトレランス設計）。Haiku（`claude-haiku-4-5-20251001`）で「シンガポール在住日本人の生活に関係あるか」を判定し`category`（admin/weather/transport/community）を付与、スポーツ・芸能・単純な事件事故等の無関係記事は却下。採用記事はSonnet（`claude-sonnet-4-6`）で日本語要約＋英語要約（`title`/`title_en`/`summary`/`summary_en`）を生成し、新規`data/sg/life-info.json`（配列、gitignore対象）に追記保存。フィールドは`id`/`category`/`title`/`title_en`/`summary`/`summary_en`/`source`（"CNA"/"Mothership"/"JCCI"）/`sourceUrl`/`publishedAt`/`fetched_at`（`severity`フィールドは、報道記事ベースで構造化された警報データでないため見送り）。`--dry-run`オプション対応
-- **cron**: 新規エントリを追加、毎日7:15 SGT（1:15 CEST）に`node scripts/fetch-life-info.js --city=sg`を実行。既存の6:30 SGT（`run-fetch-all.sh`）・7:00/18:00 SGT（`post-to-x.js --to-line`）・水日7:30 SGT（`run-source-analysis.sh`）のいずれとも時刻が衝突しない。ログは`logs/fetch-life-info.log`
-- **API**: 新規`GET /api/life-info?city=sg&category=admin|weather|transport|community`（`server.js`、`GET /api/events`の直後に配置）。既存`GET /api/events`と同じ`fs.readFileSync`都度読み込みパターン（DBなし、メモリキャッシュなし）。ファイル不存在時・不正な`category`値は空配列またはフィルタなしの全件を返す（エラーにしない）。既存`GET /api/events`・`GET /api/sales`のレスポンス構造・後方互換性には一切影響を与えていない（`server.js`全体で削除行数0の追加のみの変更）
-- **フロントエンド（ボトムナビ新規5つ目のタブ）**: `public/index.html`のボトムナビに`#nav-news`（📰「ニュース」）を`#nav-course`（非表示中）と`#nav-plan`の間に追加。DOM順のまま`#nav-course`が非表示のため、実際の表示順は「ホーム→ニュース→予定表→設定」になる。新規`#screen-news`（カテゴリチップ5種＝すべて/行政/天候・災害/交通/コミュニティ＋カード一覧＋空状態）を新設。`public/app.js`の`switchNav()`に`'news'`ケースを追加。**ニュース画面には既存の「探訪」「予定表」で使われているアカウント連携必須ゲート（`_applyScreenAuthGate`、設計書116）を適用していない**（未ログインでも閲覧可能な設計）
-- **フロントエンド（ホーム画面プレビュー）**: `#filter-row-category`（カテゴリチップ行）の手前に`#life-info-preview-section`を新設。`GET /api/life-info`から直近3件（公開日新しい順、レスポンス自体がAPI側で降順ソート済み）を軽量カードで表示、タップで元記事URLを直接開く（ニュース画面を経由しない）。「もっと見る ›」リンクで`switchNav('news')`。生活情報が0件の場合はセクション自体を`display:none`にする。**`loadEventData()`（`GET /api/events`）とは独立して`loadLifeInfoPreview()`を起動時に呼び出し、それぞれ個別の`try/catch`でエラーハンドリングするため片方の失敗がもう片方に影響しない**
-- **外部リンクの開き方**: 新規`openLifeInfoLink(url)`が既存`openSponsoredCardLink()`と同じ分岐パターンを踏襲（Capacitor環境は`Browser.open()`、Web環境は`window.open()`）
-- **i18n**: `navNews`/`newsScreenTitle`/`newsCatAll`/`newsCatAdmin`/`newsCatWeather`/`newsCatTransport`/`newsCatCommunity`/`newsEmptyDesc`/`lifeInfoPreviewTitle`/`lifeInfoPreviewMoreLink`の10キーをja/en同時追加
-- 生活情報カードは既存`.spot-card`クラスを再利用（fadeUpアニメーションが自動適用される副次効果あり、意図しない不具合ではなく無害な見た目上の恩恵）
-- `server.js`の変更を伴うため`pm2 restart`実施済み。キャッシュバスティング: `index.html` app.js `?v=20260827a`→`20260828a`、`sw.js` CACHE_NAME=`sg-weekend-v720`→`v721`（`app.css`は変更なしのため据え置き）
-- スコープ外（設計時点で明示）: プッシュ通知連携（緊急情報の即時配信）、ICA/MOM/NEA/LTA等の非公式スクレイピング実装、多言語ソースの機械翻訳精度保証、ユーザーからの情報投稿・コメント機能、カテゴリごとの通知オンオフ設定UI、BKK/SYD対応、iOSアプリのビルド・push（Web版への反映のみ、iOS版は次回TestFlightビルドで反映）
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機でのニュースタブ・ホーム画面プレビューセクションの表示、タップ後の外部リンク遷移（`Browser.open()`）の実際の動作は2026-08-28時点でWeb版での確認（curl・ロジック検証・実データでのパイプライン完走確認）のみ完了、実機未確認
-
-### 「旅行」カテゴリ追加（2026-09-02実装、設計書175）
-**【2026-09-02追記】本節の実装はロールバック済み。ユーザーの再検討により、旅行情報カテゴリは生活情報・ニュース画面ではなくおでかけ（イベント）画面のカテゴリタブとして再配置した。詳細は設計書176を参照。ただし、本節冒頭の「⚠️ 既存の不整合を発見・修正」で述べている`server.js`の`VALID_CATEGORIES`への`health`/`education`追加は設計書175実装時に発見された正当なバグ修正であり、ロールバック対象外としてそのまま維持されている（`travel`のみ`VALID_CATEGORIES`から削除済み）。**
-
-上記の生活情報・ニュース機能に7つ目のカテゴリ「旅行」を追加した。新しいボトムナビタブは作らず既存の生活情報・ニュース画面に統合する設計（ユーザー合意済み、更新頻度が低いため専用タブだと閑散として見える懸念）。分離ではなく統合方式を採用: 新規`data/sg/travel-info.json`＋新規`scripts/fetch-travel-info.js`という完全分離案は不採用とし、既存`data/sg/life-info.json`のスキーマに`category:'travel'`を追加し、既存`scripts/fetch-life-info.js`に3ソースを統合した。
-
-- **⚠️ 既存の不整合を発見・修正**: `server.js`の`GET /api/life-info`の`VALID_CATEGORIES`が`['admin','weather','transport','community']`の4種のまま更新されておらず、`health`/`education`（設計書172時点では未記録のタイミングで既に拡張されていたカテゴリ）がサーバー側の`?category=`クエリでフィルタできない状態だった（クライアント側フィルタで最終的に絞り込まれるため表面化していなかった）。今回`travel`を追加する際に7種類へ更新し、この既存の抜けも合わせて修正した
-- **新規ソース3件**（`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`）: `TheSmartLocal Travel`（`https://thesmartlocal.com/category/travel/feed/`）・`The MileLion`（`https://milelion.com/feed/`）・`Mainly Miles`（`https://mainlymiles.com/feed/`）。既存4フィード（CNA/Mothership/Straits Times/JCCI）はそのまま維持し、合計7フィードになった。`data/sources.json`（イベント取得パイプライン専用）はこの機能のソース管理には使われないため変更対象外
-- **カテゴリの色・ラベル**: 日本語ラベル「旅行」（英語`Travel`）。新規CSS変数`--plum: #9B7A94`/`--plum-pale: #F3EDF1`を`public/app.css`の`:root`に追加（ダークモードは`--plum-pale: #241C22`を別途定義）。既存6色（gold/sage/terracotta-light/caramel/sky/terracotta）を使い切っていたため、彩度を抑えた紫系の新色相を採用し既存カテゴリと混同しないようにした。`LIFE_INFO_CATEGORY_COLORS`（`public/app.js`）に`travel: { bg:'var(--plum-pale)', color:'var(--plum)' }`を追加
-- **リテンション期間: travelカテゴリのみ30日保持**（他5カテゴリは既存通り7日保持）。理由: セール・プロモ情報と異なり、TheSmartLocalの行き先紹介ガイド記事（Tiomanガイド、Kluangガイド等）は時事性が低く数ヶ月単位で有用なため、7日保持では読まれる前に消えてしまう構造になる。`scripts/fetch-life-info.js`に`getRetentionDays(category)`/`retentionCutoffFor(category)`ヘルパーを新設し、削除フィルタをアイテムごとにカテゴリ別カットオフで判定するよう変更（既存5カテゴリの7日保持ロジックは無変更）。副作用として、30日保持により旅行カテゴリの件数が他カテゴリより多くなり定常化する見込み（1日1.5〜2件×30日で最大45〜60件程度）。ホーム画面プレビュー（直近3件）のカテゴリ混在バランス調整は今回スコープ外
-- **Haiku分類プロンプトの調整**（`filterBatch()`内`instructionText`）: 「travel」カテゴリの判定基準（航空券・ホテルのセール/プロモ情報、SGから行ける近隣国・都市の行き先紹介ガイド、旅行関連のフェス・展示会情報）を追加。あわせて、MileLion/Mainly Milesのブログ内に混在する「クレジットカードの入会特典・ポイント還元率・年会費比較」「マイル・ポイントの貯め方・使い方の一般論」を明示的に除外する基準を追加（同じブログでも「セール情報記事」と「カード特典記事」が混在するため、カテゴリタグではなく記事本文の実質的内容で判定させる方針。機械的なキーワードフィルタは導入していない）
-- **UIカテゴリチップ**: 既存チップ順（新着/政府/交通/医療・健康/教育・子育て/天候・災害/コミュニティ）の末尾に「旅行」を追加し8チップ構成に。「旅行」は前向き・オプショナルな情報として性質が異なるため意図的に末尾配置
-- **`server.js`のAPI変更**: `GET /api/life-info?city=sg&category=travel`が有効なクエリとして機能するよう`VALID_CATEGORIES`を7種類（`admin`/`weather`/`transport`/`community`/`health`/`education`/`travel`）に更新。レスポンスの構造（フィールド名一覧）自体は無変更
-- **後方互換性**: `GET /api/life-info`のレスポンス構造（フィールド名・型）は無変更、`category`フィールドが取りうる値が増えるだけ。旧バージョンApp Storeアプリが未知の`category`値（`travel`）を受け取った場合、`LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || ''`のフォールバックによりカテゴリタグが空文字列で非表示になるだけで、タイトル・要約・ソース・日付は問題なく表示される想定（コードの防御的な作りによる推測、実機での旧バージョン確認はできていない）
-- **リリースタイミング（同時デプロイ）**: `server.js`（VALID_CATEGORIES更新）・`scripts/fetch-life-info.js`（新カテゴリ追加）・Web版（`public/`配下のチップ追加・i18n追加）を同時にデプロイ。iOSアプリは次回TestFlight/App Store申請ビルドに同梱し反映する（既存の「Web先行→iOSは次回ビルド」パターンを踏襲）
-- i18n新規キー: `newsCatTravel`（ja「旅行」/en「Travel」）をja/en同時追加
-- `server.js`の変更を伴うため`pm2 restart`実施済み。キャッシュバスティング: `index.html` app.css `?v=20260901a`→`20260902a`、app.js `?v=20260902b`→`20260902c`、`sw.js` CACHE_NAME=`sg-weekend-v800`→`v801`
-- スコープ外（設計時点で明示）: 新しいボトムナビタブ（既存生活情報画面への統合のみ）、イベントカードのような「エリア」「期間」専用フィールド、`data/sources.json`への統合、ホームプレビューでのカテゴリ混在バランス調整、既存の`VALID_CATEGORIES`不整合以外の生活情報機能の他の未発見の不整合の洗い出し、BKK/SYD対応、プッシュ通知連携、旧App Storeバージョンでの実機動作確認
-- **未検証（次回TestFlightビルド後にフォロー）**: iOS実機・Web版実機での旅行チップ表示・タグ配色（`--plum`）の見た目は2026-09-02時点でcurl・`node scripts/fetch-life-info.js --city=sg --dry-run`によるパイプライン完走確認のみ完了、実ブラウザ・実機とも未確認。7フィードに増えたことによるcron実行時間への影響は実測未確認（次回本番実行ログで確認）。Haiku分類プロンプトへのtravelカテゴリ追加が既存6カテゴリの判定精度に影響しないかは統合後1週間分の実データでの目視確認が必要。MileLion/Mainly Milesの「クレジットカード特典記事 vs 旅行セール記事」の判定精度は運用しながら様子見
+- **カテゴリ**: 6種（admin/weather/transport/community/health/education）。`server.js`の`VALID_CATEGORIES`もこの6種（travelは含まれない）
+- **データ取得**（`scripts/fetch-life-info.js`）: RSS4件（CNA/Mothership/Straits Times/JCCI、⚠️Straits Times追加の経緯は未記録）を`rss-parser`で取得、ハイウォーターマーク方式（`data/life-info-fetch-state.json`、イベント用の状態ファイルとは分離）。Haikuで在住日本人への関連性判定＋カテゴリ付与、Sonnetで日本語/英語要約を生成し`data/sg/life-info.json`（gitignore対象）に保存。リテンション期間は一律7日
+- **cron**: 独立エントリではなく、`run-fetch-all.sh`内で`fetch-events.js`の直後・`notify-fetch-summary.js`の直前に実行（毎日6:30 SGT）。当初（設計書172時点）は独立cronエントリ（毎日7:15 SGT）だったが、その後`run-fetch-all.sh`に統合されイベントと同じLINE通知にまとめられている
+- **API**: `GET /api/life-info?city=sg&category=...`（`server.js`、`GET /api/events`の直後）
+- **フロントエンド**: ボトムナビ「くらし」画面（`#screen-news`）＋ホーム（「おでかけ」画面）のプレビューセクション（`#life-info-preview-section`、直近3件）。未ログインでも閲覧可能（探訪・予定表で使われていたアカウント連携ゲートは適用外）
+- 詳細なi18nキー・UI構造等はコード直接参照
 
 ## 環境構成と注意事項（2026-07-07）
 
@@ -1817,76 +600,15 @@ document.getElementById('home-scroll-content').addEventListener('scroll', () => 
 }, { passive: true });
 ```
 
-### ✅ 全画面共通キーボード被り対策（2026-07-09実装 → 同日Web版無効化 → 同日「縮小+移動」方式に刷新）
+### ✅ キーボード被り対策（2026-07-09実装 → 2026-07-11に大幅簡素化、現行実装）
+当初「シートを縮小しながら移動する」複雑なJS一式（`_adjustSheetForKb`/`_liftVisibleSheetForKeyboard`等）を実装したが、ビューポート固着バグの真因は無関係な`capacitor.config.js`の`contentInset:'always'`設定（→`'never'`に変更）と判明（設計書15）し、複雑なJS一式は**無害な被害者として全撤去済み**（コード上に現存しないことを確認済み、`app.js:138`にその経緯コメントあり）。`.plan-modal`/`.plan-sheet`系のシートは内部スクロール（`.plan-modal-body{overflow-y:auto}`）とネイティブ挙動に委ねる。
 
-> ⚠️ **【2026-07-11 設計書15で撤去済み・以下の記述は実態と乖離しています】** ビューポート固着バグの真因が`ios-app/capacitor.config.js`の`contentInset:'always'`（→`'never'`に変更）と判明し、下記の`_adjustSheetForKb`/`_liftVisibleSheetForKeyboard`等のシート縮小・移動JS一式は**無害な被害者として全撤去した**。現在`public/app.js`に残るキーボード対策は「設定画面直下の入力欄（`#feedback-text`/`#nickname-input`）を逃がす軽量関数`_scrollFocusedIntoViewOnKb()`」のみで、`.plan-modal`/`.plan-sheet`系は内部スクロール（`.plan-modal-body{overflow-y:auto}`）とネイティブ挙動に委ねている。**このセクション本文（縮小+移動方式・冪等化・オーバーシュート経緯等）はTestFlight実機で対策の効果を確認でき次第、全面書き換える予定**（`.claude/next.md`参照）。それまでは歴史的経緯としてのみ残置。
->
-> **【2026-07-11 設計書16追記】** `_scrollFocusedIntoViewOnKb()`は当初「シート内の入力欄は対象外（`focused.closest('.plan-modal, .plan-sheet')`で早期return）」だったが、この早期リターンを削除。既存の祖先スクロールロジック（`overflow-y:auto`コンテナの`scrollTop`を`overflow`分加算）が、コース作成シート（`#course-sheet`の`#course-note`）等のシート内入力欄にも適用されるようになった。合わせて、設計書14フェーズ1で暫定導入していた「予定作成モーダル新規時のメモ欄非表示化」（`#plan-custom-memo-section`のdisplay制御）も、根本対策（設計書15）成功により不要と判明し撤回。メモ欄は新規・編集どちらでも常時表示。
->
-> **【2026-07-18 設計書59追記】** `_scrollFocusedIntoViewOnKb()`の`if (!foundContainer) { focused.scrollIntoView(...) }`フォールバック分岐を削除した（`#backup-passphrase-sheet`/`#cal-passphrase-sheet`が`.plan-modal-body`を持たずこのフォールバックに必ず入っていたことが、フィールド間フォーカス移動後にボタン行がボトムナビと重なる不具合の一因と推測されたため）。`overflow-y:auto`祖先が見つからない場合は現在は何もしない。合わせて`#backup-passphrase-sheet`・`#cal-passphrase-sheet`にも他シートと同じ`.plan-modal-body`ラッパーを追加し、`overflow-y:auto`祖先を持つ構造に統一した（詳細は上記「パスフレーズ入力シートのレイアウト修正」節参照）。
+**現行実装は`_scrollFocusedIntoViewOnKb(kbHeight)`という軽量関数1つのみ**（`public/app.js`、設定画面直下の`#feedback-text`/`#nickname-input`等`.plan-modal`/`.plan-sheet`の外側にある入力欄が対象）。実装上の教訓2点:
+- **判定は「スクロール可能かどうか」ではなく「フォーカス要素が実際に画面のどこにあるか」**（`getBoundingClientRect()`で判定）。`Keyboard:{resize:'none'}`下では`clientHeight`が変化しないため、旧来の「`scrollHeight > clientHeight`」判定はコンテンツ量が少ない画面で常にfalseになり誤判定していた
+- 祖先の`overflow-y:auto`コンテナが見つかっても、既存`padding-bottom`では実際に必要なスクロール量に届かないことがある（`scrollTop`は`scrollHeight-clientHeight`で頭打ち）。キーボード表示中のみ`padding-bottom`を動的に拡張してから`scrollTop`を加算する。祖先が見つからない場合は何もしない（`scrollIntoView`フォールバックはWKWebViewでレイアウトズレを誘発する副作用があり撤去済み、設計書59）
 
-`.plan-modal` / `.plan-sheet`（`#title-edit-sheet`は`.plan-modal`クラスを持つため自動的に含まれる）を対象に、**シートを縮小しながら移動する方式**（シート上端の位置は変えず、下端側だけキーボード分削る）。**JSによる制御はCapacitor環境限定**。Web環境はネイティブ挙動に完全に委ねてJS制御なし。
-
-- `_adjustSheetForKb(sheet, kbH)`: 表示中シートの`max-height`（またはheight）を`kbH`分縮小 + `bottom`を`kbH`に設定。`origH <= kbH + 80`の場合は縮小をスキップ（小さいシートで縮めすぎて表示崩れするのを防ぐガード）。どちらのプロパティを縮小したかは`sheet.dataset.kbIsMaxH`に記録。**2026-07-11に冪等化**: 初回適用時のみ「縮小前の元の高さ」を`sheet.dataset.kbOrigHeight`に保存し、2回目以降の呼び出しは必ずこの保存値を基準に`元の高さ - SAFE_GAP`を計算する（`getComputedStyle`の現在値からの相対計算はしない）。詳細は下記「フィールド間フォーカス移動時の多重縮小」参照
-- `_resetSheetAfterKb(sheet)`: `dataset.kbIsMaxH`を見て`maxHeight`または`height`のうち縮小した方だけを元に戻し、`bottom`もリセット。`dataset.kbOrigHeight`も同時に削除する
-- `_liftVisibleSheetForKeyboard(kbHeight)`: `document.querySelectorAll('.plan-modal.visible, .plan-sheet.visible')`で表示中の全シートに`_adjustSheetForKb`を適用。縮小後`setTimeout`内で、フォーカス中の入力欄が縮小後のシート下端から一定の余白（`MARGIN=16px`）を保てるよう`overflow = fRect.bottom - (sRect.bottom - MARGIN)`を計算し、`overflow > 0`の場合のみ内部スクロールコンテナ（`.plan-modal-body`等）を`scrollBy({top: overflow, behavior:'smooth'})`で動かす（2026-07-10改修。旧`focused.scrollIntoView({block:'nearest'})`は要素下端をスクロールコンテナ下端に密着させてしまい余白が生まれない問題があった）
-- `_resetSheetKeyboardOffset()`: 対象シート全てに`_resetSheetAfterKb`を適用
-- Capacitor環境: `@capacitor/keyboard` の `keyboardWillShow`/`keyboardWillHide` ネイティブイベントから共通関数を呼ぶ（正確な高さ取得。`resize:'none'`でネイティブ追従が起きないためJS制御が必須）。プラグイン未検出時は `focusin`/`focusout` + `visualViewport.height` によるフォールバック
-- **Web環境（iOS Safari/Android Chrome含む）: JSによるシート操作は一切行わない。** モバイルSafariには`position:fixed;bottom:0`要素をキーボード表示時にvisualViewportの可視領域へ自動追従させるネイティブ挙動があり（設定画面でボトムナビが一緒に上がる現象と同じ）、`.plan-sheet`/`.plan-modal`もこの対象になる。ここにJSで`bottom`を加算すると「ネイティブ追従分」+「JS加算分」の二重適用となり、キーボード高さの約2倍押し上げられてシートが画面上端を超えて完全に消える重大バグになった（2026-07-09発覚・当日中に修正）
-- `.plan-modal` / `.plan-sheet` に `transition: bottom 0.2s ease` を追加し、Capacitor環境での縮小移動/リセットをアニメーションさせる
-
-**⚠️ なぜ「持ち上げるだけ」ではなく「縮小+移動」なのか（2026-07-09オーバーシュート修正の経緯）**:
-`.plan-modal`/`.plan-sheet`は`max-height: 88vh`。画面上部の余白はわずか12vhしかない。単純に`sheet.style.bottom = kbHeight + 'px'`でシート全体を持ち上げるだけだと、シート上端も`kbHeight`分だけ画面上方向に押し上げられる。iPhoneのソフトウェアキーボード高さ（日本語キーボード、候補バー込みで概ね300〜350px）は画面上部の余白（iPhone14/15クラスで約101〜112px）を大きく超えるため、コンテンツ量が多く実高さが`88vh`近くまで達するモーダル（「予定を追加」等）では上端が画面外・ステータスバー裏まで突き抜けた。「縮小+移動」方式（高さを`kbH`分縮め、`bottom`も`kbH`分動かす）なら**シート上端の位置は変わらない**（下端側だけがキーボード分削られて画面内に収まる）ため、この問題が原理的に発生しない。
-
-**⚠️ 実装時の注意**:
-1. `_liftVisibleSheetForKeyboard`に「シート全体を持ち上げた後、フォーカス要素がまだ隠れていたら内部スクロール可能な祖先要素の`scrollTop`も追加操作する」フォールバックを**足さないこと**。内部スクロール領域を持つシートで「シートが上がりすぎる」二重対応バグになる（一度実装され修正済み）
-2. **Web環境で`visualViewport.resize`から`_liftVisibleSheetForKeyboard`/シート操作を呼ばないこと**。ネイティブ追従と二重適用になりシートが消える（一度実装され2026-07-09に撤去済み）。Web環境はブラウザのネイティブ挙動に完全に委ね、JS側は何もしない
-3. `_screenH`（キーボード表示前の画面高さ）は`let`で保持し、`_resetSheetKeyboardOffset()`実行時（＝キーボードが閉じた正しいタイミング）にのみ再取得する（Capacitor環境でのみ使用）
-4. `curH <= kbH + 80`のガード値はやや恣意的。実機テストで表示崩れがあれば調整する
-
-### ⚠️ ボトムシートの縮小・移動処理は「現在値からの相対計算」ではなく「初期値基準の絶対計算」で冪等にする（フィールド間フォーカス移動時の多重縮小、2026-07-11発見・修正）
-
-**症状**: 「予定を追加」モーダルでタイトル欄→メモ欄など、同一シート内でフィールド間のフォーカスを移動すると、モーダルの高さが極端に潰れてヘッダーだけが画面下部にごく小さく表示される状態になった。
-
-**原因**: iOSネイティブの一般的挙動として、同一フォーム内でテキストフィールド間のフォーカスが移動する場合（キーボードは表示されたまま消えない）、`keyboardWillHide`は発火せず`keyboardWillShow`のみがフォーカス変更のたびに再送される。旧`_adjustSheetForKb`は**呼ばれるたびに`getComputedStyle`の「現在の」`max-height`を読み、そこからさらに`SAFE_GAP`分を差し引く**相対計算だった。縮めすぎ防止ガード（`curH <= SAFE_GAP + 80`）は「初期状態からの1回の縮小」しか安全性を保証できない設計だったため、`keyboardWillShow`が複数回再発火すると縮小が際限なく積み重なった。
-
-**修正**: 「縮小前の元の高さ」を初回適用時のみ`sheet.dataset.kbOrigHeight`に保存し、2回目以降は必ずこの保存値を基準に絶対値で再計算する（同じ`kbH`が何度来ても同じ最終状態に収束する）。`_resetSheetAfterKb`実行時に保存値もクリアする。
-
-**再発防止の教訓**: ボトムシートの「縮小・移動」系の状態変更処理に限らず、**同一イベント（`keyboardWillShow`等）が1シーケンス中に複数回発火しうるケース**（フィールド間移動・画面回転・外部キーボード着脱など）を実装時に必ず想定し、「N回呼ばれても同じ最終状態に収束するか」をレビュー観点に加えること。`getComputedStyle`の相対値を基準に差分計算する方式ではなく、初期値を保存しておいてそこから絶対値で再計算する冪等な方式を標準パターンとする。2026-07-09の「シート上端が画面外に出る」オーバーシュート問題と根は同じ（「イベント再発火を想定していない一回限りの計算」）だが、今回は下端側の縮小が多重適用されて全体が潰れる新パターン。
-
-### ⚠️ 「スクロールで押し上げる」対策は対象コンテナの伸びしろが要求量を上回っているか確認する（設定画面フィードバック欄、2026-07-11修正）
-
-**症状**: 設定画面「改善要望」欄・ニックネーム欄にフォーカスしても、キーボードに隠れたまま送信ボタンが見えない状態が解消しなかった。
-
-**原因**: `.screen-scroll-content`の`padding-bottom:80px`が、実機ログで確認された実際に必要なスクロール量（146〜239px）に対して不足していた。JS側の祖先探索・`scrollTop`加算ロジック自体は正しく動作していたが、`scrollTop`は`scrollHeight - clientHeight`で物理的に頭打ちになるため、既存paddingの範囲を超えて動かすことができなかった（「命令は出したが動かせる余地が無かった」）。
-
-**修正**: キーボード表示中のみ`.screen-scroll-content`に一時的な`padding-bottom`（`kbHeight + 80`px）を動的付与してスクロールの伸びしろを確保してから`scrollTop`を加算するようにした。元のpadding値は`dataset`に保存し、`_resetSheetKeyboardOffset()`実行時（キーボードが閉じたタイミング）に必ず元へ戻す（戻し忘れると閉じた後も余分な余白が残る新規バグになるため要注意）。
-
-**再発防止の教訓**: 「スクロールで押し上げる」系の対策を実装する際は、対象コンテナが物理的にスクロール可能な量（`scrollHeight - clientHeight`、既存paddingに依存）が要求量を上回っているか必ず考慮する。対象がスクロールコンテナの末尾に近い要素であるほど、既存paddingだけでは不足しがちなので、キーボード表示中は動的に伸びしろを確保する設計を標準パターンにする。診断ログは「要求値」だけでなく「適用後の実測値」も併記すると原因切り分けが早い。
-
-### ⚠️ z-index是正時は「companion要素」だけでなく「子シート」も辿って確認する（2026-07-09追記）
-
-`.plan-modal-overlay`/`.plan-modal`のようなoverlay+本体のペアだけでなく、同じ構造を持つ**別クラス**（`.plan-sheet`等）にも是正漏れが起きやすい。あるz-index値を変更したら、以下を横展開で確認すること:
-
-1. 同じCSSクラスを使う他の要素（`.plan-sheet`は`#course-sheet`と`#course-detail-sheet`の2箇所で共有されていた）
-2. その要素の**内側から開かれる子シート**（`#course-detail-sheet`内の「タイトルを編集」ボタンが開く`#title-edit-sheet`など）。親のz-indexだけ上げて子のz-indexを据え置くと、子シートが親の背後に隠れる新規バグになる
-3. 最終的なz-index順序を一覧化し、意図した重なり順（overlay < 本体 < 子シート < 日付ピッカー等のさらに上位シート）になっているか確認する
-
-### ⚠️ `resize:'none'`下のキーボード回避フォールバックは「スクロール可能判定」に頼らない（2026-07-09追記）
-
-`Keyboard: { resize: 'none' }`設定下では、キーボード表示中も`clientHeight`はビューポート全体のまま変化しない。そのため「`overflowY === 'auto' && scrollHeight > clientHeight`（＝物理的にスクロール可能かどうか）」で祖先要素を判定する方式は、**コンテンツ量が少ない画面では常にfalseになり、実際にはキーボードに隠れているのにフォールバック処理が発火しない**という誤判定を起こす。
-
-正しい判定は「スクロール可能かどうか」ではなく「フォーカス要素が実際に画面のどこにあるか」:
-
-```javascript
-const rect = focused.getBoundingClientRect();
-const visibleBottom = _screenH - kbHeight - 24; // キーボード上の余白
-const overflow = rect.bottom - visibleBottom;
-if (overflow > 0) {
-  // 祖先の overflow-y:auto/scroll 要素の scrollTop を overflow 分だけ動かす
-  // （スクロール可能かどうかに関わらず操作を試みる。動かせない場合は実害なし）
-}
-```
+### ⚠️ z-index是正時は「companion要素」だけでなく「子シート」も辿って確認する（一般則、2026-07-09教訓）
+`.plan-modal-overlay`/`.plan-modal`のようなoverlay+本体のペアだけでなく、同じ構造を持つ別クラス（`.plan-sheet`等）にも是正漏れが起きやすい。あるz-index値を変更したら: (1)同じCSSクラスを使う他の要素、(2)その要素の内側から開かれる子シート（親だけ上げて子を据え置くと子が親の背後に隠れる）、(3)最終的なz-index順序を一覧化して意図した重なり順になっているか、の3点を横展開で確認すること。
 
 ### ✅ CSSキャッシュバスティング手順（セットで変更必須）
 

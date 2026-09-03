@@ -8,9 +8,6 @@ const path      = require('path');
 
 const client = new Anthropic();
 
-const CATEGORY_TARGET_RATIO = { event: 0.30, show: 0.20, gourmet: 0.30, sale: 0.10 };
-const CATEGORY_CAP_BUFFER = 1.2;
-
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
 const CITY_LOCATIONS = { sg: 'Singapore', bkk: 'Bangkok', syd: 'Sydney' };
 const CITY_AREAS = {
@@ -338,47 +335,6 @@ async function processBatch(batch, cityKey = 'sg', categoryStats = null) {
   return filterBatch(batch, cityKey, categoryStats);
 }
 
-// ─── カテゴリ上限削除ロジック ─────────────────────────────────
-function enforceTypeCap(eventsPath) {
-  const all = JSON.parse(fs.readFileSync(eventsPath, 'utf8'));
-  const nonOpening = all.filter(e => e.type !== 'opening');
-  const baseTotal = nonOpening.length;
-  if (baseTotal === 0) return;
-
-  const today = new Date();
-  const protectCutoff = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-  let changed = false;
-  let toKeep = [...all];
-
-  for (const [type, ratio] of Object.entries(CATEGORY_TARGET_RATIO)) {
-    const cap = Math.floor(baseTotal * ratio * CATEGORY_CAP_BUFFER);
-    const ofType = toKeep.filter(e => e.type === type);
-    if (ofType.length <= cap) continue;
-
-    // 終了日が7日以内のものは保護
-    const deletable = ofType
-      .filter(e => !e.end_date || new Date(e.end_date) > protectCutoff)
-      .sort((a, b) => {
-        const scoreA = typeof a.score === 'number' ? a.score : -1;
-        const scoreB = typeof b.score === 'number' ? b.score : -1;
-        if (scoreA !== scoreB) return scoreA - scoreB; // スコアが低いものを先頭（削除優先）に
-        return (a.fetched_at || '').localeCompare(b.fetched_at || ''); // 同点は古い順
-      });
-    const excess = ofType.length - cap;
-    const toDelete = new Set(deletable.slice(0, excess).map(e => e.id || e.url));
-
-    if (toDelete.size > 0) {
-      console.log(`  [enforceTypeCap] ${type}: ${ofType.length}件 → ${ofType.length - toDelete.size}件（上限${cap}件、${toDelete.size}件削除）`);
-      toKeep = toKeep.filter(e => e.type !== type || !toDelete.has(e.id || e.url));
-      changed = true;
-    }
-  }
-
-  if (changed) {
-    fs.writeFileSync(eventsPath, JSON.stringify(toKeep, null, 2), 'utf8');
-  }
-}
-
 // ─── メイン関数：フィルタリング＆保存 ──────────────────────────
 async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
   if (!eventsPath) {
@@ -614,7 +570,6 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
     console.log(`    ${stat.accepted > 0 ? '✅' : '  '} ${src}: ${stat.accepted}/${stat.sent}件 (${rate}%)`);
   }
 
-  enforceTypeCap(eventsPath);
   return { accepted: totalAccepted, rejected: totalRejected, newItems, sourceStats };
 }
 

@@ -18,7 +18,6 @@ const parser = new Parser({ timeout: 10000 });
 // ─── 設定 ─────────────────────────────────────────────────────────
 const PROBE_DAYS         = 7;   // 投稿取得対象の日数
 const PROBE_COOLDOWN     = 5;   // 再プローブまでの最低日数
-const CANDIDATES_IG_MAX  = 10;  // 都市ごとの IG 候補上限数
 const CANDIDATES_FEED_MAX = 5;  // 都市ごとの Feed 候補上限数
 const SCORE_BATCH_SIZE   = 10;  // Claude に一度に渡す投稿数
 
@@ -77,51 +76,6 @@ async function notifyLINE(message) {
     }, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
   } catch (e) {
     log(`LINE通知失敗: ${e.message}`);
-  }
-}
-
-// ─── Instagram プローブ ────────────────────────────────────────────
-// 戻り値: { posts, apiError }。apiError が立っている場合は「投稿が少ない」のではなく
-// 「ユーザー名不明・権限エラー等でAPI呼び出し自体が失敗した」ことを示す（2026-07-19修正）。
-// 従来は data.error を無視して常に posts:[] を返していたため、存在しないユーザー名を
-// 「投稿0件の候補」として静かに扱ってしまい、壊れた候補が発覚しない原因になっていた。
-async function probeInstagram(username) {
-  const pageToken = process.env.INSTAGRAM_PAGE_TOKEN;
-  const igUserId  = process.env.INSTAGRAM_IG_USER_ID;
-  if (!pageToken || !igUserId) return { posts: [] };
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - PROBE_DAYS);
-
-  try {
-    const url = new URL(`https://graph.facebook.com/v25.0/${igUserId}`);
-    url.searchParams.set(
-      'fields',
-      `business_discovery.username(${username}){media{caption,media_type,timestamp}}`
-    );
-    url.searchParams.set('access_token', pageToken);
-
-    const res  = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
-    const data = await res.json();
-
-    if (data.error) {
-      const apiError = data.error.error_user_msg || data.error.message || 'unknown API error';
-      log(`  ❌ @${username}: APIエラー「${apiError}」→ ユーザー名が間違っている可能性があります`);
-      return { posts: [], apiError };
-    }
-
-    if (!data.business_discovery?.media?.data) return { posts: [] };
-
-    const posts = data.business_discovery.media.data
-      .filter(p => new Date(p.timestamp) >= cutoff && p.caption)
-      .map(p => ({
-        title:       p.caption.split('\n')[0].slice(0, 80),
-        description: p.caption.slice(0, 400),
-      }));
-    return { posts };
-  } catch (e) {
-    log(`  ⚠️ @${username}: ${e.message}`);
-    return { posts: [], apiError: e.message };
   }
 }
 
@@ -202,51 +156,14 @@ JSON配列のみ返してください（前置き・コードブロック不要�
 // ─── 都市別プローブ処理 ────────────────────────────────────────────
 async function probeCity(cityKey, pool, sources) {
   const cityName = CITY_NAMES[cityKey];
-  const cityPool = pool[cityKey] || { feeds: [], instagramAccounts: [] };
-  const citySrc  = sources[cityKey] || { feeds: [], instagramAccounts: [] };
+  const cityPool = pool[cityKey] || { feeds: [] };
+  const citySrc  = sources[cityKey] || { feeds: [] };
 
-  const activeUrls      = new Set(citySrc.feeds.map(f => f.url));
-  const activeUsernames = new Set(citySrc.instagramAccounts.map(a => a.username));
+  const activeUrls = new Set(citySrc.feeds.map(f => f.url));
 
   log(`\n【${cityName}】プローブ開始`);
   let probedCount = 0;
   let skippedCount = 0;
-
-  // Instagram
-  for (const account of cityPool.instagramAccounts || []) {
-    if (activeUsernames.has(account.username)) {
-      log(`  ⏭ @${account.username}: sources.json にあるためスキップ`);
-      skippedCount++;
-      continue;
-    }
-    if (!isStale(account.lastProbed)) {
-      log(`  ⏭ @${account.username}: 最近プローブ済み (${account.lastProbed})`);
-      skippedCount++;
-      continue;
-    }
-
-    log(`  📸 @${account.username} をプローブ中...`);
-    const { posts, apiError } = await probeInstagram(account.username);
-
-    account.lastProbed = today();
-    probedCount++;
-
-    if (apiError) {
-      account.apiError       = apiError;
-      account.totalCount     = null;
-      account.potentialYield = null;
-      account.avgScore       = null;
-      continue;
-    }
-    delete account.apiError;
-
-    const { potentialYield, avgScore, totalCount } = await scoreWithClaude(posts, cityName);
-    account.totalCount     = totalCount;
-    account.potentialYield = potentialYield;
-    account.avgScore       = avgScore;
-
-    log(`  ✅ @${account.username}: ${totalCount}件取得 → 潜在採用${potentialYield}件 (avg:${avgScore})`);
-  }
 
   // RSS フィード
   for (const feed of cityPool.feeds || []) {
@@ -296,30 +213,21 @@ function buildCandidates(pool, sources) {
   };
 
   for (const cityKey of Object.keys(CITY_NAMES)) {
-    const cityPool = pool[cityKey] || { feeds: [], instagramAccounts: [] };
-    const citySrc  = sources[cityKey] || { feeds: [], instagramAccounts: [] };
+    const cityPool = pool[cityKey] || { feeds: [] };
+    const citySrc  = sources[cityKey] || { feeds: [] };
 
-    const activeUrls      = new Set(citySrc.feeds.map(f => f.url));
-    const activeUsernames = new Set(citySrc.instagramAccounts.map(a => a.username));
+    const activeUrls = new Set(citySrc.feeds.map(f => f.url));
 
     // スコア済みのみ対象。potentialYield 降順 → avgScore 降順
-    const scoredIG = (cityPool.instagramAccounts || [])
-      .filter(a => !activeUsernames.has(a.username) && a.potentialYield != null)
-      .sort((a, b) => b.potentialYield - a.potentialYield || b.avgScore - a.avgScore);
-
     const scoredFeeds = (cityPool.feeds || [])
       .filter(f => !activeUrls.has(f.url) && f.potentialYield != null)
       .sort((a, b) => b.potentialYield - a.potentialYield || b.avgScore - a.avgScore);
 
     // 未スコアは末尾に残す（プローブ失敗・初回前）。apiErrorが立っているものは
     // 「無効な候補」として候補一覧からは除外し、_invalid に集約する（2026-07-19修正）
-    const unscoredIG = (cityPool.instagramAccounts || [])
-      .filter(a => !activeUsernames.has(a.username) && a.potentialYield == null && !a.apiError);
     const unscoredFeeds = (cityPool.feeds || [])
       .filter(f => !activeUrls.has(f.url) && f.potentialYield == null && !f.apiError);
 
-    const invalidIG = (cityPool.instagramAccounts || [])
-      .filter(a => !activeUsernames.has(a.username) && a.apiError);
     const invalidFeeds = (cityPool.feeds || [])
       .filter(f => !activeUrls.has(f.url) && f.apiError);
 
@@ -327,12 +235,6 @@ function buildCandidates(pool, sources) {
       Object.fromEntries(keys.filter(k => src[k] != null).map(k => [k, src[k]]));
 
     result[cityKey] = {
-      instagramAccounts: [
-        ...scoredIG.slice(0, CANDIDATES_IG_MAX).map(a =>
-          toCandidate(a, ['username', 'contentFocus', 'reason', 'potentialYield', 'avgScore', 'lastProbed'])
-        ),
-        ...unscoredIG.map(a => toCandidate(a, ['username', 'contentFocus', 'reason'])),
-      ],
       feeds: [
         ...scoredFeeds.slice(0, CANDIDATES_FEED_MAX).map(f =>
           toCandidate(f, ['url', 'name', 'contentFocus', 'reason', 'options', 'potentialYield', 'avgScore', 'lastProbed'])
@@ -340,8 +242,7 @@ function buildCandidates(pool, sources) {
         ...unscoredFeeds.map(f => toCandidate(f, ['url', 'name', 'contentFocus', 'reason', 'options'])),
       ],
       _invalid: {
-        instagramAccounts: invalidIG.map(a => toCandidate(a, ['username', 'apiError', 'lastProbed'])),
-        feeds:             invalidFeeds.map(f => toCandidate(f, ['name', 'url', 'apiError', 'lastProbed'])),
+        feeds: invalidFeeds.map(f => toCandidate(f, ['name', 'url', 'apiError', 'lastProbed'])),
       },
     };
   }
@@ -361,19 +262,9 @@ function buildReport(candidates, cities) {
     const cands = candidates[cityKey];
     if (!cands) continue;
 
-    const topIG   = cands.instagramAccounts.filter(a => a.potentialYield != null).slice(0, 5);
     const topFeed = cands.feeds.filter(f => f.potentialYield != null).slice(0, 3);
 
     lines.push(`\n【${cityName}】`);
-
-    if (topIG.length > 0) {
-      lines.push('📸 IG候補（潜在採用数順）:');
-      for (const a of topIG) {
-        lines.push(`  @${a.username}: ${a.potentialYield}件 (avg:${a.avgScore})`);
-      }
-    } else {
-      lines.push('📸 IGスコアデータなし');
-    }
 
     if (topFeed.length > 0) {
       lines.push('📡 RSS候補:');
@@ -382,11 +273,9 @@ function buildReport(candidates, cities) {
       }
     }
 
-    const invalidIG    = cands._invalid?.instagramAccounts || [];
     const invalidFeeds = cands._invalid?.feeds || [];
-    if (invalidIG.length > 0 || invalidFeeds.length > 0) {
-      lines.push('⚠️ 無効な候補（ユーザー名/URL要確認、source-pool.jsonから削除推奨）:');
-      for (const a of invalidIG)    lines.push(`  @${a.username}: ${a.apiError}`);
+    if (invalidFeeds.length > 0) {
+      lines.push('⚠️ 無効な候補（URL要確認、source-pool.jsonから削除推奨）:');
       for (const f of invalidFeeds) lines.push(`  ${f.name}: ${f.apiError}`);
     }
   }
@@ -431,10 +320,8 @@ async function main() {
     for (const cityKey of cities) {
       const cands = candidates[cityKey];
       if (!cands) continue;
-      const invalidCount = (cands._invalid?.instagramAccounts.length || 0) + (cands._invalid?.feeds.length || 0);
+      const invalidCount = cands._invalid?.feeds.length || 0;
       result.cities[cityKey] = {
-        topIG:   cands.instagramAccounts.filter(a => a.potentialYield != null).slice(0, 3)
-                   .map(a => `@${a.username}(${a.potentialYield}件)`),
         topFeed: cands.feeds.filter(f => f.potentialYield != null).slice(0, 2)
                    .map(f => `${f.name}(${f.potentialYield}件)`),
         invalidCount,

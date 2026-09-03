@@ -169,12 +169,11 @@ function sortActiveByOverrepresented(activeList, overRepresented) {
 function analyzeCity(cityKey, history, sources, candidates) {
   const cityName   = CITY_NAMES[cityKey];
   const cityHist   = history[cityKey] || {};
-  const cityConf   = sources[cityKey]    || { feeds: [], instagramAccounts: [] };
-  const cityCands  = candidates[cityKey] || { feeds: [], instagramAccounts: [] };
+  const cityConf   = sources[cityKey]    || { feeds: [] };
+  const cityCands  = candidates[cityKey] || { feeds: [] };
 
   const activeFeeds = cityConf.feeds.filter(f => f.status === 'active');
-  const activeIG    = cityConf.instagramAccounts.filter(a => a.status === 'active');
-  const activeTotal = activeFeeds.length + activeIG.length;
+  const activeTotal = activeFeeds.length;
 
   // 直近 rawTotal
   const meta            = cityHist._meta || [];
@@ -184,7 +183,7 @@ function analyzeCity(cityKey, history, sources, candidates) {
   const typeDist = analyzeTypeDistribution(cityKey);
   const { mostNeeded, overRepresented } = typeDist;
 
-  log(`\n【${cityName}】アクティブ: feeds ${activeFeeds.length} / IG ${activeIG.length} / raw直近: ${latestRawTotal ?? '不明'}件`);
+  log(`\n【${cityName}】アクティブ: feeds ${activeFeeds.length} / raw直近: ${latestRawTotal ?? '不明'}件`);
 
   if (typeDist.total > 0) {
     const distStr = Object.entries(typeDist.ratios)
@@ -202,9 +201,8 @@ function analyzeCity(cityKey, history, sources, candidates) {
   const REJECT_PAUSED_DAYS = 7;  // 停止後この日数を超えたら昇格判定
   const today = new Date().toISOString().slice(0, 10);
   const pausedFeeds = cityConf.feeds.filter(f => f.status === 'paused');
-  const pausedIG    = cityConf.instagramAccounts.filter(a => a.status === 'paused');
-  for (const obj of [...pausedFeeds, ...pausedIG]) {
-    const key = obj.username ? `Instagram / @${obj.username}` : obj.name;
+  for (const obj of pausedFeeds) {
+    const key = obj.name;
     const runs = cityHist[key] || [];
     if (runs.length < THRESHOLDS.minRuns) continue;
     const daysSincePause = obj.pausedAt
@@ -223,27 +221,16 @@ function analyzeCity(cityKey, history, sources, candidates) {
   }
 
   // 候補リスト（まだ未使用かつ rejected でないもの）、多様性を考慮してソート
-  const rejectedUrls     = new Set(cityConf.feeds.filter(f => f.status === 'rejected').map(f => f.url));
-  const rejectedUsernames = new Set(cityConf.instagramAccounts.filter(a => a.status === 'rejected').map(a => a.username));
+  const rejectedUrls = new Set(cityConf.feeds.filter(f => f.status === 'rejected').map(f => f.url));
   let unusedFeedCands = sortCandidatesByDiversity(
     (cityCands.feeds || []).filter(c =>
       !cityConf.feeds.some(f => f.url === c.url) && !rejectedUrls.has(c.url)
     ),
     mostNeeded
   );
-  let unusedIGCands = sortCandidatesByDiversity(
-    (cityCands.instagramAccounts || []).filter(c =>
-      !cityConf.instagramAccounts.some(a => a.username === c.username) &&
-      !rejectedUsernames.has(c.username)
-    ),
-    mostNeeded
-  );
 
   // ─ Step1: 不良ソースを特定して入れ替え ─
-  const allActiveRaw = [
-    ...activeFeeds.map(f => ({ type: 'feed', key: f.name, obj: f })),
-    ...activeIG.map(a => ({ type: 'ig', key: `Instagram / @${a.username}`, obj: a })),
-  ];
+  const allActiveRaw = activeFeeds.map(f => ({ type: 'feed', key: f.name, obj: f }));
   // 過多カテゴリのソースを先頭に移動（優先停止のため）
   const allActive = sortActiveByOverrepresented(allActiveRaw, overRepresented);
 
@@ -274,7 +261,7 @@ function analyzeCity(cityKey, history, sources, candidates) {
 
     // 同種の候補を探す（多様性考慮済みのソート順）
     let candidate = null;
-    if (type === 'feed' && unusedFeedCands.length > 0) {
+    if (unusedFeedCands.length > 0) {
       candidate = unusedFeedCands.shift();
       cityConf.feeds.push({
         url: candidate.url, name: candidate.name,
@@ -282,13 +269,6 @@ function analyzeCity(cityKey, history, sources, candidates) {
         ...(candidate.options ? { options: candidate.options } : {}),
       });
       activated.push({ label: candidate.name, reason: candidate.reason || '', contentFocus: candidate.contentFocus });
-    } else if (type === 'ig' && unusedIGCands.length > 0) {
-      candidate = unusedIGCands.shift();
-      cityConf.instagramAccounts.push({
-        username: candidate.username,
-        status: 'active', addedAt: new Date().toISOString().slice(0, 10),
-      });
-      activated.push({ label: `@${candidate.username}`, reason: candidate.reason || '', contentFocus: candidate.contentFocus });
     } else {
       warnings.push(`${key}（採用率${rateStr}・候補ソースなし）`);
       log(`  → 停止保留（候補ソースなし）`);
@@ -308,21 +288,10 @@ function analyzeCity(cityKey, history, sources, candidates) {
   }
 
   // ─ Step2: rawTotal 不足時に候補を追加（多様性優先） ─
+  // 2026-09-03: 従来はInstagram候補のみで量補充していたが、IG取り込み自体を廃止したため本ステップも削除。
+  // rawTotal不足の検知自体は不要になったため、代替のRSS候補による補充ロジックは実装していない。
   if (latestRawTotal !== null && latestRawTotal < THRESHOLDS.targetRawMin) {
-    log(`  ⚠️ rawTotal ${latestRawTotal} < 目標${THRESHOLDS.targetRawMin}件 → 候補を追加（多様性優先）`);
-    while (unusedIGCands.length > 0) {
-      const candidate = unusedIGCands.shift();
-      cityConf.instagramAccounts.push({
-        username: candidate.username,
-        status: 'active', addedAt: new Date().toISOString().slice(0, 10),
-      });
-      activated.push({ label: `@${candidate.username}（量補充）`, reason: candidate.reason || '', contentFocus: candidate.contentFocus });
-      log(`  → 量補充追加: @${candidate.username}（${candidate.contentFocus}）`);
-      if (latestRawTotal + activated.length * 6 >= THRESHOLDS.targetRawMin) break;
-    }
-    if (unusedIGCands.length === 0 && latestRawTotal < THRESHOLDS.targetRawMin) {
-      warnings.push(`rawTotal ${latestRawTotal}件（目標${THRESHOLDS.targetRawMin}件）・候補枯渇`);
-    }
+    warnings.push(`rawTotal ${latestRawTotal}件（目標${THRESHOLDS.targetRawMin}件）・自動量補充は廃止済み`);
   }
 
   return { paused, activated, warnings, rejected, latestRawTotal, activeTotal, typeDist, mostNeeded, overRepresented };
@@ -411,12 +380,11 @@ async function main() {
     const analysisResult = { date: today, cities: {} };
     for (const [cityKey, r] of Object.entries(results)) {
       const activeFeeds = (sources[cityKey]?.feeds || []).filter(f => f.status === 'active').length;
-      const activeIG    = (sources[cityKey]?.instagramAccounts || []).filter(a => a.status === 'active').length;
       analysisResult.cities[cityKey] = {
         changed:     r.paused.length > 0 || r.activated.length > 0 || r.rejected.length > 0,
         added:       r.activated.map(a => a.label),
         removed:     [...r.paused.map(p => p.label), ...r.rejected.map(r => r.label)],
-        activeCount: activeFeeds + activeIG,
+        activeCount: activeFeeds,
       };
     }
     // logs/ ディレクトリが存在することを確認してから書き込む
