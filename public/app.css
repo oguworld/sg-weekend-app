@@ -1663,7 +1663,7 @@
     }
     .nav-item:active { opacity: 0.6; }
     .nav-icon { font-size: 23px; display: inline-flex; }
-    .nav-icon-svg { width: 23px; height: 23px; color: var(--light-gray); display: block; }
+    .nav-icon-svg { width: 26px; height: 26px; color: var(--light-gray); display: block; }
     .nav-item.active .nav-icon-svg { color: var(--caramel); }
     .nav-label {
       font-size: 13px;
