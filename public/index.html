@@ -198,7 +198,7 @@
         <div id="pin-list-content" class="cards-grid"></div>
       </div>
       <div id="pins-empty-combined" style="display:none;height:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:40px 24px;">
-        <div style="font-size:40px;">📌</div>
+        <div><svg width="40" height="40" viewBox="0 0 24 24" fill="var(--light-gray)"><path d="M12 2C7.58 2 4 5.58 4 10c0 6 8 12 8 12s8-6 8-12c0-4.42-3.58-8-8-8Z"/><circle cx="12" cy="10" r="3" fill="var(--warm-white)"/></svg></div>
         <div style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="pinsEmptyCombinedTitle">まだ何もピン留めしていません</div>
         <div style="font-size:13px;color:var(--warm-gray);line-height:1.7;" data-i18n="pinsEmptyCombinedDesc">気になるイベントやニュースの📌をタップすると<br>ここにまとめて表示されます</div>
       </div>
@@ -556,7 +556,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260905i"></script>
+  <script src="/app.js?v=20260905j"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
