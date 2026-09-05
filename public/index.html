@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260905h">
+  <link rel="stylesheet" href="/app.css?v=20260905i">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -487,19 +487,19 @@
   <!-- ─── BOTTOM NAV ─── -->
   <nav class="bottom-nav">
     <button class="nav-item active" id="nav-news" onclick="if(!_touchCapableDetected) switchNav('news')">
-      <span class="nav-icon">🏛️</span>
+      <span class="nav-icon"><svg class="nav-icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4.5C4 3.67 4.67 3 5.5 3h10.17c.4 0 .78.16 1.06.44l1.83 1.83c.28.28.44.66.44 1.06V19.5c0 .83-.67 1.5-1.5 1.5h-11A2.5 2.5 0 0 1 4 18.5V4.5Z"/><rect x="7" y="8" width="8" height="1.6" rx="0.8" opacity="0.55"/><rect x="7" y="11.5" width="10" height="1.6" rx="0.8" opacity="0.55"/><rect x="7" y="15" width="6" height="1.6" rx="0.8" opacity="0.55"/></svg></span>
       <span class="nav-label" data-i18n="navNews">くらし</span>
     </button>
     <button class="nav-item" id="nav-home" onclick="if(!_touchCapableDetected) switchNav('home')">
-      <span class="nav-icon">🏖️</span>
+      <span class="nav-icon"><svg class="nav-icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9Z"/><rect x="11.25" y="10.6" width="1.5" height="9.4" rx="0.75"/><path d="M9 20c1 1.2 2.6 1.6 4.2.9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
       <span class="nav-label" data-i18n="navHome">おでかけ</span>
     </button>
     <button class="nav-item" id="nav-pins" onclick="if(!_touchCapableDetected) switchNav('pins')">
-      <span class="nav-icon">📌</span>
+      <span class="nav-icon"><svg class="nav-icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.58 2 4 5.58 4 10c0 6 8 12 8 12s8-6 8-12c0-4.42-3.58-8-8-8Z"/><circle cx="12" cy="10" r="3" fill="var(--warm-white)"/></svg></span>
       <span class="nav-label" data-i18n="navPins">ピン留め</span>
     </button>
     <button class="nav-item" id="nav-settings" onclick="if(!_touchCapableDetected) switchNav('settings')">
-      <span class="nav-icon">⚙️</span>
+      <span class="nav-icon"><svg class="nav-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><circle cx="15" cy="6" r="2.2" fill="currentColor" stroke="none"/><circle cx="8" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="17" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg></span>
       <span class="nav-label" data-i18n="navSettings">設定</span>
     </button>
   </nav>
@@ -556,7 +556,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260905g"></script>
+  <script src="/app.js?v=20260905i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
