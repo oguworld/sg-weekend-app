@@ -221,16 +221,19 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 ## SGエリア区分
 SGのエリア区分はCentral/East/West/North/North-East/Island-wide/Sentosaの7区分（Sentosaはケーブルカー・モノレールで渡る独立した「行き先」のため単独区分）。定義箇所: `public/index.html`の`#event-filter-sheet`内`.ef-chip`（イベント絞り込みシート）、`scripts/filter-events.js`の`CITY_AREAS.sg`（取り込みパイプラインのAI分類プロンプト用列挙値）。BKK/SYDはSentosa非対象。
 
-## イベント取り込みパイプライン構成（2026-09-03時点、crontab・コード確認済み）
+## イベント取り込みパイプライン構成（2026-09-05時点、crontab・コード確認済み）
 
-システムcrontabで動いているジョブは実質2本のみ:
+システムcrontabで動いているジョブは実質3本:
 
 | ジョブ | 内容 | 頻度 |
 |---|---|---|
 | `scripts/run-fetch-all.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `fetch-life-info.js --city=sg` → `notify-fetch-summary.js`（イベント＋生活情報をまとめて1通のLINE通知） | 毎日 6:30 SGT |
+| `scripts/run-fetch-extra.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg`（**通知なし**、生活情報も含まない） | 毎日 12:30 SGT・19:30 SGT |
 | `scripts/run-source-analysis.sh` | `discover-sources.js --city=sg --no-notify` → `analyze-sources.js --city=sg --no-notify` | 水・日 7:30 SGT |
 
 BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市対応状況」参照）。**旧`refresh-courses.js`のcronエントリはコース機能削除（設計書178）に伴い完全に削除済み**（旧CLAUDE.mdに記載があったが実態と乖離していたため訂正）。生活情報取得も当初は独立cronエントリ（毎日7:15 SGT）だったが、後日`run-fetch-all.sh`内に統合され独立エントリは廃止済み（詳細は下記「生活情報・ニュースのキュレーション機能」参照）。
+
+- **`run-fetch-extra.sh`（2026-09-05追加）**: Goody Feed（推定12.6件/日、フィード窓19時間分）・The Smart Local（7.9件/日、窓30時間分）・Eatbook（7.8件/日、窓31時間分）のように、投稿頻度に対してRSSフィードの保持件数が少なく、1日1回の取得だけでは記事がフィードから流れ落ちて取りこぼされるリスクがあるソースへの対策。1日1回（6:30 SGT）だった取得を1日3回に増やし、取得漏れリスクを下げた。ハイウォーターマーク方式（`data/source-fetch-state.json`）により重複取得はされない。通知は6:30 SGTの本実行時のみ行うため、`fetch-summary-sg.json`は直近の実行結果で毎回上書きされる仕様上、**LINE通知に表示される件数はその日の累計ではなく直近の実行分のみ**（events.json自体には各回の新着が正しく累積される）
 
 - **ハイウォーターマーク方式**（`fetch-events.js`）: `data/source-fetch-state.json`にソースごとの`lastSeenGuids`/`lastFetchedAt`を保存し新着記事のみ抽出。初回は`daysBack=7`カットオフにフォールバック。取得失敗ソースは状態未更新（次回また試行）
 - **Haiku採否・記事生成**（`filter-events.js`）: `scoreThreshold=6`（`BATCH_SIZE=10`件ずつ、`max_tokens:6000`、失敗時1回リトライ）。カテゴリ比率が薄いカテゴリはscore5以上に緩和。採用イベントはSonnetで日本語/英語記事を生成（`ENRICH_BATCH_SIZE=8`、`max_tokens:6000`、同じく1回リトライ）
