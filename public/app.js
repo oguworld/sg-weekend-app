@@ -466,6 +466,7 @@
         titleEditCancel: 'キャンセル',
         labelNickname: 'ニックネーム',
         labelDarkMode: 'ダークモード',
+        labelPalette: '配色',
         nicknamePlaceholder: '匿名',
         labelWhoWith: '一緒に行く人',
         labelWhoSolo: '🚶 ひとりで',
@@ -650,6 +651,7 @@
         titleEditCancel: 'Cancel',
         labelNickname: 'Nickname',
         labelDarkMode: 'Dark Mode',
+        labelPalette: 'Color Theme',
         nicknamePlaceholder: 'Anonymous',
         labelWhoWith: 'Who to go with',
         labelWhoSolo: '🚶 Solo',
@@ -727,6 +729,7 @@
         else html.removeAttribute('data-theme');
       }
       updateDarkModeUI();
+      updatePaletteUI();
     }
     function updateDarkModeUI() {
       const el = document.getElementById('dark-mode-label');
@@ -745,6 +748,30 @@
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
       if (getDarkMode() === 'auto') applyTheme();
     });
+
+    // ─── 配色パレット（既定 / 柳グリーン） ───
+    function getPalette() { return localStorage.getItem('sg_palette') || 'default'; }
+    function applyPalette() {
+      const palette = getPalette();
+      const html = document.documentElement;
+      if (palette === 'willow') html.setAttribute('data-palette', 'willow');
+      else html.removeAttribute('data-palette');
+      updatePaletteUI();
+    }
+    function updatePaletteUI() {
+      const el = document.getElementById('palette-label');
+      if (!el) return;
+      const palette = getPalette();
+      const isJa = getLang() === 'ja';
+      const labels = isJa ? { default: 'デフォルト', willow: '柳グリーン' } : { default: 'Default', willow: 'Willow Green' };
+      el.textContent = labels[palette] || labels.default;
+    }
+    function togglePalette() {
+      const cycle = { default: 'willow', willow: 'default' };
+      const next = cycle[getPalette()] || 'default';
+      localStorage.setItem('sg_palette', next);
+      applyPalette();
+    }
 
     // ─── CITY ───
     const CITY_META = {
@@ -852,6 +879,7 @@
       updateTabLabels();
       _syncRecommendChip();
       updateDarkModeUI();
+      updatePaletteUI();
       if (typeof initSettingsProfile === 'function') initSettingsProfile();
       if (typeof initSettingsGenres === 'function') initSettingsGenres();
     }
@@ -861,6 +889,7 @@
       applyI18n();
       updateCityUI();
       updateDarkModeUI();
+      updatePaletteUI();
       renderEventCards();
       showToast(lang === 'en' ? '🇬🇧 Switched to English' : '🇯🇵 日本語に切り替えました');
     }
@@ -1195,12 +1224,12 @@
       // カテゴリタグの配色（生活情報カードのLIFE_INFO_CATEGORY_COLORSと同じ考え方）
       const EVENT_CATEGORY_LABEL_KEYS = { event: 'catEvent', show: 'catShow', gourmet: 'catGourmet', sale: 'catSale', opening: 'catOpening', travel: 'catTravel' };
       const EVENT_CATEGORY_COLORS = {
-        event:   { bg: 'var(--caramel-pale)',       color: 'var(--caramel)' },
-        show:    { bg: 'rgba(122,173,204,0.18)',    color: 'var(--sky)' },
-        gourmet: { bg: 'rgba(196,112,90,0.16)',      color: 'var(--terracotta)' },
-        sale:    { bg: 'rgba(110,158,136,0.18)',     color: 'var(--sage)' },
-        opening: { bg: 'rgba(192,144,58,0.16)',      color: 'var(--gold)' },
-        travel:  { bg: 'var(--plum-pale)',           color: 'var(--plum)' },
+        event:   { bg: 'var(--caramel-pale)',    color: 'var(--caramel)' },
+        show:    { bg: 'var(--sky-pale)',         color: 'var(--sky)' },
+        gourmet: { bg: 'var(--terracotta-pale)',  color: 'var(--terracotta)' },
+        sale:    { bg: 'var(--sage-pale)',        color: 'var(--sage)' },
+        opening: { bg: 'var(--gold-pale)',        color: 'var(--gold)' },
+        travel:  { bg: 'var(--plum-pale)',        color: 'var(--plum)' },
       };
       const catKey = EVENT_CATEGORY_LABEL_KEYS[e.type] || '';
       const catLabel = catKey ? t(catKey) : '';
@@ -1226,7 +1255,7 @@
             const igMetaHtml = `
               <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 30%,rgba(0,0,0,0.78) 100%);pointer-events:none;z-index:2;"></div>
               <div style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px 13px;pointer-events:none;z-index:3;">
-                <h2 style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);${hasRibbon ? 'padding-right:44px;' : ''}">${e.store || e.title || ''}</h2>
+                <h2 style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:white;margin:0;line-height:1.3;text-shadow:0 1px 6px rgba(0,0,0,.45);${hasRibbon ? 'padding-right:44px;' : ''}">${e.store || e.title || ''}</h2>
                 ${(e.location || e.period || e.hours) ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;opacity:0.92;">
                   ${e.location ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📍 ${e.location}</span>` : ''}
                   ${(e.period || e.hours) ? `<span style="font-size:14px;color:rgba(255,255,255,0.95);text-shadow:0 1px 3px rgba(0,0,0,.4);">📅 ${e.period || e.hours}</span>` : ''}
@@ -1291,12 +1320,12 @@
 
     // カテゴリごとのタグ配色（アプリ既存のカラーパレット内の色を流用、見た目のトーンを崩さない範囲で区別）
     const LIFE_INFO_CATEGORY_COLORS = {
-      admin:     { bg: 'rgba(192,144,58,0.16)',  color: 'var(--gold)' },
-      transport: { bg: 'rgba(110,158,136,0.18)', color: 'var(--sage)' },
-      health:    { bg: 'rgba(224,154,136,0.20)', color: 'var(--terracotta-light)' },
-      education: { bg: 'var(--sand)',            color: 'var(--caramel)' },
-      weather:   { bg: 'rgba(122,173,204,0.18)', color: 'var(--sky)' },
-      community: { bg: 'rgba(196,112,90,0.16)',  color: 'var(--terracotta)' },
+      admin:     { bg: 'var(--gold-pale)',             color: 'var(--gold)' },
+      transport: { bg: 'var(--sage-pale)',             color: 'var(--sage)' },
+      health:    { bg: 'var(--terracotta-light-pale)', color: 'var(--terracotta-light)' },
+      education: { bg: 'var(--sand)',                  color: 'var(--caramel)' },
+      weather:   { bg: 'var(--sky-pale)',              color: 'var(--sky)' },
+      community: { bg: 'var(--terracotta-pale)',       color: 'var(--terracotta)' },
     };
     function _lifeInfoCategoryTagStyle(category) {
       const c = LIFE_INFO_CATEGORY_COLORS[category] || LIFE_INFO_CATEGORY_COLORS.education;
@@ -1547,7 +1576,7 @@
           </div>
           <div class="card-body" style="padding-top:12px;">
             <div style="font-size:12px;color:var(--warm-gray);margin-bottom:4px;">${escapeHtml(card.sponsorName || '')}</div>
-            <h2 style="font-family:'Kaisei Opti',serif;font-size:16px;font-weight:700;color:var(--midnight);margin:0 0 8px;line-height:1.3;">${escapeHtml(card.title || '')}</h2>
+            <h2 style="font-family:var(--font-heading);font-size:16px;font-weight:700;color:var(--midnight);margin:0 0 8px;line-height:1.3;">${escapeHtml(card.title || '')}</h2>
             ${card.content ? `<p style="font-size:14px;color:var(--warm-gray);line-height:1.6;margin:0;">${escapeHtml(card.content)}</p>` : ''}
           </div>
         </article>`;
@@ -3382,6 +3411,7 @@
     applyI18n();
     updateCityUI();
     applyTheme();
+    applyPalette();
 
     async function doShare() {
       const cityMeta = CITY_META[getCity()] || CITY_META.sg;

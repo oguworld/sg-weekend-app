@@ -208,6 +208,15 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - **画面タイトルのマークアップ**: `<span class="screen-title" data-i18n="...">`は、装飾用の親ラッパー（`.app-title`等の独自クラス）で包まない。子孫セレクタ（例: `.app-title span`）による意図しないCSS詳細度衝突で`.screen-title`本来のスタイルが上書きされる事故があったため、ヘッダーコンテナ（`.header-top`/`.plan-title-header`等）の直接の子要素として配置する
 - **オーバーレイの表示切替は`classList.toggle('visible')`方式に統一する（2026-07-11追記）**: `display`/`opacity`のインラインstyle直書きによる表示制御は禁止。「表示側は4箇所でstyle操作・非表示側は1箇所だけ」のような取りこぼしパターンが発生しやすく、実際に`.plan-modal-overlay`でこの不統一が確認され、モーダル操作後にタップが効かなくなる重大バグの構造的リスク要因の一つとして`classList`方式へ統一した（`.claude/plan.md`「設計書5」参照）。新規オーバーレイ実装時も必ずCSS側に`.要素名.visible{display:block;opacity:1}`を定義し、JS側は`classList.add/remove('visible')`のみで制御する
 
+## 配色パレット機能（2026-09-05実装）
+設定画面「配色」で「デフォルト」（既存の暖色系）と「柳グリーン」（Willoaコーポレートカラー、白ベース＋柳グリーン差し色のミニマル配色）を切り替え可能。ダークモードと全く同じ実装パターン（`localStorage`の`sg_palette`キー、`html`要素の`data-palette="willow"`属性、`getPalette()`/`applyPalette()`/`togglePalette()`/`updatePaletteUI()`）。
+- **既存の配色は一切変更していない**: `app.css`の`:root`（既定値）は無変更。`html[data-palette="willow"]`セレクタで同じ変数名（`--caramel`/`--sage`/`--terracotta`/`--gold`/`--sky`/`--plum`とその`-light`/`-pale`派生）を上書きする方式のため、デフォルト選択時の見た目に影響なし。ダーク×柳グリーンの組み合わせ用に`html[data-palette="willow"][data-theme="dark"]`も用意
+- **見出しフォント**: 新規CSS変数`--font-heading`を導入（既定値`'Kaisei Opti', serif`、柳グリーン時は`'Noto Sans JP', sans-serif`）。旧来ハードコードされていた`font-family: 'Kaisei Opti', serif;`（`app.css`15箇所・`app.js`/`index.html`各所のインラインstyle）を全て`var(--font-heading)`参照に置換済み
+- **カテゴリタグの配色**（`EVENT_CATEGORY_COLORS`/`LIFE_INFO_CATEGORY_COLORS`、`public/app.js`）: 従来ハードコードされていた`rgba(...)`値を`--sky-pale`/`--terracotta-pale`/`--gold-pale`/`--terracotta-light-pale`等の新規CSS変数参照に置換（既定値は旧`rgba()`と同じ見た目、柳グリーン時は全カテゴリが同一の柳トーンに収束する）
+- **カテゴリタブ（`.filter-chip`）**: 既定は下線タブのまま無変更。柳グリーン時のみピル塗り（未選択=グレー輪郭／選択中=柳グリーン塗り）に変更
+- **ボトムナビ**: 既定はラベル色変化のみで無変更。柳グリーン時のみ選択中アイコンの背後に柳グリーンの薄いピルハイライトを追加（`.nav-item.active .nav-icon`、新規HTML要素追加なし）
+- i18n: `labelPalette`（配色/Color Theme）を追加
+
 ## フィルターUI（2026-06-28刷新）
 - tabs-section（いつ行く？4タブ）廃止
 - `#filter-row-category` カテゴリチップ横スクロール行を header 直下に常時表示（何も選ばない = 全件）
