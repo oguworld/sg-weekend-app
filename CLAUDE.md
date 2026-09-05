@@ -121,11 +121,10 @@ Google Sign-In・Sign in with Appleに対応。予定表データ/共有カレ�
 - **設定画面構成**: プロフィール→アカウント（ログイン+バックアップ統合、見出し「アカウント連携」）→アプリ設定→サポート・情報→フィードバック→アカウント削除（見出しなし・中央寄せ、下記「Google/Apple Sign-In認証基盤」参照）の6セクション構成
 - **App Store審査対応（プライバシーマニフェスト）**: `@codetrix-studio/capacitor-google-auth`が古いGoogleSignIn SDKに依存し審査で`ITMS-91061: Missing privacy manifest`エラーになったため、CIで`GoogleSignIn`/`GTMAppAuth`/`GTMSessionFetcher`用の`PrivacyInfo.xcprivacy`（`ios-app/PrivacyManifests/`に格納）をビルド時に注入する方式で対応。`scripts/ensure-privacy-manifests.py`が生成済み`Podfile`の`post_install`フックにコピー処理を冪等に挿入する（`.github/workflows/ios-deploy.yml`の`Sync Capacitor`直後で実行）
 
-## PWAインストール・更新バナーの廃止（2026-07-09）
-- 「ホーム画面に追加」誘導バナー（`#install-banner`）とService Worker経由の「アプリが更新されました」バナー（`#update-banner`）はUIごと削除済み（iOSアプリ（App Store配信）を正式な運用形態とするため）
-- 削除対象だった `handleInstall()` / `showInstallBanner()` / `dismissInstallBanner()` / SW登録処理ブロック（`navigator.serviceWorker.register()`含む）はすべて撤去済み
-- `openShareModal()`（設定画面「使い方」ボタンと共用のHOWTOモーダル）・`#share-modal`・`/api/version`・`@capacitor/app`バージョン取得処理は影響なし、従来通り残置
-- `public/sw.js`本体は変更なし（Web版のオフライン対応・キャッシュ機構として残置。登録処理を削除したため新規訪問者には未登録になる点に注意）
+## PWA・Service Worker
+- 「ホーム画面に追加」誘導バナー（`#install-banner`）と「アプリが更新されました」バナー（`#update-banner`）はUIごと削除済み（iOSアプリ（App Store配信）を正式な運用形態とするため）。`handleInstall()`/`showInstallBanner()`/`dismissInstallBanner()`は撤去済み
+- `openShareModal()`（設定画面「使い方」ボタンと共用のHOWTOモーダル）・`#share-modal`・`/api/version`・`@capacitor/app`バージョン取得処理はバナー廃止と無関係、従来通り残置
+- **SW登録（`navigator.serviceWorker.register('/sw.js')`）は`public/app.js`の初期化処理内に存在**（Web版プッシュ通知の`navigator.serviceWorker.ready`依存＋SW更新時の自動反映のために必要）。登録時に`navigator.serviceWorker.controller`が既にあった場合（＝既存訪問者のSW更新時）のみ`controllerchange`で1回だけ`location.reload()`し、新デザイン等の反映漏れを防止。新規訪問者では初回の`controllerchange`では自動リロードしない（フラグ`_hadController`で判定）
 - 既知の残存事項（対応不要・スコープ外）: `public/index.html`に到達不能な`#install-modal`（「ホーム画面に追加する」手順モーダル）が残存。開く関数`openInstallModal()`が存在せずorphaned markup。ボタンの`onclick="handleInstall()"`は関数削除済みで無効だが、到達不能なため実害なし
 
 ## iOSアプリ化（Capacitor）2026-07-03実装
@@ -208,14 +207,17 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - **画面タイトルのマークアップ**: `<span class="screen-title" data-i18n="...">`は、装飾用の親ラッパー（`.app-title`等の独自クラス）で包まない。子孫セレクタ（例: `.app-title span`）による意図しないCSS詳細度衝突で`.screen-title`本来のスタイルが上書きされる事故があったため、ヘッダーコンテナ（`.header-top`/`.plan-title-header`等）の直接の子要素として配置する
 - **オーバーレイの表示切替は`classList.toggle('visible')`方式に統一する（2026-07-11追記）**: `display`/`opacity`のインラインstyle直書きによる表示制御は禁止。「表示側は4箇所でstyle操作・非表示側は1箇所だけ」のような取りこぼしパターンが発生しやすく、実際に`.plan-modal-overlay`でこの不統一が確認され、モーダル操作後にタップが効かなくなる重大バグの構造的リスク要因の一つとして`classList`方式へ統一した（`.claude/plan.md`「設計書5」参照）。新規オーバーレイ実装時も必ずCSS側に`.要素名.visible{display:block;opacity:1}`を定義し、JS側は`classList.add/remove('visible')`のみで制御する
 
-## 配色パレット機能（2026-09-05実装）
-設定画面「配色」で「デフォルト」（既存の暖色系）と「柳グリーン」（Willoaコーポレートカラー、白ベース＋柳グリーン差し色のミニマル配色）を切り替え可能。ダークモードと全く同じ実装パターン（`localStorage`の`sg_palette`キー、`html`要素の`data-palette="willow"`属性、`getPalette()`/`applyPalette()`/`togglePalette()`/`updatePaletteUI()`）。
-- **既存の配色は一切変更していない**: `app.css`の`:root`（既定値）は無変更。`html[data-palette="willow"]`セレクタで同じ変数名（`--caramel`/`--sage`/`--terracotta`/`--gold`/`--sky`/`--plum`とその`-light`/`-pale`派生）を上書きする方式のため、デフォルト選択時の見た目に影響なし。ダーク×柳グリーンの組み合わせ用に`html[data-palette="willow"][data-theme="dark"]`も用意
+## 配色機能（2026-09-05実装、ダークモードは同日中に統合済み）
+設定画面「配色」1項目のみで「キャラメル」（従来の暖色系）/「柳グリーン」（Willoaコーポレートカラー、白ベース＋柳グリーン差し色）/「ダーク」の3状態をボタンタップで循環切替（`default`→`willow`→`dark`→`default`…）。**旧来あった独立の「ダークモード」設定行は廃止し、この1つの設定に統合済み**（自動/ライト/ダークの3択だった旧ダークモードの「自動(端末追従)」は廃止）。
+- 状態管理は`localStorage`の`sg_palette`キー1本のみ（旧`sg_theme`キーは廃止）。`getPalette()`/`applyPalette()`/`togglePalette()`/`updatePaletteUI()`（`public/app.js`）
+- 各状態が実際にセットする`html`要素の属性: `default`→属性なし（`app.css`の`:root`既定値）／`willow`→`data-palette="willow"`のみ／`dark`→`data-palette="willow"`と`data-theme="dark"`の両方（＝「ダーク」の実体は柳グリーンのダーク版。キャラメル単体のダーク版は用意していない）
+- **「キャラメル」選択時の配色は無変更**: `app.css`の`:root`（既定値）自体は無変更。`html[data-palette="willow"]`セレクタで同じ変数名（`--caramel`/`--sage`/`--terracotta`/`--gold`/`--sky`/`--plum`とその`-light`/`-pale`派生）を上書きする方式。ダーク状態は`html[data-theme="dark"]`（既存の汎用ダーク配色、コンポーネント個別の暗色指定を含む）と`html[data-palette="willow"][data-theme="dark"]`（柳グリーン用のCSS変数上書き、セレクタ詳細度が高いため優先適用）の組み合わせ
+- `public/index.html`の`<head>`内スクリプトは初期描画のちらつき防止のため`sg_palette`を読んで`data-palette`/`data-theme`属性を先読み設定（`applyPalette()`実行前に反映するため）
 - **見出しフォント**: 新規CSS変数`--font-heading`を導入（既定値`'Kaisei Opti', serif`、柳グリーン時は`'Noto Sans JP', sans-serif`）。旧来ハードコードされていた`font-family: 'Kaisei Opti', serif;`（`app.css`15箇所・`app.js`/`index.html`各所のインラインstyle）を全て`var(--font-heading)`参照に置換済み
 - **カテゴリタグの配色**（`EVENT_CATEGORY_COLORS`/`LIFE_INFO_CATEGORY_COLORS`、`public/app.js`）: 従来ハードコードされていた`rgba(...)`値を`--sky-pale`/`--terracotta-pale`/`--gold-pale`/`--terracotta-light-pale`等の新規CSS変数参照に置換（既定値は旧`rgba()`と同じ見た目、柳グリーン時は全カテゴリが同一の柳トーンに収束する）
 - **カテゴリタブ（`.filter-chip`）**: 既定は下線タブのまま無変更。柳グリーン時のみピル塗り（未選択=グレー輪郭／選択中=柳グリーン塗り）に変更
 - **ボトムナビ**: 既定はラベル色変化のみで無変更。柳グリーン時のみ選択中アイコンの背後に柳グリーンの薄いピルハイライトを追加（`.nav-item.active .nav-icon`、新規HTML要素追加なし）
-- i18n: `labelPalette`（配色/Color Theme）を追加
+- i18n: `labelPalette`（配色/Color Theme）を追加。旧`labelDarkMode`は廃止
 
 ## フィルターUI（2026-06-28刷新）
 - tabs-section（いつ行く？4タブ）廃止

@@ -1904,8 +1904,7 @@
     html[data-theme="dark"] .pin-btn:not(.pinned) { background: #2E241C; color: var(--midnight); border-color: var(--sand-dark); }
     html[data-theme="dark"] #lang-toggle-btn,
     html[data-theme="dark"] #push-toggle-btn,
-    html[data-theme="dark"] #clear-hidden-btn,
-    html[data-theme="dark"] #dark-mode-toggle-btn { background: #2E241C !important; color: var(--midnight) !important; border-color: var(--sand-dark) !important; }
+    html[data-theme="dark"] #clear-hidden-btn { background: #2E241C !important; color: var(--midnight) !important; border-color: var(--sand-dark) !important; }
     html[data-theme="dark"] .chip:not(.chip--active) { background: #2E241C; border-color: var(--sand-dark); color: var(--warm-gray); }
     html[data-theme="dark"] .ending-soon-banner { background: var(--warm-white); }
     html[data-theme="dark"] .pin-detail-remove { background: #2E241C; color: var(--midnight); border-color: var(--sand-dark); }

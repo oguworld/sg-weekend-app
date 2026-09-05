@@ -465,7 +465,6 @@
         prBadgeLabel: 'PR',
         titleEditCancel: 'キャンセル',
         labelNickname: 'ニックネーム',
-        labelDarkMode: 'ダークモード',
         labelPalette: '配色',
         nicknamePlaceholder: '匿名',
         labelWhoWith: '一緒に行く人',
@@ -650,7 +649,6 @@
         prBadgeLabel: 'PR',
         titleEditCancel: 'Cancel',
         labelNickname: 'Nickname',
-        labelDarkMode: 'Dark Mode',
         labelPalette: 'Color Theme',
         nicknamePlaceholder: 'Anonymous',
         labelWhoWith: 'Who to go with',
@@ -715,47 +713,21 @@
     function t(key) { const s = STRINGS[getLang()]; return (s && s[key] !== undefined) ? s[key] : (STRINGS.ja[key] || key); }
 
     // ─── DARK MODE ───
-    function getDarkMode() { return localStorage.getItem('sg_theme') || 'auto'; }
-    function applyTheme() {
-      const mode = getDarkMode();
-      const html = document.documentElement;
-      if (mode === 'dark') {
-        html.setAttribute('data-theme', 'dark');
-      } else if (mode === 'light') {
-        html.removeAttribute('data-theme');
-      } else {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (prefersDark) html.setAttribute('data-theme', 'dark');
-        else html.removeAttribute('data-theme');
-      }
-      updateDarkModeUI();
-      updatePaletteUI();
-    }
-    function updateDarkModeUI() {
-      const el = document.getElementById('dark-mode-label');
-      if (!el) return;
-      const mode = getDarkMode();
-      const isJa = getLang() === 'ja';
-      const labels = isJa ? { auto: '自動', dark: 'ダーク', light: 'オフ' } : { auto: 'Auto', dark: 'Dark', light: 'Off' };
-      el.textContent = labels[mode] || labels.auto;
-    }
-    function toggleDarkMode() {
-      const cycle = { auto: 'dark', dark: 'light', light: 'auto' };
-      const next = cycle[getDarkMode()] || 'dark';
-      localStorage.setItem('sg_theme', next);
-      applyTheme();
-    }
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-      if (getDarkMode() === 'auto') applyTheme();
-    });
-
-    // ─── 配色パレット（既定 / 柳グリーン） ───
-    function getPalette() { return localStorage.getItem('sg_palette') || 'default'; }
+    // ─── 配色（キャラメル / 柳グリーン / ダーク）※ダークモードは配色設定に統合済み ───
+    function getPalette() { return localStorage.getItem('sg_palette') || 'willow'; }
     function applyPalette() {
       const palette = getPalette();
       const html = document.documentElement;
-      if (palette === 'willow') html.setAttribute('data-palette', 'willow');
-      else html.removeAttribute('data-palette');
+      if (palette === 'dark') {
+        html.setAttribute('data-palette', 'willow');
+        html.setAttribute('data-theme', 'dark');
+      } else if (palette === 'willow') {
+        html.setAttribute('data-palette', 'willow');
+        html.removeAttribute('data-theme');
+      } else {
+        html.removeAttribute('data-palette');
+        html.removeAttribute('data-theme');
+      }
       updatePaletteUI();
     }
     function updatePaletteUI() {
@@ -763,12 +735,12 @@
       if (!el) return;
       const palette = getPalette();
       const isJa = getLang() === 'ja';
-      const labels = isJa ? { default: 'デフォルト', willow: '柳グリーン' } : { default: 'Default', willow: 'Willow Green' };
-      el.textContent = labels[palette] || labels.default;
+      const labels = isJa ? { default: 'キャラメル', willow: '柳グリーン', dark: 'ダーク' } : { default: 'Caramel', willow: 'Willow Green', dark: 'Dark' };
+      el.textContent = labels[palette] || labels.willow;
     }
     function togglePalette() {
-      const cycle = { default: 'willow', willow: 'default' };
-      const next = cycle[getPalette()] || 'default';
+      const cycle = { default: 'willow', willow: 'dark', dark: 'default' };
+      const next = cycle[getPalette()] || 'willow';
       localStorage.setItem('sg_palette', next);
       applyPalette();
     }
@@ -878,7 +850,6 @@
       buildCitySelect();
       updateTabLabels();
       _syncRecommendChip();
-      updateDarkModeUI();
       updatePaletteUI();
       if (typeof initSettingsProfile === 'function') initSettingsProfile();
       if (typeof initSettingsGenres === 'function') initSettingsGenres();
@@ -888,7 +859,6 @@
       localStorage.setItem('sg_lang', lang);
       applyI18n();
       updateCityUI();
-      updateDarkModeUI();
       updatePaletteUI();
       renderEventCards();
       showToast(lang === 'en' ? '🇬🇧 Switched to English' : '🇯🇵 日本語に切り替えました');
@@ -3410,8 +3380,21 @@
     applyProfileSort();
     applyI18n();
     updateCityUI();
-    applyTheme();
     applyPalette();
+
+    // Service Worker登録(プッシュ通知に必要 + 更新時に自動リロードして最新デザインを反映)
+    if ('serviceWorker' in navigator) {
+      const _hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      if (_hadController) {
+        let _swReloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (_swReloaded) return;
+          _swReloaded = true;
+          location.reload();
+        });
+      }
+    }
 
     async function doShare() {
       const cityMeta = CITY_META[getCity()] || CITY_META.sg;
