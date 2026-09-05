@@ -8,7 +8,7 @@ const config = {
     // ボトムナビ(position:fixed;bottom:0)が真の画面下端から浮くビューポート固着バグの真因だったため'never'に変更。
     // 崩れた場合は'always'に1行ロールバック可（詳細は.claude/next.md）。
     contentInset: 'never',
-    backgroundColor: '#FFF9F2',
+    backgroundColor: '#FAFAF8',
   },
   plugins: {
     Keyboard: {
@@ -17,7 +17,7 @@ const config = {
     SplashScreen: {
       launchShowDuration: 1000,
       launchFadeOutDuration: 300,
-      backgroundColor: '#FFF9F2',
+      backgroundColor: '#FAFAF8',
       showSpinner: false,
       launchAutoHide: true,
     },
