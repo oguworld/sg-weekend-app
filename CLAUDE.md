@@ -211,7 +211,7 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 設定画面「配色」1項目のみで「キャラメル」（従来の暖色系）/「柳グリーン」（Willoaコーポレートカラー、白ベース＋柳グリーン差し色）/「ダーク」の3状態をボタンタップで循環切替（`default`→`willow`→`dark`→`default`…）。**旧来あった独立の「ダークモード」設定行は廃止し、この1つの設定に統合済み**（自動/ライト/ダークの3択だった旧ダークモードの「自動(端末追従)」は廃止）。
 - 状態管理は`localStorage`の`sg_palette`キー1本のみ（旧`sg_theme`キーは廃止）。`getPalette()`/`applyPalette()`/`togglePalette()`/`updatePaletteUI()`（`public/app.js`）
 - 各状態が実際にセットする`html`要素の属性: `default`→属性なし（`app.css`の`:root`既定値）／`willow`→`data-palette="willow"`のみ／`dark`→`data-palette="willow"`と`data-theme="dark"`の両方（＝「ダーク」の実体は柳グリーンのダーク版。キャラメル単体のダーク版は用意していない）
-- **ボトムナビアイコン（2026-09-05実装）**: 絵文字（🏛️🏖️📌⚙️）を廃止し、`currentColor`で塗るインラインSVG（新聞紙／パラソル／地図ピン／スライダー）に置換。色は`.nav-icon-svg{color:var(--light-gray)}`／`.nav-item.active .nav-icon-svg{color:var(--caramel)}`（`public/app.css`）でCSS側から制御するため、配色（キャラメル/柳グリーン/ダーク）切り替えに画像差し替えなしで自動追従する。アプリアイコン（後述）と同じ「フラットなシルエット塗り」の世界観で統一
+- **ボトムナビアイコン（2026-09-05実装）**: 絵文字（🏛️🏖️📌⚙️）を廃止し、`currentColor`で塗るインラインSVG（くらし=家のシルエット／おでかけ=シューズ／ピン留め=地図ピン／設定=スライダー）に置換。色は`.nav-icon-svg{color:var(--light-gray)}`／`.nav-item.active .nav-icon-svg{color:var(--caramel)}`（`public/app.css`）でCSS側から制御するため、配色（キャラメル/柳グリーン/ダーク）切り替えに画像差し替えなしで自動追従する。アプリアイコン（後述）と同じ「フラットなシルエット塗り」の世界観で統一。ピン留め画面の空状態イラストも同じ地図ピンSVGに統一済み
 - **「キャラメル」選択時の配色は無変更**: `app.css`の`:root`（既定値）自体は無変更。`html[data-palette="willow"]`セレクタで同じ変数名（`--caramel`/`--sage`/`--terracotta`/`--gold`/`--sky`/`--plum`とその`-light`/`-pale`派生）を上書きする方式。ダーク状態は`html[data-theme="dark"]`（既存の汎用ダーク配色、コンポーネント個別の暗色指定を含む）と`html[data-palette="willow"][data-theme="dark"]`（柳グリーン用のCSS変数上書き、セレクタ詳細度が高いため優先適用）の組み合わせ
 - `public/index.html`の`<head>`内スクリプトは初期描画のちらつき防止のため`sg_palette`を読んで`data-palette`/`data-theme`属性を先読み設定（`applyPalette()`実行前に反映するため）
 - **見出しフォント**: 新規CSS変数`--font-heading`を導入（既定値`'Kaisei Opti', serif`、柳グリーン時は`'Noto Sans JP', sans-serif`）。旧来ハードコードされていた`font-family: 'Kaisei Opti', serif;`（`app.css`15箇所・`app.js`/`index.html`各所のインラインstyle）を全て`var(--font-heading)`参照に置換済み
@@ -219,6 +219,15 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - **カテゴリタブ（`.filter-chip`）**: 既定は下線タブのまま無変更。柳グリーン時のみピル塗り（未選択=グレー輪郭／選択中=柳グリーン塗り）に変更
 - **ボトムナビ**: 既定はラベル色変化のみで無変更。柳グリーン時のみ選択中アイコンの背後に柳グリーンの薄いピルハイライトを追加（`.nav-item.active .nav-icon`、新規HTML要素追加なし）
 - i18n: `labelPalette`（配色/Color Theme）を追加。旧`labelDarkMode`は廃止
+
+## 指標ウィジェット（2026-09-06実装）
+おでかけ画面・くらし画面それぞれの最上部に3項目ずつ、外部データの実況値を表示。`GET /api/widget-stats?city=sg`（`server.js`）1本のAPIで全項目をまとめて返し、フロントは`loadWidgetStats()`（`public/app.js`、init時に1回呼び出し）で各`#stat-*`要素に反映する。
+- **おでかけ画面**（`#stat-widget-weather`）: 気温・降水確率(`#stat-temp`/`#stat-rain`、OpenWeatherMapの5日/3時間予報から直近の`pop`を%換算)・今の空模様(`#stat-nowcast`、後述のNEAナウキャスト)
+- **くらし画面**（`#stat-widget-info`）: 為替SGD→JPY(`#stat-fx`)・PSI(`#stat-psi`)・デング熱クラスター警戒(`#stat-dengue`)
+- **データソース**: 為替=Frankfurter API(無料・キー不要)／天気=OpenWeatherMap(`OPENWEATHER_API_KEY`、`.env`。2026-09-06までプレースホルダーのまま未設定で機能していなかった)／PSI・ナウキャスト・デング熱=data.gov.sg（シンガポール政府オープンデータ、SG都市限定）
+- **NEAナウキャスト**（スコール検知用）: `2-hour-weather-forecast`の全47エリア中、`classifyNowcast()`の深刻度テーブルで最も深刻な区分を採用し「今の空模様」として1つの値に集約（エリア別表示はしない）
+- **デング熱**: data.gov.sgの新API方式（`fetchDataGovSgDataset()`、`poll-download`でS3署名付きURLを取得してから本体を取得する2段階呼び出し。`User-Agent`ヘッダーが無いと403になる点に注意）でGeoJSONクラスター一覧を取得し、クラスター数から警戒レベル(`dengueLevel()`)を判定
+- **キャッシュ設計**: `widgetStatsCache`はフィールド単位（為替/天気/PSI/nowcast/dengue）で個別に30分キャッシュ。1項目のAPIが失敗しても他項目の鮮度・表示に影響しない。取得失敗時はそのフィールドのキャッシュを更新せず、古い値が残っていればそれをそのまま返す（フォールバック）。一度も成功していないフィールドはJSONから欠落し、フロント側は該当項目を`--`のまま表示
 
 ## フィルターUI（2026-06-28刷新）
 - tabs-section（いつ行く？4タブ）廃止
