@@ -496,6 +496,15 @@ function calendarPath(city) {
   return path.join(__dirname, 'data', city, 'school-calendar.json');
 }
 
+function calendarEventsPath(city) {
+  return path.join(__dirname, 'data', city, 'calendar-events.json');
+}
+
+// アイテムが指定の月(monthStart〜monthEnd)と重なるか判定（weekOverlapと同じロジックを月境界向けに）
+function monthOverlap(itemStart, itemEnd, monthStart, monthEnd) {
+  return itemStart <= monthEnd && itemEnd >= monthStart;
+}
+
 // ─────────────────────────────────────────────
 // データファイルの初期化
 // ─────────────────────────────────────────────
@@ -993,6 +1002,66 @@ app.get('/api/school-calendar', (req, res) => {
   try {
     const city = resolveCity(req);
     res.json(JSON.parse(fs.readFileSync(calendarPath(city), 'utf8')));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/calendar?city=sg&month=YYYY-MM — カレンダー画面用（祝日・主要行事・学校休暇・実イベントを月単位でまとめて返す）
+app.get('/api/calendar', (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const monthParam = req.query.month || new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    const [y, m] = monthParam.split('-').map(Number);
+    const monthStart = `${monthParam}-01`;
+    const lastDay = new Date(y, m, 0).getDate(); // その月の末日
+    const monthEnd = `${monthParam}-${String(lastDay).padStart(2, '0')}`;
+
+    const result = [];
+
+    // 手動キュレーションデータ（祝日・主要行事・季節イベント・締切）
+    try {
+      const curated = JSON.parse(fs.readFileSync(calendarEventsPath(city), 'utf8'));
+      for (const item of curated.items || []) {
+        const end = item.endDate || item.date;
+        if (monthOverlap(item.date, end, monthStart, monthEnd)) {
+          result.push({
+            id: item.id, category: item.category, date: item.date, endDate: item.endDate,
+            name: item.name, note: item.note, confirmed: item.confirmed,
+          });
+        }
+      }
+    } catch (e) { /* ファイル未作成の場合は無視 */ }
+
+    // 学校休暇（school-calendar.jsonをcategory:'school-vacation'として正規化）
+    try {
+      const school = JSON.parse(fs.readFileSync(calendarPath(city), 'utf8'));
+      for (const v of school.vacations || []) {
+        if (monthOverlap(v.start, v.end, monthStart, monthEnd)) {
+          result.push({
+            id: `school-${v.start}`, category: 'school-vacation', date: v.start, endDate: v.end,
+            name: v.name, note: null, confirmed: true,
+          });
+        }
+      }
+    } catch (e) { /* ファイル未作成の場合は無視 */ }
+
+    // 実イベント（events.jsonをcategory:'event-ingested'として正規化、必要フィールドのみ抽出）
+    try {
+      const events = JSON.parse(fs.readFileSync(eventsPath(city), 'utf8'));
+      for (const ev of events) {
+        if (!ev.start_date) continue;
+        const end = ev.end_date || ev.start_date;
+        if (monthOverlap(ev.start_date, end, monthStart, monthEnd)) {
+          result.push({
+            id: ev.id, category: 'event-ingested', date: ev.start_date, endDate: ev.end_date || null,
+            name: ev.content || ev.store, note: null, confirmed: true, url: ev.url, emoji: ev.emoji,
+          });
+        }
+      }
+    } catch (e) { /* ファイル未作成の場合は無視 */ }
+
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
