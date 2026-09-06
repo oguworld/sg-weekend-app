@@ -360,7 +360,6 @@
         catTravel: '旅行',
         catStarting: '🆕 今週から',
         catEnding: '🔥 今週まで',
-        endingFilterBtn: '残りわずか',
         labelWhen: 'いつ行く？',
         labelWhat: 'どこ行く？',
         emptyTitle: 'まだスポット準備中！',
@@ -550,7 +549,6 @@
         catTravel: 'Travel',
         catStarting: '📅 This Week',
         catEnding: '⏰ Ending Soon',
-        endingFilterBtn: 'Ending Soon',
         labelWhen: 'When?',
         labelWhat: 'Where to go?',
         emptyTitle: 'Coming soon!',
@@ -1063,7 +1061,6 @@
     let filterWho     = new Set();
     let filterAreas   = new Set();
     let filterKeyword = '';
-    let filterEnding  = false;
     let filterNew     = true; // 先頭チップ（旧「すべて」）は「新着」化したため、初期状態からON
     let _recommendModeActive = false;
     let _draftFilterWeek    = '';
@@ -1650,22 +1647,20 @@
     let showPinnedOnly = false;
 
     function _setIconFilter(type) {
-      // pin/ending/new は元々排他トグルだったが、「新着」チップ(filterCats/filterNew)が
-      // カテゴリ行の主軸になった現在は、残りわずか(ending)・ピン留め(pin)はその上に追加で
+      // pin/new は元々排他トグルだったが、「新着」チップ(filterCats/filterNew)が
+      // カテゴリ行の主軸になった現在は、ピン留め(pin)はその上に追加で
       // 絞り込む補助フィルターという位置づけに変わっている。他方をONにした際に
       // filterNew を巻き込んで強制OFFにしないよう、自分のグループ内だけで排他制御する
-      const wasActive = type === 'pin' ? showPinnedOnly : type === 'ending' ? filterEnding : filterNew;
+      const wasActive = type === 'pin' ? showPinnedOnly : filterNew;
       if (type !== 'new') {
-        showPinnedOnly = false; filterEnding = false;
+        showPinnedOnly = false;
         document.getElementById('pin-filter-btn')?.classList.remove('active');
-        document.getElementById('ending-filter-btn')?.classList.remove('active');
       } else {
         filterNew = false;
         document.getElementById('new-filter-btn')?.classList.remove('active');
       }
       if (!wasActive) {
         if (type === 'pin')    { showPinnedOnly = true; document.getElementById('pin-filter-btn')?.classList.add('active'); }
-        if (type === 'ending') { filterEnding   = true; document.getElementById('ending-filter-btn')?.classList.add('active'); }
         if (type === 'new')    { filterNew      = true; document.getElementById('new-filter-btn')?.classList.add('active'); }
       }
       updateFilterBadge();
@@ -1674,7 +1669,6 @@
     }
 
     function togglePinFilter()    { _setIconFilter('pin'); }
-    function toggleEndingFilter() { _setIconFilter('ending'); }
     function toggleNewFilter()    { _setIconFilter('new'); }
 
     function toggleCardTips(id) {
@@ -2041,9 +2035,6 @@
         // エリア（filterAreas 空=すべて）
         const areaMatch = filterAreas.size === 0 || filterAreas.has(e.area);
 
-        // 終了間近
-        const endingMatch = !filterEnding || isEndingSoon(e);
-
         // 新着（取り込みから24時間以内、2026-09-02に日付単位判定から厳密な経過時間判定へ変更）
         const newMatch = !filterNew || (() => {
           if (!e.fetched_at) return false;
@@ -2064,7 +2055,7 @@
         const isRecommendMode = _recommendModeActive && filterCats.size === 0;
         const recommendMatch = !isRecommendMode || genreMatch(e);
 
-        return pinMatch && ageMatch && catMatch && whoFilterMatch && weekMatch && areaMatch && endingMatch && newMatch && kwMatch && recommendMatch;
+        return pinMatch && ageMatch && catMatch && whoFilterMatch && weekMatch && areaMatch && newMatch && kwMatch && recommendMatch;
       });
 
       // カテゴリチップの並び順（#filter-row-category）と一致させる
@@ -2430,8 +2421,7 @@
       const btn = e.target.closest('button');
       if (!btn) return;
       e.preventDefault();
-      if (btn.id === 'ending-filter-btn') toggleEndingFilter();
-      else if (btn.id === 'pin-filter-btn') togglePinFilter();
+      if (btn.id === 'pin-filter-btn') togglePinFilter();
       else if (btn.id === 'new-filter-btn') toggleNewFilter();
       else if (btn.id === 'event-filter-btn') openEventFilterSheet();
     }, { passive: false });
@@ -3823,15 +3813,13 @@
         // 既に「すべて」表示済み（カテゴリ未選択・おすすめモードOFF）かつ都市も変わっていなければ、
         // タブを叩くだけで毎回チップ再同期・スクロール位置リセット・再描画をやり直す必要はない。
         // ニュース画面の同種の「変化がなければ何もしない」対策と挙動を揃える（生活情報のちかつき対策と同じ考え方）。
-        const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive && filterNew === true && !filterEnding;
+        const homeAlreadyDefault = filterCats.size === 0 && !_recommendModeActive && filterNew === true;
         // 縦スクロール位置は変化の有無に関わらず必ず一番上に戻す（生活情報画面と同じ挙動）
         document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         if (!homeAlreadyDefault || cityChanged) {
           filterCats.clear();
           _recommendModeActive = false;
           filterNew = true; // 先頭チップ（新着）にリセット
-          filterEnding = false; // 「残りわずか」フィルターもリセット
-          document.getElementById('ending-filter-btn')?.classList.remove('active');
           _syncCatChips();
           _syncRecommendChip();
           // チップ行を左端にスクロール
