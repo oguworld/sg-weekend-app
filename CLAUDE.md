@@ -230,9 +230,9 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - **キャッシュ設計**: `widgetStatsCache`はフィールド単位（為替/天気/PSI/nowcast/dengue）で個別に30分キャッシュ。1項目のAPIが失敗しても他項目の鮮度・表示に影響しない。取得失敗時はそのフィールドのキャッシュを更新せず、古い値が残っていればそれをそのまま返す（フォールバック）。一度も成功していないフィールドはJSONから欠落し、フロント側は該当項目を`--`のまま表示
 
 ## カレンダー機能（2026-09-06実装、ボトムナビ4タブ目）
-ボトムナビは「くらし・おでかけ・カレンダー・設定」の4タブ構成（旧ピン留めタブは廃止、クリップFABに置き換え。後述）。`#screen-calendar`で当月の祝日・主要行事・季節イベント・締切・学校休暇・実イベントを日付グループ化リストで一覧表示する（グリッドではなくリスト形式。開いた瞬間に全項目が読める設計で、タップ展開は無し）。**多言語化はしていない**（日本語固定、`data-i18n`不要）。
-- **データソース**: `data/sg/calendar-events.json`（新規・gitignore対象・手動キュレーション、SG祝日/日本の祝日/主要行事/季節イベント/締切を収録。年1回の手動更新が必要）＋`school-calendar.json`（学校休暇、既存）＋`events.json`（実イベント、既存）を`GET /api/calendar?city=sg&month=YYYY-MM`（`server.js`）が月単位でフラットな配列にまとめて返す（`calendarEventsPath()`/`monthOverlap()`ヘルパー、既存`weekOverlap()`と同じロジックを月境界向けに）
-- **カテゴリ**: `holiday-sg`/`holiday-jp`/`festival`/`seasonal`/`deadline`/`school-vacation`/`event-ingested`の7種。`CALENDAR_CATEGORY_COLORS`（`public/app.js`、既存`LIFE_INFO_CATEGORY_COLORS`と同じCSS変数参照方式）でバッジ色分け。`#calendar-filter-row`は既存`.filter-chip`をそのまま流用したタップ絞り込み(`setCalendarCategory()`)
+ボトムナビは「くらし・おでかけ・カレンダー・設定」の4タブ構成（旧ピン留めタブは廃止、クリップFABに置き換え。後述）。`#screen-calendar`で当月の祝日・主要行事・季節イベント・締切・学校休暇を日付グループ化リストで一覧表示する（グリッドではなくリスト形式。開いた瞬間に全項目が読める設計で、タップ展開は無し）。**多言語化はしていない**（日本語固定、`data-i18n`不要）。
+- **データソース**: `data/sg/calendar-events.json`（新規・gitignore対象・手動キュレーション、SG祝日/日本の祝日/主要行事/季節イベント/締切を収録。年1回の手動更新が必要）＋`school-calendar.json`（学校休暇、既存）を`GET /api/calendar?city=sg&month=YYYY-MM`（`server.js`）が月単位でフラットな配列にまとめて返す（`calendarEventsPath()`/`monthOverlap()`ヘルパー、既存`weekOverlap()`と同じロジックを月境界向けに）。**`events.json`の実イベントは意図的に対象外**（2026-09-06、件数が多くなりすぎるため一旦除外。以前は`category:'event-ingested'`として含めていたが削除）
+- **カテゴリ**: `holiday-sg`/`holiday-jp`/`festival`/`seasonal`/`deadline`/`school-vacation`の6種。`CALENDAR_CATEGORY_COLORS`（`public/app.js`、既存`LIFE_INFO_CATEGORY_COLORS`と同じCSS変数参照方式）でバッジ色分け。`#calendar-filter-row`は既存`.filter-chip`をそのまま流用したタップ絞り込み(`setCalendarCategory()`)。**タッチ端末では他の`.filter-chip`系フィルター（`#filter-row-category`/`#news-filter-row`）と同じtouchstart/touchend委譲（`app.js`）が無いとタップが反応しない**ので、新規フィルター行を追加する際は必ずこのパターンを踏襲すること
 - **月をまたぐ期間物の表示**: 前月から続く項目は、表示中の月の1日に日付見出しをクランプして表示する（本来の開始日をそのまま見出しにすると「9月表示なのに7/11の見出しが出る」ため、`renderCalendarList()`内で`monthFirstDay`にクランプ）
 - **祝日データの一本化**: 従来`public/app.js`内に祝日データが2重に存在し、ウェサク・デー/ハリラヤ・ハジの日付が矛盾していた（Date配列版が誤り、`CITY_HOLIDAY_NAMES`が正しかった）。今回の実装でこれらのデッドコード（`CITY_HOLIDAY_NAMES`/`getCityHolidayName`/`LONG_VACATIONS_BY_CITY`/`getLongVacations`/`LONG_VACATIONS`/`CITY_HOLIDAYS`、呼び出し元なし確認済み）を削除し、`calendar-events.json`に一本化した
 
@@ -511,6 +511,8 @@ document.addEventListener('touchstart', () => { _touchCapableDetected = true; },
 ```
 
 タッチ操作が一度でも発生した端末では、ガード対象の`onclick`のみ無効化される（`touchend`ハンドラが既に処理済みのため実害なし）。ガード対象外のボタンは通常のclickイベントで動作する。PCブラウザ（マウス操作）では`_touchCapableDetected`が常に`false`のため全onclickが従来通り機能する。
+
+**⚠️ 落とし穴（2026-09-06実際に発生）**: 上記の二重登録により、タッチ端末ではガード付き`onclick`が常にスキップされ、`touchend`側の委譲ハンドラが**唯一の実行経路**になる。ボトムナビのタブ構成変更（ピン留め→カレンダー）の際、`switchNav()`内の画面配列は更新したが、`app.js`内の別の場所にある`touchend`委譲用ハードコード配列（`['home','news',...].forEach(...)`、ボトムナビ即時タップ対応ブロック）の更新を忘れ、新タブがタッチ端末で完全に無反応になるバグを作り込んだ（PCブラウザでのマウスクリックは正常に動くため気づきにくい）。**教訓**: ボトムナビ/フィルターチップのタブ・カテゴリ構成を変更する際は、(1) `switchNav()`の画面配列、(2) 同名のtouchend委譲用配列またはリスナー登録、(3) HTML側`onclick`属性、の3箇所すべてを揃って更新すること。動作確認はマウスクリックだけでなく実機タッチ（またはPlaywrightの`hasTouch`+`tap()`等のタッチイベントエミュレーション）で行うこと。
 
 オーバーレイ背景タップで閉じる系（`install-overlay`/`pin-detail-overlay`/`pin-picker-overlay`/`emoji-picker-overlay`/`schedule-action-overlay`/`cal-popup-overlay`）は、`onclick`の個別ガードに加えて`app.js`側の配列一括登録`touchend`リスナーも併用している。新規に同種オーバーレイを追加する際は同じパターンに揃えること。
 

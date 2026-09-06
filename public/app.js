@@ -2095,6 +2095,24 @@
       }, { passive: false });
     }
 
+    // ─── カレンダー画面カテゴリチップ 即時タップ対応（filter-row-categoryと同じパターン） ───
+    {
+      let _calCatTouchStartX = 0, _calCatTouchStartY = 0;
+      document.getElementById('calendar-filter-row')?.addEventListener('touchstart', e => {
+        _calCatTouchStartX = e.touches[0].clientX;
+        _calCatTouchStartY = e.touches[0].clientY;
+      }, { passive: true });
+      document.getElementById('calendar-filter-row')?.addEventListener('touchend', e => {
+        const chip = e.target.closest('.filter-chip');
+        if (!chip) return;
+        const dx = Math.abs(e.changedTouches[0].clientX - _calCatTouchStartX);
+        const dy = Math.abs(e.changedTouches[0].clientY - _calCatTouchStartY);
+        if (dx > 8 || dy > 8) return;
+        e.preventDefault();
+        setCalendarCategory(chip.dataset.calCat || '');
+      }, { passive: false });
+    }
+
     // ─── ニュース画面「新着のみ」ボタン 即時タップ対応 ───
     document.getElementById('news-new-filter-btn')?.addEventListener('touchend', e => {
       e.preventDefault();
@@ -3749,7 +3767,7 @@
       unlockScroll();
     }
 
-    // ─── カレンダー画面（祝日・主要行事・季節イベント・締切・学校休暇・実イベントを月単位で一覧表示） ───
+    // ─── カレンダー画面（祝日・主要行事・季節イベント・締切・学校休暇を月単位で一覧表示。実イベントは件数過多のため対象外） ───
     const CALENDAR_CATEGORY_COLORS = {
       'holiday-sg':      { bg: 'var(--caramel-pale)',       color: 'var(--terracotta)' },
       'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
@@ -3757,11 +3775,10 @@
       'seasonal':        { bg: 'var(--plum-pale)',          color: 'var(--plum)' },
       'deadline':        { bg: 'var(--terracotta-light-pale)', color: 'var(--terracotta)' },
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
-      'event-ingested':  { bg: 'var(--caramel-pale)',       color: 'var(--caramel)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
       'holiday-sg': 'SG祝日', 'holiday-jp': '日本の祝日', 'festival': '主要行事',
-      'seasonal': '季節イベント', 'deadline': '締切', 'school-vacation': '学校休暇', 'event-ingested': 'イベント',
+      'seasonal': '季節イベント', 'deadline': '締切', 'school-vacation': '学校休暇',
     };
     let CALENDAR_DATA = [];
     let _calendarLoadedMonth = null;
@@ -3833,7 +3850,7 @@
       for (const [date, dayItems] of byDate) {
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
         dayItems.forEach(it => {
-          const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['event-ingested'];
+          const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['deadline'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
           const range = it.endDate && it.endDate !== it.date ? `〜${it.endDate.slice(5).replace('-', '/')}` : '';
           html += `<div class="cal-item">

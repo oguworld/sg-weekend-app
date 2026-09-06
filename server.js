@@ -1007,7 +1007,7 @@ app.get('/api/school-calendar', (req, res) => {
   }
 });
 
-// GET /api/calendar?city=sg&month=YYYY-MM — カレンダー画面用（祝日・主要行事・学校休暇・実イベントを月単位でまとめて返す）
+// GET /api/calendar?city=sg&month=YYYY-MM — カレンダー画面用（祝日・主要行事・学校休暇を月単位でまとめて返す。実イベントは件数過多のため対象外）
 app.get('/api/calendar', (req, res) => {
   try {
     const city = resolveCity(req);
@@ -1041,21 +1041,6 @@ app.get('/api/calendar', (req, res) => {
           result.push({
             id: `school-${v.start}`, category: 'school-vacation', date: v.start, endDate: v.end,
             name: v.name, note: null, confirmed: true,
-          });
-        }
-      }
-    } catch (e) { /* ファイル未作成の場合は無視 */ }
-
-    // 実イベント（events.jsonをcategory:'event-ingested'として正規化、必要フィールドのみ抽出）
-    try {
-      const events = JSON.parse(fs.readFileSync(eventsPath(city), 'utf8'));
-      for (const ev of events) {
-        if (!ev.start_date) continue;
-        const end = ev.end_date || ev.start_date;
-        if (monthOverlap(ev.start_date, end, monthStart, monthEnd)) {
-          result.push({
-            id: ev.id, category: 'event-ingested', date: ev.start_date, endDate: ev.end_date || null,
-            name: ev.content || ev.store, note: null, confirmed: true, url: ev.url, emoji: ev.emoji,
           });
         }
       }
