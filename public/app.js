@@ -3888,7 +3888,10 @@
     }, { passive: true });
 
     function renderCalendarList() {
-      const items = _calendarCategory ? CALENDAR_DATA.filter(it => it.category === _calendarCategory) : CALENDAR_DATA;
+      // 「すべて」表示時は日本の祝日を含めない（カテゴリで明示的に選んだ時だけ表示する）
+      const items = _calendarCategory
+        ? CALENDAR_DATA.filter(it => it.category === _calendarCategory)
+        : CALENDAR_DATA.filter(it => it.category !== 'holiday-jp');
       const listEl = document.getElementById('calendar-list');
       const emptyEl = document.getElementById('calendar-empty-state');
       if (items.length === 0) {
