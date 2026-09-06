@@ -3820,7 +3820,7 @@
     // ─── カレンダー画面（祝日・主要行事(季節イベント/締切含む)・記念日・学校休暇を1年分まとめて一覧表示。実イベントは件数過多のため対象外） ───
     const CALENDAR_CATEGORY_COLORS = {
       'holiday-sg':      { bg: 'var(--holiday-red-pale)',  color: 'var(--holiday-red)' },
-      'holiday-jp':      { bg: 'var(--holiday-red-pale)',  color: 'var(--holiday-red)' },
+      'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
       'festival':        { bg: 'var(--gold-pale)',          color: 'var(--gold)' },
       'observance':      { bg: 'var(--sage-pale)',          color: 'var(--sage)' },
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
