@@ -1673,6 +1673,23 @@
     }
     .nav-item.active .nav-label { color: var(--caramel); font-weight: 700; }
 
+    /* ─── 指標ウィジェット（為替・天気・PSI・スコール・デング熱） ─── */
+    .stat-widget {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--warm-white);
+      border-radius: 20px;
+      padding: 14px 12px;
+      margin: 4px 16px 12px;
+      box-shadow: var(--shadow-soft);
+    }
+    .stat-col { flex: 1; text-align: center; min-width: 0; }
+    .stat-icon { font-size: 17px; }
+    .stat-val { font-size: 16px; font-weight: 800; color: var(--midnight); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-sub { font-size: 10px; color: var(--warm-gray); margin-top: 1px; }
+    .stat-div { width: 1px; height: 34px; background: var(--sand); flex-shrink: 0; }
+
     /* ─── DECORATIVE DIVIDER ─── */
     .section-divider {
       display: flex;

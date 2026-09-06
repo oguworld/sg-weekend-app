@@ -466,6 +466,12 @@
         titleEditCancel: 'キャンセル',
         labelNickname: 'ニックネーム',
         labelPalette: '配色',
+        statTemp: '気温',
+        statRain: '降水確率',
+        statNowcast: '今の空模様',
+        statFx: 'SGD→JPY',
+        statPsi: 'PSI',
+        statDengue: 'デング熱',
         nicknamePlaceholder: '匿名',
         labelWhoWith: '一緒に行く人',
         labelWhoSolo: '🚶 ひとりで',
@@ -650,6 +656,12 @@
         titleEditCancel: 'Cancel',
         labelNickname: 'Nickname',
         labelPalette: 'Color Theme',
+        statTemp: 'Temp',
+        statRain: 'Rain chance',
+        statNowcast: 'Now',
+        statFx: 'SGD→JPY',
+        statPsi: 'PSI',
+        statDengue: 'Dengue',
         nicknamePlaceholder: 'Anonymous',
         labelWhoWith: 'Who to go with',
         labelWhoSolo: '🚶 Solo',
@@ -807,6 +819,23 @@
     function getCity() {
       const c = localStorage.getItem('app_city') || 'sg';
       return ACTIVE_CITIES.includes(c) ? c : ACTIVE_CITIES[0];
+    }
+
+    // ─── 指標ウィジェット（為替・天気・PSI・スコール・デング熱） ───
+    async function loadWidgetStats() {
+      try {
+        const res = await fetch(API_BASE + '/api/widget-stats?city=' + getCity());
+        const data = await res.json();
+        const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+        if (data.exchangeRate) setText('stat-fx', data.exchangeRate.toFixed(1) + '円');
+        if (data.psi) setText('stat-psi', `${data.psi.value}(${data.psi.level})`);
+        if (data.dengue) setText('stat-dengue', `${data.dengue.clusterCount}件(${data.dengue.level})`);
+        if (data.weather) {
+          setText('stat-temp', Math.round(data.weather.temp) + '°');
+          setText('stat-rain', data.weather.rainProbPercent + '%');
+        }
+        if (data.nowcast) setText('stat-nowcast', data.nowcast.text);
+      } catch (e) { /* 取得失敗時は「--」のまま表示 */ }
     }
 
     function selectCity(city) {
@@ -3381,6 +3410,7 @@
     applyI18n();
     updateCityUI();
     applyPalette();
+    loadWidgetStats();
 
     // Service Worker登録(プッシュ通知に必要 + 更新時に自動リロードして最新デザインを反映)
     if ('serviceWorker' in navigator) {

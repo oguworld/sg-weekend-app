@@ -841,6 +841,154 @@ app.get('/api/weather', async (req, res) => {
 });
 
 // GET /api/school-calendar — 長期休暇設定
+// GET /api/widget-stats — ホーム画面上部の指標ウィジェット（為替・天気・PSI）
+// 為替: Frankfurter（無料・キー不要）/ 天気: OpenWeatherMap（既存キー流用、降水確率付き）/ PSI: data.gov.sg（SGのみ）
+// フィールドごとに個別キャッシュ（1つが取得失敗しても他のフィールドの鮮度に影響しない。
+// 失敗時は古いキャッシュ値があればそれをフォールバックとして返す）
+const widgetStatsCache = new Map(); // city -> { exchangeRate: {value,cachedAt}, weather: {...}, psi: {...} }
+const WIDGET_STATS_TTL_MS = 30 * 60 * 1000; // 30分
+
+function psiLevel(value) {
+  if (value <= 50) return '良好';
+  if (value <= 100) return '普通';
+  if (value <= 200) return '要注意';
+  if (value <= 300) return '健康に悪い';
+  return '危険';
+}
+
+// NEA(シンガポール気象庁)の2時間先ナウキャスト予報の日本語訳＋深刻度（スコール等の急変を検知するため）
+// 深刻度が高い項目ほど数値を大きくし、全地域中で最も深刻な状況を「今の空模様」として採用する
+const NOWCAST_SEVERITY = [
+  ['Heavy Thundery Showers with Gusty Winds', 9, '激しい雷雨・突風'],
+  ['Heavy Thundery Showers', 8, '激しい雷雨'],
+  ['Thundery Showers', 7, '雷雨'],
+  ['Heavy Showers', 6, '激しいにわか雨'],
+  ['Heavy Rain', 6, '激しい雨'],
+  ['Showers', 5, 'にわか雨'],
+  ['Moderate Rain', 5, 'まとまった雨'],
+  ['Light Showers', 4, '小雨(にわか雨)'],
+  ['Light Rain', 4, '小雨'],
+  ['Passing Showers', 3, '通り雨'],
+  ['Windy', 2, '風が強い'],
+  ['Mist', 2, '霧'],
+  ['Fog', 2, '濃霧'],
+  ['Hazy', 2, 'ヘイズ(煙霧)'],
+  ['Slightly Hazy', 1, 'やや煙霧'],
+  ['Cloudy', 1, '曇り'],
+  ['Partly Cloudy', 0, '一部曇り'],
+  ['Fair', 0, '晴れ'],
+];
+function classifyNowcast(text) {
+  const base = text.replace(/\s*\((Day|Night)\)\s*$/i, '').trim();
+  const match = NOWCAST_SEVERITY.find(([key]) => base === key);
+  return match ? { severity: match[1], ja: match[2] } : { severity: -1, ja: base };
+}
+
+function dengueLevel(clusterCount) {
+  if (clusterCount === 0) return '警報なし';
+  if (clusterCount <= 5) return '注意';
+  if (clusterCount <= 15) return '警戒';
+  return '厳重警戒';
+}
+
+// data.gov.sgの新API（ダウンロードURLを一度発行してから取得する2段階方式）
+async function fetchDataGovSgDataset(datasetId) {
+  const poll = await axios.get(`https://api-open.data.gov.sg/v1/public/api/datasets/${datasetId}/poll-download`, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    timeout: 6000,
+  });
+  const url = poll.data.data.url;
+  const file = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 6000 });
+  return file.data;
+}
+
+app.get('/api/widget-stats', async (req, res) => {
+  const city = resolveCity(req);
+  const cityCache = widgetStatsCache.get(city) || {};
+  const currency = CITIES[city].currency;
+  const now = Date.now();
+  const isFresh = (field) => cityCache[field] && now - cityCache[field].cachedAt < WIDGET_STATS_TTL_MS;
+
+  const [fxSettled, weatherSettled, psiSettled, nowcastSettled, dengueSettled] = await Promise.allSettled([
+    isFresh('exchangeRate') ? Promise.resolve(null) : axios.get(`https://api.frankfurter.dev/v1/latest?base=${currency}&symbols=JPY`, { timeout: 6000 }),
+    isFresh('weather') || !process.env.OPENWEATHER_API_KEY
+      ? Promise.resolve(null)
+      : axios.get(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(CITIES[city].weatherQ)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric&lang=ja`, { timeout: 6000 }),
+    isFresh('psi') || city !== 'sg'
+      ? Promise.resolve(null)
+      : axios.get('https://api.data.gov.sg/v1/environment/psi', { timeout: 6000 }),
+    isFresh('nowcast') || city !== 'sg'
+      ? Promise.resolve(null)
+      : axios.get('https://api.data.gov.sg/v1/environment/2-hour-weather-forecast', { timeout: 6000 }),
+    isFresh('dengue') || city !== 'sg'
+      ? Promise.resolve(null)
+      : fetchDataGovSgDataset('d_dbfabf16158d1b0e1c420627c0819168'),
+  ]);
+
+  if (fxSettled.status === 'fulfilled' && fxSettled.value) {
+    cityCache.exchangeRate = { value: fxSettled.value.data.rates.JPY, cachedAt: now };
+  } else if (fxSettled.status === 'rejected') {
+    console.error('widget-stats fx error:', fxSettled.reason.message);
+  }
+
+  if (weatherSettled.status === 'fulfilled' && weatherSettled.value) {
+    const nowSec = now / 1000;
+    const list = weatherSettled.value.data.list;
+    const next = list.find(item => item.dt >= nowSec) || list[0];
+    cityCache.weather = {
+      value: {
+        temp: Math.round(next.main.temp),
+        rainProbPercent: Math.round((next.pop || 0) * 100),
+        condition: next.weather[0].main,
+      },
+      cachedAt: now,
+    };
+  } else if (weatherSettled.status === 'rejected') {
+    console.error('widget-stats weather error:', weatherSettled.reason.message);
+  }
+
+  if (psiSettled.status === 'fulfilled' && psiSettled.value) {
+    const readings = psiSettled.value.data.items[0].readings.psi_twenty_four_hourly;
+    const values = Object.values(readings);
+    const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+    cityCache.psi = { value: { value: avg, level: psiLevel(avg) }, cachedAt: now };
+  } else if (psiSettled.status === 'rejected') {
+    console.error('widget-stats psi error:', psiSettled.reason.message);
+  }
+
+  if (nowcastSettled.status === 'fulfilled' && nowcastSettled.value) {
+    const forecasts = nowcastSettled.value.data.items[0].forecasts;
+    let worst = { severity: -1, ja: '晴れ' };
+    for (const f of forecasts) {
+      const c = classifyNowcast(f.forecast);
+      if (c.severity > worst.severity) worst = c;
+    }
+    cityCache.nowcast = { value: { text: worst.ja }, cachedAt: now };
+  } else if (nowcastSettled.status === 'rejected') {
+    console.error('widget-stats nowcast error:', nowcastSettled.reason.message);
+  }
+
+  if (dengueSettled.status === 'fulfilled' && dengueSettled.value) {
+    const features = dengueSettled.value.features || [];
+    const clusterCount = features.length;
+    const totalCases = features.reduce((sum, f) => sum + (f.properties.CASE_SIZE || 0), 0);
+    cityCache.dengue = { value: { clusterCount, totalCases, level: dengueLevel(clusterCount) }, cachedAt: now };
+  } else if (dengueSettled.status === 'rejected') {
+    console.error('widget-stats dengue error:', dengueSettled.reason.message);
+  }
+
+  widgetStatsCache.set(city, cityCache);
+
+  const result = {};
+  if (cityCache.exchangeRate) result.exchangeRate = cityCache.exchangeRate.value;
+  if (cityCache.weather) result.weather = cityCache.weather.value;
+  if (cityCache.psi) result.psi = cityCache.psi.value;
+  if (cityCache.nowcast) result.nowcast = cityCache.nowcast.value;
+  if (cityCache.dengue) result.dengue = cityCache.dengue.value;
+  res.json(result);
+});
+
+// GET /api/school-calendar — 長期休暇設定
 app.get('/api/school-calendar', (req, res) => {
   try {
     const city = resolveCity(req);
