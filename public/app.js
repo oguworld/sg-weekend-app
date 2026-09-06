@@ -3799,6 +3799,13 @@
           setTimeout(() => _debugLogScreenMetrics('news'), 300);
         }
         if (screen === 'calendar') {
+          // ボトムナビからカレンダータブを開くたびにカテゴリ絞り込みを「すべて」にリセットする（ニュース画面と同じ挙動）
+          _calendarCategory = '';
+          document.querySelectorAll('#calendar-filter-row .filter-chip').forEach(chip => {
+            chip.classList.toggle('active', !(chip.dataset.calCat || ''));
+          });
+          const calFilterRow = document.getElementById('calendar-filter-row');
+          if (calFilterRow) calFilterRow.scrollLeft = 0;
           loadCalendarScreen();
           document.getElementById('calendar-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         }
