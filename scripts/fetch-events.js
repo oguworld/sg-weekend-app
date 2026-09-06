@@ -239,8 +239,11 @@ function deduplicateItems(newItems, eventsPath) {
 }
 
 // ─── 取得結果をファイルに保存（8:00のサマリー通知で集計）────────
+// run-fetch-extra.shにより1日に複数回実行されるため、最新1回分の上書きだけでなく
+// 過去24時間分を合算できるよう履歴ファイル（JSONL）にも追記する（2026-09-07）
 function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, rawTotal, uniqueTotal, sourceStats }) {
   const summaryPath = path.join(__dirname, '..', 'logs', `fetch-summary-${cityKey}.json`);
+  const historyPath = path.join(__dirname, '..', 'logs', `fetch-summary-history-${cityKey}.jsonl`);
   const catCounts = {};
   for (const item of (newItems || [])) catCounts[item.type] = (catCounts[item.type] || 0) + 1;
   const summary = {
@@ -257,6 +260,20 @@ function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, ra
     updatedAt: new Date().toISOString(),
   };
   fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
+
+  // 履歴には48時間より古い行は残さない（通知が読むのは直近24時間分のみのため、無限増殖防止で少し余裕を持たせて間引く）
+  try {
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    let lines = fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8').split('\n').filter(Boolean) : [];
+    lines = lines.filter(l => {
+      try { return new Date(JSON.parse(l).updatedAt).getTime() >= cutoff; } catch (e) { return false; }
+    });
+    lines.push(JSON.stringify(summary));
+    fs.writeFileSync(historyPath, lines.join('\n') + '\n', 'utf8');
+  } catch (e) {
+    console.warn('  ⚠️ 取得サマリー履歴の更新に失敗:', e.message);
+  }
+
   console.log(`  💾 取得サマリー保存: ${summaryPath}`);
 }
 

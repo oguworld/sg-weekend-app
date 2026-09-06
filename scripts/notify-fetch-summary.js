@@ -30,6 +30,27 @@ function formatCatCounts(catCounts, labels) {
   return parts.length > 0 ? parts.join(' / ') : null;
 }
 
+// fetch-events.jsは1日に複数回（run-fetch-extra.sh分も含む）実行されるが、
+// 通知は1日1回のみ。履歴ファイル（JSONL）から過去24時間分の全実行結果を合算する（2026-09-07）
+function loadLast24hSummary(cityKey) {
+  const historyPath = path.join(LOGS_DIR, `fetch-summary-history-${cityKey}.jsonl`);
+  if (!fs.existsSync(historyPath)) return null;
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const entries = fs.readFileSync(historyPath, 'utf8').split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+    .filter(e => e && new Date(e.updatedAt).getTime() >= cutoff);
+  if (entries.length === 0) return null;
+
+  const merged = { cityKey, cityLabel: entries[0].cityLabel, accepted: 0, rawTotal: 0, catCounts: {}, newItems: [] };
+  for (const e of entries) {
+    merged.accepted += e.accepted || 0;
+    merged.rawTotal += e.rawTotal || 0;
+    for (const [k, v] of Object.entries(e.catCounts || {})) merged.catCounts[k] = (merged.catCounts[k] || 0) + v;
+    merged.newItems.push(...(e.newItems || []));
+  }
+  return merged;
+}
+
 async function pushToLine(text) {
   const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   const userId = process.env.LINE_USER_ID;
@@ -56,19 +77,12 @@ async function main() {
 
   let totalAccepted = 0;
 
-  lines.push('━━ 🏖️ おでかけ情報 ━━');
+  lines.push('━━ 🏖️ おでかけ情報（過去24時間）━━');
   for (const cityKey of CITIES) {
-    const summaryPath = path.join(LOGS_DIR, `fetch-summary-${cityKey}.json`);
+    const s = loadLast24hSummary(cityKey);
 
-    if (!fs.existsSync(summaryPath)) {
-      lines.push(`— ${cityKey.toUpperCase()}: データなし`);
-      continue;
-    }
-
-    const s = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
-
-    if (s.date !== today) {
-      lines.push(`— ${s.cityLabel}: 本日未実行`);
+    if (!s) {
+      lines.push(`— ${cityKey.toUpperCase()}: 過去24時間データなし`);
       continue;
     }
 
