@@ -3836,8 +3836,9 @@
       for (const [date, dayItems] of byDate) {
         const month = date.slice(0, 7); // 'YYYY-MM'
         if (month !== currentMonth) {
+          if (currentMonth !== null) html += `</div>`; // 前の月カードを閉じる
           currentMonth = month;
-          html += `<div class="cal-month-head">${Number(month.slice(5))}月</div>`;
+          html += `<div class="cal-month-card"><div class="cal-month-head">${Number(month.slice(5))}月</div>`;
         }
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
         dayItems.forEach(it => {
@@ -3852,6 +3853,7 @@
         });
         html += `</div>`;
       }
+      if (currentMonth !== null) html += `</div>`; // 最後の月カードを閉じる
       listEl.innerHTML = html;
     }
 
