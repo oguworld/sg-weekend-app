@@ -259,6 +259,7 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 ピン留めは独立したボトムナビタブではなく、**くらし・おでかけ画面のみに表示されるクリップ型FAB**（`#fab-pin`、`#fab-top`と反対の左下に配置）から開くボトムシート（`#pin-sheet-overlay`/`#pin-sheet`）に変更。中身（`#pins-sectioned-content`/`#news-pin-list-content`/`#pin-list-content`等のID）は旧`#screen-pins`から無変更で移設、`renderPinList()`/`renderNewsPinList()`も無変更で動作する。
 - **FABの表示条件**: ピン留めが1件も無い場合はFAB自体を非表示（`updatePinFabVisibility(screen)`、くらし・おでかけ画面かつピン件数>0の時だけ`.visible`クラス付与）。ピン留め/解除の全操作箇所（`togglePinById()`/`toggleNewsPinById()`/`removePin()`）末尾と、`switchNav()`・初期化時に呼び出して常に最新状態を反映
 - **開閉**: 新規オーバーレイのため`classList.toggle('visible')`方式（CLAUDE.mdの既存規約通り、`display`直書きはしない）
+- **バグ修正（2026-09-06）**: ピン留め件数が多い時、`.pin-sheet-scroll`が一番上/下までスクロールできず、はみ出したカードの📌ボタンに触れられない不具合があった。原因は`.pin-sheet-scroll`に`-webkit-overflow-scrolling: touch`/`overscroll-behavior: contain`/`flex: 1; min-height: 0`が無かったこと（同じボトムシート系パターンの`.plan-modal-body`には最初から揃っていた）。ネスト位置固定要素内のスクロール領域を新設する際は、必ず`.plan-modal-body`と同じこの5点セット（`overflow-y:auto` + 上記4つ）を揃えること
 
 ## フィルターUI（2026-06-28刷新）
 - tabs-section（いつ行く？4タブ）廃止
