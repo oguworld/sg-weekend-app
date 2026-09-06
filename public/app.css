@@ -1690,8 +1690,8 @@
     #stat-widget-weather { margin-left: 0; margin-right: 0; }
     .stat-col { flex: 1; text-align: center; min-width: 0; }
     .stat-row { display: flex; align-items: center; justify-content: center; gap: 4px; }
-    .stat-icon { font-size: 14px; }
-    .stat-val { font-size: 15px; font-weight: 800; color: var(--midnight); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-icon { font-size: 15px; }
+    .stat-val { font-size: 18px; font-weight: 800; color: var(--midnight); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .stat-sub { font-size: 9px; color: var(--warm-gray); margin-top: 0; }
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
 
