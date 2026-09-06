@@ -1740,7 +1740,7 @@
     }
     .cal-day-group:last-child .cal-item:last-child { border-bottom: none; }
     .cal-badge { justify-self: start; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 50px; white-space: nowrap; }
-    .cal-name-wrap { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .cal-name-wrap { position: relative; display: flex; align-items: center; gap: 4px; min-width: 0; }
     .cal-item .cal-name { font-size: 14px; font-weight: 600; color: var(--midnight); }
     .cal-item .cal-range { font-size: 11px; color: var(--warm-gray); white-space: nowrap; }
     .cal-info-btn {
@@ -1749,11 +1749,20 @@
     }
     .cal-info-btn svg { width: 16px; height: 16px; }
     .cal-info-btn:active { color: var(--warm-gray); }
-    .cal-note-text {
-      grid-column: 1 / -1; display: none; font-size: 12px; line-height: 1.6; color: var(--warm-gray);
-      background: var(--sand); border-radius: 8px; padding: 8px 10px; margin-top: 2px;
+    /* ─── 予定のinfoアイコン用吹き出し ─── */
+    .cal-note-bubble {
+      position: absolute; top: calc(100% + 9px); left: 18px; z-index: 20;
+      display: none; width: max-content; max-width: 220px;
+      font-size: 12px; line-height: 1.6; color: var(--midnight); font-weight: 400;
+      background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: 10px;
+      padding: 8px 10px; box-shadow: var(--shadow-card);
     }
-    .cal-note-text.visible { display: block; }
+    .cal-note-bubble.visible { display: block; }
+    .cal-note-bubble::before {
+      content: ''; position: absolute; top: -6px; left: 10px; width: 10px; height: 10px;
+      background: var(--warm-white); border-left: 1px solid var(--sand-dark); border-top: 1px solid var(--sand-dark);
+      transform: rotate(45deg);
+    }
 
     /* ─── DECORATIVE DIVIDER ─── */
     .section-divider {

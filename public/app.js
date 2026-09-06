@@ -3869,9 +3869,16 @@
     }
 
     function toggleCalNote(btn) {
-      const note = btn.closest('.cal-item')?.querySelector('.cal-note-text');
-      note?.classList.toggle('visible');
+      const bubble = btn.nextElementSibling;
+      const wasVisible = bubble?.classList.contains('visible');
+      document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
+      if (bubble && !wasVisible) bubble.classList.add('visible');
     }
+    // 吹き出し表示中に他の場所をタップしたら閉じる
+    document.addEventListener('touchend', e => {
+      if (e.target.closest('.cal-info-btn') || e.target.closest('.cal-note-bubble')) return;
+      document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
+    }, { passive: true });
 
     function renderCalendarList() {
       const items = _calendarCategory ? CALENDAR_DATA.filter(it => it.category === _calendarCategory) : CALENDAR_DATA;
@@ -3906,7 +3913,8 @@
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
           const range = it.endDate && it.endDate !== it.date ? `〜${it.endDate.slice(5).replace('-', '/')}` : '';
           const infoBtn = it.note
-            ? `<button class="cal-info-btn" aria-label="説明を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>`
+            ? `<button class="cal-info-btn" aria-label="説明を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
+               <div class="cal-note-bubble">${escapeHtml(it.note)}</div>`
             : '';
           html += `<div class="cal-item">
             <span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>
@@ -3915,7 +3923,6 @@
               ${infoBtn}
             </span>
             ${range ? `<span class="cal-range">${range}</span>` : ''}
-            ${it.note ? `<div class="cal-note-text">${escapeHtml(it.note)}</div>` : ''}
           </div>`;
         });
         html += `</div>`;
