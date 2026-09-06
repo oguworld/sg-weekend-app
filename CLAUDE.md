@@ -229,6 +229,18 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - **デング熱**: data.gov.sgの新API方式（`fetchDataGovSgDataset()`、`poll-download`でS3署名付きURLを取得してから本体を取得する2段階呼び出し。`User-Agent`ヘッダーが無いと403になる点に注意）でGeoJSONクラスター一覧を取得し、クラスター数から警戒レベル(`dengueLevel()`)を判定
 - **キャッシュ設計**: `widgetStatsCache`はフィールド単位（為替/天気/PSI/nowcast/dengue）で個別に30分キャッシュ。1項目のAPIが失敗しても他項目の鮮度・表示に影響しない。取得失敗時はそのフィールドのキャッシュを更新せず、古い値が残っていればそれをそのまま返す（フォールバック）。一度も成功していないフィールドはJSONから欠落し、フロント側は該当項目を`--`のまま表示
 
+## カレンダー機能（2026-09-06実装、ボトムナビ4タブ目）
+ボトムナビは「くらし・おでかけ・カレンダー・設定」の4タブ構成（旧ピン留めタブは廃止、クリップFABに置き換え。後述）。`#screen-calendar`で当月の祝日・主要行事・季節イベント・締切・学校休暇・実イベントを日付グループ化リストで一覧表示する（グリッドではなくリスト形式。開いた瞬間に全項目が読める設計で、タップ展開は無し）。**多言語化はしていない**（日本語固定、`data-i18n`不要）。
+- **データソース**: `data/sg/calendar-events.json`（新規・gitignore対象・手動キュレーション、SG祝日/日本の祝日/主要行事/季節イベント/締切を収録。年1回の手動更新が必要）＋`school-calendar.json`（学校休暇、既存）＋`events.json`（実イベント、既存）を`GET /api/calendar?city=sg&month=YYYY-MM`（`server.js`）が月単位でフラットな配列にまとめて返す（`calendarEventsPath()`/`monthOverlap()`ヘルパー、既存`weekOverlap()`と同じロジックを月境界向けに）
+- **カテゴリ**: `holiday-sg`/`holiday-jp`/`festival`/`seasonal`/`deadline`/`school-vacation`/`event-ingested`の7種。`CALENDAR_CATEGORY_COLORS`（`public/app.js`、既存`LIFE_INFO_CATEGORY_COLORS`と同じCSS変数参照方式）でバッジ色分け。`#calendar-filter-row`は既存`.filter-chip`をそのまま流用したタップ絞り込み(`setCalendarCategory()`)
+- **月をまたぐ期間物の表示**: 前月から続く項目は、表示中の月の1日に日付見出しをクランプして表示する（本来の開始日をそのまま見出しにすると「9月表示なのに7/11の見出しが出る」ため、`renderCalendarList()`内で`monthFirstDay`にクランプ）
+- **祝日データの一本化**: 従来`public/app.js`内に祝日データが2重に存在し、ウェサク・デー/ハリラヤ・ハジの日付が矛盾していた（Date配列版が誤り、`CITY_HOLIDAY_NAMES`が正しかった）。今回の実装でこれらのデッドコード（`CITY_HOLIDAY_NAMES`/`getCityHolidayName`/`LONG_VACATIONS_BY_CITY`/`getLongVacations`/`LONG_VACATIONS`/`CITY_HOLIDAYS`、呼び出し元なし確認済み）を削除し、`calendar-events.json`に一本化した
+
+### ピン留めのFAB化（カレンダー追加に伴う変更）
+ピン留めは独立したボトムナビタブではなく、**くらし・おでかけ画面のみに表示されるクリップ型FAB**（`#fab-pin`、`#fab-top`と反対の左下に配置）から開くボトムシート（`#pin-sheet-overlay`/`#pin-sheet`）に変更。中身（`#pins-sectioned-content`/`#news-pin-list-content`/`#pin-list-content`等のID）は旧`#screen-pins`から無変更で移設、`renderPinList()`/`renderNewsPinList()`も無変更で動作する。
+- **FABの表示条件**: ピン留めが1件も無い場合はFAB自体を非表示（`updatePinFabVisibility(screen)`、くらし・おでかけ画面かつピン件数>0の時だけ`.visible`クラス付与）。ピン留め/解除の全操作箇所（`togglePinById()`/`toggleNewsPinById()`/`removePin()`）末尾と、`switchNav()`・初期化時に呼び出して常に最新状態を反映
+- **開閉**: 新規オーバーレイのため`classList.toggle('visible')`方式（CLAUDE.mdの既存規約通り、`display`直書きはしない）
+
 ## フィルターUI（2026-06-28刷新）
 - tabs-section（いつ行く？4タブ）廃止
 - `#filter-row-category` カテゴリチップ横スクロール行を header 直下に常時表示（何も選ばない = 全件）

@@ -891,152 +891,8 @@
       showToast(lang === 'en' ? '🇬🇧 Switched to English' : '🇯🇵 日本語に切り替えました');
     }
 
-    // ─── HOLIDAY / LONG VACATION CONFIG ───
-    const LONG_VACATIONS_BY_CITY = {
-      sg: [
-        { name: '春休み',            start: new Date(2026, 2, 13), end: new Date(2026, 3, 11) },
-        { name: 'ゴールデンウィーク', start: new Date(2026, 3, 29), end: new Date(2026, 4, 5)  },
-        { name: '夏休み',            start: new Date(2026, 7, 1),  end: new Date(2026, 7, 31) },
-        { name: '冬休み',            start: new Date(2026, 11, 24), end: new Date(2027, 0, 6) },
-      ],
-      bkk: [
-        { name: '春休み',            start: new Date(2026, 2, 20), end: new Date(2026, 3, 6)  },
-        { name: 'ゴールデンウィーク', start: new Date(2026, 3, 29), end: new Date(2026, 4, 5)  },
-        { name: '夏休み',            start: new Date(2026, 7, 1),  end: new Date(2026, 7, 31) },
-        { name: '冬休み',            start: new Date(2026, 11, 25), end: new Date(2027, 0, 6) },
-      ],
-      syd: [
-        { name: '秋休み', start: new Date(2026, 3, 10),  end: new Date(2026, 3, 26)  },
-        { name: '冬休み', start: new Date(2026, 6, 4),   end: new Date(2026, 6, 20)  },
-        { name: '春休み', start: new Date(2026, 8, 26),  end: new Date(2026, 9, 11)  },
-        { name: '夏休み', start: new Date(2026, 11, 19), end: new Date(2027, 0, 28)  },
-      ],
-    };
-    function getLongVacations() { return LONG_VACATIONS_BY_CITY[getCity()] || LONG_VACATIONS_BY_CITY.sg; }
-    // 後方互換
-    const LONG_VACATIONS = LONG_VACATIONS_BY_CITY.sg;
-
-    // 都市別祝日
-    const CITY_HOLIDAYS = {
-      sg: [
-        new Date(2026, 0, 1),   // 元日
-        new Date(2026, 1, 17),  // 旧正月1日
-        new Date(2026, 1, 18),  // 旧正月2日
-        new Date(2026, 2, 21),  // ハリラヤ・プアサ
-        new Date(2026, 3, 3),   // 聖金曜日
-        new Date(2026, 4, 1),   // 労働者の日
-        new Date(2026, 4, 27),  // ハリラヤ・ハジ
-        new Date(2026, 4, 31),  // ウェサク（日曜）
-        new Date(2026, 5, 1),   // ウェサク振替休日
-        new Date(2026, 7, 9),   // 建国記念日（日曜）
-        new Date(2026, 7, 10),  // 建国記念日振替休日
-        new Date(2026, 10, 8),  // ディパバリ（日曜）
-        new Date(2026, 10, 9),  // ディパバリ振替休日
-        new Date(2026, 11, 25), // クリスマス
-      ],
-      bkk: [
-        new Date(2026, 0, 1),   // 元日
-        new Date(2026, 2, 3),   // 万仏節（マカブーチャー）
-        new Date(2026, 3, 6),   // チャクリー記念日
-        new Date(2026, 3, 13),  // ソンクラーン1日目
-        new Date(2026, 3, 14),  // ソンクラーン2日目
-        new Date(2026, 3, 15),  // ソンクラーン3日目
-        new Date(2026, 4, 1),   // 労働者の日
-        new Date(2026, 4, 4),   // 戴冠記念日
-        new Date(2026, 4, 31),  // ウィサーカブーチャー（日曜）
-        new Date(2026, 5, 1),   // ウィサーカブーチャー振替休日
-        new Date(2026, 5, 3),   // スティダー王妃誕生日
-        new Date(2026, 6, 28),  // ワチラロンコン国王誕生日
-        new Date(2026, 6, 29),  // アサラハブーチャー
-        new Date(2026, 7, 12),  // 母の日（王母誕生日）
-        new Date(2026, 9, 13),  // ラーマ9世崩御記念日
-        new Date(2026, 9, 23),  // チュラロンコン記念日
-        new Date(2026, 11, 5),  // 父の日（ラーマ9世誕生日・土曜）
-        new Date(2026, 11, 7),  // 父の日振替休日
-        new Date(2026, 11, 10), // 憲法記念日
-        new Date(2026, 11, 31), // 大晦日
-      ],
-      syd: [
-        new Date(2026, 0, 1),   // 元日
-        new Date(2026, 0, 26),  // オーストラリアデー（月曜）
-        new Date(2026, 3, 3),   // 聖金曜日
-        new Date(2026, 3, 4),   // イースターサタデー
-        new Date(2026, 3, 5),   // イースターサンデー
-        new Date(2026, 3, 6),   // イースターマンデー
-        new Date(2026, 3, 25),  // ANZACデー（土曜）
-        new Date(2026, 3, 27),  // ANZACデー振替休日
-        new Date(2026, 5, 8),   // 国王誕生日（NSW）
-        new Date(2026, 7, 3),   // 銀行休業日（NSW）
-        new Date(2026, 9, 5),   // 労働者の日（NSW）
-        new Date(2026, 11, 25), // クリスマス
-        new Date(2026, 11, 26), // ボクシングデー（土曜）
-        new Date(2026, 11, 28), // ボクシングデー振替休日
-      ],
-    };
-    function getCityHolidays() { return CITY_HOLIDAYS[getCity()] || CITY_HOLIDAYS.sg; }
-
-    const CITY_HOLIDAY_NAMES = {
-      sg: {
-        '2026-01-01': { ja: '元日',               en: "New Year's Day" },
-        '2026-02-17': { ja: '旧正月1日',           en: 'CNY Day 1' },
-        '2026-02-18': { ja: '旧正月2日',           en: 'CNY Day 2' },
-        '2026-03-21': { ja: 'ハリラヤ・プアサ',    en: 'Hari Raya Puasa' },
-        '2026-04-03': { ja: '聖金曜日',            en: 'Good Friday' },
-        '2026-05-01': { ja: '労働者の日',          en: 'Labour Day' },
-        '2026-05-27': { ja: 'ハリラヤ・ハジ',      en: 'Hari Raya Haji' },
-        '2026-05-31': { ja: 'ウェサク',            en: 'Vesak Day' },
-        '2026-06-01': { ja: 'ウェサク振替',        en: 'Vesak (in lieu)' },
-        '2026-08-09': { ja: '建国記念日',          en: 'National Day' },
-        '2026-08-10': { ja: '建国記念日振替',      en: 'National Day (in lieu)' },
-        '2026-11-08': { ja: 'ディパバリ',          en: 'Deepavali' },
-        '2026-11-09': { ja: 'ディパバリ振替',      en: 'Deepavali (in lieu)' },
-        '2026-12-25': { ja: 'クリスマス',          en: 'Christmas' },
-      },
-      bkk: {
-        '2026-01-01': { ja: '元日',                   en: "New Year's Day" },
-        '2026-03-03': { ja: '万仏節',                 en: 'Makha Bucha' },
-        '2026-04-06': { ja: 'チャクリー記念日',       en: 'Chakri Day' },
-        '2026-04-13': { ja: 'ソンクラーン',           en: 'Songkran' },
-        '2026-04-14': { ja: 'ソンクラーン',           en: 'Songkran' },
-        '2026-04-15': { ja: 'ソンクラーン',           en: 'Songkran' },
-        '2026-05-01': { ja: '労働者の日',             en: 'Labour Day' },
-        '2026-05-04': { ja: '戴冠記念日',             en: 'Coronation Day' },
-        '2026-05-31': { ja: 'ウィサーカブーチャー',   en: 'Visakha Bucha' },
-        '2026-06-01': { ja: 'ウィサーカブーチャー振替', en: 'Visakha Bucha (in lieu)' },
-        '2026-06-03': { ja: '王妃誕生日',             en: "Queen's Birthday" },
-        '2026-07-28': { ja: '国王誕生日',             en: "King's Birthday" },
-        '2026-07-29': { ja: 'アサラハブーチャー',     en: 'Asalha Bucha' },
-        '2026-08-12': { ja: '母の日',                 en: "Mother's Day" },
-        '2026-10-13': { ja: 'ラーマ9世崩御記念日',   en: 'Passing of Rama IX' },
-        '2026-10-23': { ja: 'チュラロンコン記念日',   en: 'Chulalongkorn Day' },
-        '2026-12-05': { ja: '父の日',                 en: "Father's Day" },
-        '2026-12-07': { ja: '父の日振替',             en: "Father's Day (in lieu)" },
-        '2026-12-10': { ja: '憲法記念日',             en: 'Constitution Day' },
-        '2026-12-31': { ja: '大晦日',                 en: "New Year's Eve" },
-      },
-      syd: {
-        '2026-01-01': { ja: '元日',                   en: "New Year's Day" },
-        '2026-01-26': { ja: 'オーストラリアデー',     en: 'Australia Day' },
-        '2026-04-03': { ja: '聖金曜日',               en: 'Good Friday' },
-        '2026-04-04': { ja: 'イースター土曜',         en: 'Easter Saturday' },
-        '2026-04-05': { ja: 'イースター日曜',         en: 'Easter Sunday' },
-        '2026-04-06': { ja: 'イースターマンデー',     en: 'Easter Monday' },
-        '2026-04-25': { ja: 'ANZACデー',              en: 'ANZAC Day' },
-        '2026-04-27': { ja: 'ANZACデー振替',          en: 'ANZAC Day (in lieu)' },
-        '2026-06-08': { ja: '国王誕生日',             en: "King's Birthday" },
-        '2026-08-03': { ja: '銀行休業日',             en: 'Bank Holiday' },
-        '2026-10-05': { ja: '労働者の日',             en: 'Labour Day' },
-        '2026-12-25': { ja: 'クリスマス',             en: 'Christmas' },
-        '2026-12-26': { ja: 'ボクシングデー',         en: 'Boxing Day' },
-        '2026-12-28': { ja: 'ボクシングデー振替',     en: 'Boxing Day (in lieu)' },
-      },
-    };
-    function getCityHolidayName(d) {
-      const names = CITY_HOLIDAY_NAMES[getCity()] || {};
-      const entry = names[fmtDateKey(d)];
-      if (!entry) return null;
-      return getLang() === 'en' ? entry.en : entry.ja;
-    }
+    // 祝日・学校休暇データは data/sg/calendar-events.json + GET /api/calendar に一本化済み
+    // （旧LONG_VACATIONS_BY_CITY/CITY_HOLIDAYS/CITY_HOLIDAY_NAMESは呼び出し元が無いデッドコードのため2026-09-06に削除）
 
     // ─── NEXT LONG HOLIDAY CALCULATION ───
 
@@ -1352,6 +1208,7 @@
       _newsListRenderedKey = null; // ピン状態はrenderNewsList()の再描画スキップ判定キーに含まれないため強制再描画
       renderNewsList();
       renderNewsPinList();
+      updatePinFabVisibility('news');
     }
 
     // 生活情報記事の元記事URLを開く（既存 openSponsoredCardLink() と同じ分岐パターン）
@@ -2687,6 +2544,7 @@
       savePins(pins);
       updatePinButtons();
       renderPinList();
+      updatePinFabVisibility('home');
     }
 
     function updatePinButtons() {
@@ -2854,6 +2712,7 @@
       savePins(pins);
       updatePinButtons();
       renderPinList();
+      updatePinFabVisibility('home');
     }
 
     function clearPins() {
@@ -3401,6 +3260,7 @@
     updateCityUI();
     applyPalette();
     loadWidgetStats();
+    updatePinFabVisibility('news'); // 起動時のデフォルト画面(くらし)に合わせて初期表示を判定
 
     // Service Worker登録(プッシュ通知に必要 + 更新時に自動リロードして最新デザインを反映)
     if ('serviceWorker' in navigator) {
@@ -3789,7 +3649,7 @@
         document.activeElement.blur();
       }
       closeAllPopups();
-      ['home','news','pins','settings'].forEach(s => {
+      ['home','news','calendar','settings'].forEach(s => {
         document.getElementById('nav-' + s).classList.remove('active');
         const el = document.getElementById('screen-' + s);
         if (el) {
@@ -3807,6 +3667,7 @@
 
       const cityChanged = getCity() !== _loadedCity;
       const appHeader = document.querySelector('.app-header');
+      updatePinFabVisibility(screen);
       if (screen === 'home') {
         document.getElementById('screen-home').style.display = 'flex';
         if (appHeader) appHeader.style.display = 'block';
@@ -3861,11 +3722,129 @@
           else loadLifeInfoNewsScreen();
           setTimeout(() => _debugLogScreenMetrics('news'), 300);
         }
-        if (screen === 'pins') {
-          renderPinList();
-          renderNewsPinList();
+        if (screen === 'calendar') {
+          loadCalendarScreen();
+          document.getElementById('calendar-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
         }
       }
+    }
+
+    // ─── ピン留めFAB＋ボトムシート（くらし・おでかけ画面のみ、ピンが1件以上ある時だけFAB表示） ───
+    function updatePinFabVisibility(screen) {
+      const fab = document.getElementById('fab-pin');
+      if (!fab) return;
+      const onPinnableScreen = screen === 'home' || screen === 'news';
+      const totalPins = Object.keys(getPins()).length + Object.keys(getNewsPins()).length;
+      fab.classList.toggle('visible', onPinnableScreen && totalPins > 0);
+    }
+    function openPinSheet() {
+      renderPinList();
+      renderNewsPinList();
+      document.getElementById('pin-sheet-overlay')?.classList.add('visible');
+      lockScroll();
+    }
+    function closePinSheet() {
+      _blurIfFocusInside('pin-sheet');
+      document.getElementById('pin-sheet-overlay')?.classList.remove('visible');
+      unlockScroll();
+    }
+
+    // ─── カレンダー画面（祝日・主要行事・季節イベント・締切・学校休暇・実イベントを月単位で一覧表示） ───
+    const CALENDAR_CATEGORY_COLORS = {
+      'holiday-sg':      { bg: 'var(--caramel-pale)',       color: 'var(--terracotta)' },
+      'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
+      'festival':        { bg: 'var(--gold-pale)',          color: 'var(--gold)' },
+      'seasonal':        { bg: 'var(--plum-pale)',          color: 'var(--plum)' },
+      'deadline':        { bg: 'var(--terracotta-light-pale)', color: 'var(--terracotta)' },
+      'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
+      'event-ingested':  { bg: 'var(--caramel-pale)',       color: 'var(--caramel)' },
+    };
+    const CALENDAR_CATEGORY_LABELS = {
+      'holiday-sg': 'SG祝日', 'holiday-jp': '日本の祝日', 'festival': '主要行事',
+      'seasonal': '季節イベント', 'deadline': '締切', 'school-vacation': '学校休暇', 'event-ingested': 'イベント',
+    };
+    let CALENDAR_DATA = [];
+    let _calendarLoadedMonth = null;
+    let _calendarMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    let _calendarCategory = '';
+
+    function _calendarMonthLabel(monthStr) {
+      const [y, m] = monthStr.split('-').map(Number);
+      return `${y}年${m}月`;
+    }
+    const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
+    function _calendarDayLabel(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      return `${d.getMonth() + 1}月${d.getDate()}日(${WEEKDAY_JA[d.getDay()]})`;
+    }
+
+    async function loadCalendarScreen() {
+      const key = `${getCity()}_${_calendarMonth}`;
+      if (_calendarLoadedMonth !== key) {
+        document.getElementById('calendar-month-label').textContent = _calendarMonthLabel(_calendarMonth);
+        try {
+          const res = await fetch(`${API_BASE}/api/calendar?city=${getCity()}&month=${_calendarMonth}`);
+          CALENDAR_DATA = await res.json();
+          _calendarLoadedMonth = key;
+        } catch (e) { CALENDAR_DATA = []; }
+      }
+      renderCalendarList();
+    }
+
+    function changeCalendarMonth(delta) {
+      const [y, m] = _calendarMonth.split('-').map(Number);
+      const d = new Date(y, m - 1 + delta, 1);
+      _calendarMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      loadCalendarScreen();
+    }
+
+    function setCalendarCategory(cat) {
+      _calendarCategory = cat;
+      document.querySelectorAll('#calendar-filter-row .filter-chip').forEach(chip => {
+        chip.classList.toggle('active', (chip.dataset.calCat || '') === cat);
+      });
+      renderCalendarList();
+    }
+
+    function renderCalendarList() {
+      document.getElementById('calendar-month-label').textContent = _calendarMonthLabel(_calendarMonth);
+      const items = _calendarCategory ? CALENDAR_DATA.filter(it => it.category === _calendarCategory) : CALENDAR_DATA;
+      const listEl = document.getElementById('calendar-list');
+      const emptyEl = document.getElementById('calendar-empty-state');
+      if (items.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.style.display = 'flex';
+        return;
+      }
+      emptyEl.style.display = 'none';
+
+      // 前月から続く期間物は、表示中の月の1日にまとめて表示する（本来の開始日が月表示の外だと
+      // 「9月なのに7/11の見出しが出る」ような混乱を招くため、表示上の見出し日付だけ月初にクランプする）
+      const monthFirstDay = `${_calendarMonth}-01`;
+      const sorted = [...items].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+      const byDate = new Map();
+      sorted.forEach(it => {
+        const displayDate = it.date < monthFirstDay ? monthFirstDay : it.date;
+        if (!byDate.has(displayDate)) byDate.set(displayDate, []);
+        byDate.get(displayDate).push(it);
+      });
+
+      let html = '';
+      for (const [date, dayItems] of byDate) {
+        html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
+        dayItems.forEach(it => {
+          const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['event-ingested'];
+          const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
+          const range = it.endDate && it.endDate !== it.date ? `〜${it.endDate.slice(5).replace('-', '/')}` : '';
+          html += `<div class="cal-item">
+            <span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>
+            <span class="cal-name">${it.name}</span>
+            ${range ? `<span class="cal-range">${range}</span>` : ''}
+          </div>`;
+        });
+        html += `</div>`;
+      }
+      listEl.innerHTML = html;
     }
 
     // ユーティリティ（getUserName()はコメント機能《postComment()》が現役使用中のため残置。getUserId()はコース機能専用のため設計書178フェーズ1で削除済み）

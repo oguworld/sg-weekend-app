@@ -1004,20 +1004,20 @@
     }
     #screen-settings,
     #screen-news,
-    #screen-pins {
+    #screen-calendar {
       padding: 0;
       padding-top: env(safe-area-inset-top, 0px);
       height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
     }
     #screen-settings.visible,
     #screen-news.visible,
-    #screen-pins.visible {
+    #screen-calendar.visible {
       display: flex;
       flex-direction: column;
     }
     #screen-settings .plan-title-header,
     #screen-news .plan-title-header,
-    #screen-pins .plan-title-header {
+    #screen-calendar .plan-title-header {
       flex-shrink: 0;
       padding: 20px 20px 0;
     }
@@ -1612,6 +1612,28 @@
       pointer-events: auto;
     }
     .fab:active { transform: scale(0.92); }
+    /* ピン留めFAB（くらし・おでかけ画面のみ、#fab-topとは反対の左下に配置） */
+    .fab-pin { left: 20px; right: auto; background: var(--warm-white); color: var(--caramel); border: 1.5px solid var(--sand-dark); box-shadow: 0 4px 14px rgba(43,43,39,0.12); }
+    .fab-pin svg { width: 22px; height: 22px; }
+
+    /* ─── ピン留めボトムシート ─── */
+    .pin-sheet-overlay {
+      position: fixed; inset: 0; background: rgba(43,43,39,0.45); z-index: 3200;
+      opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+    }
+    .pin-sheet-overlay.visible { opacity: 1; pointer-events: auto; }
+    .pin-sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 3201;
+      background: var(--warm-white); border-radius: 20px 20px 0 0;
+      max-height: 85dvh; display: flex; flex-direction: column;
+      padding: 0 0 env(safe-area-inset-bottom, 0px);
+      transform: translateY(100%); transition: transform 0.25s ease;
+    }
+    .pin-sheet-overlay.visible .pin-sheet { transform: translateY(0); }
+    .pin-sheet-handle { width: 36px; height: 4px; background: var(--sand-dark); border-radius: 2px; margin: 10px auto 0; flex-shrink: 0; }
+    .pin-sheet-close { position: absolute; top: 10px; right: 16px; background: var(--sand); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: none; cursor: pointer; color: var(--warm-gray); }
+    .pin-sheet-title { font-family: var(--font-heading); font-size: 17px; font-weight: 700; color: var(--midnight); padding: 14px 20px 10px; flex-shrink: 0; }
+    .pin-sheet-scroll { padding: 0 20px 24px; overflow-y: auto; }
 
     /* ─── SHARED OVERLAY/SHEET STYLES (backup/cal passphrase) ─── */
     .chat-overlay {
@@ -1701,6 +1723,19 @@
     .stat-sub { font-size: 11px; font-weight: 600; color: var(--warm-gray); margin-top: 1px; }
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
 
+    /* ─── カレンダー画面 ─── */
+    .cal-month-nav { display: flex; align-items: center; justify-content: center; gap: 20px; padding: 4px 20px 10px; flex-shrink: 0; }
+    .cal-month-nav button { background: none; border: none; font-size: 18px; color: var(--caramel); cursor: pointer; padding: 4px 8px; }
+    .cal-month-label { font-size: 16px; font-weight: 800; color: var(--midnight); min-width: 110px; text-align: center; }
+    #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    #calendar-filter-row::-webkit-scrollbar { display: none; }
+    .cal-day-group { margin-bottom: 16px; }
+    .cal-day-head { font-size: 13px; font-weight: 700; color: var(--warm-gray); margin-bottom: 6px; }
+    .cal-item { display: flex; align-items: center; gap: 10px; background: var(--warm-white); border-radius: 12px; padding: 10px 12px; margin-bottom: 6px; box-shadow: var(--shadow-soft); }
+    .cal-badge { flex-shrink: 0; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 50px; white-space: nowrap; }
+    .cal-item .cal-name { font-size: 14px; font-weight: 600; color: var(--midnight); }
+    .cal-item .cal-range { font-size: 11px; color: var(--warm-gray); margin-left: auto; flex-shrink: 0; }
+
     /* ─── DECORATIVE DIVIDER ─── */
     .section-divider {
       display: flex;
@@ -1772,9 +1807,9 @@
 
     .plan-title-header { display:flex;align-items:flex-start;margin-bottom:20px;min-height:52px; }
     .plan-title-header .screen-title { margin-bottom:0;flex:1; }
-    /* おでかけ画面の.header-top（margin-bottom:16px、min-heightなし）とタイトル位置を揃えるためのニュース・ピン留め画面限定オーバーライド */
+    /* おでかけ画面の.header-top（margin-bottom:16px、min-heightなし）とタイトル位置を揃えるためのニュース・カレンダー画面限定オーバーライド */
     #screen-news .plan-title-header,
-    #screen-pins .plan-title-header { margin-bottom: 16px; min-height: 0; }
+    #screen-calendar .plan-title-header { margin-bottom: 16px; min-height: 0; }
 
     /* データバックアップ機能のボタン（現役、共有カレンダー削除後も使用中のため残置。設計書178フェーズ3） */
     .cal-sync-action { width:100%;box-sizing:border-box;padding:13px 0;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;transition:opacity 0.15s;display:block;text-align:center; }
