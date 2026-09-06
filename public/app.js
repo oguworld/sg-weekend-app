@@ -3840,8 +3840,8 @@
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
-      'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '主要行事',
-      'school-vacation': '学校休暇',
+      'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '文化・イベント',
+      'school-vacation': '学校行事',
     };
     let CALENDAR_DATA = [];
     let _calendarLoadedYear = null;
@@ -3888,10 +3888,11 @@
     }, { passive: true });
 
     function renderCalendarList() {
-      // 「すべて」表示時は日本の祝日を含めない（カテゴリで明示的に選んだ時だけ表示する）
+      // 「すべて」表示時は日本の祝日・学校行事を含めない（カテゴリで明示的に選んだ時だけ表示する）
+      const CALENDAR_HIDDEN_IN_ALL = ['holiday-jp', 'school-vacation'];
       const items = _calendarCategory
         ? CALENDAR_DATA.filter(it => it.category === _calendarCategory)
-        : CALENDAR_DATA.filter(it => it.category !== 'holiday-jp');
+        : CALENDAR_DATA.filter(it => !CALENDAR_HIDDEN_IN_ALL.includes(it.category));
       const listEl = document.getElementById('calendar-list');
       const emptyEl = document.getElementById('calendar-empty-state');
       if (items.length === 0) {
