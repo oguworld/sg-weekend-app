@@ -3806,8 +3806,7 @@
           });
           const calFilterRow = document.getElementById('calendar-filter-row');
           if (calFilterRow) calFilterRow.scrollLeft = 0;
-          loadCalendarScreen();
-          document.getElementById('calendar-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
+          loadCalendarScreen(true);
         }
       }
     }
@@ -3860,7 +3859,7 @@
       return `${d.getMonth() + 1}月${d.getDate()}日(${WEEKDAY_JA[d.getDay()]})`;
     }
 
-    async function loadCalendarScreen() {
+    async function loadCalendarScreen(scrollToCurrent) {
       const key = `${getCity()}_${_calendarYear}`;
       if (_calendarLoadedYear !== key) {
         try {
@@ -3870,6 +3869,25 @@
         } catch (e) { CALENDAR_DATA = []; }
       }
       renderCalendarList();
+      if (scrollToCurrent) _scrollCalendarToCurrentMonth();
+    }
+
+    // ボトムナビからカレンダーを開いた時、今月の月カードが見えるところまでスクロールする
+    // （表示中の年が実際の今年と違う場合や、今月に予定が無い場合は先頭のまま）
+    function _scrollCalendarToCurrentMonth() {
+      const scrollEl = document.getElementById('calendar-scroll-content');
+      if (!scrollEl) return;
+      const nowMonthKey = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+      if (nowMonthKey.slice(0, 4) !== String(_calendarYear)) {
+        scrollEl.scrollTo({ top: 0, behavior: 'instant' });
+        return;
+      }
+      const cards = [...document.querySelectorAll('.cal-month-card')];
+      const target = cards.find(c => c.dataset.month === nowMonthKey) || cards.find(c => c.dataset.month > nowMonthKey);
+      if (!target) { scrollEl.scrollTo({ top: 0, behavior: 'instant' }); return; }
+      const scrollRect = scrollEl.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      scrollEl.scrollTo({ top: targetRect.top - scrollRect.top + scrollEl.scrollTop, behavior: 'instant' });
     }
 
     function setCalendarCategory(cat) {
@@ -3921,7 +3939,7 @@
         if (month !== currentMonth) {
           if (currentMonth !== null) html += `</div>`; // 前の月カードを閉じる
           currentMonth = month;
-          html += `<div class="cal-month-card"><div class="cal-month-head">${Number(month.slice(5))}月</div>`;
+          html += `<div class="cal-month-card" data-month="${month}"><div class="cal-month-head">${Number(month.slice(5))}月</div>`;
         }
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
         dayItems.forEach(it => {
