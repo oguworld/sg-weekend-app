@@ -1688,6 +1688,12 @@
       box-shadow: var(--shadow-soft);
     }
     #stat-widget-weather { margin-left: 0; margin-right: 0; }
+    /* #screen-newsはdisplay:flex;flex-direction:columnのためmarginが相殺されず合算される。
+       .app-header（おでかけ画面、通常のブロック要素）はタイトルのmargin-bottom(16px)と
+       このウィジェットのmargin-top(4px)がcollapseしてmax(16,4)=16pxになるが、
+       くらし画面はcollapseせず16+4=20pxになり、縦位置が約4px下にズレていた。
+       margin-topを0にして両画面の実効間隔を揃える。 */
+    #stat-widget-info { margin-top: 0; }
     .stat-col { flex: 1; text-align: center; min-width: 0; }
     .stat-row { display: flex; align-items: center; justify-content: center; gap: 4px; }
     .stat-icon { font-size: 15px; }
