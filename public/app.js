@@ -3863,7 +3863,6 @@
     async function loadCalendarScreen() {
       const key = `${getCity()}_${_calendarYear}`;
       if (_calendarLoadedYear !== key) {
-        document.getElementById('calendar-year-label').textContent = `${_calendarYear}年`;
         try {
           const res = await fetch(`${API_BASE}/api/calendar?city=${getCity()}&year=${_calendarYear}`);
           CALENDAR_DATA = await res.json();

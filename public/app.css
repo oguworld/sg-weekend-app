@@ -1733,8 +1733,7 @@
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
 
     /* ─── カレンダー画面 ─── */
-    .cal-year-label { font-size: 16px; font-weight: 800; color: var(--midnight); text-align: center; padding: 4px 20px 10px; flex-shrink: 0; }
-    #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     #calendar-filter-row::-webkit-scrollbar { display: none; }
     .cal-month-card { background: var(--warm-white); border-radius: 16px; padding: 16px 16px 4px; margin-bottom: 16px; box-shadow: var(--shadow-soft); }
     .cal-month-head { font-size: 15px; font-weight: 800; color: var(--caramel); margin-bottom: 12px; }
