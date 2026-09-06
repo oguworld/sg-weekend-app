@@ -3912,7 +3912,8 @@
           const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['festival'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
           const range = it.endDate && it.endDate !== it.date ? `〜${it.endDate.slice(5).replace('-', '/')}` : '';
-          const infoBtn = it.note
+          // 日本の祝日は説明不要（馴染みがあるため）。それ以外でnoteがあればinfoアイコンを出す
+          const infoBtn = (it.note && it.category !== 'holiday-jp')
             ? `<button class="cal-info-btn" aria-label="説明を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
                <div class="cal-note-bubble">${escapeHtml(it.note)}</div>`
             : '';
