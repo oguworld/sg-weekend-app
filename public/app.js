@@ -2226,6 +2226,49 @@
       }, { passive: true });
     }
 
+    // ─── カレンダー画面スワイプでカテゴリ切り替え（ホーム/ニュース画面と同じパターン、単独判定） ───
+    {
+      let _calSwipeStartX = 0, _calSwipeStartY = 0, _calSwipeIntent = null, _calSwipeOnHeaderScroll = false;
+
+      function _calVisibleCatOrder() {
+        return [...document.querySelectorAll('#calendar-filter-row .filter-chip')]
+          .filter(b => b.offsetParent !== null)
+          .map(b => b.dataset.calCat || '');
+      }
+
+      function _switchCalCatBySwipe(dir) {
+        const order = _calVisibleCatOrder();
+        const idx = order.indexOf(_calendarCategory);
+        const next = idx + dir;
+        if (idx === -1 || next < 0 || next >= order.length) return;
+        setCalendarCategory(order[next]);
+        const chip = document.querySelector(`#calendar-filter-row .filter-chip[data-cal-cat="${order[next]}"]`);
+        chip?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+
+      const calendarScreenEl = document.getElementById('screen-calendar');
+      calendarScreenEl?.addEventListener('touchstart', e => {
+        _calSwipeOnHeaderScroll = !!e.target.closest('#calendar-filter-row');
+        _calSwipeStartX = e.touches[0].clientX;
+        _calSwipeStartY = e.touches[0].clientY;
+        _calSwipeIntent = null;
+      }, { passive: true });
+
+      calendarScreenEl?.addEventListener('touchmove', e => {
+        if (_calSwipeOnHeaderScroll || _calSwipeIntent) return;
+        const dx = Math.abs(e.touches[0].clientX - _calSwipeStartX);
+        const dy = Math.abs(e.touches[0].clientY - _calSwipeStartY);
+        if (dx > 6 || dy > 6) _calSwipeIntent = dx > dy ? 'h' : 'v';
+      }, { passive: true });
+
+      calendarScreenEl?.addEventListener('touchend', e => {
+        if (_calSwipeOnHeaderScroll || _calSwipeIntent !== 'h') return;
+        const dx = e.changedTouches[0].clientX - _calSwipeStartX;
+        if (Math.abs(dx) < 50) return;
+        _switchCalCatBySwipe(dx < 0 ? 1 : -1);
+      }, { passive: true });
+    }
+
     // ─── ボトムナビ 即時タップ対応（iOS Safari scroll-offset click mismatch 回避）───
     {
       let _navTouchStartX = 0, _navTouchStartY = 0;
@@ -2275,6 +2318,7 @@
       let _fabTx = 0, _fabTy = 0;
       [
         { id: 'fab-top',    fn: () => fabScrollTop() },
+        { id: 'fab-pin',    fn: () => openPinSheet() },
       ].forEach(({ id, fn }) => {
         const btn = document.getElementById(id);
         if (!btn) return;
@@ -2521,10 +2565,15 @@
       document.getElementById('news-scroll-content')?.addEventListener('scroll', () => {
         fab.classList.toggle('visible', document.getElementById('news-scroll-content').scrollTop > 300);
       }, { passive: true });
+      document.getElementById('calendar-scroll-content')?.addEventListener('scroll', () => {
+        fab.classList.toggle('visible', document.getElementById('calendar-scroll-content').scrollTop > 300);
+      }, { passive: true });
     })();
     function fabScrollTop() {
-      const targetId = document.getElementById('nav-news')?.classList.contains('active')
-        ? 'news-scroll-content' : 'home-scroll-content';
+      const targetId = document.getElementById('nav-calendar')?.classList.contains('active')
+        ? 'calendar-scroll-content'
+        : document.getElementById('nav-news')?.classList.contains('active')
+          ? 'news-scroll-content' : 'home-scroll-content';
       document.getElementById(targetId)?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -3768,18 +3817,17 @@
       unlockScroll();
     }
 
-    // ─── カレンダー画面（祝日・主要行事・季節イベント・締切・学校休暇を1年分まとめて一覧表示。実イベントは件数過多のため対象外） ───
+    // ─── カレンダー画面（祝日・主要行事(季節イベント/締切含む)・記念日・学校休暇を1年分まとめて一覧表示。実イベントは件数過多のため対象外） ───
     const CALENDAR_CATEGORY_COLORS = {
-      'holiday-sg':      { bg: 'var(--caramel-pale)',       color: 'var(--terracotta)' },
-      'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
+      'holiday-sg':      { bg: 'var(--holiday-red-pale)',  color: 'var(--holiday-red)' },
+      'holiday-jp':      { bg: 'var(--holiday-red-pale)',  color: 'var(--holiday-red)' },
       'festival':        { bg: 'var(--gold-pale)',          color: 'var(--gold)' },
-      'seasonal':        { bg: 'var(--plum-pale)',          color: 'var(--plum)' },
-      'deadline':        { bg: 'var(--terracotta-light-pale)', color: 'var(--terracotta)' },
+      'observance':      { bg: 'var(--sage-pale)',          color: 'var(--sage)' },
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
       'holiday-sg': 'SG祝日', 'holiday-jp': '日本の祝日', 'festival': '主要行事',
-      'seasonal': '季節イベント', 'deadline': '締切', 'school-vacation': '学校休暇',
+      'observance': '記念日', 'school-vacation': '学校休暇',
     };
     let CALENDAR_DATA = [];
     let _calendarLoadedYear = null;
@@ -3842,7 +3890,7 @@
         }
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
         dayItems.forEach(it => {
-          const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['deadline'];
+          const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['festival'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
           const range = it.endDate && it.endDate !== it.date ? `〜${it.endDate.slice(5).replace('-', '/')}` : '';
           html += `<div class="cal-item">

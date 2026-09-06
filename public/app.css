@@ -23,6 +23,8 @@
       --sky-pale: rgba(122,173,204,0.18);
       --plum: #9B7A94;
       --plum-pale: #F3EDF1;
+      --holiday-red: #C0392B;
+      --holiday-red-pale: rgba(192,57,43,0.14);
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 4px 20px rgba(42,37,32,0.07);
@@ -75,6 +77,7 @@
       --gold-pale: #1E241A;
       --sky-pale: #1E241A;
       --plum-pale: #1E241A;
+      --holiday-red-pale: #2A1614;
       --midnight: #EDEAE3;
       --warm-gray: #9C9A8E;
       --light-gray: #4A4E42;

@@ -1031,14 +1031,15 @@ app.get('/api/calendar', (req, res) => {
       }
     } catch (e) { /* ファイル未作成の場合は無視 */ }
 
-    // 学校休暇（school-calendar.jsonをcategory:'school-vacation'として正規化）
+    // 学校休暇（school-calendar.json＝日本人学校(SIJS)の休暇をcategory:'school-vacation'として正規化。
+    // シンガポール現地校(MOE)の休暇はcalendar-events.json側に直接収録し、ここでは名称に「日本人学校」と付けて区別する）
     try {
       const school = JSON.parse(fs.readFileSync(calendarPath(city), 'utf8'));
       for (const v of school.vacations || []) {
         if (monthOverlap(v.start, v.end, yearStart, yearEnd)) {
           result.push({
             id: `school-${v.start}`, category: 'school-vacation', date: v.start, endDate: v.end,
-            name: v.name, note: null, confirmed: true,
+            name: `日本人学校: ${v.name}`, note: null, confirmed: true,
           });
         }
       }
