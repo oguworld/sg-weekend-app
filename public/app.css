@@ -1724,11 +1724,11 @@
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
 
     /* ─── カレンダー画面 ─── */
-    .cal-month-nav { display: flex; align-items: center; justify-content: center; gap: 20px; padding: 4px 20px 10px; flex-shrink: 0; }
-    .cal-month-nav button { background: none; border: none; font-size: 18px; color: var(--caramel); cursor: pointer; padding: 4px 8px; }
-    .cal-month-label { font-size: 16px; font-weight: 800; color: var(--midnight); min-width: 110px; text-align: center; }
+    .cal-year-label { font-size: 16px; font-weight: 800; color: var(--midnight); text-align: center; padding: 4px 20px 10px; flex-shrink: 0; }
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     #calendar-filter-row::-webkit-scrollbar { display: none; }
+    .cal-month-head { font-size: 15px; font-weight: 800; color: var(--caramel); margin: 20px 0 10px; }
+    .cal-month-head:first-child { margin-top: 0; }
     .cal-day-group { margin-bottom: 16px; }
     .cal-day-head { font-size: 13px; font-weight: 700; color: var(--warm-gray); margin-bottom: 6px; }
     .cal-item { display: flex; align-items: center; gap: 10px; background: var(--warm-white); border-radius: 12px; padding: 10px 12px; margin-bottom: 6px; box-shadow: var(--shadow-soft); }

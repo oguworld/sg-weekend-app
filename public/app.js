@@ -2113,13 +2113,6 @@
       }, { passive: false });
     }
 
-    // ─── カレンダー画面 月送りボタン 即時タップ対応（filter-row-categoryと同じパターン） ───
-    document.getElementById('cal-month-nav')?.addEventListener('touchend', e => {
-      const btn = e.target.closest('button[data-cal-delta]');
-      if (!btn) return;
-      e.preventDefault();
-      changeCalendarMonth(Number(btn.dataset.calDelta));
-    }, { passive: false });
 
     // ─── ニュース画面「新着のみ」ボタン 即時タップ対応 ───
     document.getElementById('news-new-filter-btn')?.addEventListener('touchend', e => {
@@ -3775,7 +3768,7 @@
       unlockScroll();
     }
 
-    // ─── カレンダー画面（祝日・主要行事・季節イベント・締切・学校休暇を月単位で一覧表示。実イベントは件数過多のため対象外） ───
+    // ─── カレンダー画面（祝日・主要行事・季節イベント・締切・学校休暇を1年分まとめて一覧表示。実イベントは件数過多のため対象外） ───
     const CALENDAR_CATEGORY_COLORS = {
       'holiday-sg':      { bg: 'var(--caramel-pale)',       color: 'var(--terracotta)' },
       'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
@@ -3789,14 +3782,10 @@
       'seasonal': '季節イベント', 'deadline': '締切', 'school-vacation': '学校休暇',
     };
     let CALENDAR_DATA = [];
-    let _calendarLoadedMonth = null;
-    let _calendarMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    let _calendarLoadedYear = null;
+    const _calendarYear = new Date().getFullYear();
     let _calendarCategory = '';
 
-    function _calendarMonthLabel(monthStr) {
-      const [y, m] = monthStr.split('-').map(Number);
-      return `${y}年${m}月`;
-    }
     const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
     function _calendarDayLabel(dateStr) {
       const d = new Date(dateStr + 'T00:00:00');
@@ -3804,23 +3793,16 @@
     }
 
     async function loadCalendarScreen() {
-      const key = `${getCity()}_${_calendarMonth}`;
-      if (_calendarLoadedMonth !== key) {
-        document.getElementById('calendar-month-label').textContent = _calendarMonthLabel(_calendarMonth);
+      const key = `${getCity()}_${_calendarYear}`;
+      if (_calendarLoadedYear !== key) {
+        document.getElementById('calendar-year-label').textContent = `${_calendarYear}年`;
         try {
-          const res = await fetch(`${API_BASE}/api/calendar?city=${getCity()}&month=${_calendarMonth}`);
+          const res = await fetch(`${API_BASE}/api/calendar?city=${getCity()}&year=${_calendarYear}`);
           CALENDAR_DATA = await res.json();
-          _calendarLoadedMonth = key;
+          _calendarLoadedYear = key;
         } catch (e) { CALENDAR_DATA = []; }
       }
       renderCalendarList();
-    }
-
-    function changeCalendarMonth(delta) {
-      const [y, m] = _calendarMonth.split('-').map(Number);
-      const d = new Date(y, m - 1 + delta, 1);
-      _calendarMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      loadCalendarScreen();
     }
 
     function setCalendarCategory(cat) {
@@ -3832,7 +3814,6 @@
     }
 
     function renderCalendarList() {
-      document.getElementById('calendar-month-label').textContent = _calendarMonthLabel(_calendarMonth);
       const items = _calendarCategory ? CALENDAR_DATA.filter(it => it.category === _calendarCategory) : CALENDAR_DATA;
       const listEl = document.getElementById('calendar-list');
       const emptyEl = document.getElementById('calendar-empty-state');
@@ -3843,19 +3824,21 @@
       }
       emptyEl.style.display = 'none';
 
-      // 前月から続く期間物は、表示中の月の1日にまとめて表示する（本来の開始日が月表示の外だと
-      // 「9月なのに7/11の見出しが出る」ような混乱を招くため、表示上の見出し日付だけ月初にクランプする）
-      const monthFirstDay = `${_calendarMonth}-01`;
       const sorted = [...items].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
       const byDate = new Map();
       sorted.forEach(it => {
-        const displayDate = it.date < monthFirstDay ? monthFirstDay : it.date;
-        if (!byDate.has(displayDate)) byDate.set(displayDate, []);
-        byDate.get(displayDate).push(it);
+        if (!byDate.has(it.date)) byDate.set(it.date, []);
+        byDate.get(it.date).push(it);
       });
 
       let html = '';
+      let currentMonth = null;
       for (const [date, dayItems] of byDate) {
+        const month = date.slice(0, 7); // 'YYYY-MM'
+        if (month !== currentMonth) {
+          currentMonth = month;
+          html += `<div class="cal-month-head">${Number(month.slice(5))}月</div>`;
+        }
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
         dayItems.forEach(it => {
           const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['deadline'];

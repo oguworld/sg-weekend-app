@@ -230,10 +230,10 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - **キャッシュ設計**: `widgetStatsCache`はフィールド単位（為替/天気/PSI/nowcast/dengue）で個別に30分キャッシュ。1項目のAPIが失敗しても他項目の鮮度・表示に影響しない。取得失敗時はそのフィールドのキャッシュを更新せず、古い値が残っていればそれをそのまま返す（フォールバック）。一度も成功していないフィールドはJSONから欠落し、フロント側は該当項目を`--`のまま表示
 
 ## カレンダー機能（2026-09-06実装、ボトムナビ4タブ目）
-ボトムナビは「くらし・おでかけ・カレンダー・設定」の4タブ構成（旧ピン留めタブは廃止、クリップFABに置き換え。後述）。`#screen-calendar`で当月の祝日・主要行事・季節イベント・締切・学校休暇を日付グループ化リストで一覧表示する（グリッドではなくリスト形式。開いた瞬間に全項目が読める設計で、タップ展開は無し）。**多言語化はしていない**（日本語固定、`data-i18n`不要）。
-- **データソース**: `data/sg/calendar-events.json`（新規・gitignore対象・手動キュレーション、SG祝日/日本の祝日/主要行事/季節イベント/締切を収録。年1回の手動更新が必要）＋`school-calendar.json`（学校休暇、既存）を`GET /api/calendar?city=sg&month=YYYY-MM`（`server.js`）が月単位でフラットな配列にまとめて返す（`calendarEventsPath()`/`monthOverlap()`ヘルパー、既存`weekOverlap()`と同じロジックを月境界向けに）。**`events.json`の実イベントは意図的に対象外**（2026-09-06、件数が多くなりすぎるため一旦除外。以前は`category:'event-ingested'`として含めていたが削除）
+ボトムナビは「くらし・おでかけ・カレンダー・設定」の4タブ構成（旧ピン留めタブは廃止、クリップFABに置き換え。後述）。`#screen-calendar`でその年(1〜12月)の祝日・主要行事・季節イベント・締切・学校休暇を月見出し+日付グループ化リストで**1年分まとめて**一覧表示する（グリッドではなくリスト形式。月送りボタンは無く、縦スクロールのみで全月を閲覧する。2026-09-06に「月送りで一月ずつ」から「一年分を縦に並べる」方式へ変更済み）。**多言語化はしていない**（日本語固定、`data-i18n`不要）。
+- **データソース**: `data/sg/calendar-events.json`（新規・gitignore対象・手動キュレーション、SG祝日/日本の祝日/主要行事/季節イベント/締切を収録。年1回の手動更新が必要）＋`school-calendar.json`（学校休暇、既存）を`GET /api/calendar?city=sg&year=YYYY`（`server.js`）が1年分フラットな配列にまとめて返す（`calendarEventsPath()`/`monthOverlap()`ヘルパー、既存`weekOverlap()`と同じロジックで月/年どちらの範囲判定にも使える）。**`events.json`の実イベントは意図的に対象外**（2026-09-06、件数が多くなりすぎるため一旦除外。以前は`category:'event-ingested'`として含めていたが削除）
 - **カテゴリ**: `holiday-sg`/`holiday-jp`/`festival`/`seasonal`/`deadline`/`school-vacation`の6種。`CALENDAR_CATEGORY_COLORS`（`public/app.js`、既存`LIFE_INFO_CATEGORY_COLORS`と同じCSS変数参照方式）でバッジ色分け。`#calendar-filter-row`は既存`.filter-chip`をそのまま流用したタップ絞り込み(`setCalendarCategory()`)。**タッチ端末では他の`.filter-chip`系フィルター（`#filter-row-category`/`#news-filter-row`）と同じtouchstart/touchend委譲（`app.js`）が無いとタップが反応しない**ので、新規フィルター行を追加する際は必ずこのパターンを踏襲すること
-- **月をまたぐ期間物の表示**: 前月から続く項目は、表示中の月の1日に日付見出しをクランプして表示する（本来の開始日をそのまま見出しにすると「9月表示なのに7/11の見出しが出る」ため、`renderCalendarList()`内で`monthFirstDay`にクランプ）
+- **月見出し**: `renderCalendarList()`が日付でグループ化する際、月が変わるタイミングで`.cal-month-head`（例:「9月」）を自動挿入する。該当月に1件も予定が無い場合は見出し自体を出さない（空月の見出しだけ並ぶのを避けるため）
 - **祝日データの一本化**: 従来`public/app.js`内に祝日データが2重に存在し、ウェサク・デー/ハリラヤ・ハジの日付が矛盾していた（Date配列版が誤り、`CITY_HOLIDAY_NAMES`が正しかった）。今回の実装でこれらのデッドコード（`CITY_HOLIDAY_NAMES`/`getCityHolidayName`/`LONG_VACATIONS_BY_CITY`/`getLongVacations`/`LONG_VACATIONS`/`CITY_HOLIDAYS`、呼び出し元なし確認済み）を削除し、`calendar-events.json`に一本化した
 
 ### ピン留めのFAB化（カレンダー追加に伴う変更）

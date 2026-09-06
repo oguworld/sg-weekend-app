@@ -500,7 +500,7 @@ function calendarEventsPath(city) {
   return path.join(__dirname, 'data', city, 'calendar-events.json');
 }
 
-// アイテムが指定の月(monthStart〜monthEnd)と重なるか判定（weekOverlapと同じロジックを月境界向けに）
+// アイテムが指定の期間(rangeStart〜rangeEnd、月/年どちらの範囲にも使える)と重なるか判定（weekOverlapと同じロジック）
 function monthOverlap(itemStart, itemEnd, monthStart, monthEnd) {
   return itemStart <= monthEnd && itemEnd >= monthStart;
 }
@@ -1007,15 +1007,13 @@ app.get('/api/school-calendar', (req, res) => {
   }
 });
 
-// GET /api/calendar?city=sg&month=YYYY-MM — カレンダー画面用（祝日・主要行事・学校休暇を月単位でまとめて返す。実イベントは件数過多のため対象外）
+// GET /api/calendar?city=sg&year=YYYY — カレンダー画面用（祝日・主要行事・学校休暇を1年分まとめて返す。実イベントは件数過多のため対象外）
 app.get('/api/calendar', (req, res) => {
   try {
     const city = resolveCity(req);
-    const monthParam = req.query.month || new Date().toISOString().slice(0, 7); // 'YYYY-MM'
-    const [y, m] = monthParam.split('-').map(Number);
-    const monthStart = `${monthParam}-01`;
-    const lastDay = new Date(y, m, 0).getDate(); // その月の末日
-    const monthEnd = `${monthParam}-${String(lastDay).padStart(2, '0')}`;
+    const year = req.query.year || new Date().getFullYear().toString();
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
 
     const result = [];
 
@@ -1024,7 +1022,7 @@ app.get('/api/calendar', (req, res) => {
       const curated = JSON.parse(fs.readFileSync(calendarEventsPath(city), 'utf8'));
       for (const item of curated.items || []) {
         const end = item.endDate || item.date;
-        if (monthOverlap(item.date, end, monthStart, monthEnd)) {
+        if (monthOverlap(item.date, end, yearStart, yearEnd)) {
           result.push({
             id: item.id, category: item.category, date: item.date, endDate: item.endDate,
             name: item.name, note: item.note, confirmed: item.confirmed,
@@ -1037,7 +1035,7 @@ app.get('/api/calendar', (req, res) => {
     try {
       const school = JSON.parse(fs.readFileSync(calendarPath(city), 'utf8'));
       for (const v of school.vacations || []) {
-        if (monthOverlap(v.start, v.end, monthStart, monthEnd)) {
+        if (monthOverlap(v.start, v.end, yearStart, yearEnd)) {
           result.push({
             id: `school-${v.start}`, category: 'school-vacation', date: v.start, endDate: v.end,
             name: v.name, note: null, confirmed: true,
@@ -1046,6 +1044,7 @@ app.get('/api/calendar', (req, res) => {
       }
     } catch (e) { /* ファイル未作成の場合は無視 */ }
 
+    result.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
