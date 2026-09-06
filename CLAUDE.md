@@ -222,10 +222,10 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 
 ## 指標ウィジェット（2026-09-06実装）
 おでかけ画面・くらし画面それぞれの最上部に3項目ずつ、外部データの実況値を表示。`GET /api/widget-stats?city=sg`（`server.js`）1本のAPIで全項目をまとめて返し、フロントは`loadWidgetStats()`（`public/app.js`、init時に1回呼び出し）で各`#stat-*`要素に反映する。
-- **おでかけ画面**（`#stat-widget-weather`）: 気温・降水確率(`#stat-temp`/`#stat-rain`、OpenWeatherMapの5日/3時間予報から直近の`pop`を%換算)・今の空模様(`#stat-nowcast`、後述のNEAナウキャスト)
+- **おでかけ画面**（`#stat-widget-weather`）: 気温・降水確率(`#stat-temp`/`#stat-rain`、OpenWeatherMapの5日/3時間予報から直近の`pop`を%換算)・スコール(`#stat-nowcast`、後述のNEAナウキャスト。ラベルは当初「今の空模様」だったが、2026-09-06「スコール情報と分かる形がいい」との要望で「スコール」に変更、英語版も`Now`→`Squall`)
 - **くらし画面**（`#stat-widget-info`）: 為替SGD→JPY(`#stat-fx`)・PSI(`#stat-psi`)・デング熱クラスター警戒(`#stat-dengue`)
 - **データソース**: 為替=Frankfurter API(無料・キー不要)／天気=OpenWeatherMap(`OPENWEATHER_API_KEY`、`.env`。2026-09-06までプレースホルダーのまま未設定で機能していなかった)／PSI・ナウキャスト・デング熱=data.gov.sg（シンガポール政府オープンデータ、SG都市限定）
-- **NEAナウキャスト**（スコール検知用）: `2-hour-weather-forecast`の全47エリア中、`classifyNowcast()`の深刻度テーブルで最も深刻な区分を採用し「今の空模様」として1つの値に集約（エリア別表示はしない）
+- **NEAナウキャスト**（スコール検知用）: `2-hour-weather-forecast`の全47エリア中、`classifyNowcast()`の深刻度テーブルで最も深刻な区分を採用し「スコール」欄として1つの値に集約（エリア別表示はしない）
 - **デング熱**: data.gov.sgの新API方式（`fetchDataGovSgDataset()`、`poll-download`でS3署名付きURLを取得してから本体を取得する2段階呼び出し。`User-Agent`ヘッダーが無いと403になる点に注意）でGeoJSONクラスター一覧を取得し、クラスター数から警戒レベル(`dengueLevel()`)を判定
 - **キャッシュ設計**: `widgetStatsCache`はフィールド単位（為替/天気/PSI/nowcast/dengue）で個別に30分キャッシュ。1項目のAPIが失敗しても他項目の鮮度・表示に影響しない。取得失敗時はそのフィールドのキャッシュを更新せず、古い値が残っていればそれをそのまま返す（フォールバック）。一度も成功していないフィールドはJSONから欠落し、フロント側は該当項目を`--`のまま表示
 
@@ -248,7 +248,9 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - **`festival`(主要行事)バッジも同様の理由で固定ゴールド**: `--gold`/`--gold-pale`は柳グリーンパレットで`holiday-jp`と同じ緑に収束してしまい、両カテゴリが見分けづらくなっていた。`--festival-gold: #B8860B`/`--festival-gold-pale`という専用の固定色を追加し(2026-09-06)、`holiday-sg`の赤固定と同じパターンでパレットに関わらず金色のまま表示するようにした。カテゴリ数が増えて配色が被る場合は、この2例のように`--holiday-red`/`--festival-gold`パターン(固定色の変数を`:root`に追加し、ダークモード用のpale変数だけ`html[data-palette="willow"][data-theme="dark"]`で上書き)を踏襲すること
 - **カテゴリフィルターチップの並び順**: `#calendar-filter-row`は「すべて・祝日(旧SG祝日)・主要行事・学校休暇・日本の祝日」の順（2026-09-06「日本の祝日は学校行事の後にして」との要望で日本の祝日を最後に移動、「SG祝日」ラベルも「祝日」に短縮）。スワイプでのカテゴリ切り替え(`_switchCalCatBySwipe()`)はDOM順を動的に読むため、チップの並び替えだけでJS変更は不要
 - **「すべて」表示では日本の祝日・学校行事を除外する**（2026-09-06「日本の祝日はすべてに表示しないで」「学校行事のカテゴリもすべてには表示しないで」との2回の要望より）: `renderCalendarList()`内の`CALENDAR_HIDDEN_IN_ALL = ['holiday-jp', 'school-vacation']`に含まれるカテゴリは、`_calendarCategory`が空(＝「すべて」選択時)の場合のみ除外される。該当のフィルターチップを明示的にタップした時だけ表示される（データ自体は引き続き`/api/calendar`から返るので、除外はフロントエンドの表示ロジックのみ。「すべて」で常に見せたくないカテゴリが増えたら`CALENDAR_HIDDEN_IN_ALL`に追加するだけでよい）
-- **カテゴリ名・構成の変遷**（2026-09-06）: `school-vacation`は当初「学校休暇」（日本人学校/現地校の長期休み専用）だったが、「学校行事」に改称の上、PSLE/O-Level試験・ユース・デー・先生の日・こどもの日(SG)を`festival`から移動して統合（学校関連の予定を1カテゴリに集約する方針）。`festival`は「主要行事」→ユーザーとの相談の上「文化・イベント」に改称（「学校行事」とラベルが被るとの指摘のため、"行事"を含まない語を選定）
+- **カテゴリ名・構成の変遷**（2026-09-06）: `school-vacation`は当初「学校休暇」（日本人学校/現地校の長期休み専用）だったが、「学校行事」に改称の上、PSLE/O-Level試験・ユース・デー・先生の日・こどもの日(SG)を`festival`から移動して統合（学校関連の予定を1カテゴリに集約する方針）。`festival`のラベルは「主要行事」→「文化・イベント」→最終的に「文化・催し」に落ち着いた（「学校行事」と"行事"が被る→「文化・イベント」も"イベント"がおでかけ画面の`catEvent`カテゴリと被るとの指摘が続き、最終的に"行事"も"イベント"も含まない「文化・催し」を採用）。`data/sg/calendar-events.json`のIRAS所得税確定申告期限は「文化・催し」カテゴリに馴染まないとして削除済み（2026-09-06、53→57件は他の変更との兼ね合いで前後）
+- **フィルターチップの表示文言は`CALENDAR_CATEGORY_LABELS`に一本化**（2026-09-06「カレンダー側のラベル名がカテゴリ名と連動していない」との指摘より）: 以前は`index.html`のチップ内テキストを手動で`CALENDAR_CATEGORY_LABELS`と同じ文言に保つ必要があったが、`CALENDAR_CATEGORY_LABELS`定義直後に`#calendar-filter-row .filter-chip`の`textContent`を`chip.dataset.calCat`から引いて自動セットする処理を追加。カテゴリ名を変更する際は`CALENDAR_CATEGORY_LABELS`を直すだけでバッジ・チップ両方に反映される（`index.html`側のテキストはJS無効時のフォールバック表示としてのみ残す）
+- **おでかけ画面の`catEvent`(`event`カテゴリ)を「イベント」→「限定イベント」に改称**（2026-09-06、カレンダーの「文化・イベント」と紛らわしいとの指摘より。`public/app.js`のJA/EN両方のi18n辞書、`index.html`のフォールバックテキストを更新）
 - **カテゴリの横スワイプ切り替え**: くらし・おでかけ画面と同じパターン(`_switchCatBySwipe()`/`_switchNewsCatBySwipe()`)で`#screen-calendar`にも横スワイプでのカテゴリ切り替えを実装(`_switchCalCatBySwipe()`)。`#calendar-filter-row`上で始まったタッチは除外(チップ行自体の横スクロールと誤爆しないように)、横方向50px以上のスワイプで前後のカテゴリチップへ切り替える
 - **スクロールトップFAB(`#fab-top`)はカレンダー画面にも対応**: 元々`home-scroll-content`/`news-scroll-content`のみ監視していたscrollリスナーと`fabScrollTop()`の遷移先判定に`calendar-scroll-content`を追加(2026-09-06)。新しい`.screen-scroll-content`を持つ画面を追加する際は、この2箇所(スクロールリスナー・`fabScrollTop()`のtargetId分岐)を必ず更新すること
 - **`#fab-pin`(くらし/おでかけ画面のクリップFAB)もtouchend委譲が必須**: 他のボトムナビ/フィルターチップと同じ理由で、`onclick`属性だけではタッチ端末で無反応になる。`app.js`の「FAB 即時タップ対応」ブロック(`{ id: 'fab-top', fn: ... }`の配列)に`{ id: 'fab-pin', fn: () => openPinSheet() }`を追加して解決(2026-09-06)。新しいFABを追加する際は必ずこの配列に登録すること

@@ -352,7 +352,7 @@
         tabAll: '指定なし',
         catAll: '新着',
         catRecommend: 'おすすめ',
-        catEvent: 'イベント',
+        catEvent: '限定イベント',
         catShow: '展示・公演',
         catGourmet: 'グルメ・フェア',
         catSale: 'プロモ・お得',
@@ -467,7 +467,7 @@
         labelPalette: '配色',
         statTemp: '気温',
         statRain: '降水確率',
-        statNowcast: '今の空模様',
+        statNowcast: 'スコール',
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
         statDengue: 'デング熱',
@@ -541,7 +541,7 @@
         tabAll: 'All dates',
         catAll: 'New',
         catRecommend: 'Recommended',
-        catEvent: 'Events',
+        catEvent: 'Limited-Time Events',
         catShow: 'Shows & Exhibitions',
         catGourmet: 'Food & Fairs',
         catSale: 'Promos & Deals',
@@ -656,7 +656,7 @@
         labelPalette: 'Color Theme',
         statTemp: 'Temp',
         statRain: 'Rain chance',
-        statNowcast: 'Now',
+        statNowcast: 'Squall',
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
         statDengue: 'Dengue',
@@ -3840,9 +3840,15 @@
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
-      'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '文化・イベント',
+      'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '文化・催し',
       'school-vacation': '学校行事',
     };
+    // フィルターチップの表示文言をCALENDAR_CATEGORY_LABELSと連動させる（index.html側に別途ハードコードしない。
+    // カテゴリ名を変更する際はCALENDAR_CATEGORY_LABELSを直すだけでバッジ・チップ両方に反映される）
+    document.querySelectorAll('#calendar-filter-row .filter-chip').forEach(chip => {
+      const cat = chip.dataset.calCat || '';
+      chip.textContent = cat ? (CALENDAR_CATEGORY_LABELS[cat] || cat) : 'すべて';
+    });
     let CALENDAR_DATA = [];
     let _calendarLoadedYear = null;
     const _calendarYear = new Date().getFullYear();
@@ -3889,7 +3895,7 @@
 
     function renderCalendarList() {
       // 「すべて」表示時は日本の祝日・学校行事を含めない（カテゴリで明示的に選んだ時だけ表示する）
-      const CALENDAR_HIDDEN_IN_ALL = ['holiday-jp', 'school-vacation'];
+      const CALENDAR_HIDDEN_IN_ALL = ['holiday-jp'];
       const items = _calendarCategory
         ? CALENDAR_DATA.filter(it => it.category === _calendarCategory)
         : CALENDAR_DATA.filter(it => !CALENDAR_HIDDEN_IN_ALL.includes(it.category));
