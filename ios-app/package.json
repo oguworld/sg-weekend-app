@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.7.17",
+  "version": "1.7.18",
   "description": "SG在住Navi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -24,5 +24,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "おでかけ画面・くらし画面の上部に、気温・降水確率・空模様(おでかけ)や為替・PSI・デング熱警戒レベル(くらし)がひと目でわかる指標を追加しました。"
+  "releaseNotes": "指標ウィジェットの表示を調整しました。あわせて「残りわずか」フィルターを削除しました(該当情報はカード上のバッジで引き続き確認できます)。"
 }
