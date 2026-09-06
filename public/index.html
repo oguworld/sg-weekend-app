@@ -246,10 +246,10 @@
     <div class="plan-title-header">
       <span class="screen-title">カレンダー</span>
     </div>
-    <div class="cal-month-nav">
-      <button onclick="if(!_touchCapableDetected) changeCalendarMonth(-1)">‹</button>
+    <div class="cal-month-nav" id="cal-month-nav">
+      <button data-cal-delta="-1" onclick="if(!_touchCapableDetected) changeCalendarMonth(-1)">‹</button>
       <span class="cal-month-label" id="calendar-month-label"></span>
-      <button onclick="if(!_touchCapableDetected) changeCalendarMonth(1)">›</button>
+      <button data-cal-delta="1" onclick="if(!_touchCapableDetected) changeCalendarMonth(1)">›</button>
     </div>
     <div id="calendar-filter-row">
       <button class="filter-chip active" data-cal-cat="" onclick="if(!_touchCapableDetected) setCalendarCategory('')">すべて</button>
@@ -623,7 +623,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260906j"></script>
+  <script src="/app.js?v=20260906k"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

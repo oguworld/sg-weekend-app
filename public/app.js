@@ -2113,6 +2113,14 @@
       }, { passive: false });
     }
 
+    // ─── カレンダー画面 月送りボタン 即時タップ対応（filter-row-categoryと同じパターン） ───
+    document.getElementById('cal-month-nav')?.addEventListener('touchend', e => {
+      const btn = e.target.closest('button[data-cal-delta]');
+      if (!btn) return;
+      e.preventDefault();
+      changeCalendarMonth(Number(btn.dataset.calDelta));
+    }, { passive: false });
+
     // ─── ニュース画面「新着のみ」ボタン 即時タップ対応 ───
     document.getElementById('news-new-filter-btn')?.addEventListener('touchend', e => {
       e.preventDefault();
