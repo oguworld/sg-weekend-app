@@ -222,10 +222,10 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 
 ## 指標ウィジェット（2026-09-06実装）
 おでかけ画面・くらし画面それぞれの最上部に3項目ずつ、外部データの実況値を表示。`GET /api/widget-stats?city=sg`（`server.js`）1本のAPIで全項目をまとめて返し、フロントは`loadWidgetStats()`（`public/app.js`、init時に1回呼び出し）で各`#stat-*`要素に反映する。
-- **おでかけ画面**（`#stat-widget-weather`）: 気温・降水確率(`#stat-temp`/`#stat-rain`、OpenWeatherMapの5日/3時間予報から直近の`pop`を%換算)・スコール(`#stat-nowcast`、後述のNEAナウキャスト。ラベルは当初「今の空模様」だったが、2026-09-06「スコール情報と分かる形がいい」との要望で「スコール」に変更、英語版も`Now`→`Squall`)
+- **おでかけ画面**（`#stat-widget-weather`）: 気温・降水確率(`#stat-temp`/`#stat-rain`、OpenWeatherMapの5日/3時間予報から直近の`pop`を%換算)・2時間予報(`#stat-nowcast`、後述のNEAナウキャスト)。ラベルは「今の空模様」→「スコール」→最終的に「2時間予報」に変更（2026-09-06。表示値が「晴れ」〜「激しい雷雨・突風」まで幅広く、「スコール」だと晴れの日に「スコール：晴れ」と矛盾して見えるため、値と矛盾しない中立的なラベルを採用。英語版は`Now`→`Squall`→`2-Hour Forecast`）
 - **くらし画面**（`#stat-widget-info`）: 為替SGD→JPY(`#stat-fx`)・PSI(`#stat-psi`)・デング熱クラスター警戒(`#stat-dengue`)
 - **データソース**: 為替=Frankfurter API(無料・キー不要)／天気=OpenWeatherMap(`OPENWEATHER_API_KEY`、`.env`。2026-09-06までプレースホルダーのまま未設定で機能していなかった)／PSI・ナウキャスト・デング熱=data.gov.sg（シンガポール政府オープンデータ、SG都市限定）
-- **NEAナウキャスト**（スコール検知用）: `2-hour-weather-forecast`の全47エリア中、`classifyNowcast()`の深刻度テーブルで最も深刻な区分を採用し「スコール」欄として1つの値に集約（エリア別表示はしない）
+- **NEAナウキャスト**（スコール検知用）: `2-hour-weather-forecast`の全47エリア中、`classifyNowcast()`の深刻度テーブルで最も深刻な区分を採用し「2時間予報」欄として1つの値に集約（エリア別表示はしない）
 - **デング熱**: data.gov.sgの新API方式（`fetchDataGovSgDataset()`、`poll-download`でS3署名付きURLを取得してから本体を取得する2段階呼び出し。`User-Agent`ヘッダーが無いと403になる点に注意）でGeoJSONクラスター一覧を取得し、クラスター数から警戒レベル(`dengueLevel()`)を判定
 - **キャッシュ設計**: `widgetStatsCache`はフィールド単位（為替/天気/PSI/nowcast/dengue）で個別に30分キャッシュ。1項目のAPIが失敗しても他項目の鮮度・表示に影響しない。取得失敗時はそのフィールドのキャッシュを更新せず、古い値が残っていればそれをそのまま返す（フォールバック）。一度も成功していないフィールドはJSONから欠落し、フロント側は該当項目を`--`のまま表示
 
