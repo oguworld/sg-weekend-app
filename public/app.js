@@ -3836,7 +3836,7 @@
     const CALENDAR_CATEGORY_COLORS = {
       'holiday-sg':      { bg: 'var(--holiday-red-pale)',  color: 'var(--holiday-red)' },
       'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
-      'festival':        { bg: 'var(--gold-pale)',          color: 'var(--gold)' },
+      'festival':        { bg: 'var(--festival-gold-pale)', color: 'var(--festival-gold)' },
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
