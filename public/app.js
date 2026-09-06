@@ -3896,6 +3896,7 @@
         chip.classList.toggle('active', (chip.dataset.calCat || '') === cat);
       });
       renderCalendarList();
+      _scrollCalendarToCurrentMonth();
     }
 
     function toggleCalNote(btn) {
