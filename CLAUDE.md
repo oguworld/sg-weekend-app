@@ -259,7 +259,11 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 ピン留めは独立したボトムナビタブではなく、**くらし・おでかけ画面のみに表示されるクリップ型FAB**（`#fab-pin`、`#fab-top`と反対の左下に配置）から開くボトムシート（`#pin-sheet-overlay`/`#pin-sheet`）に変更。中身（`#pins-sectioned-content`/`#news-pin-list-content`/`#pin-list-content`等のID）は旧`#screen-pins`から無変更で移設、`renderPinList()`/`renderNewsPinList()`も無変更で動作する。
 - **FABの表示条件**: ピン留めが1件も無い場合はFAB自体を非表示（`updatePinFabVisibility(screen)`、くらし・おでかけ画面かつピン件数>0の時だけ`.visible`クラス付与）。ピン留め/解除の全操作箇所（`togglePinById()`/`toggleNewsPinById()`/`removePin()`）末尾と、`switchNav()`・初期化時に呼び出して常に最新状態を反映
 - **開閉**: 新規オーバーレイのため`classList.toggle('visible')`方式（CLAUDE.mdの既存規約通り、`display`直書きはしない）
-- **バグ修正（2026-09-06）**: ピン留め件数が多い時、`.pin-sheet-scroll`が一番上/下までスクロールできず、はみ出したカードの📌ボタンに触れられない不具合があった。原因は`.pin-sheet-scroll`に`-webkit-overflow-scrolling: touch`/`overscroll-behavior: contain`/`flex: 1; min-height: 0`が無かったこと（同じボトムシート系パターンの`.plan-modal-body`には最初から揃っていた）。ネスト位置固定要素内のスクロール領域を新設する際は、必ず`.plan-modal-body`と同じこの5点セット（`overflow-y:auto` + 上記4つ）を揃えること
+- **バグ修正（2026-09-06、2段階）**: ピン留め件数が多い時、`.pin-sheet-scroll`が一番上/下までスクロールできず、はみ出したカードの📌ボタンに触れられない不具合があった。
+  1. まず`.pin-sheet-scroll`に`-webkit-overflow-scrolling: touch`/`overscroll-behavior: contain`/`flex: 1; min-height: 0`を追加（同じボトムシート系パターンの`.plan-modal-body`には最初から揃っていたのに漏れていた）。これ自体は正しい修正だが、**根本原因ではなかった**（ユーザーから「まだダメ」と再報告があり判明）。
+  2. **真因**: `.pin-sheet-overlay`(z-index:3200)/`.pin-sheet`(z-index:3201)が`.bottom-nav`(z-index:9999)より低かった。`.pin-sheet`は`bottom:0`で画面最下部まで届くため、**画面下部（ボトムナビと重なる帯）ではz-indexの高いボトムナビがヒットテストを奪い、その領域のタッチ（スクロール・ボタンタップ含め全て）が一切効かなくなっていた**。CDP経由の実タッチイベント（`Input.dispatchTouchEvent`、`element.dispatchEvent(new TouchEvent(...))`ではJSリスナーは発火するが実際のブラウザのスクロールジェスチャーは駆動されないため区別が必要）で`document.elementFromPoint()`を検証して発覚。修正は`.pin-sheet-overlay`/`.pin-sheet`のz-indexを10000/10001に引き上げ、`.bottom-nav`より確実に上にした。
+  - **教訓**: `bottom:0`で画面最下部まで届く新規`position:fixed`要素（シート・モーダル）を追加する際は、z-indexが`.bottom-nav`(9999)より高いか必ず確認すること。`.pin-detail-modal`(z-index:3301、同じく`bottom:0`)など他の同パターンモーダルにも同種の潜在バグが残っている可能性があり、触る際は要確認
+  - **デバッグ手法**: 実機不具合の再現には`element.dispatchEvent(new TouchEvent(...))`では不十分（JSリスナーは発火するがブラウザの実スクロールは動かない）。Playwrightの`context.newCDPSession(page)`→`Input.dispatchTouchEvent`で本物のタッチジェスチャーを再現し、`document.elementFromPoint(x,y)`で実際のヒット先要素を確認するのが有効
 
 ## フィルターUI（2026-06-28刷新）
 - tabs-section（いつ行く？4タブ）廃止

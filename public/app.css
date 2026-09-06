@@ -1623,13 +1623,16 @@
     .fab-pin svg { width: 22px; height: 22px; }
 
     /* ─── ピン留めボトムシート ─── */
+    /* ⚠️ z-indexは.bottom-nav(9999)より必ず高くすること。.pin-sheetはbottom:0で画面最下部まで届くため、
+       .bottom-navより低いz-indexだと画面下部でナビバーがシートより手前に来て、その領域のタッチが
+       全てナビバーに奪われる（スクロール・タップ操作が一切効かなくなる）。2026-09-06実機バグで発覚。 */
     .pin-sheet-overlay {
-      position: fixed; inset: 0; background: rgba(43,43,39,0.45); z-index: 3200;
+      position: fixed; inset: 0; background: rgba(43,43,39,0.45); z-index: 10000;
       opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
     }
     .pin-sheet-overlay.visible { opacity: 1; pointer-events: auto; }
     .pin-sheet {
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: 3201;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 10001;
       background: var(--warm-white); border-radius: 20px 20px 0 0;
       max-height: 85dvh; display: flex; flex-direction: column;
       padding: 0 0 env(safe-area-inset-bottom, 0px);
