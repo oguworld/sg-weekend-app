@@ -3877,6 +3877,14 @@
     function _scrollCalendarToCurrentMonth() {
       const scrollEl = document.getElementById('calendar-scroll-content');
       if (!scrollEl) return;
+      // カテゴリ切替直前までスクロール中だった場合、iOSの慣性スクロールが残っていて
+      // この後のscrollTo()による位置指定を後から上書きしてしまい、意図せず一番下まで
+      // スクロールしてしまうことがある。一瞬overflowを止めて慣性を強制キャンセルしてから
+      // 位置を計算・適用する（2026-09-07 カテゴリ切替時のスクロール暴走で発覚）
+      scrollEl.style.overflowY = 'hidden';
+      void scrollEl.offsetHeight;
+      scrollEl.style.overflowY = '';
+
       const nowMonthKey = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
       if (nowMonthKey.slice(0, 4) !== String(_calendarYear)) {
         scrollEl.scrollTo({ top: 0, behavior: 'instant' });
@@ -3887,7 +3895,9 @@
       if (!target) { scrollEl.scrollTo({ top: 0, behavior: 'instant' }); return; }
       const scrollRect = scrollEl.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
-      scrollEl.scrollTo({ top: targetRect.top - scrollRect.top + scrollEl.scrollTop, behavior: 'instant' });
+      const maxScrollTop = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+      const rawTop = targetRect.top - scrollRect.top + scrollEl.scrollTop;
+      scrollEl.scrollTo({ top: Math.min(Math.max(rawTop, 0), maxScrollTop), behavior: 'instant' });
     }
 
     function setCalendarCategory(cat) {
