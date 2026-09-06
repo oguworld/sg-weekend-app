@@ -1682,17 +1682,18 @@
       align-items: center;
       justify-content: space-between;
       background: var(--warm-white);
-      border-radius: 20px;
-      padding: 14px 12px;
-      margin: 4px 20px 12px;
+      border-radius: 16px;
+      padding: 8px 12px;
+      margin: 4px 20px 8px;
       box-shadow: var(--shadow-soft);
     }
     #stat-widget-weather { margin-left: 0; margin-right: 0; }
     .stat-col { flex: 1; text-align: center; min-width: 0; }
-    .stat-icon { font-size: 17px; }
-    .stat-val { font-size: 16px; font-weight: 800; color: var(--midnight); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stat-sub { font-size: 10px; color: var(--warm-gray); margin-top: 1px; }
-    .stat-div { width: 1px; height: 34px; background: var(--sand); flex-shrink: 0; }
+    .stat-row { display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .stat-icon { font-size: 14px; }
+    .stat-val { font-size: 15px; font-weight: 800; color: var(--midnight); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-sub { font-size: 9px; color: var(--warm-gray); margin-top: 0; }
+    .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
 
     /* ─── DECORATIVE DIVIDER ─── */
     .section-divider {

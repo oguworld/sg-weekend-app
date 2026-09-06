@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260906a">
+  <link rel="stylesheet" href="/app.css?v=20260906b">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -61,20 +61,17 @@
       <!-- 指標ウィジェット: 気温・降水確率・スコール情報 -->
       <div class="stat-widget" id="stat-widget-weather">
         <div class="stat-col">
-          <div class="stat-icon">🌡️</div>
-          <div class="stat-val" id="stat-temp">--</div>
+          <div class="stat-row"><span class="stat-icon">🌡️</span><span class="stat-val" id="stat-temp">--</span></div>
           <div class="stat-sub" data-i18n="statTemp">気温</div>
         </div>
         <div class="stat-div"></div>
         <div class="stat-col">
-          <div class="stat-icon">☔</div>
-          <div class="stat-val" id="stat-rain">--</div>
+          <div class="stat-row"><span class="stat-icon">☔</span><span class="stat-val" id="stat-rain">--</span></div>
           <div class="stat-sub" data-i18n="statRain">降水確率</div>
         </div>
         <div class="stat-div"></div>
         <div class="stat-col">
-          <div class="stat-icon">⛈️</div>
-          <div class="stat-val" id="stat-nowcast">--</div>
+          <div class="stat-row"><span class="stat-icon">⛈️</span><span class="stat-val" id="stat-nowcast">--</span></div>
           <div class="stat-sub" data-i18n="statNowcast">今の空模様</div>
         </div>
       </div>
@@ -178,20 +175,17 @@
     <!-- 指標ウィジェット: 為替・PSI・デング熱警戒 -->
     <div class="stat-widget" id="stat-widget-info">
       <div class="stat-col">
-        <div class="stat-icon">💱</div>
-        <div class="stat-val" id="stat-fx">--</div>
+        <div class="stat-row"><span class="stat-icon">💱</span><span class="stat-val" id="stat-fx">--</span></div>
         <div class="stat-sub" data-i18n="statFx">SGD→JPY</div>
       </div>
       <div class="stat-div"></div>
       <div class="stat-col">
-        <div class="stat-icon">🌫️</div>
-        <div class="stat-val" id="stat-psi">--</div>
+        <div class="stat-row"><span class="stat-icon">🌫️</span><span class="stat-val" id="stat-psi">--</span></div>
         <div class="stat-sub" data-i18n="statPsi">PSI</div>
       </div>
       <div class="stat-div"></div>
       <div class="stat-col">
-        <div class="stat-icon">🦟</div>
-        <div class="stat-val" id="stat-dengue">--</div>
+        <div class="stat-row"><span class="stat-icon">🦟</span><span class="stat-val" id="stat-dengue">--</span></div>
         <div class="stat-sub" data-i18n="statDengue">デング熱</div>
       </div>
     </div>
@@ -597,7 +591,7 @@
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260905m"></script>
+  <script src="/app.js?v=20260906b"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
