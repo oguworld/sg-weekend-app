@@ -2113,6 +2113,14 @@
       }, { passive: false });
     }
 
+    // ─── カレンダー画面 予定のinfoボタン 即時タップ対応（動的に再描画されるため#calendar-listへのイベント委譲） ───
+    document.getElementById('calendar-list')?.addEventListener('touchend', e => {
+      const btn = e.target.closest('.cal-info-btn');
+      if (!btn) return;
+      e.preventDefault();
+      toggleCalNote(btn);
+    }, { passive: false });
+
 
     // ─── ニュース画面「新着のみ」ボタン 即時タップ対応 ───
     document.getElementById('news-new-filter-btn')?.addEventListener('touchend', e => {
@@ -3817,17 +3825,16 @@
       unlockScroll();
     }
 
-    // ─── カレンダー画面（祝日・主要行事(季節イベント/締切含む)・記念日・学校休暇を1年分まとめて一覧表示。実イベントは件数過多のため対象外） ───
+    // ─── カレンダー画面（祝日・主要行事(季節イベント/締切/記念日含む)・学校休暇を1年分まとめて一覧表示。実イベントは件数過多のため対象外） ───
     const CALENDAR_CATEGORY_COLORS = {
       'holiday-sg':      { bg: 'var(--holiday-red-pale)',  color: 'var(--holiday-red)' },
       'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
       'festival':        { bg: 'var(--gold-pale)',          color: 'var(--gold)' },
-      'observance':      { bg: 'var(--sage-pale)',          color: 'var(--sage)' },
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
       'holiday-sg': 'SG祝日', 'holiday-jp': '日本の祝日', 'festival': '主要行事',
-      'observance': '記念日', 'school-vacation': '学校休暇',
+      'school-vacation': '学校休暇',
     };
     let CALENDAR_DATA = [];
     let _calendarLoadedYear = null;
@@ -3859,6 +3866,11 @@
         chip.classList.toggle('active', (chip.dataset.calCat || '') === cat);
       });
       renderCalendarList();
+    }
+
+    function toggleCalNote(btn) {
+      const note = btn.closest('.cal-item')?.querySelector('.cal-note-text');
+      note?.classList.toggle('visible');
     }
 
     function renderCalendarList() {
@@ -3893,10 +3905,17 @@
           const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['festival'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
           const range = it.endDate && it.endDate !== it.date ? `〜${it.endDate.slice(5).replace('-', '/')}` : '';
+          const infoBtn = it.note
+            ? `<button class="cal-info-btn" aria-label="説明を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>`
+            : '';
           html += `<div class="cal-item">
             <span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>
-            <span class="cal-name">${it.name}</span>
+            <span class="cal-name-wrap">
+              <span class="cal-name">${it.name}</span>
+              ${infoBtn}
+            </span>
             ${range ? `<span class="cal-range">${range}</span>` : ''}
+            ${it.note ? `<div class="cal-note-text">${escapeHtml(it.note)}</div>` : ''}
           </div>`;
         });
         html += `</div>`;

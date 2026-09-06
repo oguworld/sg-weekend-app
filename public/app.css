@@ -1740,8 +1740,20 @@
     }
     .cal-day-group:last-child .cal-item:last-child { border-bottom: none; }
     .cal-badge { justify-self: start; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 50px; white-space: nowrap; }
+    .cal-name-wrap { display: flex; align-items: center; gap: 4px; min-width: 0; }
     .cal-item .cal-name { font-size: 14px; font-weight: 600; color: var(--midnight); }
     .cal-item .cal-range { font-size: 11px; color: var(--warm-gray); white-space: nowrap; }
+    .cal-info-btn {
+      flex-shrink: 0; width: 18px; height: 18px; padding: 0; border: none; background: none;
+      color: var(--light-gray); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .cal-info-btn svg { width: 16px; height: 16px; }
+    .cal-info-btn:active { color: var(--warm-gray); }
+    .cal-note-text {
+      grid-column: 1 / -1; display: none; font-size: 12px; line-height: 1.6; color: var(--warm-gray);
+      background: var(--sand); border-radius: 8px; padding: 8px 10px; margin-top: 2px;
+    }
+    .cal-note-text.visible { display: block; }
 
     /* ─── DECORATIVE DIVIDER ─── */
     .section-divider {
