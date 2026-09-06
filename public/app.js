@@ -3840,7 +3840,7 @@
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
-      'holiday-sg': 'SG祝日', 'holiday-jp': '日本の祝日', 'festival': '主要行事',
+      'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '主要行事',
       'school-vacation': '学校休暇',
     };
     let CALENDAR_DATA = [];
