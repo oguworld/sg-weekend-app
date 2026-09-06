@@ -1673,7 +1673,10 @@
     }
     .nav-item.active .nav-label { color: var(--caramel); font-weight: 700; }
 
-    /* ─── 指標ウィジェット（為替・天気・PSI・スコール・デング熱） ─── */
+    /* ─── 指標ウィジェット（為替・天気・PSI・スコール・デング熱） ───
+       くらし画面(#screen-news)は親要素に横paddingが無いため20pxをここで持たせる。
+       おでかけ画面は.app-header自体が既に左右20pxのpaddingを持つため、
+       #stat-widget-weather側で0に打ち消して二重加算を防ぐ（#filter-row-categoryと同じ考え方）。 */
     .stat-widget {
       display: flex;
       align-items: center;
@@ -1681,9 +1684,10 @@
       background: var(--warm-white);
       border-radius: 20px;
       padding: 14px 12px;
-      margin: 4px 16px 12px;
+      margin: 4px 20px 12px;
       box-shadow: var(--shadow-soft);
     }
+    #stat-widget-weather { margin-left: 0; margin-right: 0; }
     .stat-col { flex: 1; text-align: center; min-width: 0; }
     .stat-icon { font-size: 17px; }
     .stat-val { font-size: 16px; font-weight: 800; color: var(--midnight); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
