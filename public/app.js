@@ -842,6 +842,10 @@
         { label: '厳重警戒', range: '16件+' },
       ],
     };
+    const STAT_CRITERIA_DESC = {
+      psi: '大気汚染の程度を示す指標です',
+      dengue: '現在活動中のデング熱クラスター(流行地区)の数です。日々の新規感染者数ではありません',
+    };
     const _statCurrentLevel = { psi: null, dengue: null };
 
     function toggleStatCriteria(kind) {
@@ -852,9 +856,10 @@
         return;
       }
       const currentLevel = _statCurrentLevel[kind];
-      popover.innerHTML = STAT_CRITERIA[kind].map(it =>
+      const chips = STAT_CRITERIA[kind].map(it =>
         `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.label} ${it.range}</span>`
       ).join('');
+      popover.innerHTML = `<div class="stat-criteria-desc">${STAT_CRITERIA_DESC[kind]}</div><div class="stat-criteria-chips">${chips}</div>`;
       popover.dataset.kind = kind;
       popover.classList.add('visible');
     }
