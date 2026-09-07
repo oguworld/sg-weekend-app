@@ -275,8 +275,7 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 - QRコードに埋め込むURLは既存の`doShare()`と同じApp Store URL(`https://apps.apple.com/app/id6787159354`)
 - シートの見た目・開閉パターンは既存の`#backup-passphrase-overlay`/`#backup-passphrase-sheet`(`.chat-overlay`+`.plan-modal`、`classList.add/remove('visible')`、`lockScroll()`/`unlockScroll()`)をそのまま踏襲
 - `#qr-code-canvas`の背景は`#fff`固定(CSS変数不使用)。ダークモードでも白背景を維持しQRコードの読み取り精度を落とさないため
-
-## フィルターUI（2026-06-28刷新）
+- **実装直後バグ（2026-09-07、教訓）**: `index.html`側の`onclick`属性は`doShare()`→`openQrShareSheet()`に差し替えたが、`#screen-settings`への`touchend`委譲リスナー（`public/app.js`内、設定画面の即時タップ対応ブロック）に**別途ハードコードされていた`doShare()`直呼び出しの更新を見落とし**、タッチデバイス（実機・スマホ）ではQRシートが開かず従来通りの共有動作のままになっていた。`_touchCapableDetected`がtrueになった後は`onclick`側は実行されず、この`touchend`委譲側が実質的な唯一の実行経路になるため、**同じアクションに複数の実行経路（`onclick`属性＋`touchend`委譲）がある機能を変更する際は、両方を必ず一緒に更新すること**。同様に新設した`#qr-share-overlay`（オーバーレイタップで閉じる）・`#qr-share-link-btn`（リンクを共有ボタン）も、既存の「オーバーレイ・モーダル閉じる 即時タップ対応」配列（`[[id, fn], ...].forEach(...)`）に追加が必要だった
 - tabs-section（いつ行く？4タブ）廃止
 - `#filter-row-category` カテゴリチップ横スクロール行を header 直下に常時表示（何も選ばない = 全件）
 - `#event-filter-btn` 絞り込みボタン → `#event-filter-sheet` ボトムシート（いつ行く？/誰と/エリア/キーワード）

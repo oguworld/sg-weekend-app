@@ -2421,7 +2421,7 @@
       settingsEl.addEventListener('touchend', e => {
         if (Math.abs(e.changedTouches[0].clientY - settingsTouchStartY) > 8) return;
         if (e.target.closest('#clear-pins-item'))   { e.preventDefault(); clearPins();    return; }
-        if (e.target.closest('#do-share-btn'))      { e.preventDefault(); doShare();      return; }
+        if (e.target.closest('#do-share-btn'))      { e.preventDefault(); openQrShareSheet(); return; }
         if (e.target.closest('#feedback-send-btn')) { e.preventDefault(); sendFeedback(); return; }
         if (e.target.closest('#lang-toggle-btn'))   { e.preventDefault(); setLang(getLang() === 'ja' ? 'en' : 'ja'); return; }
         if (e.target.closest('#push-toggle-btn'))   { e.preventDefault(); togglePush(); return; }
@@ -2471,6 +2471,8 @@
       ['pin-detail-overlay', () => closePinDetail()],
       ['backup-passphrase-overlay', () => closeBackupPassphraseSheet()],
       ['backup-passphrase-submit-btn', () => submitBackupPassphrase()],
+      ['qr-share-overlay', () => closeQrShareSheet()],
+      ['qr-share-link-btn', () => doShare()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
