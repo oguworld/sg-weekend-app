@@ -3877,6 +3877,14 @@
     function _scrollCalendarToCurrentMonth() {
       const scrollEl = document.getElementById('calendar-scroll-content');
       if (!scrollEl) return;
+
+      // 今月合わせは「すべて」表示の時だけ行う。カテゴリを絞った表示は該当月が
+      // 疎らで年末近くにしか無いことも多く、無理に今月へ合わせず素直に先頭(1月)へ戻す
+      if (_calendarCategory !== '') {
+        scrollEl.scrollTo({ top: 0, behavior: 'instant' });
+        return;
+      }
+
       // カテゴリ切替直前までスクロール中だった場合、iOSの慣性スクロールが残っていて
       // この後のscrollTo()による位置指定を後から上書きしてしまい、意図せず一番下まで
       // スクロールしてしまうことがある。一瞬overflowを止めて慣性を強制キャンセルしてから
@@ -3929,6 +3937,11 @@
         : CALENDAR_DATA.filter(it => !CALENDAR_HIDDEN_IN_ALL.includes(it.category));
       const listEl = document.getElementById('calendar-list');
       const emptyEl = document.getElementById('calendar-empty-state');
+      const scrollEl = document.getElementById('calendar-scroll-content');
+      // 「すべて」表示は今月合わせスクロールの対象のため、今月が年末近くで
+      // 後続コンテンツが1画面に満たない場合でもきっちり先頭に寄せられるよう、
+      // 画面の高さ分の余白を末尾に確保しておく（他のカテゴリでは不要なので付けない）
+      if (listEl) listEl.style.paddingBottom = (_calendarCategory === '' && scrollEl) ? `${scrollEl.clientHeight}px` : '';
       if (items.length === 0) {
         listEl.innerHTML = '';
         emptyEl.style.display = 'flex';
