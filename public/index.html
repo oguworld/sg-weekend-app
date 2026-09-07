@@ -471,7 +471,7 @@
 
       <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="shareSettingsBtn">友達にシェアする</span>
-        <button id="do-share-btn" onclick="if(!_touchCapableDetected) doShare()"
+        <button id="do-share-btn" onclick="if(!_touchCapableDetected) openQrShareSheet()"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;"
           onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
           <span data-i18n="shareLabel">シェア</span>
@@ -611,12 +611,33 @@
     </div>
   </div>
 
+  <!-- アプリ共有用QRコードシート -->
+  <div class="chat-overlay" id="qr-share-overlay" onclick="if(!_touchCapableDetected) closeQrShareSheet()" style="z-index:3601;"></div>
+  <div id="qr-share-sheet" class="plan-modal" style="z-index:3602;
+    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;
+    box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
+      <div style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="qrShareTitle">アプリを共有</div>
+      <button data-close onclick="closeQrShareSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
+    </div>
+    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
+      <div id="qr-code-canvas" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:20px;margin-bottom:12px;"></div>
+      <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;text-align:center;margin-bottom:16px;" data-i18n="qrShareDesc">このQRコードを友達に読み取ってもらうと、アプリのダウンロードページが開きます</div>
+      <button id="qr-share-link-btn" onclick="if(!_touchCapableDetected) doShare()"
+        style="width:100%;box-sizing:border-box;padding:12px;background:var(--caramel);border:none;border-radius:12px;
+               font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
+        data-i18n="qrShareLinkBtn">リンクを共有</button>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
   <!-- スタンプラリー機能用 Leaflet 本体（設計書69。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/vendor/leaflet/leaflet.js"></script>
-  <script src="/app.js?v=20260907d"></script>
+  <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
+  <script src="/qrcode-generator.js"></script>
+  <script src="/app.js?v=20260907f"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

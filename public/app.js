@@ -442,6 +442,9 @@
         pinsEmptyCombinedDesc: '気になるイベントやニュースの📌をタップすると<br>ここにまとめて表示されます',
         shareSettingsDesc: 'シンガポール在住の友達にこのアプリを紹介しよう！',
         shareSettingsBtn: '友達にシェアする',
+        qrShareTitle: 'アプリを共有',
+        qrShareDesc: 'このQRコードを友達に読み取ってもらうと、アプリのダウンロードページが開きます',
+        qrShareLinkBtn: 'リンクを共有',
         bannerToday: '⏰ 本日まで',
         bannerTomorrow: '⏰ 明日まで',
         bannerDaysLeft: '⏰ あと{d}日',
@@ -631,6 +634,9 @@
         pinsEmptyCombinedDesc: 'Tap 📌 on any event or news article<br>and it will show up here',
         shareSettingsDesc: 'Share this app with your friends in Singapore!',
         shareSettingsBtn: 'Share with Friends',
+        qrShareTitle: 'Share App',
+        qrShareDesc: 'Have your friend scan this QR code to open the app download page',
+        qrShareLinkBtn: 'Share Link',
         bannerToday: '⏰ Today only',
         bannerTomorrow: '⏰ Until tomorrow',
         bannerDaysLeft: '⏰ {d} days left',
@@ -3367,6 +3373,25 @@
       }
     }
 
+    function openQrShareSheet() {
+      const canvas = document.getElementById('qr-code-canvas');
+      if (canvas && !canvas.hasChildNodes()) {
+        const qr = qrcode(0, 'M');
+        qr.addData('https://apps.apple.com/app/id6787159354');
+        qr.make();
+        canvas.innerHTML = qr.createSvgTag(6, 4);
+      }
+      lockScroll();
+      document.getElementById('qr-share-overlay').classList.add('visible');
+      document.getElementById('qr-share-sheet').classList.add('visible');
+    }
+
+    function closeQrShareSheet() {
+      unlockScroll();
+      document.getElementById('qr-share-overlay').classList.remove('visible');
+      document.getElementById('qr-share-sheet').classList.remove('visible');
+    }
+
     async function sendFeedback() {
       const text = document.getElementById('feedback-text').value.trim();
       if (!text) { showToast(t('toastFeedbackEmpty')); return; }
@@ -3938,10 +3963,11 @@
       const listEl = document.getElementById('calendar-list');
       const emptyEl = document.getElementById('calendar-empty-state');
       const scrollEl = document.getElementById('calendar-scroll-content');
-      // 「すべて」表示は今月合わせスクロールの対象のため、今月が年末近くで
-      // 後続コンテンツが1画面に満たない場合でもきっちり先頭に寄せられるよう、
-      // 画面の高さ分の余白を末尾に確保しておく（他のカテゴリでは不要なので付けない）
-      if (listEl) listEl.style.paddingBottom = (_calendarCategory === '' && scrollEl) ? `${scrollEl.clientHeight}px` : '';
+      // 「すべて」表示は今月合わせスクロールの対象のため、12月分のカードが
+      // 見える程度の少しのバッファを末尾に確保しておく（他のカテゴリでは不要なので付けない）。
+      // 画面の高さ分まるごと確保すると手動で一番下までスクロールした時に無駄な空白が
+      // 大きくなりすぎるため、控えめな固定値にとどめる（2026-09-07）
+      if (listEl) listEl.style.paddingBottom = (_calendarCategory === '' && scrollEl) ? '140px' : '';
       if (items.length === 0) {
         listEl.innerHTML = '';
         emptyEl.style.display = 'flex';
