@@ -473,7 +473,7 @@
         statNowcast: '2時間予報',
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
-        statDengue: '流行地区数',
+        statDengue: 'デング熱',
         nicknamePlaceholder: '匿名',
         labelWhoWith: '一緒に行く人',
         labelWhoSolo: '🚶 ひとりで',
@@ -665,7 +665,7 @@
         statNowcast: '2-Hour Forecast',
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
-        statDengue: 'Active Clusters',
+        statDengue: 'Dengue',
         nicknamePlaceholder: 'Anonymous',
         labelWhoWith: 'Who to go with',
         labelWhoSolo: '🚶 Solo',
@@ -826,14 +826,52 @@
     }
 
     // ─── 指標ウィジェット（為替・天気・PSI・スコール・デング熱） ───
+    // PSI・デング熱の判定基準（server.jsのpsiLevel()/dengueLevel()と一致させること）
+    const STAT_CRITERIA = {
+      psi: [
+        { label: '良好', range: '0-50' },
+        { label: '普通', range: '51-100' },
+        { label: '要注意', range: '101-200' },
+        { label: '健康に悪い', range: '201-300' },
+        { label: '危険', range: '301+' },
+      ],
+      dengue: [
+        { label: '警報なし', range: '0件' },
+        { label: '注意', range: '1-5件' },
+        { label: '警戒', range: '6-15件' },
+        { label: '厳重警戒', range: '16件+' },
+      ],
+    };
+    const _statCurrentLevel = { psi: null, dengue: null };
+
+    function toggleStatCriteria(kind) {
+      const popover = document.getElementById('stat-criteria-popover');
+      if (!popover) return;
+      if (popover.classList.contains('visible') && popover.dataset.kind === kind) {
+        popover.classList.remove('visible');
+        return;
+      }
+      const currentLevel = _statCurrentLevel[kind];
+      popover.innerHTML = STAT_CRITERIA[kind].map(it =>
+        `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.label} ${it.range}</span>`
+      ).join('');
+      popover.dataset.kind = kind;
+      popover.classList.add('visible');
+    }
+    // クライテリア表示中に他の場所をタップしたら閉じる
+    document.addEventListener('touchend', e => {
+      if (e.target.closest('[data-stat-crit]') || e.target.closest('#stat-criteria-popover')) return;
+      document.getElementById('stat-criteria-popover')?.classList.remove('visible');
+    }, { passive: true });
+
     async function loadWidgetStats() {
       try {
         const res = await fetch(API_BASE + '/api/widget-stats?city=' + getCity());
         const data = await res.json();
         const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
         if (data.exchangeRate) setText('stat-fx', data.exchangeRate.toFixed(1) + '円');
-        if (data.psi) setText('stat-psi', `${data.psi.value}(${data.psi.level})`);
-        if (data.dengue) setText('stat-dengue', `${data.dengue.clusterCount}件(${data.dengue.level})`);
+        if (data.psi) { setText('stat-psi', `${data.psi.value}(${data.psi.level})`); _statCurrentLevel.psi = data.psi.level; }
+        if (data.dengue) { setText('stat-dengue', `${data.dengue.clusterCount}件(${data.dengue.level})`); _statCurrentLevel.dengue = data.dengue.level; }
         if (data.weather) {
           setText('stat-temp', Math.round(data.weather.temp) + '°');
           setText('stat-rain', data.weather.rainProbPercent + '%');
@@ -2125,6 +2163,14 @@
       if (!btn) return;
       e.preventDefault();
       toggleCalNote(btn);
+    }, { passive: false });
+
+    // ─── PSI・デング熱指標タップでクライテリア表示 即時タップ対応 ───
+    document.getElementById('stat-widget-info')?.addEventListener('touchend', e => {
+      const col = e.target.closest('[data-stat-crit]');
+      if (!col) return;
+      e.preventDefault();
+      toggleStatCriteria(col.dataset.statCrit);
     }, { passive: false });
 
 

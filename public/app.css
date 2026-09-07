@@ -1709,6 +1709,7 @@
        おでかけ画面は.app-header自体が既に左右20pxのpaddingを持つため、
        #stat-widget-weather側で0に打ち消して二重加算を防ぐ（#filter-row-categoryと同じ考え方）。 */
     .stat-widget {
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1731,6 +1732,40 @@
     .stat-val { font-size: 16px; font-weight: 800; color: var(--midnight); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .stat-sub { font-size: 11px; font-weight: 600; color: var(--warm-gray); margin-top: 1px; }
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
+    .stat-col[data-stat-crit] { cursor: pointer; }
+    /* PSI・デング熱タップ時のクライテリア表示（各レベルをピル型チップで並べ、現在値のチップだけ強調） */
+    #stat-criteria-popover {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 8px;
+      right: 8px;
+      margin-top: 6px;
+      z-index: 20;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: var(--warm-white);
+      border: 1px solid var(--sand-dark);
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: var(--shadow-card);
+    }
+    #stat-criteria-popover.visible { display: flex; }
+    .stat-criteria-chip {
+      flex-shrink: 0;
+      padding: 5px 10px;
+      border-radius: 20px;
+      background: var(--sand);
+      color: var(--warm-gray);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .stat-criteria-chip.active {
+      background: var(--caramel);
+      color: #fff;
+      font-weight: 700;
+    }
 
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
