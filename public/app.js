@@ -4009,11 +4009,7 @@
       const listEl = document.getElementById('calendar-list');
       const emptyEl = document.getElementById('calendar-empty-state');
       const scrollEl = document.getElementById('calendar-scroll-content');
-      // 「すべて」表示は今月合わせスクロールの対象のため、12月分のカードが
-      // 見える程度の少しのバッファを末尾に確保しておく（他のカテゴリでは不要なので付けない）。
-      // 画面の高さ分まるごと確保すると手動で一番下までスクロールした時に無駄な空白が
-      // 大きくなりすぎるため、控えめな固定値にとどめる（2026-09-07）
-      if (listEl) listEl.style.paddingBottom = (_calendarCategory === '' && scrollEl) ? '140px' : '';
+      if (listEl) listEl.style.paddingBottom = '';
       if (items.length === 0) {
         listEl.innerHTML = '';
         emptyEl.style.display = 'flex';
@@ -4060,6 +4056,17 @@
       }
       if (currentMonth !== null) html += `</div>`; // 最後の月カードを閉じる
       listEl.innerHTML = html;
+
+      // 「すべて」表示は今月合わせスクロールの対象のため、12月が年内最後のカードでも
+      // きっちり画面最上部に寄せられるよう、最後のカード自身の高さを差し引いた分だけ
+      // 末尾に余白を確保する（固定値だと画面サイズやカードの中身の量で過不足が出るため、
+      // 実測して必要な分だけ確保する。2026-09-07）
+      if (_calendarCategory === '' && scrollEl) {
+        const cards = listEl.querySelectorAll('.cal-month-card');
+        const lastCard = cards[cards.length - 1];
+        const need = lastCard ? Math.max(0, scrollEl.clientHeight - lastCard.getBoundingClientRect().height) : 0;
+        listEl.style.paddingBottom = `${need}px`;
+      }
     }
 
     // ユーティリティ（getUserName()はコメント機能《postComment()》が現役使用中のため残置。getUserId()はコース機能専用のため設計書178フェーズ1で削除済み）
