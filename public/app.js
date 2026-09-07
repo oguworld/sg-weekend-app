@@ -874,9 +874,10 @@
         const res = await fetch(API_BASE + '/api/widget-stats?city=' + getCity());
         const data = await res.json();
         const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+        const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
         if (data.exchangeRate) setText('stat-fx', data.exchangeRate.toFixed(1) + '円');
-        if (data.psi) { setText('stat-psi', `${data.psi.value}(${data.psi.level})`); _statCurrentLevel.psi = data.psi.level; }
-        if (data.dengue) { setText('stat-dengue', `${data.dengue.clusterCount}件(${data.dengue.level})`); _statCurrentLevel.dengue = data.dengue.level; }
+        if (data.psi) { setHTML('stat-psi', `${data.psi.value}<span class="stat-val-level">(${data.psi.level})</span>`); _statCurrentLevel.psi = data.psi.level; }
+        if (data.dengue) { setHTML('stat-dengue', `${data.dengue.clusterCount}件<span class="stat-val-level">(${data.dengue.level})</span>`); _statCurrentLevel.dengue = data.dengue.level; }
         if (data.weather) {
           setText('stat-temp', Math.round(data.weather.temp) + '°');
           setText('stat-rain', data.weather.rainProbPercent + '%');

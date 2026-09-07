@@ -1730,6 +1730,7 @@
     .stat-row { display: flex; align-items: center; justify-content: center; gap: 4px; }
     .stat-icon { font-size: 15px; }
     .stat-val { font-size: 16px; font-weight: 800; color: var(--midnight); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-val-level { font-size: 12px; font-weight: 600; }
     .stat-sub { font-size: 11px; font-weight: 600; color: var(--warm-gray); margin-top: 1px; }
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
     .stat-col[data-stat-crit] { cursor: pointer; }
