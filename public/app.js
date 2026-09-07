@@ -836,10 +836,10 @@
         { label: '危険', range: '301+' },
       ],
       dengue: [
-        { label: '警報なし', range: '0箇所' },
-        { label: '注意', range: '1-5箇所' },
-        { label: '警戒', range: '6-15箇所' },
-        { label: '厳重警戒', range: '16箇所+' },
+        { label: '警報なし', range: '0区' },
+        { label: '注意', range: '1-5区' },
+        { label: '警戒', range: '6-15区' },
+        { label: '厳重警戒', range: '16区+' },
       ],
     };
     const STAT_CRITERIA_DESC = {
@@ -877,7 +877,7 @@
         const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
         if (data.exchangeRate) setText('stat-fx', data.exchangeRate.toFixed(1) + '円');
         if (data.psi) { setHTML('stat-psi', `${data.psi.value}<span class="stat-val-level">(${data.psi.level})</span>`); _statCurrentLevel.psi = data.psi.level; }
-        if (data.dengue) { setHTML('stat-dengue', `${data.dengue.clusterCount}箇所<span class="stat-val-level">(${data.dengue.level})</span>`); _statCurrentLevel.dengue = data.dengue.level; }
+        if (data.dengue) { setHTML('stat-dengue', `${data.dengue.clusterCount}区<span class="stat-val-level">(${data.dengue.level})</span>`); _statCurrentLevel.dengue = data.dengue.level; }
         if (data.weather) {
           setText('stat-temp', Math.round(data.weather.temp) + '°');
           setText('stat-rain', data.weather.rainProbPercent + '%');
