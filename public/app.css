@@ -1753,9 +1753,10 @@
     #stat-criteria-popover.visible { display: flex; }
     .stat-criteria-chip {
       flex-shrink: 0;
-      padding: 5px 10px;
+      padding: 4px 9px;
       border-radius: 20px;
-      background: var(--sand);
+      background: transparent;
+      border: 1.5px solid var(--sand-dark);
       color: var(--warm-gray);
       font-size: 12px;
       font-weight: 600;
@@ -1763,6 +1764,7 @@
     }
     .stat-criteria-chip.active {
       background: var(--caramel);
+      border-color: var(--caramel);
       color: #fff;
       font-weight: 700;
     }
