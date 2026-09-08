@@ -18121,3 +18121,41 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 ### スコープ外
 - Pull-to-Refresh機構自体(`_initPtr`)の改修
 - 他画面のローディング文言の新規追加
+
+---
+
+## 設計書182: くらし画面へのスポーツニュース取り込み対応(RSS追加・カテゴリマッピング、2026-09-08設計)
+
+### 背景・課題
+「くらし」タブに本田圭佑選手のJDT FC入団、RTS Link開通、日本代表vsブラジル代表戦のシンガポール開催決定のようなスポーツ関連ニュースが取り込まれていなかった。調査の結果、2つの原因が判明した。
+
+### 原因1: フィードがスポーツ専用ではない
+`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`(現行4本: CNA/Mothership/Straits Times/JCCI)は全て「シンガポール一般ニュース」欄で、スポーツ記事自体が上流でほぼ流通しない。
+
+### 原因2(より本質的): Haiku分類プロンプトが明示的にスポーツを不採用としている
+`filterBatch()`内の`instructionText`(205-229行目付近)の「【不採用とすべきもの】」に「スポーツ・芸能・エンタメ関連のニュース」という記述があり、フィード追加だけでは意味がない。`filter-events.js`のような数値の足切りスコア(`scoreThreshold`)はこちらには存在せず、ルールベースの二値判定のため、この除外ルール自体を調整する必要がある。
+
+### 対応方針(ユーザー承認済み)
+1. **RSSフィード追加**: CNA Sport(`https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10296`, name: `'CNA Sport'`)を`CITY_CONFIG.sg.feeds`に追加する。既存4フィード(CNA/Mothership/Straits Times/JCCI)は削減しない(重複データ計測なしでの削減はリスクが高いため見送り。ただしStraits Times導入経緯が記録に残っていない点は既知の懸念事項として残る)
+2. **Haiku分類プロンプトの調整**: `filterBatch()`の`instructionText`内、「【不採用とすべきもの】」の「スポーツ・芸能・エンタメ関連のニュース」という文言を、「芸能・エンタメ関連のニュース(ただし日本人選手の移籍・日本代表戦の開催など、在住日本人の関心が高いスポーツニュースは除く)」のように調整する。また`community`カテゴリの説明文に「日本人選手の移籍、日本代表の試合開催など、在住日本人の関心が高いスポーツニュース」という例を追記する
+3. **カテゴリマッピング**: 新カテゴリは新設せず、既存の`community`(コミュニティ)カテゴリにスポーツニュースを分類する。`server.js`のVALID_CATEGORIES、`public/app.js`のLIFE_INFO_CATEGORY_COLORS等、`public/index.html`のカテゴリタブは**一切変更しない**(6カテゴリのまま)
+
+### スコープ外(今回やらないこと)
+- 新カテゴリ`sports`の新設(見送り、community寄せを採用したため不要)
+- 既存4フィードの削減・統合(重複率未計測のため見送り)
+- `run-fetch-extra.sh`への`fetch-life-info.js`追加(1日3回化。これは別問題として切り分け、今回は対応しない)
+- Straits Times Sportフィードの追加(CNA Sportのみ採用)
+- BKK/SYD都市への同様の対応
+
+### 変更ファイル
+- `scripts/fetch-life-info.js`のみ(feeds配列に1行追加、`instructionText`内の除外文言調整、community説明文への追記)
+- `server.js`・`public/app.js`・`public/index.html`は無変更
+
+### 受け入れ基準
+- `node scripts/fetch-life-info.js --city=sg --dry-run`(dry-runオプションがあれば。なければ実行前にコードレビューで代替)で、CNA Sportフィードが正常に取得できることを確認
+- 構文エラーがないこと(`node --check scripts/fetch-life-info.js`)
+- 既存のCITY_CONFIG構造・関数シグネチャは変更しない(feeds配列への追加のみ)
+
+### 後方互換性・影響範囲
+- `data/sg/life-info.json`のスキーマ変更なし(`category`の値の集合は6種のまま、`community`が使われるだけ)。Web版・iOS App Store版どちらも影響なし
+- サーバー側(`scripts/fetch-life-info.js`、cron実行のみ)の変更のため、フロントエンドのリリース・TestFlightビルドは不要。次回cron実行(毎日6:30 SGT、`run-fetch-all.sh`経由)から自動的に反映される

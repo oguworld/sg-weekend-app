@@ -63,6 +63,7 @@ const CITY_CONFIG = {
       { url: 'https://mothership.sg/feed/',                                                          name: 'Mothership' },
       { url: 'https://www.straitstimes.com/news/singapore/rss.xml',                                  name: 'Straits Times' },
       { url: 'https://www.jcci.org.sg/feed/',                                                         name: 'JCCI' },
+      { url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10296',  name: 'CNA Sport' },
     ],
   },
 };
@@ -211,10 +212,10 @@ async function filterBatch(batch, cityKey) {
 - "health": 医療・健康（クリニック・病院情報、健康アラート、感染症情報など）
 - "education": 教育・子育て（学校情報、保活、子育て支援制度など）
 - "weather": 天候・災害・ヘイズ（PSI指数・洪水警報・大雨警報・気象関連ニュース）
-- "community": 日本人コミュニティ・近隣制度（日本人会・日本人学校・日系企業・近隣国との往来制度等）
+- "community": 日本人コミュニティ・近隣制度（日本人会・日本人学校・日系企業・近隣国との往来制度等。加えて、日本人選手の移籍、日本代表の試合開催など、在住日本人の関心が高いスポーツニュースも含む。ただし「知っておくべき話題のニュース」（移籍情報・大会結果・開催決定の速報等）が対象で、チケット販売中の参加イベント告知のようなものは対象外）
 
 【不採用とすべきもの】
-- スポーツ・芸能・エンタメ関連のニュース
+- 芸能・エンタメ関連のニュース（ただし日本人選手の移籍・日本代表戦の開催など、在住日本人の関心が高いスポーツニュースは除く）
 - 単純な事件・事故報道（生活への影響が薄いもの）
 - 政治的な論争・スキャンダル記事で生活情報としての実用性がないもの
 - 広告・PR記事

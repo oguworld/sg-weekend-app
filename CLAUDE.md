@@ -332,7 +332,8 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市�
 ⚠️ 「旅行」カテゴリは設計書175で一度この機能に追加されたが、同日中に設計書176でロールバックされ、**現在は「おでかけ」画面（イベント一覧）のカテゴリタブとして再配置されている**（上記「イベント取り込みパイプライン構成」の`CATEGORY_TARGET_RATIO`参照）。以下は現在のコード基準の記述。
 
 - **カテゴリ**: 6種（admin/weather/transport/community/health/education）。`server.js`の`VALID_CATEGORIES`もこの6種（travelは含まれない）
-- **データ取得**（`scripts/fetch-life-info.js`）: RSS4件（CNA/Mothership/Straits Times/JCCI、⚠️Straits Times追加の経緯は未記録）を`rss-parser`で取得、ハイウォーターマーク方式（`data/life-info-fetch-state.json`、イベント用の状態ファイルとは分離）。Haikuで在住日本人への関連性判定＋カテゴリ付与、Sonnetで日本語/英語要約を生成し`data/sg/life-info.json`（gitignore対象）に保存。リテンション期間は一律7日
+- **データ取得**（`scripts/fetch-life-info.js`）: RSS5件（CNA/Mothership/Straits Times/JCCI/CNA Sport〈設計書182で追加〉、⚠️Straits Times追加の経緯は未記録）を`rss-parser`で取得、ハイウォーターマーク方式（`data/life-info-fetch-state.json`、イベント用の状態ファイルとは分離）。Haikuで在住日本人への関連性判定＋カテゴリ付与、Sonnetで日本語/英語要約を生成し`data/sg/life-info.json`（gitignore対象）に保存。リテンション期間は一律7日
+- **スポーツニュースの扱い（設計書182、2026-09-08）**: `filterBatch()`のHaiku分類プロンプトは元々「スポーツ・芸能・エンタメ関連のニュース」を一律不採用としていたが、日本人選手の移籍・日本代表戦の開催など在住日本人の関心が高いスポーツニュースは除外対象から外し、既存の`community`カテゴリに分類するよう調整済み（新カテゴリ`sports`は新設していない、6カテゴリのまま）。プロンプト上は「知っておくべき話題のニュース」（移籍・大会結果・開催決定の速報等）を対象とし、「チケット販売中の参加イベント告知」は対象外と明記して、おでかけ側の独立イベント取り込みパイプライン（`fetch-events.js`/`filter-events.js`）との話題重複をプロンプト文言レベルで緩和している。**ただし両パイプライン間の技術的な重複排除ロジックは存在せず、完全な重複防止は未対応**（同じ話題が両タブに出る可能性は残る）
 - **cron**: 独立エントリではなく、`run-fetch-all.sh`内で`fetch-events.js`の直後・`notify-fetch-summary.js`の直前に実行（毎日6:30 SGT）。当初（設計書172時点）は独立cronエントリ（毎日7:15 SGT）だったが、その後`run-fetch-all.sh`に統合されイベントと同じLINE通知にまとめられている
 - **API**: `GET /api/life-info?city=sg&category=...`（`server.js`、`GET /api/events`の直後）
 - **フロントエンド**: ボトムナビ「くらし」画面（`#screen-news`）＋ホーム（「おでかけ」画面）のプレビューセクション（`#life-info-preview-section`、直近3件）。未ログインでも閲覧可能（探訪・予定表で使われていたアカウント連携ゲートは適用外）
