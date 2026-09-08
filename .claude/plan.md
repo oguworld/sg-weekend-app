@@ -18372,3 +18372,57 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 - SG祝日バッジ・主要行事バッジは引き続き赤/金で表示されること(柳グリーンに巻き込まれない)
 - 設定画面の「ダークモード」トグルUI(自動/オン/オフ)自体の挙動は変更前と同じであること
 - キャッシュバスティング(index.htmlの`?v=`、sw.jsの`CACHE_NAME`)が確実に更新されており、実際にブラウザで新しい配色が反映されることをcurl+目視で確認すること
+
+
+## 設計書187: 開発者向けLINE通知を「1日3回・その回だけの件数」方式に戻す(おでかけ・くらし両方対象)
+
+### 背景・経緯
+2026-09-07の修正で、開発者向けLINE通知(`notify-fetch-summary.js`)は「1日3回取得だが通知は1日1回(6:30)、過去24時間分を履歴ファイルから合算表示」という方式になっていた(直近1回分だけだと`run-fetch-extra.sh`の12:30/19:30の採用件数がLINE通知上「消えて見える」不具合があったため)。くらし情報側も設計書183で同型対応した。
+
+今回、ユーザーから「1日3回、その都度その回だけの件数を通知してほしい」という方針変更の依頼があり、1日3通に増えることは意図的に許容済み。
+
+### 事前調査で判明した事実(planner調査済み)
+- `run-fetch-all.sh`(6:30 SGT): `fetch-events.js`→`check-content-integrity.js`→`fetch-life-info.js --no-notify`→`notify-fetch-summary.js`(LINE通知あり)
+- `run-fetch-extra.sh`(12:30/19:30 SGT): `fetch-events.js`→`check-content-integrity.js`→`fetch-life-info.js`(19:30のみ`--no-notify`なし=ユーザー向けプッシュ通知)。**`notify-fetch-summary.js`は呼ばれていない**
+- `fetch-events.js`の`saveFetchSummary()`は毎回、最新1回分の上書きファイル`logs/fetch-summary-${cityKey}.json`と、履歴ファイル`logs/fetch-summary-history-${cityKey}.jsonl`の両方を更新している(後者は48h超過分を間引きながら追記)
+- `fetch-life-info.js`の`saveFetchSummary()`も同様に、毎回`logs/fetch-life-info-summary.json`(最新1回分。コード内コメントには「後方互換で残置・現在未使用」とあるが、実際には毎回書き込まれ続けている)と履歴ファイルの両方を更新している
+- つまり**最新1回分の上書きファイルは既に両方存在し正しく更新され続けている**ため、`notify-fetch-summary.js`側を「24時間合算関数」から「単純にこの上書きファイルを読むだけの関数」に切り替えるだけで実現できる
+
+### 対応方針(ユーザー承認済み)
+1. **`run-fetch-extra.sh`の変更**: 12:30・19:30両方の実行末尾(`fetch-life-info.js`呼び出しの後)に`notify-fetch-summary.js`の呼び出しを追加する
+2. **`notify-fetch-summary.js`の変更**:
+   - イベント側: `loadLast24hSummary(cityKey)`の代わりに、`logs/fetch-summary-${cityKey}.json`(最新1回分)をそのまま読むだけの新関数(例: `loadLatestSummary(cityKey)`)を新設し、`main()`内の呼び出しを差し替える
+   - くらし側: `loadLifeInfoLast24hSummary(cityKey)`の代わりに、`logs/fetch-life-info-summary.json`(最新1回分)をそのまま読むだけの新関数(例: `loadLifeInfoLatestSummary(cityKey)`)を新設し、`main()`内の呼び出しを差し替える。このファイルのコード内コメント「後方互換で残置・現在未使用」は「現役で使用」に修正すること
+   - 見出し文言「過去24時間」を「今回の取り込み結果」等、1回分であることが分かる表現に変更する
+3. **既存の24時間合算関数・履歴ファイルへの追記ロジックは削除しない**: `loadLast24hSummary()`・`loadLifeInfoLast24hSummary()`関数自体、`logs/fetch-summary-history-${cityKey}.jsonl`・`logs/fetch-life-info-summary-history-sg.jsonl`への追記ロジック(48時間間引き含む)は今回一切変更せず残置する(将来の分析・復元用途のため、データ収集自体は継続)
+4. **`fetch-life-info.js`の`--no-notify`フラグ(ユーザー向けプッシュ通知を19:30のみに限定する仕組み)は一切変更しない**(開発者向けLINE通知とは完全に独立した仕組みのため)
+
+### 許容されたトレードオフ(ユーザー確認済み)
+取得処理自体が失敗した回は、直前の古いサマリーファイルの内容がそのまま再通知される可能性がある(24時間合算方式ではこの問題は目立たなかった)。今回はシンプルさを優先し、このリスクは許容する。追加のエラーハンドリング実装は不要。
+
+### スコープ外(今回やらないこと)
+- `loadLast24hSummary()`/`loadLifeInfoLast24hSummary()`関数の削除
+- 履歴ファイル(`*-history-*.jsonl`)への追記ロジックの削除・変更
+- `fetch-life-info.js`の`--no-notify`(ユーザー向けプッシュ通知)ロジックの変更
+- 取得失敗時の古いサマリー再通知に対する追加エラーハンドリング
+- BKK/SYD都市への対応
+
+### 変更ファイル一覧
+- `scripts/run-fetch-extra.sh`: 12:30・19:30両方の末尾に`notify-fetch-summary.js`呼び出しを追加
+- `scripts/notify-fetch-summary.js`: `loadLatestSummary(cityKey)`・`loadLifeInfoLatestSummary(cityKey)`(新規)を追加し、`main()`内の呼び出しを差し替え。見出し文言修正
+- `scripts/fetch-life-info.js`: `saveFetchSummary()`周辺のコメント「後方互換で残置・現在未使用」を「現役で使用」に修正するのみ(ロジック自体は無変更)
+- `CLAUDE.md`: 「イベント取り込みパイプライン構成」節・「生活情報・ニュースのキュレーション機能」節を、1日3回・都度通知の実態に合わせて更新
+
+### 受け入れ基準
+- `run-fetch-all.sh`(6:30想定)実行後、その回のみの件数でLINE通知が届くこと
+- `run-fetch-extra.sh`の12:30実行後、その回のみの件数でLINE通知が届くこと(現状は通知なし→今回追加)
+- `run-fetch-extra.sh`の19:30実行後、その回のみの件数でLINE通知が届くこと(現状は通知なし→今回追加、かつユーザー向けプッシュ通知も従来通り送信されること)
+- 新着0件の回は「新着なし」等その回の実態を反映した通知になること
+- `logs/fetch-summary-sg.json`・`logs/fetch-life-info-summary.json`が存在しない場合でもエラーで落ちず、従来通り「データなし」表示にフォールバックすること
+- `node --check scripts/notify-fetch-summary.js`で構文エラーがないこと、`bash -n`で両shスクリプトの構文エラーがないこと
+
+### データモデル・APIの変更
+なし。`data/`配下・`/api/*`は無関係。読み込み対象ファイルを切り替えるのみ。
+
+### 後方互換性・影響範囲
+サーバー内部のcronスクリプト・開発者向け通知ロジックのみが対象。Web版・iOS App Store版のデータ・APIには一切影響しない。アプリの再ビルド・App Store提出は不要、次回cron実行から即座に反映される。

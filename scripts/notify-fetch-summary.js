@@ -15,7 +15,7 @@ const LOGS_DIR = path.join(__dirname, '../logs');
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
 const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
 const DISCOVER_RESULT_PATH = path.join(LOGS_DIR, 'discover-sources-result.json');
-const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json'); // 後方互換で残置（最新1回分のみ、現在は未使用）
+const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json'); // 最新1回分（設計書187で現役使用に復帰）
 const LIFE_INFO_HISTORY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary-history-sg.jsonl');
 // ラベル・順番は public/index.html のカテゴリチップ（#screen-news / #screen-home）と一致させること
 const LIFE_INFO_CAT_LABELS = { admin: 'SG政府', transport: '都市開発・交通', health: '医療・健康', weather: '天候・災害', community: 'コミュニティ', education: '教育・子育て' };
@@ -31,8 +31,23 @@ function formatCatCounts(catCounts, labels) {
   return parts.length > 0 ? parts.join(' / ') : null;
 }
 
-// fetch-events.jsは1日に複数回（run-fetch-extra.sh分も含む）実行されるが、
-// 通知は1日1回のみ。履歴ファイル（JSONL）から過去24時間分の全実行結果を合算する（2026-09-07）
+// fetch-events.jsは1日3回（run-fetch-all.sh 6:30 + run-fetch-extra.sh 12:30/19:30）実行され、
+// 設計書187により通知も1日3回・その都度その回だけの件数を通知する方式に戻した。
+// 最新1回分の上書きファイル（fetch-events.js の saveFetchSummary() が毎回更新）をそのまま読む。
+function loadLatestSummary(cityKey) {
+  const summaryPath = path.join(LOGS_DIR, `fetch-summary-${cityKey}.json`);
+  if (!fs.existsSync(summaryPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+  } catch (e) {
+    console.warn(`イベントサマリー(${cityKey})の読み込みに失敗:`, e.message);
+    return null;
+  }
+}
+
+// 2026-09-07に「通知は1日1回、過去24時間分を履歴ファイルから合算」する方式へ変更したが、
+// 設計書187でユーザー要望により「1日3回、その都度その回だけの件数」方式に戻した。
+// この合算関数自体は将来の分析・復元用途のため削除せず残置する（現在はmain()から未呼び出し）。
 function loadLast24hSummary(cityKey) {
   const historyPath = path.join(LOGS_DIR, `fetch-summary-history-${cityKey}.jsonl`);
   if (!fs.existsSync(historyPath)) return null;
@@ -52,10 +67,23 @@ function loadLast24hSummary(cityKey) {
   return merged;
 }
 
-// fetch-life-info.jsも1日3回（6:30/12:30/19:30 SGT）実行されるようになった（設計書183）ため、
-// イベント側のloadLast24hSummary()と同じ方式で履歴ファイル（JSONL）から過去24時間分を合算する。
+// fetch-life-info.jsが毎回更新する最新1回分の上書きファイルをそのまま読む（設計書187）。
 // ユーザー向けプッシュ通知は19:30の回にのみ送られるが（fetch-life-info.js側の--no-notify制御）、
-// この開発者向けLINE通知の集計は3回分すべてを対象にする。
+// この開発者向けLINE通知はこの制御とは独立しており、6:30/12:30/19:30の3回とも通知する。
+function loadLifeInfoLatestSummary(cityKey) {
+  if (cityKey !== 'sg') return null; // 現状SGのみ運用（BKK/SYDは対応外）
+  if (!fs.existsSync(LIFE_INFO_SUMMARY_PATH)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(LIFE_INFO_SUMMARY_PATH, 'utf8'));
+  } catch (e) {
+    console.warn('生活情報サマリーの読み込みに失敗:', e.message);
+    return null;
+  }
+}
+
+// 2026-09-07に「通知は1日1回、過去24時間分を履歴ファイルから合算」する方式へ変更したが（設計書183）、
+// 設計書187でユーザー要望により「1日3回、その都度その回だけの件数」方式に戻した。
+// この合算関数自体は将来の分析・復元用途のため削除せず残置する（現在はmain()から未呼び出し）。
 function loadLifeInfoLast24hSummary(cityKey) {
   if (cityKey !== 'sg') return null; // 現状SGのみ運用（BKK/SYDは対応外、設計書183スコープ外）
   if (!fs.existsSync(LIFE_INFO_HISTORY_PATH)) return null;
@@ -101,12 +129,12 @@ async function main() {
 
   let totalAccepted = 0;
 
-  lines.push('━━ 🏖️ おでかけ情報（過去24時間）━━');
+  lines.push('━━ 🏖️ おでかけ情報（今回の取り込み結果）━━');
   for (const cityKey of CITIES) {
-    const s = loadLast24hSummary(cityKey);
+    const s = loadLatestSummary(cityKey);
 
     if (!s) {
-      lines.push(`— ${cityKey.toUpperCase()}: 過去24時間データなし`);
+      lines.push(`— ${cityKey.toUpperCase()}: データなし`);
       continue;
     }
 
@@ -124,13 +152,12 @@ async function main() {
 
   lines.push(`合計 ${totalAccepted}件採用`);
 
-  // くらし情報セクションを追記（過去24時間分の履歴合算、設計書183。fetch-life-info.jsも
-  // 1日3回実行されるようになったため、イベント側と同じ24時間合算方式に統一した）
+  // くらし情報セクションを追記（今回1回分のみ、設計書187）
   try {
-    const li = loadLifeInfoLast24hSummary('sg');
+    const li = loadLifeInfoLatestSummary('sg');
     if (li) {
       lines.push('');
-      lines.push('━━ 🏛️ くらし情報（過去24時間）━━');
+      lines.push('━━ 🏛️ くらし情報（今回の取り込み結果）━━');
       lines.push(`📰 ${li.accepted}件採用 / ${li.rawTotal}件取得`);
       const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
       if (catLine) {

@@ -19,9 +19,10 @@ const path      = require('path');
 const parser = new Parser({ timeout: 10000 });
 const client = new Anthropic();
 
-// ─── 取得結果をファイルに保存（notify-fetch-summary.jsがイベント通知と合算して通知する） ───
-// 1日3回実行されるようになった（設計書183）ため、最新1回分の上書き（後方互換で残置）に加え、
-// fetch-events.js と同じパターンで履歴ファイル（JSONL）にも追記し、過去24時間分を合算できるようにする。
+// ─── 取得結果をファイルに保存（notify-fetch-summary.jsが読み込んでLINE通知する） ───
+// 1日3回実行される（設計書183）。最新1回分の上書きファイルは設計書187で現役で使用（毎回その回
+// だけの件数を通知する方式）。履歴ファイル（JSONL）への追記は将来の分析・復元用途のため引き続き
+// 行う（fetch-events.js と同じパターン、48時間分を保持）。
 function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems }) {
   const summaryPath = path.join(__dirname, '..', 'logs', 'fetch-life-info-summary.json');
   const historyPath = path.join(__dirname, '..', 'logs', 'fetch-life-info-summary-history-sg.jsonl');
