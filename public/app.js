@@ -422,6 +422,7 @@
         toastClearedPins: 'ピン留めをすべて削除しました',
         toastUrlCopied: '🔗 URLをコピーしました！',
         loadingEvents: 'おでかけ情報を読み込み中...',
+        loadingLifeInfo: 'くらし情報を読み込み中...',
         labelPush: '更新の通知',
         pushOn: 'ON',
         pushOff: 'OFF',
@@ -614,6 +615,7 @@
         toastClearedPins: 'All pins cleared',
         toastUrlCopied: '🔗 URL copied!',
         loadingEvents: 'Loading events...',
+        loadingLifeInfo: 'Loading life info...',
         labelPush: 'Update Notifications',
         pushOn: 'ON',
         pushOff: 'OFF',
@@ -1416,7 +1418,7 @@
       const list = document.getElementById('news-list');
       if (list) list.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--warm-gray);">
         <div style="font-size:24px;margin-bottom:8px;">⏳</div>
-        <div style="font-size:14px;">${t('loadingEvents')}</div>
+        <div style="font-size:14px;">${t('loadingLifeInfo')}</div>
       </div>`;
       try {
         const res = await fetch(API_BASE + `/api/life-info?city=${getCity()}`);

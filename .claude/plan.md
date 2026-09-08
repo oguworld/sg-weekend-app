@@ -18091,3 +18091,33 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 - `ios-app/resources/icon.png`
 - `ios-app/resources/splash.png`
 - `ios-app/resources/splash-dark.png`
+
+---
+
+## 設計書181: くらし画面Pull-to-Refreshのローディング文言誤用を修正
+
+### 背景・問題
+アプリ版でくらし画面(`#screen-news`)を下にプルして更新(Pull-to-Refresh)すると、データ再取得中に「おでかけ情報を読み込み中...」という誤った文言が一瞬表示される。
+
+原因は`public/app.js`の`loadLifeInfoNewsScreen()`(1415行目〜、くらし画面のデータ取得関数)内、1419行目で、おでかけ画面専用に用意されたi18nキー`loadingEvents`(424/616行目、ja:「おでかけ情報を読み込み中...」/ en:「Loading events...」)を誤って流用していること。
+
+このキーはコード全体で2箇所のみ使用されており、`loadEventData()`(978行目〜、おでかけ画面のデータ取得関数)内988行目の使用は文言として正しいが、`loadLifeInfoNewsScreen()`内1419行目の使用が誤り。他画面(`homeScreenTitle`/`emptyDesc`等)に同様の誤用は確認されていない(くらし画面には既に`newsEmptyDesc`という専用キーがある)。
+
+### 対応内容
+1. `STRINGS.ja`(424行目付近)に新規キーを追加: `loadingLifeInfo: 'くらし情報を読み込み中...'`
+2. `STRINGS.en`(616行目付近)に新規キーを追加: `loadingLifeInfo: 'Loading life info...'`
+3. `loadLifeInfoNewsScreen()`内、1419行目の`${t('loadingEvents')}`を`${t('loadingLifeInfo')}`に差し替える
+4. `loadEventData()`内、988行目の`${t('loadingEvents')}`は変更しない(おでかけ画面として正しい文言のため現状維持)
+
+### 変更ファイル
+- `public/app.js`のみ(3箇所の差分: `STRINGS.ja`に1行追加、`STRINGS.en`に1行追加、1419行目の1箇所差し替え)
+- `server.js`・データファイル・APIレスポンス構造の変更は一切なし
+
+### 受け入れ基準
+- くらし画面をPull-to-Refresh(または初回読み込み)した際、ローディングプレースホルダーに「くらし情報を読み込み中...」(en環境では"Loading life info...")が表示される
+- おでかけ画面側は従来通り「おでかけ情報を読み込み中...」のまま(デグレなし)
+- 英語モードに切り替えて目視確認し、キー名がそのまま表示されていないこと(CLAUDE.mdのi18n必須ルール)
+
+### スコープ外
+- Pull-to-Refresh機構自体(`_initPtr`)の改修
+- 他画面のローディング文言の新規追加
