@@ -31,7 +31,7 @@ function formatCatCounts(catCounts, labels) {
   return parts.length > 0 ? parts.join(' / ') : null;
 }
 
-// fetch-events.jsは1日3回（run-fetch-all.sh 6:30 + run-fetch-extra.sh 12:30/19:30）実行され、
+// fetch-events.jsは1日3回（run-fetch-all.sh 7:00 + run-fetch-extra.sh 12:30/19:30）実行され、
 // 設計書187により通知も1日3回・その都度その回だけの件数を通知する方式に戻した。
 // 最新1回分の上書きファイル（fetch-events.js の saveFetchSummary() が毎回更新）をそのまま読む。
 function loadLatestSummary(cityKey) {
@@ -69,7 +69,7 @@ function loadLast24hSummary(cityKey) {
 
 // fetch-life-info.jsが毎回更新する最新1回分の上書きファイルをそのまま読む（設計書187）。
 // ユーザー向けプッシュ通知は19:30の回にのみ送られるが（fetch-life-info.js側の--no-notify制御）、
-// この開発者向けLINE通知はこの制御とは独立しており、6:30/12:30/19:30の3回とも通知する。
+// この開発者向けLINE通知はこの制御とは独立しており、7:00/12:30/19:30の3回とも通知する。
 function loadLifeInfoLatestSummary(cityKey) {
   if (cityKey !== 'sg') return null; // 現状SGのみ運用（BKK/SYDは対応外）
   if (!fs.existsSync(LIFE_INFO_SUMMARY_PATH)) return null;

@@ -7,8 +7,8 @@
 // Anthropic SDK呼び出し・エラーハンドリング）を踏襲する。
 // 使い方: node fetch-life-info.js [--city=sg] [--dry-run] [--no-notify]
 // --no-notify: ユーザー向けプッシュ通知（notifyContentUpdated()）をスキップする。
-// 1日3回（6:30/12:30/19:30 SGT）実行されるようになった（設計書183）ため、通知は
-// 19:30 SGTの回にのみ送るよう run-fetch-all.sh / run-fetch-extra.sh 側で使い分ける。
+// 1日3回（7:00/12:30/19:30 SGT）実行されるようになった（設計書183、2026-09-09に朝の時刻を
+// 6:30→7:00 SGTへ再調整）ため、通知は朝の回にのみ送るよう run-fetch-all.sh / run-fetch-extra.sh 側で使い分ける。
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const Parser    = require('rss-parser');
@@ -55,10 +55,10 @@ function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems 
   }
 }
 
-// ─── 1日1回、19:30 SGTの取り込み完了後にアプリへプッシュ通知を送る（設計書173→183） ───
-// fetch-life-info.js自体は1日3回（6:30/12:30/19:30 SGT）実行されるようになったが（設計書183）、
-// ユーザー向けプッシュ通知は19:30 SGTの回にのみ送る（呼び出し側が--no-notifyを付与して制御する。
-// run-fetch-all.sh〈6:30〉・run-fetch-extra.sh の12:30側は--no-notify付き、19:30側のみ付けない）。
+// ─── 1日1回、朝の取り込み完了後にアプリへプッシュ通知を送る（設計書173→183→2026-09-09で朝の時刻に再調整） ───
+// fetch-life-info.js自体は1日3回（7:00/12:30/19:30 SGT）実行されるようになったが（設計書183）、
+// ユーザー向けプッシュ通知は7:00 SGTの回にのみ送る（呼び出し側が--no-notifyを付与して制御する。
+// run-fetch-all.sh〈7:00〉・run-fetch-extra.sh の12:30/19:30側は両方とも--no-notify付き）。
 // これは開発者向けLINE通知（notify-fetch-summary.js）とは別の、エンドユーザー向け実プッシュ通知
 // （server.jsのPOST /api/notify-events-updated → sendPushToAll()経由）である。
 // 通知はオプトイン済みユーザーのみに届く（data/push-subscriptions.jsonに登録済み＝設定で

@@ -19,8 +19,9 @@ $NODE $SCRIPTS/check-content-integrity.js --city=sg || echo "[WARN] コンテン
 
 # 生活情報・ニュースのキュレーション取得（設計書172。イベント通知とまとめて1通のLINE通知にするため
 # notify-fetch-summary.js より前に実行する。旧・独立cronエントリは廃止）
-# ユーザー向けプッシュ通知（notifyContentUpdated()）は6:30 SGTのこの回にのみ送る（2026-09-09、ユーザー要望により
-# 19:30 SGTから朝の6:30 SGTに戻した。理由: 朝が最も通知を見る・通勤中にアプリを開くのがルーティーンのため）。
+# ユーザー向けプッシュ通知（notifyContentUpdated()）は7:00 SGTのこの回にのみ送る（2026-09-09、ユーザー要望により
+# 19:30 SGTから朝の6:30 SGTに戻した。理由: 朝が最も通知を見る・通勤中にアプリを開くのがルーティーンのため。
+# 同日中に「6:30は少し早い」とのユーザー要望を受け7:00 SGTに調整）。
 # 12:30/19:30 SGT（run-fetch-extra.sh）側は`--no-notify`を付けて通知を抑制する
 # （開発者向けLINE通知=notify-fetch-summary.jsは従来通り毎回実行、影響を受けない）
 $NODE $SCRIPTS/fetch-life-info.js --city=sg || echo "[WARN] life-info fetch failed"
