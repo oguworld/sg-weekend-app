@@ -909,7 +909,7 @@
       padding: 52px 24px;
     }
     .empty-state.visible { display: block; }
-    .empty-emoji { font-size: 52px; margin-bottom: 14px; }
+    .empty-emoji { font-size: 36px; margin-bottom: 14px; }
     .empty-title {
       font-family: var(--font-heading);
       font-size: 20px;
