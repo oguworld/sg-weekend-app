@@ -18212,3 +18212,56 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 ### 後方互換性・影響範囲
 - `data/sg/life-info.json`・`/api/*`のスキーマ変更なし。Web版・iOS App Store版どちらも影響なし
 - サーバー側(cron・スクリプト)のみの変更のため、TestFlightビルド・App Store審査は不要。次回cron実行から自動的に反映される
+
+## 設計書184: 配色機能(キャラメル/柳グリーン/ダーク)を廃止し、旧ダークモード設定(自動/ライト/ダーク)に戻す
+
+### 背景・課題
+2026-09-05に実装した「配色機能」(設定画面「配色」1項目、キャラメル/柳グリーン/ダークの3状態循環切替)をユーザーの意向により廃止し、それ以前にあった「ダークモード」設定(自動(端末追従)/ライト/ダークの3択)に戻す。
+
+### 事前調査で判明した事実(planner調査済み、裏付け済み)
+- 現状の状態管理は`localStorage`の`sg_palette`キー。実際の既定値は`willow`(柳グリーン)であり、CLAUDE.mdの「既定値はキャラメル」という記述は実態と異なっていた(要CLAUDE.md訂正)
+- 関連コード:
+  - `public/app.js`: `getPalette()`/`applyPalette()`/`togglePalette()`/`updatePaletteUI()`(730〜764行目付近)、およびカテゴリ色定義(`EVENT_CATEGORY_COLORS`/`LIFE_INFO_CATEGORY_COLORS`/`CALENDAR_CATEGORY_COLORS`、1128-1145/1226-1240/3916-3924行目付近)、i18nの`labelPalette`キー
+  - `public/index.html`: `<head>`内の初期化スクリプト(33-38行目、ちらつき防止のため`sg_palette`を先読みして`data-palette`/`data-theme`属性を設定)、設定画面の配色ボタンUI(421-427行目)
+  - `public/app.css`: `html[data-palette="willow"]`ブロック(41-115行目)、`html[data-theme="dark"]`ブロック(既存の汎用ダーク配色、こちらは流用する)、`html[data-palette="willow"][data-theme="dark"]`ブロック(2014-2059行目付近)
+- **重要**: 現行UIでは「ダーク」は実質「柳グリーン+ダーク」の組み合わせでしか到達できない(`html[data-theme="dark"]`単独=キャラメルベースのダークは現在のUIから到達不能な未検証パス)。今回`data-palette="willow"`を廃止した後、`html[data-theme="dark"]`単独のスタイルが実際に正しく見える状態になっているか、実装後に目視確認が必要
+- `--holiday-red`/`--festival-gold`(SG祝日・主要行事バッジの固定色)は`:root`直下で定義されており、`willow`ブロックとは独立しているため、柳グリーン削除の影響を受けない(このロジック自体は変更不要)
+
+### 対応方針(ユーザー承認済み)
+
+1. **状態管理を`sg_theme`キー(値: `auto`/`light`/`dark`)に置き換える**。旧`sg_palette`キーは廃止する
+2. **「自動」の実装**: `window.matchMedia('(prefers-color-scheme: dark)')`でシステムのダークモード設定を検知し、`data-theme="dark"`属性の有無を切り替える。システム設定の変更にリアルタイムで追従できるよう、`matchMedia(...).addEventListener('change', ...)`でリスナーを登録する(現在「自動」選択時のみ有効化し、「ライト」「ダーク」手動選択時はリスナー不要)。iOS Capacitor(WKWebView)環境でこのメディアクエリが正しく機能するかは実機未検証のため、実装後に「実機での動作確認が必要」という注記をユーザーへの報告に含めること
+3. **「ライト」「ダーク」は手動固定**。`data-palette`属性自体は今後使用しないため付与しない。`data-theme="dark"`属性の有無だけで制御する(既存の`html[data-theme="dark"]`セレクタ群をそのまま流用)
+4. **柳グリーン(`data-palette="willow"`)関連の完全削除**:
+   - `public/app.css`の`html[data-palette="willow"]`ブロック、`html[data-palette="willow"][data-theme="dark"]`ブロックを削除
+   - `public/app.js`の`getPalette()`/`applyPalette()`/`togglePalette()`/`updatePaletteUI()`を、新しい`sg_theme`用の関数(例: `getTheme()`/`applyTheme()`/`cycleTheme()`/`updateThemeUI()`のような名前)に置き換える
+   - カテゴリ色定義(`EVENT_CATEGORY_COLORS`等)・見出しフォント(`--font-heading`)・フィルターチップのピル塗り・ボトムナビの選択中ピルハイライトなど、柳グリーン限定の分岐ロジック(CSS上の`[data-palette="willow"]`セレクタ、JS上のwillow判定)を削除し、既定(キャラメル)の見た目に一本化する
+   - `STRINGS.ja`/`STRINGS.en`の`labelPalette`キーを削除し、`labelDarkMode`(ダークモード/Dark Mode)のようなキーを復活させる
+5. **設定画面UI**: 「配色」の1ボタン循環切替UIを、旧来の「ダークモード」設定行(自動/ライト/ダークの3択、タップで切替 or セレクタ形式。既存のUIパターンに合わせて実装すること)に置き換える
+6. **既存ユーザーのマイグレーション(ユーザー最終決定)**:
+   - 既存の`sg_palette`の値が`'default'`または`'willow'`だったユーザー → `sg_theme = 'light'`に移行
+   - 既存の`sg_palette`の値が`'dark'`だったユーザー → `sg_theme = 'dark'`に移行
+   - `sg_palette`キー自体が存在しない新規ユーザー → `sg_theme = 'light'`をデフォルトにする(自動ではなくライトがデフォルト)
+   - マイグレーション処理は初回起動時に`sg_palette`の値を読んで`sg_theme`に変換し、その後`sg_palette`キーは削除(またはそのまま放置してもよいが、今後参照されないことを確認)
+
+### スコープ外(今回やらないこと)
+- ダークモード自体のビジュアルデザイン変更(既存の`html[data-theme="dark"]`の配色定義はそのまま流用、見た目の作り込みはしない)
+- BKK/SYD都市への影響(この機能は都市非依存のUI設定のため対象外という理解でよいか、念のため確認すること)
+
+### 変更ファイル一覧
+- `public/app.js`(状態管理関数の置き換え、マイグレーション処理追加、i18nキー変更、柳グリーン分岐の削除)
+- `public/index.html`(head内初期化スクリプト、設定画面UI)
+- `public/app.css`(willowブロック削除)
+- `CLAUDE.md`(「配色機能」節を「ダークモード機能」節に書き換え、実態と異なっていた既定値の記述も訂正)
+
+### 受け入れ基準
+- 設定画面に「ダークモード」設定(自動/ライト/ダーク)が表示され、タップで循環または選択切替できる
+- 「自動」選択時、端末のシステム設定(ライト/ダーク)に連動して見た目が切り替わる(可能であればシステム設定変更時にアプリ再起動なしで追従することも確認)
+- 「ライト」「ダーク」選択時は、システム設定に関わらず固定される
+- 柳グリーンの見た目(緑基調の配色、ボトムナビのピルハイライト等)が一切表示されなくなり、キャラメル基調の既定デザイン+汎用ダーク配色のみになる
+- 英語モードに切り替えて`labelDarkMode`相当のラベルが正しく表示されること(i18n必須ルール)
+- 既存ユーザー(過去に`sg_palette`を保存済み)が次回起動時、上記マイグレーション方針通りに`sg_theme`へ移行されること
+- `node --check`相当は無し(フロントJSのため)、構文エラーがないことをブラウザ/curlでの動作確認で担保すること
+
+### 後方互換性・影響範囲
+- `public/`配下のみの変更(データ・API無関係)。Web版は即時反映、iOS版は次回release/TestFlightビルドまで旧UIのまま(今回のスコープではpush・リリースは行わない)

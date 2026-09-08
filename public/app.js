@@ -468,7 +468,7 @@
         prBadgeLabel: 'PR',
         titleEditCancel: 'キャンセル',
         labelNickname: 'ニックネーム',
-        labelPalette: '配色',
+        labelDarkMode: 'ダークモード',
         statTemp: '気温',
         statRain: '降水確率',
         statNowcast: '2時間予報',
@@ -661,7 +661,7 @@
         prBadgeLabel: 'PR',
         titleEditCancel: 'Cancel',
         labelNickname: 'Nickname',
-        labelPalette: 'Color Theme',
+        labelDarkMode: 'Dark Mode',
         statTemp: 'Temp',
         statRain: 'Rain chance',
         statNowcast: '2-Hour Forecast',
@@ -730,38 +730,51 @@
     function getLang() { return localStorage.getItem('sg_lang') || 'ja'; }
     function t(key) { const s = STRINGS[getLang()]; return (s && s[key] !== undefined) ? s[key] : (STRINGS.ja[key] || key); }
 
-    // ─── DARK MODE ───
-    // ─── 配色（キャラメル / 柳グリーン / ダーク）※ダークモードは配色設定に統合済み ───
-    function getPalette() { return localStorage.getItem('sg_palette') || 'willow'; }
-    function applyPalette() {
-      const palette = getPalette();
+    // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
+    // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
+    (function migratePaletteToTheme() {
+      if (localStorage.getItem('sg_theme') !== null) return; // 既にsg_theme設定済みなら何もしない
+      const oldPalette = localStorage.getItem('sg_palette');
+      if (oldPalette === 'dark') {
+        localStorage.setItem('sg_theme', 'dark');
+      } else {
+        // 'default' / 'willow' / 未設定(新規ユーザー) いずれも 'light' に移行
+        localStorage.setItem('sg_theme', 'light');
+      }
+      localStorage.removeItem('sg_palette');
+    })();
+    function getTheme() { return localStorage.getItem('sg_theme') || 'light'; }
+    function applyTheme() {
+      const mode = getTheme();
       const html = document.documentElement;
-      if (palette === 'dark') {
-        html.setAttribute('data-palette', 'willow');
+      if (mode === 'dark') {
         html.setAttribute('data-theme', 'dark');
-      } else if (palette === 'willow') {
-        html.setAttribute('data-palette', 'willow');
+      } else if (mode === 'light') {
         html.removeAttribute('data-theme');
       } else {
-        html.removeAttribute('data-palette');
-        html.removeAttribute('data-theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) html.setAttribute('data-theme', 'dark');
+        else html.removeAttribute('data-theme');
       }
-      updatePaletteUI();
+      updateThemeUI();
     }
-    function updatePaletteUI() {
-      const el = document.getElementById('palette-label');
+    function updateThemeUI() {
+      const el = document.getElementById('dark-mode-label');
       if (!el) return;
-      const palette = getPalette();
+      const mode = getTheme();
       const isJa = getLang() === 'ja';
-      const labels = isJa ? { default: 'キャラメル', willow: '柳グリーン', dark: 'ダーク' } : { default: 'Caramel', willow: 'Willow Green', dark: 'Dark' };
-      el.textContent = labels[palette] || labels.willow;
+      const labels = isJa ? { auto: '自動', light: 'ライト', dark: 'ダーク' } : { auto: 'Auto', light: 'Light', dark: 'Dark' };
+      el.textContent = labels[mode] || labels.light;
     }
-    function togglePalette() {
-      const cycle = { default: 'willow', willow: 'dark', dark: 'default' };
-      const next = cycle[getPalette()] || 'willow';
-      localStorage.setItem('sg_palette', next);
-      applyPalette();
+    function cycleTheme() {
+      const cycle = { auto: 'light', light: 'dark', dark: 'auto' };
+      const next = cycle[getTheme()] || 'auto';
+      localStorage.setItem('sg_theme', next);
+      applyTheme();
     }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+      if (getTheme() === 'auto') applyTheme();
+    });
 
     // ─── CITY ───
     const CITY_META = {
@@ -929,7 +942,7 @@
       buildCitySelect();
       updateTabLabels();
       _syncRecommendChip();
-      updatePaletteUI();
+      updateThemeUI();
       if (typeof initSettingsProfile === 'function') initSettingsProfile();
       if (typeof initSettingsGenres === 'function') initSettingsGenres();
     }
@@ -938,7 +951,7 @@
       localStorage.setItem('sg_lang', lang);
       applyI18n();
       updateCityUI();
-      updatePaletteUI();
+      updateThemeUI();
       renderEventCards();
       showToast(lang === 'en' ? '🇬🇧 Switched to English' : '🇯🇵 日本語に切り替えました');
     }
@@ -3396,7 +3409,7 @@
     applyProfileSort();
     applyI18n();
     updateCityUI();
-    applyPalette();
+    applyTheme();
     loadWidgetStats();
     updatePinFabVisibility('news'); // 起動時のデフォルト画面(くらし)に合わせて初期表示を判定
 
