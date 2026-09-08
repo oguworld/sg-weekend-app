@@ -18159,3 +18159,56 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 ### 後方互換性・影響範囲
 - `data/sg/life-info.json`のスキーマ変更なし(`category`の値の集合は6種のまま、`community`が使われるだけ)。Web版・iOS App Store版どちらも影響なし
 - サーバー側(`scripts/fetch-life-info.js`、cron実行のみ)の変更のため、フロントエンドのリリース・TestFlightビルドは不要。次回cron実行(毎日6:30 SGT、`run-fetch-all.sh`経由)から自動的に反映される
+
+---
+
+## 設計書183: くらし情報の取り込みも1日3回化する(fetch-life-info.jsのrun-fetch-extra.sh組み込み、ユーザー向け通知は夜1回に集約)
+
+### 背景・課題
+現状「おでかけ」(`fetch-events.js`)は1日3回(6:30/12:30/19:30 SGT)実行されるが、「くらし」(`fetch-life-info.js`)は1日1回(6:30 SGT、`run-fetch-all.sh`経由)のみ。実測の結果、CNA(概算69件/日)・CNA Sport(概算28件/日)・Mothership(概算12件/日、フィード保持件数10件)は1日1回では取りこぼしリスクが高いことが判明した。Straits Times(51件保持、概算39件/日)は余裕があるが念のため含める。JCCIは低頻度のため現状維持で十分だが、技術的に`CITY_CONFIG.sg.feeds`は一括処理のためフィード単位の頻度分けはせず全5フィードを一律1日3回にする。
+
+### コスト増についての確認済み事項
+`fetch-life-info.js`はハイウォーターマーク方式(前回チェック時点からの新着記事のみ処理)のため、1日3回に分けても「同じ記事を3回処理する」わけではなく「1日分の新着を3回に分けて処理する」だけ。Haiku(BATCH_SIZE=10)・Sonnet(ENRICH_BATCH_SIZE=8)のバッチ処理単位から考えても、API呼び出し回数の増加は数%〜十数%程度に留まる見込みで、単純な3倍にはならないことをユーザーに説明し、この認識で了承済み。
+
+### 重要な発見: notifyContentUpdated()はユーザー向け実プッシュ通知
+`fetch-life-info.js`内の`notifyContentUpdated()`は、開発者向けLINE通知ではなく、`server.js`の`POST /api/notify-events-updated`→`sendPushToAll()`経由の**エンドユーザー向けWebプッシュ通知/APNs通知**である(唯一の呼び出し元)。CLAUDE.mdの「ユーザー向けWebプッシュ通知は完全停止済み」という記述は、これとは別の`notify-fetch-summary.js`(開発者向けLINE通知)の文脈であり、実態と乖離した誤解を招く記述だったため、本実装で合わせて訂正すること。
+
+### 対応方針(ユーザー承認済み)
+1. **`run-fetch-extra.sh`に`fetch-life-info.js --city=sg`の呼び出しを追加**する。フィード単位の頻度分けはせず、既存の`CITY_CONFIG.sg.feeds`全5本を一括で1日3回(6:30/12:30/19:30 SGT)実行する。ハイウォーターマーク方式により重複取得はされない
+2. **ユーザー向けプッシュ通知は1日1回、19:30 SGTの回にのみ送る(ユーザー最終決定)**。理由: 朝6:30は身支度等で忙しく通知が埋もれやすい一方、19:30はその日3回分の新着が出揃った後で内容が最も充実しており、かつユーザーがスマホを見る余裕がある時間帯のため。具体的には:
+   - `fetch-life-info.js`のCLI引数に`--no-notify`のようなフラグを追加し、`notifyContentUpdated()`の呼び出しを条件付きにする
+   - `run-fetch-all.sh`(6:30 SGT)経由の呼び出しには`--no-notify`を付与し、プッシュ通知を送らないようにする(従来は6:30に送っていたが、今回19:30に移すため無効化)
+   - `run-fetch-extra.sh`内、12:30 SGTの`fetch-life-info.js`呼び出しにも`--no-notify`を付与
+   - `run-fetch-extra.sh`内、19:30 SGTの`fetch-life-info.js`呼び出しには`--no-notify`を付与せず、従来通りプッシュ通知を送る(1日1回、19:30固定)
+   - `saveFetchSummary()`によるサマリー・履歴ファイルへの記録自体は3回とも毎回行う(開発者向けLINE通知の集計に必要なため)
+3. **開発者向けLINE通知の集計方式をイベント側と同じ「過去24時間分の履歴合算」方式に変更**:
+   - `fetch-life-info.js`の`saveFetchSummary()`を拡張し、`logs/fetch-life-info-summary-history-sg.jsonl`に各回の結果を1行追記する(48時間より古い行は書き込み時に間引き、イベント側`fetch-summary-history-${cityKey}.jsonl`と同じロジックを踏襲)。既存の`logs/fetch-life-info-summary.json`(最新1回分、上書き)は後方互換のため残置してよい
+   - `notify-fetch-summary.js`に`loadLifeInfoLast24hSummary(cityKey)`(関数名は`LifeInfo`を含めて既存の`loadLast24hSummary`と区別)を新規追加し、`fetch-life-info-summary-history-sg.jsonl`から過去24時間分の`accepted`/`rawTotal`/`catCounts`/`newItems`を合算する
+   - `main()`内のくらし情報セクション出力部分を、`li.date === today`の単純ファイル読み込みから`loadLifeInfoLast24hSummary('sg')`の結果を使う形に置き換える
+4. **CLAUDE.mdの訂正**: 「ユーザー向けWebプッシュ通知は完全停止済み」という記述(イベント側の文脈)が、くらし情報側の実態(プッシュ通知は現役で稼働、かつ今回19:30固定に変更)と混同されないよう、該当箇所に注記を追加するか、くらし情報セクション側に正確な現状(1日3回巡回・通知は19:30の1回のみ)を明記すること
+
+### スコープ外(今回やらないこと)
+- フィード単位での頻度分け制御(全5フィード一律1日3回)
+- BKK/SYD都市への同様の対応
+- リテンション期間(7日)の見直し
+- 意味的重複排除ロジックの変更
+- カテゴリ・UIの変更
+
+### 変更ファイル一覧
+- `scripts/run-fetch-extra.sh`: `fetch-life-info.js --city=sg --no-notify`(12:30側)の呼び出しを追加、19:30側は`--no-notify`なしで呼ぶ(19:30のextra実行タイミングで`fetch-life-info.js`を呼ぶ箇所を新設)
+- `scripts/run-fetch-all.sh`: 既存の`fetch-life-info.js --city=sg`呼び出しに`--no-notify`を追加(6:30の通知を止める)
+- `scripts/fetch-life-info.js`: CLI引数解析に`--no-notify`追加、`notifyContentUpdated()`呼び出し箇所を条件付きに変更、`saveFetchSummary()`を履歴ファイル追記方式に拡張
+- `scripts/notify-fetch-summary.js`: `loadLifeInfoLast24hSummary(cityKey)`新規追加、くらし情報セクション出力ロジックを24時間合算方式に置換
+- `CLAUDE.md`: 「イベント取り込みパイプライン構成」節・「生活情報・ニュースのキュレーション機能」節を更新(1日3回化・通知は19:30固定・誤解を招く記述の訂正)
+
+### 受け入れ基準
+- `run-fetch-all.sh`(6:30想定)実行時、`data/sg/life-info.json`は更新されるが、ユーザー向けプッシュ通知(`sendPushToAll`)は送信されないこと
+- `run-fetch-extra.sh`の12:30側実行時も同様に、データ更新はされるが通知は送信されないこと
+- `run-fetch-extra.sh`の19:30側実行時のみ、ユーザー向けプッシュ通知が送信されること
+- 開発者向けLINE通知(`notify-fetch-summary.js`)のくらし情報セクションが、1日3回分の実行結果を正しく合算(過去24時間分)して表示すること
+- `node --check scripts/fetch-life-info.js`・`node --check scripts/notify-fetch-summary.js`で構文エラーがないこと
+- 既存の`--no-notify`未指定時の動作(後方互換)が壊れないこと
+
+### 後方互換性・影響範囲
+- `data/sg/life-info.json`・`/api/*`のスキーマ変更なし。Web版・iOS App Store版どちらも影響なし
+- サーバー側(cron・スクリプト)のみの変更のため、TestFlightビルド・App Store審査は不要。次回cron実行から自動的に反映される

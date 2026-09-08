@@ -301,19 +301,19 @@ SGのエリア区分はCentral/East/West/North/North-East/Island-wide/Sentosaの
 
 | ジョブ | 内容 | 頻度 |
 |---|---|---|
-| `scripts/run-fetch-all.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `fetch-life-info.js --city=sg` → `notify-fetch-summary.js`（イベント＋生活情報をまとめて1通のLINE通知） | 毎日 6:30 SGT |
-| `scripts/run-fetch-extra.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg`（**通知なし**、生活情報も含まない） | 毎日 12:30 SGT・19:30 SGT |
+| `scripts/run-fetch-all.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `fetch-life-info.js --city=sg --no-notify` → `notify-fetch-summary.js`（イベント＋生活情報をまとめて1通のLINE通知） | 毎日 6:30 SGT |
+| `scripts/run-fetch-extra.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `fetch-life-info.js --city=sg`（**開発者向けLINE通知なし**。19:30 SGT実行分のみユーザー向けプッシュ通知あり、詳細は下記参照） | 毎日 12:30 SGT・19:30 SGT |
 | `scripts/run-source-analysis.sh` | `discover-sources.js --city=sg --no-notify` → `analyze-sources.js --city=sg --no-notify` | 水・日 7:30 SGT |
 
-BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市対応状況」参照）。**旧`refresh-courses.js`のcronエントリはコース機能削除（設計書178）に伴い完全に削除済み**（旧CLAUDE.mdに記載があったが実態と乖離していたため訂正）。生活情報取得も当初は独立cronエントリ（毎日7:15 SGT）だったが、後日`run-fetch-all.sh`内に統合され独立エントリは廃止済み（詳細は下記「生活情報・ニュースのキュレーション機能」参照）。
+BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市対応状況」参照）。**旧`refresh-courses.js`のcronエントリはコース機能削除（設計書178）に伴い完全に削除済み**（旧CLAUDE.mdに記載があったが実態と乖離していたため訂正）。生活情報取得も当初は独立cronエントリ（毎日7:15 SGT）だったが、後日`run-fetch-all.sh`内に統合され独立エントリは廃止済み。さらに設計書183で`run-fetch-extra.sh`にも組み込まれ1日3回化された（詳細は下記「生活情報・ニュースのキュレーション機能」参照）。
 
-- **`run-fetch-extra.sh`（2026-09-05追加）**: Goody Feed（推定12.6件/日、フィード窓19時間分）・The Smart Local（7.9件/日、窓30時間分）・Eatbook（7.8件/日、窓31時間分）のように、投稿頻度に対してRSSフィードの保持件数が少なく、1日1回の取得だけでは記事がフィードから流れ落ちて取りこぼされるリスクがあるソースへの対策。1日1回（6:30 SGT）だった取得を1日3回に増やし、取得漏れリスクを下げた。ハイウォーターマーク方式（`data/source-fetch-state.json`）により重複取得はされない。通知は6:30 SGTの本実行時のみ行われる（詳細は下記の24時間集計の項目を参照）
-- **LINE通知のイベント件数は過去24時間分の合計（2026-09-07修正）**: `fetch-events.js`は1日3回実行されるが通知は1日1回のみのため、`saveFetchSummary()`が`logs/fetch-summary-${city}.json`を実行のたびに上書きする従来方式では、通知に表示される件数が直近1回分のみになり、`run-fetch-extra.sh`の2回分の採用件数がLINE通知上は消えていた（`events.json`自体には正しく累積されるが、通知の集計値だけが不正確だった）。修正として`saveFetchSummary()`が`logs/fetch-summary-history-${city}.jsonl`にも各回の結果を1行追記するようにし（48時間より古い行は書き込み時に間引き）、`notify-fetch-summary.js`の`loadLast24hSummary(cityKey)`がこの履歴から`updatedAt`が過去24時間以内の行だけを合算（accepted/rawTotal/catCounts/newItems）して表示する。`fetch-life-info.js`（くらし情報）は1日1回しか実行されないためこの問題は元々なく、今回の修正対象外
+- **`run-fetch-extra.sh`（2026-09-05追加、2026-09-08にくらし情報取得を追加）**: Goody Feed（推定12.6件/日、フィード窓19時間分）・The Smart Local（7.9件/日、窓30時間分）・Eatbook（7.8件/日、窓31時間分）のように、投稿頻度に対してRSSフィードの保持件数が少なく、1日1回の取得だけでは記事がフィードから流れ落ちて取りこぼされるリスクがあるソースへの対策。1日1回（6:30 SGT）だった取得を1日3回に増やし、取得漏れリスクを下げた。ハイウォーターマーク方式（`data/source-fetch-state.json`）により重複取得はされない。開発者向けLINE通知は6:30 SGTの本実行時のみ行われる（詳細は下記の24時間集計の項目を参照）。設計書183で`fetch-life-info.js --city=sg`の呼び出しも追加し、くらし情報も同様に1日3回化した。同一スクリプトが12:30/19:30両方でcron起動されるため、スクリプト内で`TZ=Asia/Singapore date +%H`により実行時刻のSGT時を判定し、19時台のみ`--no-notify`を付けずに呼ぶ（ユーザー向けプッシュ通知は19:30 SGTの1回のみ）
+- **LINE通知のイベント件数は過去24時間分の合計（2026-09-07修正、2026-09-08にくらし情報も同方式化）**: `fetch-events.js`は1日3回実行されるが通知は1日1回のみのため、`saveFetchSummary()`が`logs/fetch-summary-${city}.json`を実行のたびに上書きする従来方式では、通知に表示される件数が直近1回分のみになり、`run-fetch-extra.sh`の2回分の採用件数がLINE通知上は消えていた（`events.json`自体には正しく累積されるが、通知の集計値だけが不正確だった）。修正として`saveFetchSummary()`が`logs/fetch-summary-history-${city}.jsonl`にも各回の結果を1行追記するようにし（48時間より古い行は書き込み時に間引き）、`notify-fetch-summary.js`の`loadLast24hSummary(cityKey)`がこの履歴から`updatedAt`が過去24時間以内の行だけを合算（accepted/rawTotal/catCounts/newItems）して表示する。`fetch-life-info.js`（くらし情報）も設計書183で1日3回実行になったため同じ問題が発生し、`fetch-life-info-summary-history-sg.jsonl`＋`notify-fetch-summary.js`の`loadLifeInfoLast24hSummary('sg')`という同型ロジックで対応済み（開発者向けLINE通知の集計は3回分すべてが対象。ユーザー向けプッシュ通知が19:30の1回だけなのとは独立した話）
 
 - **ハイウォーターマーク方式**（`fetch-events.js`）: `data/source-fetch-state.json`にソースごとの`lastSeenGuids`/`lastFetchedAt`を保存し新着記事のみ抽出。初回は`daysBack=7`カットオフにフォールバック。取得失敗ソースは状態未更新（次回また試行）
 - **Haiku採否・記事生成**（`filter-events.js`）: `scoreThreshold=6`（`BATCH_SIZE=10`件ずつ、`max_tokens:6000`、失敗時1回リトライ）。カテゴリ比率が薄いカテゴリはscore5以上に緩和。採用イベントはSonnetで日本語/英語記事を生成（`ENRICH_BATCH_SIZE=8`、`max_tokens:6000`、同じく1回リトライ）
 - **`data/sources.json`のstatus運用**: `active`/`paused`/`rejected`の3値のみが実際の取得可否を左右する。`pausedAt`/`pausedReason`等は記録用メタデータのみで`fetch-events.js`は参照しない
-- **ユーザー向けWebプッシュ通知は完全停止済み**（`notify-fetch-summary.js`は開発者向けLINE通知のみ、`sendPushToAll()`自体は将来の手動再送信用に関数として残置）
+- **ユーザー向けWebプッシュ通知は完全停止済み（この「おでかけ」イベント取り込みパイプラインに限る）**（`notify-fetch-summary.js`は開発者向けLINE通知のみ、`sendPushToAll()`自体は将来の手動再送信用に関数として残置）。⚠️ **これはイベント側（`fetch-events.js`）に限った話であり、下記「生活情報・ニュースのキュレーション機能」の`fetch-life-info.js`側のユーザー向けプッシュ通知は現役で稼働中**（設計書183で1日1回・19:30 SGT固定に整理）。両者を混同しないこと
 - 画像URL疎通確認・discover-sources.jsのAPIエラー握りつぶし修正等の細かい改修履歴はgit履歴を参照
 
 **2026-09-03削除（コード変更）**:
@@ -334,7 +334,8 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市�
 - **カテゴリ**: 6種（admin/weather/transport/community/health/education）。`server.js`の`VALID_CATEGORIES`もこの6種（travelは含まれない）
 - **データ取得**（`scripts/fetch-life-info.js`）: RSS5件（CNA/Mothership/Straits Times/JCCI/CNA Sport〈設計書182で追加〉、⚠️Straits Times追加の経緯は未記録）を`rss-parser`で取得、ハイウォーターマーク方式（`data/life-info-fetch-state.json`、イベント用の状態ファイルとは分離）。Haikuで在住日本人への関連性判定＋カテゴリ付与、Sonnetで日本語/英語要約を生成し`data/sg/life-info.json`（gitignore対象）に保存。リテンション期間は一律7日
 - **スポーツニュースの扱い（設計書182、2026-09-08）**: `filterBatch()`のHaiku分類プロンプトは元々「スポーツ・芸能・エンタメ関連のニュース」を一律不採用としていたが、日本人選手の移籍・日本代表戦の開催など在住日本人の関心が高いスポーツニュースは除外対象から外し、既存の`community`カテゴリに分類するよう調整済み（新カテゴリ`sports`は新設していない、6カテゴリのまま）。プロンプト上は「知っておくべき話題のニュース」（移籍・大会結果・開催決定の速報等）を対象とし、「チケット販売中の参加イベント告知」は対象外と明記して、おでかけ側の独立イベント取り込みパイプライン（`fetch-events.js`/`filter-events.js`）との話題重複をプロンプト文言レベルで緩和している。**ただし両パイプライン間の技術的な重複排除ロジックは存在せず、完全な重複防止は未対応**（同じ話題が両タブに出る可能性は残る）
-- **cron**: 独立エントリではなく、`run-fetch-all.sh`内で`fetch-events.js`の直後・`notify-fetch-summary.js`の直前に実行（毎日6:30 SGT）。当初（設計書172時点）は独立cronエントリ（毎日7:15 SGT）だったが、その後`run-fetch-all.sh`に統合されイベントと同じLINE通知にまとめられている
+- **1日3回取得・ユーザー向けプッシュ通知は19:30 SGT固定（設計書183、2026-09-08）**: フィード単位の頻度分けは行わず、`CITY_CONFIG.sg.feeds`全5本を一律1日3回（6:30/12:30/19:30 SGT、`run-fetch-all.sh`＋`run-fetch-extra.sh`）取得するように変更（ハイウォーターマーク方式のため同一記事の重複処理は発生しない）。`notifyContentUpdated()`（`server.js`の`POST /api/notify-events-updated`→`sendPushToAll()`経由のエンドユーザー向けWebプッシュ通知/APNs通知。開発者向けLINE通知とは別物）は`--no-notify` CLIフラグで呼び出し側から制御し、19:30 SGTの回にのみ送るよう集約した（6:30・12:30の回は`--no-notify`付き）。理由: 朝は身支度等で忙しく通知が埋もれやすい一方、19:30はその日3回分の新着が出揃い内容が最も充実しているため
+- **cron**: 独立エントリではなく、`run-fetch-all.sh`（6:30 SGT、`fetch-events.js`の直後・`notify-fetch-summary.js`の直前、`--no-notify`付き）と`run-fetch-extra.sh`（12:30/19:30 SGT、設計書183で追加。19:30側のみ`--no-notify`なし）の両方に組み込まれている。当初（設計書172時点）は独立cronエントリ（毎日7:15 SGT）だったが、その後`run-fetch-all.sh`に統合されイベントと同じLINE通知にまとめられ、さらに設計書183で1日3回化された
 - **API**: `GET /api/life-info?city=sg&category=...`（`server.js`、`GET /api/events`の直後）
 - **フロントエンド**: ボトムナビ「くらし」画面（`#screen-news`）＋ホーム（「おでかけ」画面）のプレビューセクション（`#life-info-preview-section`、直近3件）。未ログインでも閲覧可能（探訪・予定表で使われていたアカウント連携ゲートは適用外）
 - 詳細なi18nキー・UI構造等はコード直接参照

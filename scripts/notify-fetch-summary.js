@@ -15,7 +15,8 @@ const LOGS_DIR = path.join(__dirname, '../logs');
 const CITY_NAMES = { sg: 'シンガポール', bkk: 'バンコク', syd: 'シドニー' };
 const SOURCE_ANALYSIS_PATH = path.join(LOGS_DIR, 'source-analysis-result.json');
 const DISCOVER_RESULT_PATH = path.join(LOGS_DIR, 'discover-sources-result.json');
-const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json');
+const LIFE_INFO_SUMMARY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary.json'); // 後方互換で残置（最新1回分のみ、現在は未使用）
+const LIFE_INFO_HISTORY_PATH = path.join(LOGS_DIR, 'fetch-life-info-summary-history-sg.jsonl');
 // ラベル・順番は public/index.html のカテゴリチップ（#screen-news / #screen-home）と一致させること
 const LIFE_INFO_CAT_LABELS = { admin: 'SG政府', transport: '都市開発・交通', health: '医療・健康', weather: '天候・災害', community: 'コミュニティ', education: '教育・子育て' };
 const EVENT_CAT_LABELS = { event: 'イベント', show: '展示・公演', gourmet: 'グルメ・フェア', sale: 'プロモ・お得', opening: '新規オープン', travel: '旅行' };
@@ -42,6 +43,29 @@ function loadLast24hSummary(cityKey) {
   if (entries.length === 0) return null;
 
   const merged = { cityKey, cityLabel: entries[0].cityLabel, accepted: 0, rawTotal: 0, catCounts: {}, newItems: [] };
+  for (const e of entries) {
+    merged.accepted += e.accepted || 0;
+    merged.rawTotal += e.rawTotal || 0;
+    for (const [k, v] of Object.entries(e.catCounts || {})) merged.catCounts[k] = (merged.catCounts[k] || 0) + v;
+    merged.newItems.push(...(e.newItems || []));
+  }
+  return merged;
+}
+
+// fetch-life-info.jsも1日3回（6:30/12:30/19:30 SGT）実行されるようになった（設計書183）ため、
+// イベント側のloadLast24hSummary()と同じ方式で履歴ファイル（JSONL）から過去24時間分を合算する。
+// ユーザー向けプッシュ通知は19:30の回にのみ送られるが（fetch-life-info.js側の--no-notify制御）、
+// この開発者向けLINE通知の集計は3回分すべてを対象にする。
+function loadLifeInfoLast24hSummary(cityKey) {
+  if (cityKey !== 'sg') return null; // 現状SGのみ運用（BKK/SYDは対応外、設計書183スコープ外）
+  if (!fs.existsSync(LIFE_INFO_HISTORY_PATH)) return null;
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const entries = fs.readFileSync(LIFE_INFO_HISTORY_PATH, 'utf8').split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l); } catch (e) { return null; } })
+    .filter(e => e && new Date(e.updatedAt).getTime() >= cutoff);
+  if (entries.length === 0) return null;
+
+  const merged = { accepted: 0, rawTotal: 0, catCounts: {}, newItems: [] };
   for (const e of entries) {
     merged.accepted += e.accepted || 0;
     merged.rawTotal += e.rawTotal || 0;
@@ -100,20 +124,19 @@ async function main() {
 
   lines.push(`合計 ${totalAccepted}件採用`);
 
-  // くらし情報セクションを追記（当日のJSONが存在する場合のみ）
+  // くらし情報セクションを追記（過去24時間分の履歴合算、設計書183。fetch-life-info.jsも
+  // 1日3回実行されるようになったため、イベント側と同じ24時間合算方式に統一した）
   try {
-    if (fs.existsSync(LIFE_INFO_SUMMARY_PATH)) {
-      const li = JSON.parse(fs.readFileSync(LIFE_INFO_SUMMARY_PATH, 'utf8'));
-      if (li.date === today) {
-        lines.push('');
-        lines.push('━━ 🏛️ くらし情報 ━━');
-        lines.push(`📰 ${li.accepted}件採用 / ${li.rawTotal}件取得`);
-        const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
-        if (catLine) {
-          lines.push(`  ${catLine}`);
-        } else {
-          lines.push('  （新着なし）');
-        }
+    const li = loadLifeInfoLast24hSummary('sg');
+    if (li) {
+      lines.push('');
+      lines.push('━━ 🏛️ くらし情報（過去24時間）━━');
+      lines.push(`📰 ${li.accepted}件採用 / ${li.rawTotal}件取得`);
+      const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
+      if (catLine) {
+        lines.push(`  ${catLine}`);
+      } else {
+        lines.push('  （新着なし）');
       }
     }
   } catch (e) {

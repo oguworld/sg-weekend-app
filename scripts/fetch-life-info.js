@@ -5,7 +5,10 @@
 // data/{city}/life-info.json に保存する。
 // 既存 scripts/fetch-events.js / scripts/filter-events.js のパターン（ハイウォーターマーク方式・
 // Anthropic SDK呼び出し・エラーハンドリング）を踏襲する。
-// 使い方: node fetch-life-info.js [--city=sg] [--dry-run]
+// 使い方: node fetch-life-info.js [--city=sg] [--dry-run] [--no-notify]
+// --no-notify: ユーザー向けプッシュ通知（notifyContentUpdated()）をスキップする。
+// 1日3回（6:30/12:30/19:30 SGT）実行されるようになった（設計書183）ため、通知は
+// 19:30 SGTの回にのみ送るよう run-fetch-all.sh / run-fetch-extra.sh 側で使い分ける。
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const Parser    = require('rss-parser');
@@ -17,8 +20,11 @@ const parser = new Parser({ timeout: 10000 });
 const client = new Anthropic();
 
 // ─── 取得結果をファイルに保存（notify-fetch-summary.jsがイベント通知と合算して通知する） ───
+// 1日3回実行されるようになった（設計書183）ため、最新1回分の上書き（後方互換で残置）に加え、
+// fetch-events.js と同じパターンで履歴ファイル（JSONL）にも追記し、過去24時間分を合算できるようにする。
 function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems }) {
   const summaryPath = path.join(__dirname, '..', 'logs', 'fetch-life-info-summary.json');
+  const historyPath = path.join(__dirname, '..', 'logs', 'fetch-life-info-summary-history-sg.jsonl');
   const catCounts = {};
   for (const item of (newItems || [])) catCounts[item.category] = (catCounts[item.category] || 0) + 1;
   const summary = {
@@ -27,17 +33,35 @@ function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems 
     accepted,
     rejected,
     catCounts,
+    newItems: (newItems || []).map(e => ({ title: e.title, category: e.category, source: e.source || '' })),
     date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' }),
     updatedAt: new Date().toISOString(),
   };
   fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
   fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
+
+  // 履歴には48時間より古い行は残さない（通知が読むのは直近24時間分のみのため、無限増殖防止で少し余裕を持たせて間引く）
+  try {
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    let lines = fs.existsSync(historyPath) ? fs.readFileSync(historyPath, 'utf8').split('\n').filter(Boolean) : [];
+    lines = lines.filter(l => {
+      try { return new Date(JSON.parse(l).updatedAt).getTime() >= cutoff; } catch (e) { return false; }
+    });
+    lines.push(JSON.stringify(summary));
+    fs.writeFileSync(historyPath, lines.join('\n') + '\n', 'utf8');
+  } catch (e) {
+    console.warn('  ⚠️ 生活情報サマリー履歴の更新に失敗:', e.message);
+  }
 }
 
-// ─── 1日1回、朝の取り込み完了後にアプリへプッシュ通知を送る（設計書173） ───
-// fetch-events.js（6:30 SGT）→fetch-life-info.js（7:15 SGT）の順で毎日実行されるため、
-// 後発のこのスクリプトの完了時点で1日1回だけ呼ぶ。通知はオプトイン済みユーザーのみに届く
-// （data/push-subscriptions.jsonに登録済み＝設定で「イベント通知」をONにした人のみ）。
+// ─── 1日1回、19:30 SGTの取り込み完了後にアプリへプッシュ通知を送る（設計書173→183） ───
+// fetch-life-info.js自体は1日3回（6:30/12:30/19:30 SGT）実行されるようになったが（設計書183）、
+// ユーザー向けプッシュ通知は19:30 SGTの回にのみ送る（呼び出し側が--no-notifyを付与して制御する。
+// run-fetch-all.sh〈6:30〉・run-fetch-extra.sh の12:30側は--no-notify付き、19:30側のみ付けない）。
+// これは開発者向けLINE通知（notify-fetch-summary.js）とは別の、エンドユーザー向け実プッシュ通知
+// （server.jsのPOST /api/notify-events-updated → sendPushToAll()経由）である。
+// 通知はオプトイン済みユーザーのみに届く（data/push-subscriptions.jsonに登録済み＝設定で
+// 「イベント通知」をONにした人のみ）。
 async function notifyContentUpdated() {
   const secret = process.env.ADMIN_SECRET;
   if (!secret) { console.log('  ⚠️ ADMIN_SECRET未設定のためプッシュ通知をスキップ'); return; }
@@ -75,7 +99,8 @@ function parseArgs() {
   const cityArg = process.argv.find(a => a.startsWith('--city='));
   const city = cityArg ? cityArg.split('=')[1].toLowerCase() : 'sg';
   const dryRun = process.argv.includes('--dry-run');
-  return { city: CITY_CONFIG[city] ? city : 'sg', dryRun };
+  const noNotify = process.argv.includes('--no-notify');
+  return { city: CITY_CONFIG[city] ? city : 'sg', dryRun, noNotify };
 }
 
 // ─── ハイウォーターマーク方式（ソースごとの既知GUID管理） ──────
@@ -517,10 +542,10 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
 
 // ─── メイン ──────────────────────────────────────────────────────
 async function main() {
-  const { city: cityKey, dryRun } = parseArgs();
+  const { city: cityKey, dryRun, noNotify } = parseArgs();
   const conf = CITY_CONFIG[cityKey];
 
-  console.log(`\n📰 fetch-life-info.js 開始（${conf.nameJa}）${dryRun ? ' [--dry-run]' : ''}\n`);
+  console.log(`\n📰 fetch-life-info.js 開始（${conf.nameJa}）${dryRun ? ' [--dry-run]' : ''}${noNotify ? ' [--no-notify]' : ''}\n`);
   console.log('━'.repeat(50));
 
   console.log('\n📡 RSSフィード取得中...');
@@ -531,7 +556,7 @@ async function main() {
     console.log('\n✅ 新着なし。終了します。\n');
     if (!dryRun) {
       saveFetchSummary({ rawTotal: 0, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
-      await notifyContentUpdated();
+      if (!noNotify) await notifyContentUpdated();
     }
     return;
   }
@@ -541,7 +566,7 @@ async function main() {
     console.log('✅ 重複なし新着なし。終了します。\n');
     if (!dryRun) {
       saveFetchSummary({ rawTotal: rawItems.length, uniqueTotal: 0, accepted: 0, rejected: 0, newItems: [] });
-      await notifyContentUpdated();
+      if (!noNotify) await notifyContentUpdated();
     }
     return;
   }
@@ -557,7 +582,7 @@ async function main() {
       rejected: result.rejected,
       newItems: result.newItems,
     });
-    await notifyContentUpdated();
+    if (!noNotify) await notifyContentUpdated();
   }
 
   console.log('\n🎉 fetch-life-info.js 完了\n');
