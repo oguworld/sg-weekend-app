@@ -1,11 +1,11 @@
 // ─── Service Worker for 今週末どこいく？SG ───
-const CACHE_NAME = 'sg-weekend-v876';
+const CACHE_NAME = 'sg-weekend-v877';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/app.css',
   '/app.js',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Serif+Display:ital@0;1&display=swap',
 ];
 
@@ -98,8 +98,8 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'SG在住Navi', {
       body: data.body,
-      icon: '/icons/icon-192.svg',
-      badge: '/icons/icon-192.svg',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
       tag: 'sg-weekend',
       renotify: true,
       data: data.data || {},

@@ -127,6 +127,13 @@ Google Sign-In・Sign in with Appleに対応。予定表データ/共有カレ�
 - **SW登録（`navigator.serviceWorker.register('/sw.js')`）は`public/app.js`の初期化処理内に存在**（Web版プッシュ通知の`navigator.serviceWorker.ready`依存＋SW更新時の自動反映のために必要）。登録時に`navigator.serviceWorker.controller`が既にあった場合（＝既存訪問者のSW更新時）のみ`controllerchange`で1回だけ`location.reload()`し、新デザイン等の反映漏れを防止。新規訪問者では初回の`controllerchange`では自動リロードしない（フラグ`_hadController`で判定）
 - 既知の残存事項（対応不要・スコープ外）: `public/index.html`に到達不能な`#install-modal`（「ホーム画面に追加する」手順モーダル）が残存。開く関数`openInstallModal()`が存在せずorphaned markup。ボタンの`onclick="handleInstall()"`は関数削除済みで無効だが、到達不能なため実害なし
 
+## アプリアイコン・スプラッシュ画面（2026-09-08刷新、設計書179・180）
+アイコンデザインを「シンガポール島スカイライン＋コンパス針のピン」に刷新（旧デザインにあった雲と「S」の文字は削除）。Web版・iOS版アイコン、iOSスプラッシュ画面（ライト/ダーク）を統一して差し替え済み。
+- **Web版**: `dosuru-icon.png`（1024x1024マスター）→`node generate-icons.js`で`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`を生成。アイコンを差し替える際は必ずこの手順（マスター差し替え→スクリプト再実行）を踏む
+- **iOSネイティブアイコン**: `ios-app/resources/icon.png`（1024x1024、App Store提出要件によりRGB・アルファチャンネルなし）
+- **iOSスプラッシュ画面**: `ios-app/resources/splash.png`（ライト、クリーム背景）・`splash-dark.png`（ダーク、黒背景+クリーム色パネル）とも2732x2732。中央上寄りのアイコン正方形部分（現行デザインではx:1017, y:977（ライト）/951（ダーク）起点、695x695四方）のみを`composite()`で新アイコンに置き換える方式を採用。背景色と「SG在住Navi」テキストロゴ部分（y:1702〜1843付近）は変更しない。次回アイコンを差し替える際も同じ座標感覚（画像解析で背景色との差分ピクセル走査を行い正確な旧アイコン境界を特定）で対応すること
+- **Web Push通知アイコン**: `public/sw.js`は`public/icons/icon-192.png`/`icon-512.png`（PNG、`.svg`ではない）を参照する。過去に存在しない`.svg`パスを参照するバグがあったため、アイコン関連の変更時は`STATIC_ASSETS`配列と`showNotification()`内`icon`/`badge`のパスが実在するファイルと一致しているか必ず確認する
+
 ## iOSアプリ化（Capacitor）2026-07-03実装
 - 方式: ローカルバンドル（webDir: `../public`）。Web版と同じHTMLをアプリ内に同梱
 - appId: `app.dosuru`（2026-07-10訂正: 以前`app.dosuru.odenavi`と誤記していたが、実際にApple Developer Portalに登録され署名・TestFlight配信に使われている値は`ios-app/capacitor.config.js`の`app.dosuru`） / appName: `SG在住Navi`（`ios-app/capacitor.config.js`で確認済み、旧名`おでかけNavi`から改名）

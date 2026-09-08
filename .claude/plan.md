@@ -18029,3 +18029,65 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 - `/home/masahiko/sg-weekend-app/scripts/generate-model-courses.js`
 - `/home/masahiko/sg-weekend-app/scripts/fill-stamp-spot-images.js`
 - `/home/masahiko/sg-weekend-app/CLAUDE.md`（削除完了後に大幅な記述更新が必要）
+
+
+---
+
+## 設計書179: Web Push通知アイコンの誤ったパス参照を修正（2026-09-08設計）
+
+### 背景・問題
+`public/sw.js`のPush通知関連処理が、実在しない`.svg`拡張子のアイコンファイルを参照しているバグがある。実際に`public/icons/`配下に存在するのは`.png`ファイルのみ。
+
+### 対応内容
+- `STATIC_ASSETS`配列内:
+  - `/icons/icon-192.svg` → `/icons/icon-192.png`
+  - `/icons/icon-512.svg` → `/icons/icon-512.png`
+- `push`イベントの`showNotification()`呼び出し内、`icon:`・`badge:`に指定されている値も同様に`.svg` → `/icons/icon-192.png`へ修正
+- `CACHE_NAME`（現行`'sg-weekend-v876'`）を1つインクリメントする。ただし設計書180のアイコン差し替え作業でも同じ`CACHE_NAME`を更新するため、**両設計書の変更をまとめて1回だけインクリメント**する（例: `'sg-weekend-v877'`）。実装直前に`public/sw.js`の実際の現在値を確認してから+1すること。
+
+### 影響範囲
+- `public/sw.js`のみ。`server.js`側のロジック変更は不要。
+- Web版はサーバー上のファイル配置のみで反映され、Service Workerの`CACHE_NAME`更新により次回アクセス時にクライアント側で新SWが有効化される。
+
+---
+
+## 設計書180: アイコン・スプラッシュ画面の全差し替え（Web版・iOS版、2026-09-08設計）
+
+### 背景
+アプリアイコンのデザインを刷新した（シンガポール島スカイライン＋コンパス針のピン。旧デザインにあった雲と「S」の文字は削除し、ピンのサイズ・位置・レイヤー順を調整済みの最終FIX版）。この新アイコン画像を使い、Web版・iOS版のアイコン、およびiOSスプラッシュ画面（ライト/ダーク両方）を差し替える。
+
+新アイコン画像ファイル（2000x2000px, RGB, アルファチャンネルなし）:
+`/home/masahiko/.claude/uploads/f0b4c27d-14c5-42d3-83e6-18c84e36aedb/3181b9e9-App_Icon_Color_Theme_Update.png`
+
+### 対応内容
+
+1. **Web版アイコン**
+   - `dosuru-icon.png`（現行1024x1024 RGBA）を新アイコン画像にリサイズして差し替え。`sharp`を用いたNode.jsスクリプトで`sharp(newImagePath).resize(1024,1024).png().toFile('dosuru-icon.png')`のように対応する。
+   - 差し替え後、`node generate-icons.js`を実行し、`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`を再生成する。
+
+2. **iOSネイティブアイコン**
+   - `ios-app/resources/icon.png`（現行1024x1024 RGB、アルファなし）を同じ新アイコン画像にリサイズして差し替える。
+   - App Store提出要件によりアルファチャンネルを持たせないこと。`sharp`の`.flatten({background:'#fff'})`等で確実にアルファチャンネルを除去してから出力する。
+
+3. **iOSスプラッシュ画面（ライト/ダーク共通）**
+   - `ios-app/resources/splash.png`（2732x2732、クリーム色背景、中央上寄りに旧アイコン、その下に「SG在住Navi」ロゴテキスト）
+   - `ios-app/resources/splash-dark.png`（2732x2732、黒背景中央にクリーム色パネルとして旧アイコン、その下に明るい色の「SG在住Navi」テキスト）
+   - 両ファイルとも、**中央上寄りのアイコン部分だけ**を新デザインの正方形アイコンに差し替える。背景色（ライトはクリーム全面、ダークは黒背景＋クリーム色パネル）とテキストロゴ「SG在住Navi」は変更しない。
+   - 進め方: 元のsplash画像内で旧アイコンの正方形が占める位置・サイズ（ピクセル座標）を画像解析で特定し、新アイコン画像を同サイズにリサイズして同じ位置に`sharp`の`composite()`で上書き合成する。新アイコンは背景込みの完成画像で透明部分がないため、上書き合成すれば旧アイコンの絵柄は完全に隠れる。
+   - 合成後は必ずReadツールで結果画像を目視確認し、テキストロゴが隠れていないか・アイコンが不自然に切れていないか・背景色の継ぎ目が不自然でないかを確認する。ズレていれば位置・サイズを微調整して再合成する。
+
+### 厳守事項（ユーザー指示）
+- `ios-app/package.json`のバージョン番号（現行`1.8.1`）は変更しないこと。アイコン・画像差し替えのみのタスクでありバージョン番号は無関係。
+- スプラッシュはライト版・ダーク版とも「同じ新アイコン」を使うこと（意匠を変えない、ダーク版だけ別配色にする等はしない）。
+- `release`ブランチへのpush・TestFlight配信・App Store提出は本タスクのスコープ外。ローカルのファイル差し替えとgit管理下への反映まで。
+- Web版（`public/`配下）の変更はサーバー上のファイル配置のみで反映され、`server.js`側のコード変更は不要なため`pm2 restart`は本来不要な想定。ただし`public/sw.js`を編集するため、`CACHE_NAME`更新により次回アクセス時にクライアント側で新SWが有効化される仕組みに委ねる。
+
+### 影響範囲
+- `dosuru-icon.png`
+- `public/icons/icon-{72,96,128,144,152,192,384,512}.png`
+- `public/apple-touch-icon.png`
+- `public/favicon.png`
+- `public/sw.js`（`CACHE_NAME`のみ、設計書179と合わせて1回のインクリメント）
+- `ios-app/resources/icon.png`
+- `ios-app/resources/splash.png`
+- `ios-app/resources/splash-dark.png`
