@@ -763,7 +763,7 @@
       if (!el) return;
       const mode = getTheme();
       const isJa = getLang() === 'ja';
-      const labels = isJa ? { auto: '自動', light: 'ライト', dark: 'ダーク' } : { auto: 'Auto', light: 'Light', dark: 'Dark' };
+      const labels = isJa ? { auto: '自動', light: 'オフ', dark: 'オン' } : { auto: 'Auto', light: 'Off', dark: 'On' };
       el.textContent = labels[mode] || labels.light;
     }
     function cycleTheme() {

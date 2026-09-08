@@ -218,6 +218,7 @@ UI文字列を追加・変更するときは **必ず ja と en の両方を同�
 2026-09-05に一度「配色」1項目（キャラメル/柳グリーン/ダークの3状態循環切替）に統合されたが、ユーザーの意向により2026-09-08設計書184で完全に廃止し、それ以前の「ダークモード」設定（自動(端末追従)/ライト/ダークの3択）に戻した。柳グリーン（Willoaコーポレートカラー配色）関連のコード・CSSは全て削除済み。
 - **状態管理**: `localStorage`の`sg_theme`キー（値: `auto`/`light`/`dark`）。旧`sg_palette`キーは廃止。`getTheme()`/`applyTheme()`/`cycleTheme()`/`updateThemeUI()`（`public/app.js`）
 - **既定値**: 新規ユーザー（`sg_theme`未設定）は`light`がデフォルト（`auto`ではない）。設定画面はタップで自動→ライト→ダーク→自動…と循環切替
+- **表示ラベル（2026-09-08設計書185で変更）**: 設定画面の値表示は内部値（`light`/`dark`/`auto`）と異なり「オフ」「オン」「自動」（英語: `Off`/`On`/`Auto`）。設定名が「ダークモード」であることに合わせた直感的な言い回しへの変更で、`light`→オフ、`dark`→オン、`auto`→自動（変更なし）。ラベル文言は`STRINGS.ja/en`ではなく`updateThemeUI()`（`public/app.js`）内のインライン`labels`オブジェクトに直接定義されている点に注意（他のi18n文言と実装方式が異なる）。切り替えロジック・保存値自体は無変更
 - **自動モード**: `window.matchMedia('(prefers-color-scheme: dark)')`でシステム設定を検知し`data-theme="dark"`属性の有無を切り替える。`matchMedia(...).addEventListener('change', ...)`でシステム設定変更にリアルタイム追従（自動モード時のみ有効）。iOS Capacitor(WKWebView)環境でこのメディアクエリが正しく機能するかは実機未検証
 - **ライト/ダーク固定モード**: `data-palette`属性は使用しない。`data-theme="dark"`属性の有無のみで制御。ダーク時の実際の配色定義は`app.css`の`html[data-theme="dark"]`ブロック（既存の汎用ダーク配色、柳グリーン統合前から存在していたもの）をそのまま流用
 - `public/index.html`の`<head>`内スクリプトは初期描画のちらつき防止のため`sg_theme`（または移行前の`sg_palette`）を読んで`data-theme`属性を先読み設定（`applyTheme()`実行前に反映するため）
