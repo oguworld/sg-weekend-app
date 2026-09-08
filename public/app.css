@@ -1,37 +1,37 @@
     :root {
-      --cream: #FFF9F2;
-      --warm-white: #FFFDF9;
-      --sand: #F0E6D3;
-      --sand-dark: #E2D0B8;
-      --caramel: #C8804A;
-      --caramel-light: #E0A878;
-      --caramel-pale: #FDF0E6;
-      --sage: #6E9E88;
-      --sage-light: #A0C4B4;
-      --sage-pale: #EDF4F1;
-      --terracotta: #C4705A;
-      --terracotta-light: #E09A88;
-      --terracotta-pale: rgba(196,112,90,0.16);
-      --terracotta-light-pale: rgba(224,154,136,0.20);
-      --midnight: #2C2420;
-      --warm-gray: #6B5E52;
-      --light-gray: #C4B8AC;
-      --gold: #C0903A;
-      --gold-light: #E4C472;
-      --gold-pale: rgba(192,144,58,0.16);
-      --sky: #7AADCC;
-      --sky-pale: rgba(122,173,204,0.18);
-      --plum: #9B7A94;
-      --plum-pale: #F3EDF1;
+      --cream: #FAFAF8;
+      --warm-white: #FFFFFF;
+      --sand: #EAEAE6;
+      --sand-dark: #DCDCD6;
+      --caramel: #6F8F63;
+      --caramel-light: #9BB58F;
+      --caramel-pale: #EEF3EA;
+      --sage: #6F8F63;
+      --sage-light: #9BB58F;
+      --sage-pale: #EEF3EA;
+      --terracotta: #52704A;
+      --terracotta-light: #9BB58F;
+      --terracotta-pale: #EEF3EA;
+      --terracotta-light-pale: #EEF3EA;
+      --midnight: #2B2B27;
+      --warm-gray: #767268;
+      --light-gray: #A8A49A;
+      --gold: #6F8F63;
+      --gold-light: #9BB58F;
+      --gold-pale: #EEF3EA;
+      --sky: #6F8F63;
+      --sky-pale: #EEF3EA;
+      --plum: #52704A;
+      --plum-pale: #EEF3EA;
       --holiday-red: #C0392B;
       --holiday-red-pale: rgba(192,57,43,0.14);
       --festival-gold: #B8860B;
       --festival-gold-pale: rgba(184,134,11,0.14);
       --radius-card: 24px;
       --radius-btn: 14px;
-      --shadow-soft: 0 4px 20px rgba(42,37,32,0.07);
-      --shadow-card: 0 6px 28px rgba(42,37,32,0.10);
-      --font-heading: 'Kaisei Opti', serif;
+      --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
+      --shadow-card: 0 4px 18px rgba(43,43,39,0.08);
+      --font-heading: 'Noto Sans JP', sans-serif;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -364,12 +364,12 @@
     #news-filter-row::-webkit-scrollbar { display: none; }
     .filter-chip {
       flex-shrink: 0;
-      padding: 14px 16px 13px;
-      border: none;
-      border-bottom: 3px solid transparent;
-      margin-bottom: -2px;
-      border-radius: 0;
-      background: transparent;
+      padding: 7px 14px;
+      border: 1px solid var(--sand);
+      border-bottom: none;
+      margin-bottom: 0;
+      border-radius: 50px;
+      background: var(--cream);
       color: var(--warm-gray);
       font-size: 14px;
       font-weight: 500;
@@ -377,12 +377,13 @@
       cursor: pointer;
       white-space: nowrap;
       text-align: center;
-      transition: color .18s, border-color .18s;
+      transition: color .18s, border-color .18s, background .18s;
     }
     .filter-chip.active {
-      color: var(--caramel);
+      background: var(--caramel);
+      color: #fff;
+      border-color: var(--caramel);
       font-weight: 700;
-      border-bottom-color: var(--caramel);
     }
     .ef-chip {
       padding: 7px 14px;
@@ -1616,6 +1617,12 @@
     .nav-icon { font-size: 23px; display: inline-flex; }
     .nav-icon-svg { width: 26px; height: 26px; color: var(--light-gray); display: block; }
     .nav-item.active .nav-icon-svg { color: var(--caramel); }
+    .nav-item.active .nav-icon {
+      display: inline-block;
+      background: var(--caramel-pale);
+      border-radius: 50px;
+      padding: 2px 14px;
+    }
     .nav-label {
       font-size: 13px;
       font-weight: 500;
@@ -1933,16 +1940,24 @@
 
     /* ─── DARK MODE ─── */
     html[data-theme="dark"] {
-      --cream: #1C1410;
-      --warm-white: #17110D;
-      --sand: #2C2018;
-      --sand-dark: #382A20;
-      --caramel-pale: #28180E;
-      --sage-pale: #141E1C;
-      --plum-pale: #241C22;
-      --midnight: #F0E8DF;
-      --warm-gray: #9E9080;
-      --light-gray: #483C32;
+      --cream: #1B1E19;
+      --warm-white: #14160F;
+      --sand: #262B22;
+      --sand-dark: #32382C;
+      --caramel-pale: #1E241A;
+      --sage-pale: #1E241A;
+      --terracotta-pale: #1E241A;
+      --terracotta-light-pale: #1E241A;
+      --gold-pale: #1E241A;
+      --sky-pale: #1E241A;
+      --plum-pale: #1E241A;
+      --midnight: #EDEAE3;
+      --warm-gray: #9C9A8E;
+      --light-gray: #4A4E42;
+      --caramel-light: #7FA075;
+      --sage-light: #7FA075;
+      --terracotta-light: #7FA075;
+      --gold-light: #7FA075;
       --shadow-soft: 0 4px 20px rgba(0,0,0,0.4);
       --shadow-card: 0 6px 28px rgba(0,0,0,0.5);
       color-scheme: dark;

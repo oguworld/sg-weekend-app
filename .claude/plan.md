@@ -18288,3 +18288,87 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 ### スコープ外
 - 切り替えロジック・保存される値そのものの変更
 - ダークモードの見た目デザイン自体の変更
+
+## 設計書186: ライトモードの配色をキャラメル基調から柳グリーン基調へ全面置換(フォント・UI形状も含めて完全復元)
+
+### 背景・経緯
+設計書184で「配色」機能(キャラメル/柳グリーン/ダークの3択循環切替UI)を廃止し、ライトモードをキャラメル基調に、ダークモードを「自動/オン/オフ」の単純トグルにした。しかし実機を見たユーザーが「クリームに戻ってしまっている、柳グリーンの方が良かった、キャラメルはもう一切使わない」と判断。ユーザーへの確認の結果、**配色切替UI(3択循環)は復活させず、ライトモードの見た目そのもの(色・フォント・UI形状すべて)を柳グリーン基調1本に置き換える**ことで最終確定した(「フォントも含めてデザインはすべて柳グリーンに戻してください」と明示指示あり)。
+
+### 実装方針(確定)
+
+1. **`public/app.css`の`:root`のデフォルト値を柳グリーン(ライト)の値に置換する**(キャラメル基調の値は完全に削除・置換):
+```css
+--cream: #FAFAF8; --warm-white: #FFFFFF; --sand: #EAEAE6; --sand-dark: #DCDCD6;
+--caramel: #6F8F63; --caramel-light: #9BB58F; --caramel-pale: #EEF3EA;
+--sage: #6F8F63; --sage-light: #9BB58F; --sage-pale: #EEF3EA;
+--terracotta: #52704A; --terracotta-light: #9BB58F; --terracotta-pale: #EEF3EA; --terracotta-light-pale: #EEF3EA;
+--midnight: #2B2B27; --warm-gray: #767268; --light-gray: #A8A49A;
+--gold: #6F8F63; --gold-light: #9BB58F; --gold-pale: #EEF3EA;
+--sky: #6F8F63; --sky-pale: #EEF3EA;
+--plum: #52704A; --plum-pale: #EEF3EA;
+--shadow-soft: 0 2px 12px rgba(43,43,39,0.06); --shadow-card: 0 4px 18px rgba(43,43,39,0.08);
+--font-heading: 'Noto Sans JP', sans-serif;
+```
+   - `--holiday-red`/`--holiday-red-pale`/`--festival-gold`/`--festival-gold-pale`/`--radius-card`/`--radius-btn`は変更しない(そのまま維持)
+
+2. **`html[data-theme="dark"]`の値を柳グリーン+ダークの値に置換する**。現行ブロックが上書きしているプロパティに加え、以下のプロパティも新規に上書き対象へ追加し、キャラメル系アクセントが混在しないようにする:
+```css
+--cream: #1B1E19; --warm-white: #14160F; --sand: #262B22; --sand-dark: #32382C;
+--caramel-pale: #1E241A; --sage-pale: #1E241A; --terracotta-pale: #1E241A; --terracotta-light-pale: #1E241A;
+--gold-pale: #1E241A; --sky-pale: #1E241A; --plum-pale: #1E241A;
+--midnight: #EDEAE3; --warm-gray: #9C9A8E; --light-gray: #4A4E42;
+--caramel-light: #7FA075; --sage-light: #7FA075; --terracotta-light: #7FA075; --gold-light: #7FA075;
+```
+   - `--holiday-red-pale`/`--festival-gold-pale`はダークモード時も変更しない(既知の未対応事項として据え置き、柳グリーン導入前から存在しない上書きのため今回もスコープ外)
+   - `--shadow-soft`/`--shadow-card`のダーク値は現行のまま変更不要
+   - `color-scheme: dark`は現行通り維持
+
+3. **`.filter-chip`・`.nav-item.active .nav-icon`のピル型スタイルを、条件分岐なしの通常スタイルとして復活させる**(以前は`html[data-palette="willow"]`限定だったが、柳グリーンが唯一の基調になるため常時適用):
+```css
+/* .filter-chip を下線ボーダー方式からピル塗り方式に変更 */
+.filter-chip {
+  border-bottom: none;
+  margin-bottom: 0;
+  border-radius: 50px;
+  background: var(--cream);
+  border: 1px solid var(--sand);
+  padding: 7px 14px;
+}
+.filter-chip.active {
+  background: var(--caramel);
+  color: #fff;
+  border-color: var(--caramel);
+}
+/* ボトムナビの選択中アイコンにピル背景 */
+.nav-item.active .nav-icon {
+  display: inline-block;
+  background: var(--caramel-pale);
+  border-radius: 50px;
+  padding: 2px 14px;
+}
+```
+   - 既存の`.filter-chip`(下線ボーダー方式)・`.nav-item.active .nav-icon-svg`(アイコン色変更のみ)の現行CSSルールを、上記に置き換えるか統合すること。既存ルールとの重複・競合がないよう、実装時に既存のセレクタ定義箇所を`grep`で確認してから統合すること
+
+4. **`public/app.js`側の変更は不要**(カテゴリ色定義`EVENT_CATEGORY_COLORS`等は全て`var(--xxx)`参照のため、`:root`書き換えのみで自動的に柳グリーン基調に追従する)
+
+### スコープ外(今回やらないこと)
+- `data-palette`属性・`sg_palette`関連のJS/CSSロジックの復活(配色切替UI自体は作らない、色は`:root`固定値のみ)
+- ダークモードの「自動/オン/オフ」トグルの仕様変更
+- `--holiday-red`/`--festival-gold`(常に固定色、変更しない)
+- `--holiday-red-pale`/`--festival-gold-pale`のダークモード時の調整(既存の未対応事項として据え置き)
+- BKK/SYD都市への影響(都市非依存のため対象外)
+
+### 変更ファイル一覧
+- `public/app.css`(`:root`ブロックの値置換、`html[data-theme="dark"]`ブロックの値置換・不足プロパティ追加、`.filter-chip`・`.nav-item.active .nav-icon`のピル型スタイル復活)
+- `public/index.html`(`app.css?v=`・`app.js?v=`のキャッシュバスティング用クエリパラメータをインクリメント。**設計書185実装時にこのステップを忘れて「修正が反映されない」トラブルが実際に発生した前例があるため、絶対に忘れないこと**)
+- `public/sw.js`(`CACHE_NAME`を1つインクリメント。上記index.htmlの変更とセットで必須)
+- `CLAUDE.md`(「ダークモード機能」節等、既定配色の記述があれば柳グリーン基調である旨に訂正)
+
+### 受け入れ基準
+- ライトモード時、アプリ全体(ホーム/ニュース/ピン留め/設定の全画面)でクリーム/キャラメル色(オレンジ系)が一切表示されず、柳グリーン基調(緑系)で統一されていること
+- 見出し(イベントタイトル・セクション見出し等)のフォントがゴシック体(Noto Sans JP)になっていること
+- カテゴリフィルターチップがピル塗り形状になっていること、ボトムナビの選択中アイコンに緑系のピルハイライトが付いていること
+- ダークモード(「オン」固定 or 「自動」でシステムがダーク)時、キャラメル系のオレンジ色アクセントが残らず柳グリーン系ダークで統一されていること
+- SG祝日バッジ・主要行事バッジは引き続き赤/金で表示されること(柳グリーンに巻き込まれない)
+- 設定画面の「ダークモード」トグルUI(自動/オン/オフ)自体の挙動は変更前と同じであること
+- キャッシュバスティング(index.htmlの`?v=`、sw.jsの`CACHE_NAME`)が確実に更新されており、実際にブラウザで新しい配色が反映されることをcurl+目視で確認すること
