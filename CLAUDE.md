@@ -373,6 +373,7 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市�
 - **cron**: 独立エントリではなく、`run-fetch-all.sh`（7:00 SGT、`fetch-events.js`の直後・`notify-fetch-summary.js`の直前、`--no-notify`なし＝ユーザー向けプッシュ通知あり）と`run-fetch-extra.sh`（12:00/21:00 SGT、設計書183で追加。2026-09-09にユーザー要望で12:30/19:30から時刻変更、さらに同日中に3回目を17:00から21:00へ再変更。2026-09-09以降は両方とも`--no-notify`付き。設計書187で末尾に`notify-fetch-summary.js`呼び出しも追加）の両方に組み込まれている。当初（設計書172時点）は独立cronエントリ（毎日7:15 SGT）だったが、その後`run-fetch-all.sh`に統合されイベントと同じLINE通知にまとめられ、さらに設計書183で1日3回化された
 - **API**: `GET /api/life-info?city=sg&category=...`（`server.js`、`GET /api/events`の直後）
 - **フロントエンド**: ボトムナビ「くらし」画面（`#screen-news`）＋ホーム（「おでかけ」画面）のプレビューセクション（`#life-info-preview-section`、直近3件）。未ログインでも閲覧可能（探訪・予定表で使われていたアカウント連携ゲートは適用外）
+- **新着リストのソート順（`public/app.js`、2026-09-09にユーザー要望で優先順位を変更）**: くらし画面・おでかけ画面（`renderEventCards()`）とも、1次キー=`fetched_at`（取り込み時間、降順・新しい順）、2次キー=カテゴリー順（くらしは`NEWS_CATEGORY_ORDER`、おでかけは`CATEGORY_ORDER`。いずれもカテゴリチップ`#news-filter-row`/`#filter-row-category`の並び順と一致する固定順）でソートされる。従来は「カテゴリー→時間」の優先順位だったが、「まず取り込んだ時間、次にカテゴリー」の順に入れ替えた。くらし画面は2次キーの参照フィールドもこの変更に合わせて`publishedAt`（元記事の公開日時）から`fetched_at`（自システムへの取り込み日時）に変更済み（おでかけ画面は元々`fetched_at`を使用済みだったため変更不要だった）
 - 詳細なi18nキー・UI構造等はコード直接参照
 
 ## 環境構成と注意事項（2026-07-07）

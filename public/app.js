@@ -1191,13 +1191,15 @@
         ? LIFE_INFO_DATA.filter(item => item.category === _newsCategory)
         : [...LIFE_INFO_DATA];
       if (_newsFilterNew) filtered = filtered.filter(_isLifeInfoItemNew);
-      // カテゴリチップの並び順（#news-filter-row）と一致させる
+      // 1次キー: 取り込み時間（新しい順）、2次キー: カテゴリー順（#news-filter-rowの並びと一致させる）
       const NEWS_CATEGORY_ORDER = { admin: 0, transport: 1, health: 2, weather: 3, community: 4, education: 5 };
       filtered.sort((a, b) => {
+        const fa = new Date(a.fetched_at || 0).getTime();
+        const fb = new Date(b.fetched_at || 0).getTime();
+        if (fa !== fb) return fb - fa;
         const ca = NEWS_CATEGORY_ORDER[a.category] ?? 99;
         const cb = NEWS_CATEGORY_ORDER[b.category] ?? 99;
-        if (ca !== cb) return ca - cb;
-        return new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0);
+        return ca - cb;
       });
       const countEl = document.getElementById('news-result-count');
       if (countEl) countEl.textContent = `${filtered.length}件`;
@@ -1764,15 +1766,15 @@
         return pinMatch && ageMatch && catMatch && whoFilterMatch && weekMatch && areaMatch && newMatch && kwMatch && recommendMatch;
       });
 
-      // カテゴリチップの並び順（#filter-row-category）と一致させる
+      // 1次キー: 取り込み時間（新しい順）、2次キー: カテゴリー順（#filter-row-categoryの並びと一致させる）
       const CATEGORY_ORDER = { event: 0, show: 1, gourmet: 2, sale: 3, opening: 4, travel: 5 };
       filtered.sort((a, b) => {
-        const ca = CATEGORY_ORDER[a.type] ?? 99;
-        const cb = CATEGORY_ORDER[b.type] ?? 99;
-        if (ca !== cb) return ca - cb;
         const fa = a.fetched_at || '0000-00-00';
         const fb = b.fetched_at || '0000-00-00';
-        return fb.localeCompare(fa);
+        if (fa !== fb) return fb.localeCompare(fa);
+        const ca = CATEGORY_ORDER[a.type] ?? 99;
+        const cb = CATEGORY_ORDER[b.type] ?? 99;
+        return ca - cb;
       });
 
       // PRカード（スポンサー広告枠、設計書29）: おすすめモード中は非表示。3〜5枚目あたりに1件だけ差し込む
