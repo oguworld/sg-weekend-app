@@ -590,34 +590,6 @@
       syd: { code: 'SYD', flag: '🇦🇺', nameJa: 'シドニー',         nameEn: 'Sydney',        subtitleJa: 'シドニー在住者の週末おでかけガイド',         subtitleEn: 'Weekend guide for Japanese in Sydney' },
     };
 
-    const CITY_COURSE_AREAS = {
-      sg: [
-        { val: 'Central',     label: '🏙 Central' },
-        { val: 'East',        label: '🌅 East' },
-        { val: 'West',        label: '🌇 West' },
-        { val: 'North',       label: '🌿 North' },
-        { val: 'North-East',  label: '🌳 North-East' },
-        { val: 'Island-wide', label: '🗺️ Island-wide' },
-        { val: 'Sentosa',     label: '🏖 Sentosa' },
-      ],
-      bkk: [
-        { val: 'Sukhumvit',   label: '🌆 Sukhumvit' },
-        { val: 'Silom',       label: '🏢 Silom' },
-        { val: 'Siam',        label: '🛍️ Siam' },
-        { val: 'Riverside',   label: '🌊 Riverside' },
-        { val: 'Old Town',    label: '🛕 Old Town' },
-        { val: 'City-wide',   label: '🗺️ City-wide' },
-      ],
-      syd: [
-        { val: 'CBD',              label: '🏙 CBD' },
-        { val: 'Inner West',       label: '🌿 Inner West' },
-        { val: 'Eastern Suburbs',  label: '🌅 Eastern Suburbs' },
-        { val: 'North Shore',      label: '🌉 North Shore' },
-        { val: 'Western Sydney',   label: '🏘️ Western Sydney' },
-        { val: 'City-wide',        label: '🗺️ City-wide' },
-      ],
-    };
-
     // BKK/SYD 一時停止中。復活時は ACTIVE_CITIES に 'bkk', 'syd' を追加
     const ACTIVE_CITIES = ['sg'];
 
@@ -3528,22 +3500,11 @@
     function closeAllPopups() {
       closePinDetail();
       closeEventFilterSheet();
-      const detail = document.getElementById('detail-screen');
-      if (detail) detail.classList.remove('visible');
     }
 
     const FAB_HIDDEN_SCREENS = new Set(['settings']);
 
     let _loadedCity = getCity();
-
-    // アカウント連携必須ゲート（設計書116）
-    function _applyScreenAuthGate(screenKey) {
-      const gateEl = document.getElementById(`${screenKey}-auth-gate`);
-      if (!gateEl) return;
-      const gated = !getAuthToken();
-      gateEl.style.display = gated ? 'flex' : 'none';
-      return gated;
-    }
 
     function goToAccountLinking() {
       switchNav('settings');
@@ -3923,115 +3884,6 @@
     }
 
     checkNavParam();
-
-    // ─── HIDDEN GEMS DATA ───
-    const GEMS_DATA = [
-      {
-        id: 'g1',
-        emoji: '🍜',
-        bgClass: 'ramen',
-        badge: '隠れた名店',
-        name: '麺屋 暁（あかつき）',
-        location: 'Tanjong Pagar',
-        hours: '11:30〜14:30 / 18:00〜22:00（月曜定休）',
-        teaser: '元ミシュランシェフが脱サラして開いた、行列のできる博多ラーメン店。',
-        owner: '東京の有名フレンチレストランで10年修行した後、故郷の博多ラーメンへの愛が忘れられず、2019年にシンガポールへ。「本物の博多の味を世界に届けたい」という思いで、毎朝4時から豚骨スープを仕込む。食材は可能な限り日本から空輸。妻のエリさんが担当するデザートの抹茶プリンも密かな人気メニュー。',
-        residentAuthor: 'シンガポール在住 5年目・Mさん（2児のママ）',
-        residentText: '子どもたちがラーメン好きで毎月通っています。子ども用の細麺・薄味対応をお願いすると快く対応してくれます。ランチは13時を過ぎると少し空くので、その時間を狙うのがコツ。駐車場はないのでMRT Tanjong Pagar駅から徒歩5分。',
-        tips: [
-          '人気No.1は「特製とんこつ $18」。麺の硬さは「バリカタ」で注文すると本場の食感',
-          '12時〜13時は行列必至。13時15分以降に行くとほぼ待たずに入れる',
-          'ランチの〆に頼める「替え玉 $2」はコスパ最高。ニンニクは自分で入れる派がコツ',
-          '駐車場なし。Tanjong Pagar駅A出口から徒歩5分',
-          'テイクアウト不可。必ず店内で食べること',
-        ],
-      },
-      {
-        id: 'g2',
-        emoji: '☕',
-        bgClass: 'cafe',
-        badge: '穴場カフェ',
-        name: 'Forest Brew',
-        location: 'Dempsey Hill',
-        hours: '9:00〜18:00（火曜定休）',
-        teaser: 'Dempsey Hillの森の中に隠れた、地元在住者だけが知るオーガニックカフェ。',
-        owner: 'マレーシア出身のLinaとシンガポール人のJamesが2021年に開業。2人とも元々はIT業界出身で、コロナ禍をきっかけに「本当にやりたいこと」を追求してカフェをオープン。コーヒー豆はスマトラとエチオピアから直接仕入れ、フードは全てオーガニック食材を使用。小さな農園も裏に持っており、ハーブは自家栽培。',
-        residentAuthor: 'シンガポール在住 3年目・Kさん（ワーキングマム）',
-        residentText: '週末の午前中に子どもを連れてよく来ます。広い庭があって子どもが走り回れるので、ゆっくりコーヒーを楽しめます。ベビーチェアも完備。パンケーキが絶品で、うちの子は毎回これをリクエスト。駐車場も広いので車でのアクセスが楽です。',
-        tips: [
-          '人気メニューは「シングルオリジン フラットホワイト $7」と「バナナパンケーキ $14」',
-          '庭席は週末の10時前後に埋まる。9時台に来ると確実に取れる',
-          '犬同伴OK。ペット用の水とおやつも用意してくれる',
-          'Dempsey Hillの奥まった場所にあるのでGoogleマップ必須。看板が小さくて見逃しやすい',
-          'テイクアウトのコーヒー豆（$28/250g）はお土産にも最適',
-        ],
-      },
-      {
-        id: 'g3',
-        emoji: '🌊',
-        bgClass: 'park',
-        badge: '知る人ぞ知る',
-        name: 'Coney Island Park',
-        location: 'Punggol',
-        hours: '7:00〜19:00（年中無休）',
-        teaser: 'シンガポール北東端の小島。地元ファミリーだけが知る「もうひとつのセントーサ」。',
-        owner: '観光化されていない自然保護区で、シンガポール政府が管理する公園。1980年代まで民間所有だったが、現在は誰でも無料でアクセスできる。島内には在来種の植物や野鳥が生息し、自然観察の場としても貴重。ローカルのサイクリストや家族連れに人気だが、観光客にはほとんど知られていない。',
-        residentAuthor: 'シンガポール在住 7年目・Tさん（小学生2人のパパ）',
-        residentText: '子どもたちが小さいうちから毎年来ています。サイクリングロードが整備されていて、6歳くらいから自転車で一周できます。島内に売店はないので、飲み物・おやつは必ず持参。朝7時に入ると人も少なく、野生のオオトカゲや珍しい鳥に会えることも。日が高くなる前に切り上げるのがベスト。',
-        tips: [
-          '入口はPunggol Promenade Nature Walk側のみ。迷ったらGoogleマップで「Coney Island West Entrance」と検索',
-          'レンタル自転車あり（入口付近 $8/時間）。6歳以上なら一周（約4km）楽しめる',
-          '売店ゼロ。水・おやつ・虫除けスプレーは必ず持参',
-          '野生のカピバラが目撃される唯一のスポット。朝7〜9時が遭遇率高め',
-          '日陰が少ないので帽子必須。10時以降は気温が上がり子どもにはきつい',
-        ],
-      },
-    ];
-
-    function renderGems() {
-      const container = document.getElementById('gems-scroll');
-      if (!container) return;
-      container.innerHTML = GEMS_DATA.map((g, i) => `
-        <div class="gem-card" style="animation-delay:${i * 0.1}s" onclick="openDetail('${g.id}')">
-          <div class="gem-image ${g.bgClass}">
-            <span class="gem-badge">${g.badge}</span>
-            ${g.emoji}
-          </div>
-          <div class="gem-body">
-            <div class="gem-name">${g.name}</div>
-            <div class="gem-meta">📍 ${g.location}</div>
-            <div class="gem-teaser">${g.teaser}</div>
-          </div>
-        </div>`).join('');
-    }
-
-    function openDetail(id) {
-      const g = GEMS_DATA.find(x => x.id === id);
-      if (!g) return;
-
-      document.getElementById('detail-emoji').textContent = g.emoji;
-      document.getElementById('detail-header-img').className = 'detail-header-img ' + g.bgClass;
-      document.getElementById('detail-badge').textContent = g.badge;
-      document.getElementById('detail-title').textContent = g.name;
-      document.getElementById('detail-meta-row').innerHTML = `
-        <span class="detail-meta-item">📍 ${g.location}</span>
-        <span class="detail-meta-item">🕐 ${g.hours}</span>`;
-      document.getElementById('detail-owner').textContent = g.owner;
-      document.getElementById('detail-resident-author').textContent = g.residentAuthor;
-      document.getElementById('detail-resident-text').textContent = g.residentText;
-      document.getElementById('detail-tips-list').innerHTML =
-        g.tips.map(t => `<li>${t}</li>`).join('');
-
-      const screen = document.getElementById('detail-screen');
-      screen.classList.add('visible');
-      screen.scrollTop = 0;
-    }
-
-    function closeDetail() {
-      document.getElementById('detail-screen').classList.remove('visible');
-    }
-
-    renderGems();
 
     // ─── SHARE APP ───
     async function shareApp(spotName, eventUrl) {

@@ -18631,3 +18631,116 @@ if (catLine) {
 ### 検証状況
 - 本番の`logs/fetch-summary-sg.json`等の実データにこのシナリオ（accepted>0かつcatCounts空）が実際に出現するかは未確認。ロジック自体は`node -e`によるユニット的な動作確認（`formatCatCounts`のスタブ呼び出し）で分岐が意図通りに機能することを確認済み
 - サーバー側スクリプトのみの変更のため、次回のcron実行（1日3回、SGT 7:00/12:30/19:30）で自然に動作確認される
+
+# 設計書192: 未使用コードの一括削除（コードクリーンアップ、2026-09-10設計）
+
+（前回のplannerタスクによる徹底調査〈A1〜A17〉＋ユーザー確定判断3件〈B1〜B3〉を統合し、今回のplannerセッションで全項目をコード上で再検証した最終版。実装はこの後別のorchestratorエージェントが行う。ユーザーは全項目に承認済み、追加確認は不要）
+
+## 1. 背景・ユーザーストーリー
+
+「機能が一通り完成したので使ってないコードをキレイにしたい」という開発者（ユーザー）からの要望。長期間の機能追加・削除（探訪/コース/予定表機能の完全削除〈設計書178〉、i18n英語対応の廃止〈設計書189〉、配色機能の変遷等）を経て、`server.js`・`public/app.js`・`public/app.css`・`public/index.html`・リポジトリ直下に、呼び出し元が存在しない関数・エンドポイント・CSS・孤立ファイル・未使用npm依存が蓄積している。これらを安全に削除し、コードベースの可読性・保守性を高める。
+
+## 2. 受け入れ基準
+
+### 正常系
+- 削除後、`pm2 restart sg-weekend`でサーバーが正常起動すること
+- 削除後、Web版アプリの4タブ（くらし/おでかけ/ピン留め/設定）が従来通り動作すること（イベント一覧表示、コメント、ピン留め、認証、バックアップ、通知設定等）
+- 削除後、構文チェックが通ること（`node --check server.js`等）
+- `about.dosuru.app`（LP）が引き続き正常表示されること（`public/screenshots/`の未参照pngファイル削除がjpg参照に影響しないこと）
+
+### 失敗系・エッジケース
+- 削除対象と誤検知対象（下記「絶対に削除してはいけない7件」）が混同され、現役機能が壊れないこと
+- `.sale-pin-btn`関連CSS（現役）を`.sale-*`他ルールと一緒に消してしまわないこと（クラス名が似ているため誤爆リスクが高い、下記4-3参照）
+- COURSE API削除時に、同じファイル内で共有されているヘルパー関数を誤って巻き込んで削除しないこと
+- `/privacy`エンドポイントが2つ存在する（旧: コメントアウト内188行目、現行: 2765行目）。B1削除時は必ずコメントアウトブロック内の重複のほうを消すこと。現行の`app.get('/privacy', ...)`（`public/privacy.html`をsendFile）は絶対に消さないこと
+
+## 3. スコープ外
+- 新機能の追加は一切行わない（削除のみ）
+- コース・探訪・予定表機能の「復活」は行わない
+- `GENRE_LIST`・`CITY_META`の`_en`フィールド等、意図的に残置と判断済みのデータ定義には一切手を触れない
+- npm依存の削除は`qrcode`・`@playwright/test`の2つのみ
+- git操作（コミット・push）の要否・タイミングは本設計書のスコープ外。ローカルコミットまで行い、main/releaseへのpushはユーザーの明示指示があるまで行わないこと（過去の運用パターン踏襲）
+- `data/{city}/community-courses.json`等のコース関連データファイル自体の削除は今回のスコープ外（残置でよい）
+
+## 4. 削除対象一覧（A1〜A17 + B1〜B3、行番号は2026-09-10時点の目安。実装前に必ず現物を確認すること）
+
+### 4-1. `server.js`
+- **B1**: コメントアウト済みStripe決済コード一式（116〜262行目付近、`// STRIPE（現在無効化中...）`のコメント見出しから`*/`終端まで。中身は`stripe`初期化・`POST /api/webhook`・`POST /api/create-checkout-session`・**旧`/privacy`ルートの重複定義**・`GET /api/subscription-status`）
+- **B2**: コメントアウト済みnode-cronイベント自動取得ブロック（527〜560行目付近、`// イベント自動収集 cron（無効化中...）`から`*/`終端まで。`node-cron`requireと`cron.schedule('0 8 * * 1', ...)`）
+- **A1**: COURSE API群（2104〜2753行目付近、`// COURSE API`区切りコメントから`app.post('/api/courses/:id/unpublish', ...)`の終端`});`まで。9エンドポイント: `GET /api/courses`／`GET /api/courses/image`／`POST /api/courses/candidates`／`POST /api/courses/generate`／`POST /api/courses/chat`／`POST /api/courses/publish`／`DELETE /api/courses/:id`／`POST /api/courses/:id/like`／`POST /api/courses/:id/unpublish`。付随する`courseGenerateLimit`・`courseChatLimit`のrate-limit定義もセットで削除）
+- **A2**: `/api/chat`エンドポイント（1111〜1231行目付近、`chatLimit`rate-limit定義を含め`app.post('/api/chat', ...)`の終端`});`まで）
+
+削除順序: B1・B2は単純にブロック削除。A1・A2削除後、`GET/PUT /api/user-plans/me`（バックアップ機能、現役）の直後に`GET /api/version`が直結する形になることを確認すること。
+
+### 4-2. `public/app.js`
+- **A3**: `GEMS_DATA`定数（約3928〜3989行目）、`renderGems()`関数（約3991〜4006行目、`#gems-scroll`がindex.htmlに存在せず実質no-op）、`openDetail(id)`関数（約4008〜4028行目、到達不能）、`closeDetail()`関数（約4030〜4032行目、`#detail-screen`ごと削除するのでセット）、`renderGems();`呼び出し（約4034行目）
+- **A4**: `_applyScreenAuthGate(screenKey)`関数（約3540〜3546行目）。定義のみで呼び出し元ゼロ
+- **A7**: `CITY_COURSE_AREAS`定数（約593行目付近）。削除前に必ず`grep`で呼び出し元ゼロを再確認すること
+
+**削除しないこと（誤検知）**: `updateTabLabels()`/`syncHeaderHeight()`（約760行目・約2284行目、意図的なno-op、呼び出し元が現役）
+
+### 4-3. `public/app.css`
+- **A3**: 「隠れた名店」関連CSS一式（1053〜1266行目付近: `.gems-scroll`, `.gem-card`, `.gem-image`〈`.ramen`/`.cafe`/`.park`含む〉, `.gem-badge`, `.gem-body`, `.gem-name`, `.gem-meta`, `.gem-teaser`, `.detail-screen`, `.detail-header-img`, `.detail-back-btn`, `.detail-badge`, `.detail-title`, `.detail-meta-row`, `.detail-meta-item`, `.detail-section`, `.detail-section-title`, `.detail-section-body`, `.detail-tips-box`, `.detail-tips-list`〈::before含む〉, `.detail-resident-box`, `.detail-resident-author`, `.detail-resident-text`）
+- **A3**: ダークモード対応行（約1987行目）: `html[data-theme="dark"] .sale-card, html[data-theme="dark"] .gem-card { background: #252019; }` の**`.gem-card`部分のみ削除**（`.sale-card`部分は下記A6と合わせて処理）
+- **A5**: 旧タブCSS（84〜125行目付近、`/* ─── TABS ─── */`から`.tab:not(.active):active`まで。`.tabs-section`, `.tabs-label`, `.tabs`, `.tabs-weekend-group`, `#tab-weekend`等, `.tab`, `.tab.active`等）
+- **A6**: `.sale-*`旧CSS（1269〜1439行目付近の一部）: `.sale-list`, `.sale-card`, `.sale-card-top`, `.sale-card-left`, `.sale-store`, `.sale-area-badge`〈.nearby含む〉, `.sale-period`, `.sale-content`, `.sale-location`, `.sale-official-btn`〈:active含む〉, `.sale-filter-row`〈::-webkit-scrollbar含む〉, `.sale-filter-chip`〈.active含む〉, `.sale-empty`〈-emoji/-title/-desc含む〉, `.sale-section-label`〈:first-child含む〉。
+  **⚠️絶対に削除しないこと**: `.sale-pin-btn`, `.sale-pin-btn.pinned`, `.sale-pin-btn:active`（1338〜1361行目付近、`app.js`2616/2620行目で動的生成され現役）
+- **A6**: ダークモード対応（約1984行目）: `.sale-filter-chip:not(.active)`部分のみ削除（同じ行の`.age-chip...`部分は現役のため残す）。約1986〜1987行目: `.sale-card`部分削除（`.gem-card`部分と合わせて行ごと削除可）。約1988行目: `.sale-pin-btn`のダークモード対応行は**削除しないこと**
+
+複合セレクタが入り組んでいる箇所（1984〜1988行目付近）は必ず現物を読んでから編集すること。機械的な一括置換は避ける。
+
+### 4-4. `public/index.html`
+- **A3**: `#detail-screen`ブロック（144行目付近のコメントから対応する終了タグまで一式）
+
+### 4-5. 孤立ファイル削除
+- `public/success.html`
+- `public/index-bak.html`
+- `public/x-banner.svg`
+- `public/screenshots/screen-courses-appstore.png`
+- `public/screenshots/screen-courses.png`
+- `public/screenshots/screen-events-appstore.png`
+- `public/screenshots/screen-schedule-appstore.png`
+- `public/screenshots/screen-schedule.png`
+- `public/screenshots/screen-events.png`
+- `public/screenshots/screen-explore.png`
+（about.htmlが参照するのは同ディレクトリの`screen-news.jpg`/`screen-home.jpg`/`screen-calendar.jpg`/`screen-pins.jpg`のみで上記pngはいずれも無関係）
+
+### 4-6. `scripts/post-to-line.js`削除（B3）
+crontab未登録（ユーザー確認済み）、コード上も呼び出し元ゼロ確認済み。現行の`scripts/post-to-x.js --to-line`とは別物。
+
+### 4-7. npm依存削除（A17）
+- `package.json`から`qrcode`を削除（**`public/qrcode-generator.js`とは全くの別物、混同して残さないよう注意。削除対象はnpmパッケージの方のみ**）
+- `package.json`から`@playwright/test`を削除
+- `npm install`を実行して`package-lock.json`を更新
+
+## 5. 絶対に削除してはいけない「誤検知」項目（7件）
+1. `.cal-sync-action`（`.primary`/`.secondary`/`.danger`/`:disabled`含む、`public/app.css`約1814〜1818行目）— バックアップパスフレーズUIで現役
+2. `updateTabLabels()`/`syncHeaderHeight()`（`public/app.js`）— 意図的no-op、呼び出し元現役
+3. `goToAccountLinking()`（`public/app.js`約3548〜3553行目）— コメント認証ゲートで現役。`_applyScreenAuthGate()`と混同しないこと
+4. `GENRE_LIST`（`public/app.js`約324行目）— 将来再有効化のため意図的残置
+5. `CITY_META`の`nameEn`/`subtitleEn`フィールド（`public/app.js`約588〜590行目）— 既存方針により意図的残置
+6. `public/qrcode-generator.js` — アプリ共有QRコード機能で現役（`index.html`638行目で読み込み中）
+7. 現行`GET /privacy`ルート（`server.js`約2765行目）— `public/privacy.html`をsendFileする現役ルート。B1で消すのはコメントアウトブロック内の重複のみ
+
+## 6. データ共有への影響
+API変更（COURSE API・`/api/chat`削除）はWeb版・iOS版どちらの現行/旧バージョンからも呼び出し元が存在しないため、後方互換性への影響なし。データファイル自体は削除しない。サーバー側変更の反映には`pm2 restart sg-weekend`が必要（本番反映は別途ユーザー確認）。フロントエンド側変更はCSS/JSキャッシュバスティング（`index.html`の`?v=`、`sw.js`の`CACHE_NAME`）を通常通り更新すること。
+
+## 7. 変更するファイル一覧
+`server.js` / `public/app.js` / `public/app.css` / `public/index.html` / `public/success.html`(削除) / `public/index-bak.html`(削除) / `public/x-banner.svg`(削除) / `public/screenshots/*`(7ファイル削除) / `scripts/post-to-line.js`(削除) / `package.json` / `package-lock.json`
+
+## 8. データモデルの変更
+なし
+
+## 9. APIの変更
+COURSE API 9本、`/api/chat`を削除。後方互換性への影響なし（呼び出し元ゼロのため）
+
+## 10. フロントエンドの変更
+「隠れた名店」機能一式・旧タブCSS・旧セールCSS(pin-btn除く)・`CITY_COURSE_AREAS`・`_applyScreenAuthGate()`を削除。いずれも到達不能/未参照コードのため現行UIへの影響なし
+
+## 11. リスク・注意事項
+- `.sale-*`削除時の`.sale-pin-btn`誤爆に最大注意
+- 1984〜1988行目の複合セレクタは必ず現物確認してから編集
+- `CITY_COURSE_AREAS`削除前に念のため再度grep確認
+- npm依存削除後は`npm install`実行、本番VPSでの反映要否も確認
+- 削除後、CSS/JSキャッシュバスティング(`index.html`の`?v=`、`sw.js`の`CACHE_NAME`)を通常運用ルールに従って更新すること
+- git commitはローカルに留め、main/releaseへのpushはユーザーの明示指示があるまで行わないこと

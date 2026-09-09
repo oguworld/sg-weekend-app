@@ -70,7 +70,7 @@ sg-weekend-app/
 │   │   ├── life-info.json          ← 生活情報・ニュース（gitignore対象）
 │   │   ├── comments.json           ← コメント機能
 │   │   ├── model-courses.json / community-courses.json / affiliate-links.json / stamp-spots.json
-│   │   │   ← コース・探訪機能削除済み（設計書178）の残置データ、`server.js`側API未クリーンアップのため現存
+│   │   │   ← コース・探訪機能削除済み（設計書178）の残置データ。`server.js`側のCOURSE API（9エンドポイント）自体は設計書192（2026-09-10）で削除済みだが、データファイル自体の削除はスコープ外のため引き続き残置
 │   │   └── school-calendar.json / sponsored-cards.json 等
 │   ├── bkk/ (同様)
 │   └── syd/ (同様)
@@ -213,7 +213,7 @@ Web版（VAPID/Web Push）とは完全に独立した仕組みとしてiOSネイ
   - 同様に`server.js`のLINE Bot経由イベント投稿生成（`generateEventDraft()`）・`scripts/fill-content.js`（空content補完）・`scripts/retip-events.js`（tips一括更新）も英語フィールド生成部分を削除済み。英語専用の補完スクリプト`scripts/fill-english.js`は削除済み
   - `data/bkk/events.json`・`data/syd/events.json`（BKK/SYD、現在停止中都市）には`content_en`が残存しているが、意図的に未対応（BKK/SYD都市対応自体がスコープ外のため）
 - `CITY_META`の`nameEn`/`subtitleEn`、`GENRE_LIST`の`labelEn`のような**未使用の静的データフィールド自体は削除していない**（参照コードが無いため実害なし、コード整理の粒度としてデータ定義までは踏み込んでいない）
-- `/api/chat`（`server.js`）の`lang`パラメータは削除済み（フロントエンドから呼び出し箇所が存在しない未接続のデッドパラメータだったため。エンドポイント自体は存続）
+- `/api/chat`（`server.js`）は当初`lang`パラメータのみ削除していたが、エンドポイント自体もフロントエンドから呼び出し箇所が存在しない未接続のデッドコードだったため、2026-09-10設計書192でエンドポイント自体を完全削除した（AIチャット機能はWeb版・iOS版いずれのUIにも現存しない）
 - 新しいUI文字列を追加する場合、`data-i18n`属性＋`STRINGS.ja`へのキー追加は従来通り可能（表示は常に日本語）。英語キー（`STRINGS.en`）は追加不要（存在しないため）
 
 ## X自動投稿（scripts/post-to-x.js）
@@ -313,7 +313,7 @@ Web版（VAPID/Web Push）とは完全に独立した仕組みとしてiOSネイ
 
 ## アプリ共有機能（2026-09-07実装）
 - 設定画面の「シェア」ボタン(`#do-share-btn`)のタップ動作を変更: 従来は`doShare()`が直接呼ばれ`navigator.share`(対応環境)/クリップボードコピー(非対応環境)のどちらかに即分岐していたが、**まずQRコード表示シートを開くように変更**(`onclick`を`openQrShareSheet()`に差し替え)。シート内に「リンクを共有」ボタン(`#qr-share-link-btn`)を新設し、そこから従来通り`doShare()`を呼ぶ(中身は無変更)。目の前にいる友達にその場でQRコードを見せてスキャンしてもらいたい、という要望から
-- QRコード生成は`public/qrcode-generator.js`(Kazuhiko Arase氏のMIT製、依存なしの純クライアントサイドライブラリ)を使用。**このファイルは以前から存在していたが、削除済みのコース/スタンプラリー機能の名残でどこからも読み込まれていない未使用ファイルだった**(`npm`の`qrcode`パッケージも同様に未使用、package.jsonに残置)。新規依存追加はせず、この既存ファイルを`app.js`より前に`<script src="/qrcode-generator.js">`で読み込んで再利用。API: `qrcode(0,'M').addData(url); .make(); .createSvgTag(6,4)`でSVG文字列を取得し`#qr-code-canvas`に`innerHTML`で挿入(初回のみ生成しキャッシュ)
+- QRコード生成は`public/qrcode-generator.js`(Kazuhiko Arase氏のMIT製、依存なしの純クライアントサイドライブラリ)を使用。このファイルは以前から存在していたが、削除済みのコース/スタンプラリー機能の名残でどこからも読み込まれていない未使用ファイルだったものを、新規依存追加せずこの既存ファイルを`app.js`より前に`<script src="/qrcode-generator.js">`で読み込んで再利用している。API: `qrcode(0,'M').addData(url); .make(); .createSvgTag(6,4)`でSVG文字列を取得し`#qr-code-canvas`に`innerHTML`で挿入(初回のみ生成しキャッシュ)。**`npm`の`qrcode`パッケージ（このファイルとは無関係の別物、未使用だった）は設計書192（2026-09-10コードクリーンアップ）で`package.json`から削除済み**
 - QRコードに埋め込むURLは既存の`doShare()`と同じApp Store URL(`https://apps.apple.com/app/id6787159354`)
 - シートの見た目・開閉パターンは既存の`#backup-passphrase-overlay`/`#backup-passphrase-sheet`(`.chat-overlay`+`.plan-modal`、`classList.add/remove('visible')`、`lockScroll()`/`unlockScroll()`)をそのまま踏襲
 - `#qr-code-canvas`の背景は`#fff`固定(CSS変数不使用)。ダークモードでも白背景を維持しQRコードの読み取り精度を落とさないため
@@ -598,9 +598,9 @@ document.addEventListener('touchstart', () => { _touchCapableDetected = true; },
 
 オーバーレイ背景タップで閉じる系（`install-overlay`/`pin-detail-overlay`/`pin-picker-overlay`/`emoji-picker-overlay`/`schedule-action-overlay`/`cal-popup-overlay`）は、`onclick`の個別ガードに加えて`app.js`側の配列一括登録`touchend`リスナーも併用している。新規に同種オーバーレイを追加する際は同じパターンに揃えること。
 
-## server.js編集時の注意（2026-07-09追記）
-- `server.js`内、47〜200行目付近は無効化中のStripe決済コードが`/* ... */`で丸ごとコメントアウトされている。この範囲に新しいルートを追加すると**サイレントに一切発火しない**（エラーも出ない）ため要注意
-- ルート追加時は必ず追加後に`grep -n "^/\*\|^\*/"`等でコメントブロックの範囲を確認し、対象行が有効なコード領域にあるか確認する
+## server.js編集時の注意（2026-07-09追記、2026-09-10更新）
+- ⚠️ **2026-09-10設計書192で削除済み**: かつて`server.js`冒頭付近に無効化中のStripe決済コード一式（`/api/webhook`・`/api/create-checkout-session`・旧`/privacy`ルートの重複定義・`/api/subscription-status`）とイベント自動収集cronブロックが`/* ... */`で丸ごとコメントアウトされて残っており、この範囲に新しいルートを追加すると**サイレントに一切発火しない**（エラーも出ない）という罠があったが、コードクリーンアップ（設計書192）でこれらのコメントアウトブロック自体を完全削除したため、この罠は現在は存在しない
+- ルート追加時は念のため`grep -n "^/\*\|^\*/"`等でコメントブロックが無いか確認する習慣は今後も維持すること（将来また無効化コードが増える可能性があるため）
 - 新規ルート追加後は`curl -H "Host: xxx"`等で実際にレスポンスを検証してから完了報告すること（行番号だけを頼りに配置場所を判断しない）
 - **新しいHTTPメソッド（PUT/PATCH等）を使うエンドポイントを追加する際は、`/api`向けCORSミドルウェアの`Access-Control-Allow-Methods`にそのメソッドが含まれているか必ず確認する**: 漏れるとWeb版はSame-Originのため気づかず、Capacitor環境（`capacitor://localhost`オリジン）のiOS実機でのみOPTIONSプリフライトが拒否され`fetch()`が失敗する。`curl -i -X OPTIONS -H "Origin: capacitor://localhost" -H "Access-Control-Request-Method: <メソッド>" <URL>`で確認してから完了報告すること
 
