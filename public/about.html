@@ -84,6 +84,10 @@
       font-style: normal;
       color: var(--caramel);
     }
+    .mobile-break { display: none; }
+    @media (max-width: 480px) {
+      .mobile-break { display: block; }
+    }
     .hero p {
       font-size: 17px;
       color: var(--warm-gray);
@@ -152,17 +156,13 @@
       border-radius: 30px;
       overflow: hidden;
       position: relative;
-    }
-    .phone-img-wrap::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 48px;
-      background: linear-gradient(to bottom, #DCE5D6 0%, transparent 100%);
-      pointer-events: none;
+      aspect-ratio: 1170 / 2309;
     }
     .phone img {
       width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
       display: block;
     }
 
@@ -355,7 +355,7 @@
   <!-- HERO -->
   <section class="hero">
     <div class="hero-badge">シンガポール在住の日本人向け</div>
-    <h1>シンガポールの出来事を、<br><em>日本語で</em>まるごとチェック。</h1>
+    <h1>シンガポールの出来事を、<br><em>日本語で</em><br class="mobile-break">まるごとチェック。</h1>
     <p>おでかけ情報も生活ニュースも毎日更新。<br>気になるスポットを巡って、シンガポール暮らしをもっと楽しく。</p>
     <div class="hero-btns">
       <a href="#download" class="btn-primary">📱 アプリを入手</a>
