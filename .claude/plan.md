@@ -18513,3 +18513,121 @@ CLAUDE.mdの記述通り、設定画面には`#delete-account-btn`のような�
 ### データ共有影響の確認(重要、必ず確認すること)
 - `data/sg/events.json`・`data/sg/life-info.json`から`_en`フィールドを削除すると、**まだ更新していない旧バージョンのiOSアプリ**(万が一`localStorage`に`sg_lang=en`等が残っていて英語表示を試みるケースがあった場合)で英語フィールドが見つからずフォールバック処理が発生する可能性がある。既存コードのフォールバック処理(`e.content_en || e.content`のような書き方になっているか)を確認し、フォールバックが安全に効くことを確認すること
 - この変更はサーバー側データ・スクリプトの変更が中心。`public/`側の変更(言語切替UI削除等)はWeb版に即時反映されるが、iOSアプリ本体への反映には次回`release`ブランチへのpushが必要
+
+## 設計書190（調査のみ、コード未変更）: プッシュ通知に表示されるアプリアイコンが旧デザインのままになる不具合の原因調査
+
+### 症状
+TestFlightビルド（現行v1.8.2）実機において、プッシュ通知に表示される小さいアプリアイコンが旧デザイン（ベージュ×草履/サンダルのイラスト）のままになっている。ホーム画面のアプリアイコン自体は新デザイン（シンガポールスカイライン＋コンパスピン、柳グリーン基調）に更新済みであることをユーザーが実機で確認済み。ユーザーは「OSキャッシュの問題ではない」と明言している。
+
+### 事前に確定している事実（調査不要）
+- `server.js`の`sendApnToToken()`（49-64行目）はAPNsペイロードに`mutable-content`やリッチメディア添付を一切設定していない。**通知アイコンはサーバー側ペイロードに一切依存せず、100%アプリ本体ビルド時に埋め込まれるAppIcon（Notifications用20ptサイズ）由来**であることが確定している
+- `ios-app/resources/icon.png`は新デザインに更新済み（設計書180、2026-09-08）
+- CI（`.github/workflows/ios-deploy.yml`）は`release`ブランチpushのたびに`npx cap add ios`→`npx capacitor-assets generate --ios`→`npx cap sync ios`の順で毎回Xcodeプロジェクトを生成し直す設計（`ios/`はgit管理外、ビルドのたびに使い捨て）
+
+### 調査内容と判明した事実
+
+1. **`ios-deploy.yml`のステップ順序**: `Add iOS platform`→`Generate app icons and splash screen`→`Sync Capacitor`の順。アイコン生成が`cap sync`より**前**に実行されており、懸念されていた「sync時に生成済みアイコンが上書き・削除される」という順序逆転の問題は**存在しない**（`cap sync`はWebアセットのコピー・CocoaPods更新が主目的で、Assets.xcassets内のAppIconには触れない）
+2. **キャッシュ**: `actions/cache`等でnode_modules・DerivedData・Pods等をキャッシュしている箇所は`ios-deploy.yml`に存在しない。`ios/`ディレクトリ自体が毎回`npx cap add ios`で新規生成されるため、古いビルド成果物の混入という意味でのキャッシュ問題は考えにくい
+3. **実際のCIログ確認（決定的な証拠）**: 設計書180のアイコン差し替えを含むビルド（run 34174496972、2026-09-08、成功）の実ログを`gh api .../jobs/{id}/logs`で取得し確認した。「Generate app icons and splash screen」ステップの出力は以下の1行のみ：
+   ```
+   CREATE ios icon .../AppIcon.appiconset/AppIcon-512@2x.png (674.79 KB)
+   ```
+   Totalsも`ios: 13 generated`（icon 1個＋splash/splash-dark系12個）であり、**AppIconセットに関しては1024×1024の単一ファイルしか生成されていない**。Notifications用20pt（40×40/60×60px）はおろか、Settings用29pt・Spotlight用40pt・従来のiPhone/iPad個別サイズも一切ログに出現しない
+4. **原因の特定**: `ios-app/node_modules/@capacitor/assets/dist/platforms/ios/index.js`の`updateIconsContentsJson()`関数のソースコードを確認し、原因を特定した。このツール（`@capacitor/assets` v3系）は、Xcode 14以降の「Single Size App Icon」機能（1024×1024の1枚だけをxcassetsに登録し、Xcodeのビルドシステムが実行時に他の全サイズを自動生成する仕組み）に対応する設計になっている。具体的には、生成した`AppIcon-512@2x.png`（universal、1024×1024）**以外の既存アイコンファイルを`rmSync`で物理削除し**、`Contents.json`の`images`配列も**そのuniversal 1024×1024の1エントリだけに書き換えて上書きする**処理になっている（`npx cap add ios`が生成する初期テンプレートには本来Notifications/Settings/Spotlight等の個別サイズエントリが存在するが、これらは全て削除される）
+5. **ビルドログの追加確認**: 実際のXcodeビルドフェーズでは`AppIcon60x60@2x.png`（ホーム画面用iPhone）・`AppIcon76x76@2x~ipad.png`（iPad用）がビルド成果物に`Emplaced`（自動生成・配置）されたことをログで確認できたが、**Notifications用の`AppIcon20x20@2x.png`/`AppIcon20x20@3x.png`が生成・配置されたことを示すログは見当たらなかった**（この点はログの記載範囲内での確認であり、実機での再現と完全に一致する直接証拠ではない）
+
+### 原因（上記4を根拠とするが、Xcodeのシングルサイズ機能自体の内部的な自動生成範囲の限界については「推測」）
+`capacitor-assets generate --ios`が1024×1024の単一ファイル方式でAppIconを生成し、Xcodeのシングルサイズ機能に生成を委ねる仕様になっている。この方式ではホーム画面用アイコン（60pt/76pt/83.5pt相当）は正しく自動生成・反映されるが、**Notifications用の20ptサイズ（通知センターに表示される小さいアイコン）が自動生成の対象に含まれていない、または何らかの理由でOS側が別の値（ビルドキャッシュ相当の古いアイコン、あるいはXcodeプロジェクトテンプレートに残存する別経路のアイコン参照）にフォールバックしている可能性が高い**（推測）。少なくとも「サーバーの通知ペイロードの問題」「OSキャッシュの問題」「`icon.png`自体が未更新」という可能性は全て排除できており、**CIのアイコン生成ステップがNotifications用アイコンを正しく生成・反映できていないこと**が最有力の原因である。
+
+### 修正方針（案、実装はしていない）
+以下のいずれか、または組み合わせで対応することを推奨する。
+1. `npx capacitor-assets generate --ios`の後に、Notifications用個別サイズ（`AppIcon20x20@2x.png`=40×40px、`AppIcon20x20@3x.png`=60×60px、可能なら29pt/40pt含む旧来のフルサイズセット一式）を`ios-app/resources/icon.png`から直接生成し、`Contents.json`に追記する後処理ステップをCIに追加する（他の`scripts/`配下のPlistBuddy/plistlib方式の冪等スクリプトと同様のアプローチ）
+2. または、`capacitor-assets`のバージョンアップ・設定オプション（`assets.config.json`等でシングルサイズ方式を無効化し、旧来の全サイズ個別生成方式に切り替えられるオプションがあるか）を確認し、全サイズ生成方式に切り替える
+3. 対応後は必ず実際のCIログで「Generate app icons」ステップの出力にNotifications関連サイズ（20x20系）のファイル名が含まれることを確認し、TestFlightビルドの実機で通知アイコンが新デザインになっていることを目視確認する
+
+### 変更するファイル一覧（案、未実装）
+- `.github/workflows/ios-deploy.yml`（アイコン生成ステップの後に個別サイズ生成・Contents.json補完ステップを追加する場合）
+- 新規スクリプト（例: `scripts/ensure-notification-icon.py`または同等のNode.js/Python画像生成スクリプト、`sharp`等を利用）
+- 場合によっては`ios-app/package.json`の`@capacitor/assets`バージョン、または新設定ファイル（`assets.config.json`等）
+
+### 受け入れ基準
+- 次回`release`ブランチpushによるTestFlightビルドのCIログで、「Generate app icons and splash screen」相当のステップの出力にNotifications用サイズ（20x20@2x/@3x、または40×40px/60×60pxファイル）の生成が明示的に確認できること
+- 実機のTestFlightビルドで、プッシュ通知に表示される小さいアイコンが新デザイン（スカイライン＋コンパスピン、柳グリーン基調）になっていること
+- ホーム画面アイコン・スプラッシュ画面など、既に正しく反映されている他のアイコン関連表示に悪影響が出ていないこと
+
+### 再発防止策
+- 今後アプリアイコンを差し替える際は、CIログで「Generate app icons」ステップの出力を必ず確認し、生成されたファイル一覧にNotifications用サイズが含まれているかをチェック項目に加える（`CLAUDE.md`の「アプリアイコン・スプラッシュ画面」節に手順として追記することを推奨）
+- `@capacitor/assets`のようなサードパーティ生成ツールに一括生成を任せる場合、そのツールが「フルサイズ個別生成方式」か「Xcodeシングルサイズ委任方式」かを事前に確認し、後者の場合はNotifications等の非ホーム画面用途のアイコンが正しくカバーされるか個別に検証する
+
+### 未実施（コードは一切変更していない、読み取り専用調査のみ）
+
+## 設計書190 実装内容: プッシュ通知に表示されるアプリアイコンが旧デザインのままになる不具合の修正（2026-09-10実装）
+
+上記「設計書190（調査のみ、コード未変更）」の調査結果・修正方針（案1: CIに後処理ステップを追加）を採用し、実装した。方針案2（`capacitor-assets`の設定でシングルサイズ方式を無効化）は、パッケージ内コード（`ios-app/node_modules/@capacitor/assets/dist/platforms/ios/assets.js`・`index.js`）およびREADME（Easy Mode/Custom Modeいずれも1024×1024の`IOS_1024_ICON`テンプレート1本のみを対象としており、`--legacy`等の切り替えフラグは存在しない）を確認した上で「存在しない」と判断し、不採用とした。
+
+### 実装内容
+1. `.github/workflows/ios-deploy.yml`の`Generate app icons and splash screen`ステップ（`npx capacitor-assets generate --ios`）の直後に、新ステップ`(通知アイコン修正) Add Notifications icon sizes (20pt) missing from single-size AppIcon`を追加。`ios-app/resources/icon.png`（1024×1024）から`sharp`で20pt用の2ファイル（40×40px=2x、60×60px=3x）を生成し、`ios/App/App/Assets.xcassets/AppIcon.appiconset/`に配置、`Contents.json`に2エントリを追記するNode.jsワンショットスクリプトをインラインで実行する
+2. `Contents.json`のエントリ形式は、`capacitor-assets`のソースコード（`updateIconsContentsJson()`、`index.js:191-214`）が実際に書き込む形式（`idiom`/`size`/`filename`/`platform:"ios"`のみ、`scale`キーは含まない）を忠実に踏襲した。ただし20ptサイズは1つの`size`（`"20x20"`）に対して2x/3xの2ファイルが対応するため、Appleの標準命名規則に従い`filename`を`AppIcon20x20@2x.png`/`AppIcon20x20@3x.png`とし、`scale`キーもXcodeの標準的なAppIcon.appiconset形式（`idiom:"iphone"`, `size:"20x20"`, `scale:"2x"`/`"3x"`）に合わせて明示的に追加した（`capacitor-assets`自身が生成するuniversal 1024×1024エントリには`scale`が無いが、これは1エントリのみのシングルサイズ方式特有の簡略形式であり、複数バリエーション（2x/3x）を区別する必要がある個別サイズエントリでは`scale`が必須のため）
+3. 追加した2エントリは`idiom:"iphone"`のみとした（`ios-app/resources/icon.png`はiPhone/iPad共通の単一マスター画像であり、iPad用Notifications 20pt（`idiom:"ipad"`, 2x）は本来別途必要になるが、今回の不具合報告・受け入れ基準がiPhone実機のプッシュ通知表示に限定されているため、まずiPhone分のみ対応した。iPad版の通知アイコンは今回のスコール外、将来的な課題として残る）
+4. 既存のuniversal 1024×1024エントリ（`AppIcon-512@2x.png`）は変更しない。ホーム画面用（60pt/76pt相当）はXcodeのシングルサイズ機能による自動生成に引き続き委ねるため、CIでの追加生成は行わない
+5. `sharp`は`ios-app/package.json`には依存関係が存在しなかったため、追加ステップ内で`npm install --no-save sharp`により一時インストールする方式を採った（`ios-app`自体の`package.json`永続的な依存関係には追加しない。リポジトリルートの`package.json`には既に`sharp:^0.34.5`が存在するが、CIの`Generate app icons`ステップは`cd ios-app`済みで実行されるため、ルート側の`node_modules`をそのまま流用せず`ios-app`側で都度インストールする形にした）
+
+### 変更ファイル
+- `.github/workflows/ios-deploy.yml`のみ（新規スクリプトファイルは作成せず、ワークフロー内にインラインNode.jsスクリプトとして実装）
+
+### 検証状況・残課題
+- ローカル環境（Linux、Xcodeプロジェクト自体が存在しない）ではCIの`ios/App/App/Assets.xcassets/AppIcon.appiconset/`ディレクトリ自体を再現できないため、実際にこのステップを走らせた動作確認は未実施。YAML構文・インラインスクリプトのロジック（`sharp`でのリサイズ処理、`Contents.json`のJSON読み書き）はコードレビューレベルでのみ確認済み
+- **次回`release`ブランチへのpushによるTestFlightビルドで、実際にCIが走った際のログ（「(通知アイコン修正)」ステップの出力）を確認する必要がある。** 現時点ではこのステップ自体をpushしてCIで検証していないため、実行時エラー（パス不一致・`Contents.json`の既存構造との不整合等）が発生する可能性は残っている
+- 実機のプッシュ通知アイコンが新デザインになったかどうかの最終確認はユーザーに委ねる
+
+## 設計書191: 開発者向けLINE通知の「新着なし」表示を分かりやすくする（重複除外による0件を明示、2026-09-10実装）
+
+### 背景
+`scripts/notify-fetch-summary.js`の`formatCatCounts()`は、`catCounts`（カテゴリ別件数）を`newItems`（重複除外**後**の配列）から集計している。一方、`accepted`（採用件数）は重複除外**前**の値を使っている（`fetch-events.js`の`saveFetchSummary()`247行目、`fetch-life-info.js`の`saveFetchSummary()`29-30行目、いずれも`item.type`/`item.category`を`newItems`から集計）。
+
+このため、「AIには関連ありと判定されたが、既存記事と重複していたため実際には0件しか新規追加されなかった」ケースで、「3件採用」という表示と「（新着なし）」という表示が矛盾して見え、ユーザーが混乱する不具合があった。また、「旅行」のようなカテゴリの記事が重複除外されやすい傾向がある場合、そのカテゴリが通知に一切表示されないように見えてしまう問題があった（実際にはAIには採用されているが、重複除外後の集計にしか使われないカテゴリ内訳には反映されないため）。
+
+### 実装内容
+`formatCatCounts()`呼び出し箇所（おでかけ・くらし両方）で、以下のロジックに変更した。
+1. `catLine`（カテゴリ内訳）が存在する場合は、これまで通りそのまま表示する
+2. `catLine`が空（該当カテゴリなし）だが、`accepted`（採用件数）が1件以上ある場合は、単純な「（新着なし）」ではなく、実際の採用件数を含めた「（◯件は重複のため新規追加なし）」という文言に変更した
+3. `accepted`が0件の場合（元々新着が無かった場合）は、従来通り「（新着なし）」のまま
+
+おでかけ側（`s.accepted`/`s.catCounts`、既存143-150行目付近）:
+```js
+const catLine = formatCatCounts(s.catCounts, EVENT_CAT_LABELS);
+if (catLine) {
+  lines.push(`  ${catLine}`);
+} else if (s.accepted > 0) {
+  lines.push(`  （${s.accepted}件は重複のため新規追加なし）`);
+} else if (!s.newItems || s.newItems.length === 0) {
+  lines.push('  （新着なし）');
+}
+```
+おでかけ側は元々「新着なし」判定に`s.newItems`（配列の有無）を使っていたが、`accepted>0`だが`catLine`が空というケースは`newItems`が空配列であることと実質的に同値であるため、`else if`チェーンとして矛盾なく統合した。
+
+くらし側（`li.accepted`/`li.catCounts`、既存161-167行目付近）:
+```js
+const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
+if (catLine) {
+  lines.push(`  ${catLine}`);
+} else if (li.accepted > 0) {
+  lines.push(`  （${li.accepted}件は重複のため新規追加なし）`);
+} else {
+  lines.push('  （新着なし）');
+}
+```
+
+### 変更ファイル
+- `scripts/notify-fetch-summary.js`のみ
+
+### 受け入れ基準
+- 採用件数が1件以上あるがカテゴリ内訳が空（重複除外で0件になった）場合、「（◯件は重複のため新規追加なし）」のように実際の件数を含めた分かりやすい文言になる
+- 採用件数自体が0件の場合は、従来通り「（新着なし）」と表示される
+- おでかけ・くらし両方に同じロジックを適用済み
+- 既存の「カテゴリ内訳がある場合の表示」は変更していない
+- 「旅行」カテゴリ自体のラベル定義（`EVENT_CAT_LABELS`の`travel: '旅行'`）は既存のまま変更なし（表示ロジックの分かりやすさ改善のみ）
+
+### 検証状況
+- 本番の`logs/fetch-summary-sg.json`等の実データにこのシナリオ（accepted>0かつcatCounts空）が実際に出現するかは未確認。ロジック自体は`node -e`によるユニット的な動作確認（`formatCatCounts`のスタブ呼び出し）で分岐が意図通りに機能することを確認済み
+- サーバー側スクリプトのみの変更のため、次回のcron実行（1日3回、SGT 7:00/12:30/19:30）で自然に動作確認される

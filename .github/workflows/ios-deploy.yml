@@ -32,6 +32,70 @@ jobs:
           cd ios-app
           npx capacitor-assets generate --ios
 
+      # 設計書190: @capacitor/assets（v3系）はXcode 14+の「シングルサイズアイコン」方式で
+      # 1024×1024の1ファイルのみをAppIcon.appiconsetに生成し、他の全個別サイズエントリを
+      # rmSync/Contents.json書き換えで削除してしまう。ホーム画面用(60pt/76pt)はXcodeの
+      # シングルサイズ機能で自動生成されるが、通知センター用の20pt(40×40px/60×60px)は
+      # 自動生成の対象に含まれず、プッシュ通知に古いアイコンが表示され続ける原因になっていた。
+      # ここで20pt用の2ファイルを直接生成し、Contents.jsonに個別エントリとして追記する。
+      # 既存のuniversal 1024×1024エントリ（ホーム画面用）は変更しない。
+      - name: (通知アイコン修正) Add Notifications icon sizes (20pt) missing from single-size AppIcon
+        run: |
+          cd ios-app
+          npm install --no-save sharp
+          node - <<'NODEEOF'
+          const sharp = require('sharp');
+          const fs = require('fs');
+          const path = require('path');
+
+          const SOURCE_ICON = path.join(__dirname, 'resources', 'icon.png');
+          const APPICONSET_DIR = path.join(__dirname, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset');
+          const CONTENTS_JSON_PATH = path.join(APPICONSET_DIR, 'Contents.json');
+
+          const NOTIFICATION_SIZES = [
+            { filename: 'AppIcon20x20@2x.png', px: 40, scale: '2x' },
+            { filename: 'AppIcon20x20@3x.png', px: 60, scale: '3x' },
+          ];
+
+          async function main() {
+            if (!fs.existsSync(SOURCE_ICON)) {
+              throw new Error(`Source icon not found: ${SOURCE_ICON}`);
+            }
+            if (!fs.existsSync(APPICONSET_DIR)) {
+              throw new Error(`AppIcon.appiconset not found: ${APPICONSET_DIR}`);
+            }
+
+            for (const { filename, px } of NOTIFICATION_SIZES) {
+              const outPath = path.join(APPICONSET_DIR, filename);
+              await sharp(SOURCE_ICON).resize(px, px).png().toFile(outPath);
+              console.log(`CREATE ios notification icon ${outPath} (${px}x${px})`);
+            }
+
+            const contents = JSON.parse(fs.readFileSync(CONTENTS_JSON_PATH, 'utf8'));
+            const existingFilenames = new Set((contents.images || []).map((i) => i.filename));
+
+            for (const { filename, scale } of NOTIFICATION_SIZES) {
+              if (existingFilenames.has(filename)) continue;
+              contents.images.push({
+                idiom: 'iphone',
+                size: '20x20',
+                filename,
+                scale,
+                platform: 'ios',
+              });
+            }
+
+            fs.writeFileSync(CONTENTS_JSON_PATH, JSON.stringify(contents, null, 2));
+            console.log('Contents.json updated with Notifications (20pt) entries:');
+            console.log(JSON.stringify(contents.images, null, 2));
+          }
+
+          main().catch((e) => {
+            console.error(e);
+            process.exit(1);
+          });
+          NODEEOF
+
       - name: Sync Capacitor
         run: |
           cd ios-app

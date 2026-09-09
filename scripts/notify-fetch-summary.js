@@ -143,9 +143,11 @@ async function main() {
     lines.push(`【${s.cityLabel}】${s.accepted}件採用 / ${s.rawTotal}件取得`);
 
     const catLine = formatCatCounts(s.catCounts, EVENT_CAT_LABELS);
-    if (catLine) lines.push(`  ${catLine}`);
-
-    if (!s.newItems || s.newItems.length === 0) {
+    if (catLine) {
+      lines.push(`  ${catLine}`);
+    } else if (s.accepted > 0) {
+      lines.push(`  （${s.accepted}件は重複のため新規追加なし）`);
+    } else if (!s.newItems || s.newItems.length === 0) {
       lines.push('  （新着なし）');
     }
   }
@@ -162,6 +164,8 @@ async function main() {
       const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
       if (catLine) {
         lines.push(`  ${catLine}`);
+      } else if (li.accepted > 0) {
+        lines.push(`  （${li.accepted}件は重複のため新規追加なし）`);
       } else {
         lines.push('  （新着なし）');
       }
