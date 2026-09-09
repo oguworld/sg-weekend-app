@@ -16,13 +16,14 @@
 - SSL: Let's Encrypt (Cloudflare DNS)
 
 ## サブドメイン
-- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開、2026-07-09ルートバグ修正、2026-09-09設計書188で現行アイコン・現行機能に合わせて最新化、同日中にモバイル表示不具合2件を追加修正）
+- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開、2026-07-09ルートバグ修正、2026-09-09設計書188で現行アイコン・現行機能に合わせて最新化、同日中にモバイル表示不具合2件を追加修正、同日中に周辺静的ページの配色統一も実施）
   - ファイル: `public/about.html`
   - nginx: `/etc/nginx/sites-available/dosuru.app`内の3つ目のserverブロックに同居（Node.jsへプロキシ）
   - Express route: `GET /about` → `public/about.html`（パスベース）。`GET /`（ルートパス、Hostヘッダーが`about.dosuru.app`の場合のみ`about.html`を返す）は`server.js`内`express.static`直前に配置（2026-07-09追加）
   - App StoreのURL: `https://apps.apple.com/sg/app/sg%E5%9C%A8%E4%BD%8Fnavi/id6787159354`（現行スラッグ。2026-09-09確認: `curl`でリダイレクト先・ページタイトルとも「SG在住Navi」の正しいアプリページであることを実証済み）
   - 「6つの便利な機能」セクションは現行機能と一致（設計書184で廃止済みの配色3択機能の説明は削除済み、現行のダークモード「オフ/オン/自動」切替の説明に更新）。スクリーンショット3枚（`screen-calendar.jpg`/`screen-home.jpg`/`screen-news.jpg`）は2026-09-09時点の実機最新版に差し替え済み（`screen-pins.jpg`は据え置き）。about.html自体はダークモードCSS非対応（LP自体は常にライト表示）
   - **モバイル表示の不具合修正（2026-09-09）**: (1) `.hero h1`見出しが固定`<br>`構造のためモバイル幅で単語途中改行される不具合を、`<em>日本語で</em>`と`まるごとチェック。`の間にモバイル限定（`max-width:480px`）の`<br class="mobile-break">`を追加して解消。(2) `screen-pins.jpg`（1170×1992px、他3枚は1170×2309px）だけスマホモックアップの高さが揃わない不具合を、`.phone-img-wrap`に`aspect-ratio:1170/2309`、`.phone img`に`object-fit:cover;object-position:top`を追加する形で解消（画像ファイル自体は無編集、CSS側の根本対応のため今後スクリーンショットを更新してもアスペクト比違いで再発しない）
+  - **プライバシーポリシー・お問い合わせページ（`public/privacy.html`/`public/contact.html`、Express `GET /privacy`・`GET /contact`）の配色統一（2026-09-09）**: `about.dosuru.app`のフッターからリンクされるこの2ページが柳グリーン化(設計書186)から取り残され旧キャラメル(オレンジ)配色のままだった不具合を修正。原因は両ページが共有する`public/css/about-shared.css`の`:root`にオレンジ系の`--caramel`/`--caramel-dark`/`--caramel-pale`（`about.html`は独自`<style>`内で柳グリーンに再定義してオーバーライド済みだったが、この2ページには同様のオーバーライドがなかった）。`about-shared.css`側の3変数を`about.html`と同じ柳グリーン値に修正し解消。アイコン（`icon-128.png`/`favicon.png`）は既に最新デザインを参照済みのため無変更。`about.html`からリンクされる静的ページはこの2つのみ（利用規約等は存在しない）
 
 ## 起動・操作コマンド
 pm2 restart sg-weekend
