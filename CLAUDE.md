@@ -16,11 +16,12 @@
 - SSL: Let's Encrypt (Cloudflare DNS)
 
 ## サブドメイン
-- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開、2026-07-09ルートバグ修正）
+- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開、2026-07-09ルートバグ修正、2026-09-09設計書188で現行アイコン・現行機能に合わせて最新化）
   - ファイル: `public/about.html`
   - nginx: `/etc/nginx/sites-available/dosuru.app`内の3つ目のserverブロックに同居（Node.jsへプロキシ）
   - Express route: `GET /about` → `public/about.html`（パスベース）。`GET /`（ルートパス、Hostヘッダーが`about.dosuru.app`の場合のみ`about.html`を返す）は`server.js`内`express.static`直前に配置（2026-07-09追加）
-  - App StoreのURLはプレースホルダー（審査通過後に差し替え）
+  - App StoreのURL: `https://apps.apple.com/sg/app/sg%E5%9C%A8%E4%BD%8Fnavi/id6787159354`（現行スラッグ。2026-09-09確認: `curl`でリダイレクト先・ページタイトルとも「SG在住Navi」の正しいアプリページであることを実証済み）
+  - 「6つの便利な機能」セクションは現行機能と一致（設計書184で廃止済みの配色3択機能の説明は削除済み、現行のダークモード「オフ/オン/自動」切替の説明に更新）。スクリーンショット3枚（`screen-calendar.jpg`/`screen-home.jpg`/`screen-news.jpg`）は2026-09-09時点の実機最新版に差し替え済み（`screen-pins.jpg`は据え置き）。about.html自体はダークモードCSS非対応（LP自体は常にライト表示）
 
 ## 起動・操作コマンド
 pm2 restart sg-weekend
