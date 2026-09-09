@@ -1974,7 +1974,6 @@
     html[data-theme="dark"] .custom-select-pill,
     html[data-theme="dark"] .city-select,
     html[data-theme="dark"] .pin-btn:not(.pinned) { background: #2E241C; color: var(--midnight); border-color: var(--sand-dark); }
-    html[data-theme="dark"] #lang-toggle-btn,
     html[data-theme="dark"] #push-toggle-btn,
     html[data-theme="dark"] #clear-hidden-btn { background: #2E241C !important; color: var(--midnight) !important; border-color: var(--sand-dark) !important; }
     html[data-theme="dark"] .chip:not(.chip--active) { background: #2E241C; border-color: var(--sand-dark); color: var(--warm-gray); }

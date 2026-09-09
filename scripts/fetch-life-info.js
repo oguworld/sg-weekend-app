@@ -302,14 +302,12 @@ async function enrichBatch(batch, cityKey) {
   );
 
   const instructionText = `あなたは${cityName}在住日本人向け生活情報アプリのコンテンツライターです。
-以下の各記事について、日本語要約と英語要約を生成してください。
+以下の各記事について、日本語要約を生成してください。
 
 各エントリについて以下のフィールドを返すこと：
 - index: 受け取ったindexをそのまま返す
 - title_ja: 日本語タイトル（30文字以内）
-- title_en: English title (concise, under 15 words)
 - summary_ja: 日本語要約（100〜150文字程度）。何が起きたか・在住日本人にとってどう関係するかを具体的に記述すること
-- summary_en: English summary (60–100 words). Concise, informative.
 
 JSON配列のみ返すこと（前置き・説明・コードブロック不要）。
 
@@ -482,9 +480,7 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
       id,
       category:   f.category,
       title:      enrich.title_ja || original.title || '',
-      title_en:   enrich.title_en || original.title || '',
       summary:    enrich.summary_ja || '',
-      summary_en: enrich.summary_en || '',
       source:     original.source || '',
       sourceUrl:  original.link || '',
       publishedAt,

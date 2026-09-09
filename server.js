@@ -1120,7 +1120,7 @@ app.post('/api/chat', chatLimit, async (req, res) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not set' });
 
-  const { message, history = [], lang = 'ja' } = req.body;
+  const { message, history = [] } = req.body;
   if (!message?.trim()) return res.status(400).json({ error: 'message required' });
 
   const city = resolveCity(req);
@@ -1133,7 +1133,7 @@ app.post('/api/chat', chatLimit, async (req, res) => {
 
   const today = new Date().toLocaleDateString('ja-JP', { timeZone: cityConf.timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
 
-  // コンテキスト用にスリム化（image/url/tips_en/bgClass/style/fetched_atは除外）
+  // コンテキスト用にスリム化（image/url/bgClass/style/fetched_atは除外）
   const eventContext = events.map(e => ({
     id: e.id,
     type: e.type,
@@ -1416,9 +1416,7 @@ async function generateEventDraft(image, userText, webContent, city = 'sg') {
 - style: ["beginner","resident"] から1つ以上（beginner=観光客向け, resident=在住者向け）
 - major_score: 1〜5（${cityConf.nameJa}在住日本人にとっての魅力度）
 - content: 150〜200文字の日本語説明文
-- content_en: 100〜150文字の英語説明文
 - tips: 日本語ヒント2〜3点の配列（各26文字以内）
-- tips_en: 英語ヒント2〜3点の配列（各38文字以内）
 - period: "M/D〜M/D" 形式（単日なら "M/D"）
 - start_date / end_date: "YYYY-MM-DD"（不明なら今日から1ヶ月後を end_date に）
 - location: エリア名（${areaGuide} のいずれか。住所は入れない）
@@ -1430,7 +1428,7 @@ async function generateEventDraft(image, userText, webContent, city = 'sg') {
         description: 'イベント情報を1件生成する',
         input_schema: {
           type: 'object',
-          required: ['store', 'type', 'emoji', 'who', 'age', 'style', 'major_score', 'content', 'content_en', 'tips', 'tips_en', 'period', 'start_date', 'end_date', 'location', 'area'],
+          required: ['store', 'type', 'emoji', 'who', 'age', 'style', 'major_score', 'content', 'tips', 'period', 'start_date', 'end_date', 'location', 'area'],
           properties: {
             store:      { type: 'string' },
             type:       { type: 'string', enum: ['event', 'gourmet', 'sale', 'opening'] },
@@ -1440,9 +1438,7 @@ async function generateEventDraft(image, userText, webContent, city = 'sg') {
             style:      { type: 'array', items: { type: 'string' } },
             major_score: { type: 'number' },
             content:    { type: 'string' },
-            content_en: { type: 'string' },
             tips:       { type: 'array', items: { type: 'string' } },
-            tips_en:    { type: 'array', items: { type: 'string' } },
             period:     { type: 'string' },
             start_date: { type: 'string' },
             end_date:   { type: 'string' },

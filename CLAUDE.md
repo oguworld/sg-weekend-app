@@ -200,16 +200,20 @@ Web版（VAPID/Web Push）とは完全に独立した仕組みとしてiOSネイ
 - 画像読み込み失敗時は`handleImgError()`が1.2秒待って1回だけ自動リトライしてから絵文字フォールバックに切り替える（メインカード・ピン詳細・ピン一覧の3箇所で共有）
 - 同様の「DOM要素キャッシュで差分更新」パターンを他画面に導入する際の注意: `grid.innerHTML`の丸ごと再代入が別の分岐に残っていると、そこでキャッシュ済みノード（iframe含む）がdocumentから切り離されて破棄される
 
-## i18n対応
-- 言語切り替え: STRINGS オブジェクト（ja/en）+ `t(key)` 関数 + `applyI18n()`
-- 対応済み: くらし・おでかけ・ピン留め・設定の全画面、ボトムナビ
+## i18n対応（2026-09-09設計書189で英語対応を廃止、日本語固定の内部実装として存続）
+英語対応（多言語切替）は「実際には使われておらず紛らわしい」というユーザー判断により2026-09-09に廃止した。**ただし`t(key)`関数・`data-i18n`属性（76箇所）・`applyI18n()`関数自体は削除せず残っている**（影響範囲が大きすぎるため温存、常に日本語を表示する内部実装として存続）。
 
-### ⚠️ i18n 必須ルール
-UI文字列を追加・変更するときは **必ず ja と en の両方を同時に対応** する。
-- 静的HTMLにテキストを直書きしない。`data-i18n="キー名"` を付け、デフォルトテキストは日本語にする
-- `app.js` の `STRINGS.ja` と `STRINGS.en` に **同じキーを同時に** 追加する
-- JS側でテキストを生成する場合は `t('キー名')` を使う（ハードコード禁止）
-- 変更後は英語モードに切り替えて目視確認すること（キー名がそのまま表示されたら追加漏れ）
+- **`STRINGS.en`は削除済み**。`STRINGS`オブジェクトは`STRINGS.ja`のみを持つ
+- **`getLang()`は常に`'ja'`を返す**（`localStorage.getItem('sg_lang')`は参照しない）。呼び出し元19箇所を個別に書き換える代わりに、関数自体を簡略化することで影響範囲を最小化する方針を採用した
+- `t(key)`は`STRINGS.ja`のみを参照する簡略化された実装
+- **設定画面の言語切替ボタン（`#lang-toggle-btn`）・`setLang()`関数は削除済み**。言語を切り替える手段はUI上に存在しない
+- `isEn`/`getLang()==='en'`のような条件分岐は、`getLang()`が常に`'ja'`を返すようになったことで到達不能になったコードとして全て削除済み（英語側の分岐を消し、日本語側の処理だけを残す形に整理。`updateThemeUI()`/`selectCity()`/`updateCityUI()`/`applyI18n()`/`initSettingsGenres()`/`initSettingsProfile()`/`_lifeInfoCardHtml()`/`_lifeInfoPreviewCardHtml()`/`_formatLifeInfoDate()`/`renderEventCard()`が対象だった）
+- **既存データの英語フィールド（`content_en`/`tips_en`/`title_en`/`summary_en`）は生成・保存されなくなった**。`scripts/filter-events.js`（イベント記事生成）・`scripts/fetch-life-info.js`（生活情報要約生成）のSonnetプロンプトから英語生成指示を削除済み。`data/sg/events.json`・`data/sg/life-info.json`から既存の`_en`フィールドも削除済み（クリーンアップは一時スクリプトで実行し、実行後にスクリプト自体は削除）
+  - 同様に`server.js`のLINE Bot経由イベント投稿生成（`generateEventDraft()`）・`scripts/fill-content.js`（空content補完）・`scripts/retip-events.js`（tips一括更新）も英語フィールド生成部分を削除済み。英語専用の補完スクリプト`scripts/fill-english.js`は削除済み
+  - `data/bkk/events.json`・`data/syd/events.json`（BKK/SYD、現在停止中都市）には`content_en`が残存しているが、意図的に未対応（BKK/SYD都市対応自体がスコープ外のため）
+- `CITY_META`の`nameEn`/`subtitleEn`、`GENRE_LIST`の`labelEn`のような**未使用の静的データフィールド自体は削除していない**（参照コードが無いため実害なし、コード整理の粒度としてデータ定義までは踏み込んでいない）
+- `/api/chat`（`server.js`）の`lang`パラメータは削除済み（フロントエンドから呼び出し箇所が存在しない未接続のデッドパラメータだったため。エンドポイント自体は存続）
+- 新しいUI文字列を追加する場合、`data-i18n`属性＋`STRINGS.ja`へのキー追加は従来通り可能（表示は常に日本語）。英語キー（`STRINGS.en`）は追加不要（存在しないため）
 
 ## X自動投稿（scripts/post-to-x.js）
 - ペルソナ: 日本・SG両方フラットに見る30-40代男性。構造・逆説・気づきを提示するスタイル。「自分だから気づけたこと」を重視し、具体的な在住年数は書かない（個人特定リスク回避のため`PERSONA`定数には「長く」とだけ記載）
@@ -341,7 +345,7 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市�
 - **開発者向けLINE通知は1日3回、その都度その回だけの件数を通知する方式（設計書187、2026-09-09）**: 2026-09-07に「通知は1日1回（6:30）のみ、過去24時間分を履歴ファイルから合算表示」する方式に変更していたが（`run-fetch-extra.sh`の12:00/17:00〈当時は12:30/19:30〉の採用件数がLINE通知上「消えて見える」不具合の対策）、ユーザー要望により1日3通に増えることを許容の上で元の「毎回・その回だけの件数」方式に戻した。`notify-fetch-summary.js`の`loadLatestSummary(cityKey)`が`logs/fetch-summary-${city}.json`（`fetch-events.js`の`saveFetchSummary()`が毎回上書きする最新1回分）を、`loadLifeInfoLatestSummary('sg')`が`logs/fetch-life-info-summary.json`（`fetch-life-info.js`が同様に毎回上書き）をそのまま読んで表示する。通知見出しは「今回の取り込み結果」（1回分であることを明示）。**過去24時間分を合算する`loadLast24hSummary()`/`loadLifeInfoLast24hSummary()`関数・履歴ファイル（`logs/fetch-summary-history-${city}.jsonl`・`logs/fetch-life-info-summary-history-sg.jsonl`、48時間分保持）への追記ロジック自体は削除しておらず、将来の分析・復元用途のため残置**（現在は`main()`から未呼び出し）。トレードオフとして、取得処理自体が失敗した回は直前の古いサマリーファイルの内容がそのまま再通知される可能性があるが、シンプルさを優先しユーザー確認の上で許容している
 
 - **ハイウォーターマーク方式**（`fetch-events.js`）: `data/source-fetch-state.json`にソースごとの`lastSeenGuids`/`lastFetchedAt`を保存し新着記事のみ抽出。初回は`daysBack=7`カットオフにフォールバック。取得失敗ソースは状態未更新（次回また試行）
-- **Haiku採否・記事生成**（`filter-events.js`）: `scoreThreshold=6`（`BATCH_SIZE=10`件ずつ、`max_tokens:6000`、失敗時1回リトライ）。カテゴリ比率が薄いカテゴリはscore5以上に緩和。採用イベントはSonnetで日本語/英語記事を生成（`ENRICH_BATCH_SIZE=8`、`max_tokens:6000`、同じく1回リトライ）
+- **Haiku採否・記事生成**（`filter-events.js`）: `scoreThreshold=6`（`BATCH_SIZE=10`件ずつ、`max_tokens:6000`、失敗時1回リトライ）。カテゴリ比率が薄いカテゴリはscore5以上に緩和。採用イベントはSonnetで日本語記事を生成（`ENRICH_BATCH_SIZE=8`、`max_tokens:6000`、同じく1回リトライ。2026-09-09設計書189で英語記事生成は廃止済み、詳細は上記「i18n対応」節参照）
 - **`data/sources.json`のstatus運用**: `active`/`paused`/`rejected`の3値のみが実際の取得可否を左右する。`pausedAt`/`pausedReason`等は記録用メタデータのみで`fetch-events.js`は参照しない
 - **ユーザー向けWebプッシュ通知は完全停止済み（この「おでかけ」イベント取り込みパイプラインに限る）**（`notify-fetch-summary.js`は開発者向けLINE通知のみ、`sendPushToAll()`自体は将来の手動再送信用に関数として残置）。⚠️ **これはイベント側（`fetch-events.js`）に限った話であり、下記「生活情報・ニュースのキュレーション機能」の`fetch-life-info.js`側のユーザー向けプッシュ通知は現役で稼働中**（設計書183で1日1回・19:30 SGT固定に整理後、2026-09-09にユーザー要望で6:30 SGT固定に変更、同日中にユーザー要望で7:00 SGT固定へ再調整済み）。両者を混同しないこと
 - 画像URL疎通確認・discover-sources.jsのAPIエラー握りつぶし修正等の細かい改修履歴はgit履歴を参照
@@ -362,7 +366,7 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市�
 ⚠️ 「旅行」カテゴリは設計書175で一度この機能に追加されたが、同日中に設計書176でロールバックされ、**現在は「おでかけ」画面（イベント一覧）のカテゴリタブとして再配置されている**（上記「イベント取り込みパイプライン構成」の`CATEGORY_TARGET_RATIO`参照）。以下は現在のコード基準の記述。
 
 - **カテゴリ**: 6種（admin/weather/transport/community/health/education）。`server.js`の`VALID_CATEGORIES`もこの6種（travelは含まれない）
-- **データ取得**（`scripts/fetch-life-info.js`）: RSS5件（CNA/Mothership/Straits Times/JCCI/CNA Sport〈設計書182で追加〉、⚠️Straits Times追加の経緯は未記録）を`rss-parser`で取得、ハイウォーターマーク方式（`data/life-info-fetch-state.json`、イベント用の状態ファイルとは分離）。Haikuで在住日本人への関連性判定＋カテゴリ付与、Sonnetで日本語/英語要約を生成し`data/sg/life-info.json`（gitignore対象）に保存。リテンション期間は一律7日
+- **データ取得**（`scripts/fetch-life-info.js`）: RSS5件（CNA/Mothership/Straits Times/JCCI/CNA Sport〈設計書182で追加〉、⚠️Straits Times追加の経緯は未記録）を`rss-parser`で取得、ハイウォーターマーク方式（`data/life-info-fetch-state.json`、イベント用の状態ファイルとは分離）。Haikuで在住日本人への関連性判定＋カテゴリ付与、Sonnetで日本語要約を生成し`data/sg/life-info.json`（gitignore対象）に保存（2026-09-09設計書189で英語要約生成は廃止済み）。リテンション期間は一律7日
 - **スポーツニュースの扱い（設計書182、2026-09-08）**: `filterBatch()`のHaiku分類プロンプトは元々「スポーツ・芸能・エンタメ関連のニュース」を一律不採用としていたが、日本人選手の移籍・日本代表戦の開催など在住日本人の関心が高いスポーツニュースは除外対象から外し、既存の`community`カテゴリに分類するよう調整済み（新カテゴリ`sports`は新設していない、6カテゴリのまま）。プロンプト上は「知っておくべき話題のニュース」（移籍・大会結果・開催決定の速報等）を対象とし、「チケット販売中の参加イベント告知」は対象外と明記して、おでかけ側の独立イベント取り込みパイプライン（`fetch-events.js`/`filter-events.js`）との話題重複をプロンプト文言レベルで緩和している。**ただし両パイプライン間の技術的な重複排除ロジックは存在せず、完全な重複防止は未対応**（同じ話題が両タブに出る可能性は残る）
 - **1日3回取得・ユーザー向けプッシュ通知は7:00 SGT固定（設計書183で19:30 SGT固定に整理→2026-09-09にユーザー要望で6:30 SGT固定へ変更→同日中に「6:30は少し早い」とのユーザー要望で7:00 SGT固定へ再調整。なお`run-fetch-extra.sh`側の追加実行の時刻も同日中に12:30/19:30から12:00/17:00へ変更、さらに同日中に3回目を17:00から21:00へ再変更）**: フィード単位の頻度分けは行わず、`CITY_CONFIG.sg.feeds`全5本を一律1日3回（7:00/12:00/21:00 SGT、`run-fetch-all.sh`＋`run-fetch-extra.sh`）取得するように変更（ハイウォーターマーク方式のため同一記事の重複処理は発生しない）。`notifyContentUpdated()`（`server.js`の`POST /api/notify-events-updated`→`sendPushToAll()`経由のエンドユーザー向けWebプッシュ通知/APNs通知。開発者向けLINE通知とは別物）は`--no-notify` CLIフラグで呼び出し側から制御する。当初（設計書183）は朝は身支度等で忙しく通知が埋もれやすい・19:30はその日3回分の新着が出揃い内容が最も充実しているという理由で19:30 SGTの回にのみ送るよう集約していたが、2026-09-09にユーザーから「朝が一番通知を見る、通勤中にアプリを開くのがルーティーンだから」との要望を受け、朝の回（`run-fetch-all.sh`）にのみ送るよう戻した（12:00・21:00の回は`--no-notify`付き）。当初は6:30 SGTとしたが、同日中に「6:30は少し早い」とのユーザー要望を受け7:00 SGTに調整した
 - **開発者向けLINE通知（`notify-fetch-summary.js`）も1日3回化（設計書187、2026-09-09）**: `fetch-life-info.js`の`saveFetchSummary()`が毎回上書きする`logs/fetch-life-info-summary.json`（最新1回分。コード内コメントは「後方互換で残置・現在未使用」から「現役で使用」に訂正済み）を`notify-fetch-summary.js`がそのまま読み、その回だけの件数を通知する。上記のユーザー向けプッシュ通知の`--no-notify`制御（7:00のみ送信）とは完全に独立した仕組みで、開発者向けLINE通知は7:00/12:00/21:00の3回とも送られる

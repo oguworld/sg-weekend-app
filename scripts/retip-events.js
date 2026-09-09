@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 既存events.jsonのtips/tips_enを短く（1行）に一括更新する
+// 既存events.jsonのtipsを短く（1行）に一括更新する
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const Anthropic = require('@anthropic-ai/sdk');
@@ -19,14 +19,12 @@ async function retipBatch(events) {
     store: e.store || e.title || '',
     content: e.content || '',
     current_tips_ja: e.tips || [],
-    current_tips_en: e.tips_en || [],
   }));
 
-  const prompt = `以下のイベント情報について、tips_ja と tips_en を書き直してください。
+  const prompt = `以下のイベント情報について、tips_ja を書き直してください。
 
 【ルール】
 - tips_ja: 2〜3点、各26文字以内、1行に収まる短さ。例: ["週末は混むので午前中がねらい目", "ベビーカー入場可", "要予約"]
-- tips_en: 2〜3 points, each under 38 chars, one-liner. e.g. ["Go early on weekends to avoid crowds", "Stroller-friendly", "Booking required"]
 - 内容の本質（混雑回避・持ち物・注意点など）は残しつつ、できるだけ短く簡潔に
 - 元のtipsが既に短ければそのままでよい
 
@@ -35,7 +33,7 @@ ${JSON.stringify(items, null, 2)}
 
 レスポンスはJSONのみ。形式:
 [
-  { "index": 0, "tips_ja": [...], "tips_en": [...] },
+  { "index": 0, "tips_ja": [...] },
   ...
 ]`;
 
@@ -69,8 +67,7 @@ async function processCity(city) {
       const results = await retipBatch(batch);
       for (const r of results) {
         const idx = targetIndices[i + r.index];
-        if (r.tips_ja && r.tips_ja.length) updated[idx].tips    = r.tips_ja;
-        if (r.tips_en && r.tips_en.length) updated[idx].tips_en = r.tips_en;
+        if (r.tips_ja && r.tips_ja.length) updated[idx].tips = r.tips_ja;
       }
       console.log('完了');
     } catch (e) {

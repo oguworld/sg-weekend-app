@@ -31,7 +31,7 @@ async function generateContent(event, articleText) {
     max_tokens: 400,
     messages: [{
       role: 'user',
-      content: `以下のイベント情報をもとに、日本語と英語の説明文を生成してください。
+      content: `以下のイベント情報をもとに、日本語の説明文を生成してください。
 
 イベント名: ${event.store || event.title}
 種別: ${event.type}
@@ -40,10 +40,9 @@ async function generateContent(event, articleText) {
 
 【要件】
 - content_ja: 日本人向け説明文（100〜180文字）。内容・特徴・なぜおすすめかを具体的に
-- content_en: English description (80–130 chars). Concise and informative.
 
 JSONのみ出力:
-{ "content_ja": "...", "content_en": "..." }`,
+{ "content_ja": "..." }`,
     }],
   });
   const text = res.content[0].text.trim().replace(/^```json\s*/i, '').replace(/```$/,'');
@@ -62,12 +61,11 @@ async function main() {
     console.log(`  処理中: ${event.store || event.title}`);
     const articleText = event.url ? await fetchText(event.url) : null;
     try {
-      const { content_ja, content_en } = await generateContent(event, articleText);
+      const { content_ja } = await generateContent(event, articleText);
       if (!DRY) {
         const idx = events.findIndex(e => e.id === event.id);
         if (idx >= 0) {
-          events[idx].content    = content_ja || '';
-          events[idx].content_en = content_en || '';
+          events[idx].content = content_ja || '';
         }
       }
       console.log(`  ✅ ${content_ja?.slice(0, 50)}...`);

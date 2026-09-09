@@ -287,9 +287,7 @@ async function enrichBatch(batch, cityKey = 'sg') {
 - index: 受け取ったindexをそのまま返す
 - title_ja: 日本語タイトル（20文字以内）
 - content_ja: 日本人向け説明文（150〜200文字）。内容・特徴・なぜおすすめかを具体的に記述すること
-- content_en: English description (100–150 chars). Concise, informative, highlights what makes it worth visiting.
 - tips_ja: ひとことアドバイスの配列（2〜3点、各26文字以内）例: ["週末は混むので午前中がねらい目", "ベビーカー入場可", "要予約"]
-- tips_en: English tips array (2–3 points, each under 38 chars) e.g. ["Go early on weekends to avoid crowds", "Stroller-friendly", "Booking required"]
 
 JSON配列のみ返すこと（前置き・説明・コードブロック不要）。
 
@@ -419,7 +417,7 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
   // listicleで同一indexが重複する問題を防ぐため、filtered配列の通し番号を_enrichPosとして付与
   filtered.forEach((item, i) => { item.filtered._enrichPos = i; });
 
-  const enriched = new Map(); // _enrichPos → { title_ja, content_ja, content_en, tips_ja, tips_en }
+  const enriched = new Map(); // _enrichPos → { title_ja, content_ja, tips_ja }
   const enrichBatches = [];
   for (let i = 0; i < filtered.length; i += ENRICH_BATCH_SIZE) {
     enrichBatches.push(filtered.slice(i, i + ENRICH_BATCH_SIZE));
@@ -494,9 +492,7 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
       start_date:  f.start_date,
       end_date:    endDate,
       content:     enrich.content_ja || '',
-      content_en:  enrich.content_en || '',
       tips:        Array.isArray(enrich.tips_ja) ? enrich.tips_ja : [],
-      tips_en:     Array.isArray(enrich.tips_en) ? enrich.tips_en : [],
       location:    validType === 'travel' ? (f.destination || '') : (f.area || defaultLocation),
       area:        validType === 'travel' ? '' : (f.area || defaultArea),
       url:         original.link || '',

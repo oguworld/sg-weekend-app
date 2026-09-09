@@ -369,7 +369,6 @@
         settingsTitle: '設定',
         secProfile: 'プロフィール',
         secAppSettings: 'アプリ設定',
-        labelLang: '表示言語',
         secData: 'データ',
         secSupport: 'サポート・情報',
         clearPins: 'ピン留めをすべて削除',
@@ -531,204 +530,13 @@
         toastBackupRestored: '✅ バックアップから復元しました',
         toastBackupError: '⚠️ 処理に失敗しました。もう一度お試しください',
         toastBackupPassphraseWrong: 'パスフレーズが正しくありません',
-      },
-      en: {
-        headerSubtitle: 'Weekend guide for Japanese in Singapore', // city-specific: overridden by updateCityUI()
-        labelCity: 'City',
-        shareLabel: 'Share',
-        tabsLabel: 'When?',
-        tabWeekend: 'This Week',
-        tabNextWeekend: 'Next Week',
-        tabAfterWeekend: 'In 2 Weeks',
-        tabThreeWeeks: 'In 3 Weeks',
-        sectionTitle: 'Filter',
-        tabAll: 'All dates',
-        catAll: 'New',
-        catRecommend: 'Recommended',
-        catEvent: 'Limited-Time Events',
-        catShow: 'Shows & Exhibitions',
-        catGourmet: 'Food & Fairs',
-        catSale: 'Promos & Deals',
-        catOpening: 'Grand Openings',
-        catTravel: 'Travel',
-        catStarting: '📅 This Week',
-        catEnding: '⏰ Ending Soon',
-        labelWhen: 'When?',
-        labelWhat: 'Where to go?',
-        emptyTitle: 'No spots found',
-        emptyDesc: 'Try adjusting your filters<br>to see more results.',
-        pinScreenTitle: '📌 Pinned',
-        homeScreenTitle: 'Outing Info',
-        settingsTitle: 'Settings',
-        secProfile: 'Profile',
-        secAppSettings: 'App Settings',
-        labelLang: 'Display Language',
-        secData: 'Data',
-        secSupport: 'Support & Info',
-        clearPins: 'Clear all pins',
-        resetBtn: 'Reset',
-        secFeedback: 'Feedback',
-        feedbackPlaceholder: 'Suggestions, bug reports, spot requests — anything welcome!',
-        feedbackSend: '📨 Send',
-        supportDesc: 'This app is free to use. If you enjoy it, buying us a coffee would mean a lot.',
-        supportLabel: 'Support the app',
-        supportBtn: 'Gift SGD 5',
-        secAbout: 'About',
-        aboutAppName: 'App',
-        aboutVersion: 'Version',
-        navHome: 'Outings',
-        navSettings: 'Settings',
-        pinBtn: 'Pin',
-        pinnedBtn: 'Unpin ✓',
-        shareBtn: '📤 Share',
-        articleLink: 'Source article',
-        tipsLabel: '🎒 Tips',
-        commentsBtnLabel: '💬 Comments',
-        commentEmpty: 'No comments yet. Be the first to write one!',
-        commentPlaceholder: 'Write a comment (max 300 chars)',
-        commentDeleteLink: 'Delete',
-        commentAuthGate: 'Link your account to comment.',
-        confirmDeleteComment: 'Delete this comment?',
-        toastCommentSent: 'Comment posted',
-        toastCommentDeleted: 'Comment deleted',
-        toastCommentError: 'Something went wrong. Please try again.',
-        hintLabel: '💡 Hint',
-        tabWeekendBadge: 'This Wk',
-        tabNextWeekendBadge: 'Next Wk',
-        tabAfterWeekendBadge: '+2 Wks',
-        tabThreeWeeksBadge: '+3 Wks',
-        whoFamilyBadge: '👨‍👩‍👧‍👦 Family',
-        whoCoupleBadge: '👫 Couple',
-        whoSoloBadge: '🧑‍💼 Solo',
-        whoGroupBadge: '👥 Group',
-        ageBabyBadge: '🍼 0–2 yrs',
-        agePreschoolBadge: '🚀 3–6 yrs',
-        ageSchoolBadge: '📚 School age',
-        confirmClearPins: 'Clear all pins?',
-        confirmLogout: 'Disconnect your linked account?',
-        toastPinned: '📌 Pinned!',
-        toastUnpinned: '📌 Unpinned',
-        toastFeedbackSent: '📨 Feedback sent!',
-        toastFeedbackError: '⚠️ Failed to send. Please try again.',
-        toastFeedbackNetError: '⚠️ Failed to send. Check your network.',
-        toastFeedbackEmpty: '💬 Please enter a message',
-        toastClearedPins: 'All pins cleared',
-        toastUrlCopied: '🔗 URL copied!',
-        loadingEvents: 'Loading events...',
-        loadingLifeInfo: 'Loading life info...',
-        labelPush: 'Update Notifications',
-        pushOn: 'On',
-        pushOff: 'Off',
-        pushDenied: 'Permission needed',
-        pushUnsupported: 'Not supported',
-        toastPushOn: '🔔 Push notifications enabled!',
-        toastPushOff: '🔕 Push notifications disabled',
-        toastPushDenied: '⚙️ Please allow notifications in Settings',
-        toastPushError: '⚠️ Failed to configure notifications',
-        countSuffix: '',
-        pinEmpty: 'No pinned events yet',
-        pinEmptyDesc: 'Tap 📌 on any card to pin it!',
-        navPins: 'Pinned',
-        pinSectionEvents: 'Outing Info',
-        pinSectionNews: 'Life Info & News',
-        newsPinEmpty: 'No pinned news articles yet',
-        pinsEmptyCombinedTitle: 'No pins yet',
-        pinsEmptyCombinedDesc: 'Tap 📌 on any event or news article<br>and it will show up here',
-        shareSettingsDesc: 'Share this app with your friends in Singapore!',
-        shareSettingsBtn: 'Share with Friends',
-        qrShareTitle: 'Share App',
-        qrShareDesc: 'Have your friend scan this QR code to open the app download page',
-        qrShareLinkBtn: 'Share Link',
-        bannerToday: '⏰ Today only',
-        bannerTomorrow: '⏰ Until tomorrow',
-        bannerDaysLeft: '⏰ {d} days left',
-        toastProfileSet: '✅ Set to: {label}',
-        profileLabelAll: 'All (no preference)',
-        navNews: 'Life Info',
-        newsScreenTitle: 'Life Info & News',
-        newsCatAll: 'New',
-        newsCatAdmin: 'Admin',
-        newsCatTransport: 'Urban Dev. & Transport',
-        newsCatHealth: 'Health',
-        newsCatEducation: 'Education',
-        newsCatWeather: 'Weather',
-        newsCatCommunity: 'Community',
-        newsEmptyDesc: 'No information available right now.<br>Please check back later.',
-        lifeInfoPreviewTitle: '📰 Singapore Life Info',
-        lifeInfoPreviewMoreLink: 'More ›',
-        authGateMessage: 'Please link your account to use this feature',
-        authGateBtn: 'Link Account in Settings',
-        prBadgeLabel: 'PR',
-        titleEditCancel: 'Cancel',
-        labelNickname: 'Nickname',
-        labelDarkMode: 'Dark Mode',
-        statTemp: 'Temp',
-        statRain: 'Rain chance',
-        statNowcast: '2-Hour Forecast',
-        statFx: 'SGD→JPY',
-        statPsi: 'PSI',
-        statDengue: 'Dengue',
-        nicknamePlaceholder: 'Anonymous',
-        labelWhoWith: 'Who to go with',
-        labelWhoSolo: '🚶 Solo',
-        labelWhoCouple: '💑 Couple',
-        labelWhoGroup: '👥 Group',
-        labelWhoFamily: '👨‍👩‍👧 Family',
-        labelChildAge: "Kids' age",
-        labelAgeBaby: '👶 0–2 yrs',
-        labelAgePreschool: '🧒 3–6 yrs',
-        labelAgeSchool: '🎒 School age+',
-        labelGenres: 'Genres & Interests',
-        genreStatusUnset: 'Not set',
-        genreStatusSet: '{n} selected',
-        genreHint: 'Select genres to enable ⭐ Recommended',
-        labelVersion: 'Version',
-        labelOfficialX: 'SNS',
-        labelAboutApp: 'About',
-        labelOfficialSite: 'Official Site',
-        labelAboutSns: 'Official Site & SNS',
-        secAccount: 'Account',
-        loginWithGoogle: 'Sign in with Google',
-        loginWithApple: 'Sign in with Apple',
-        loginStatusGoogle: 'Linked with Google',
-        loginStatusApple: 'Linked with Apple',
-        logoutBtn: 'Unlink',
-        toastLoginSuccess: 'Account linked',
-        toastLoginError: 'Linking failed. Please try again',
-        toastLogoutSuccess: 'Account unlinked',
-        deleteAccountBtn: 'Delete account',
-        confirmDeleteAccount: 'Delete your account?\nThis action cannot be undone. Your backed-up schedule data will also be permanently deleted.',
-        toastDeleteAccountSuccess: 'Account deleted',
-        toastDeleteAccountError: 'Failed to delete account. Please try again later',
-        // Data backup for device migration (design doc 54 -> expanded to all data in design doc 58)
-        backupLoginRequired: 'Please link your account to use backup',
-        backupDisabledDesc: 'Set a passphrase to back up your plans, my courses, and other data to the server, encrypted so only you can read them.',
-        backupEnabledDesc: 'Backup is enabled. Changes to your plans, my courses, and other data are automatically encrypted and synced.',
-        backupFoundExistingDesc: 'An existing backup from another device was found. Enter your passphrase to restore it, or create a new backup.',
-        backupEnable: 'Enable Backup',
-        backupDisable: 'Disable Backup',
-        backupChangePassphrase: 'Change Passphrase',
-        backupSetupTitle: 'Set a Backup Passphrase',
-        backupRestoreTitle: 'Enter Passphrase',
-        backupPassphraseWarning: '⚠️ If you forget your passphrase, the backup cannot be recovered. Please keep it somewhere safe.',
-        backupPassphrasePlaceholder: 'Passphrase',
-        backupPassphraseConfirmPlaceholder: 'Confirm Passphrase',
-        backupPassphraseSubmit: 'Confirm',
-        backupPassphraseEmpty: 'Please enter a passphrase',
-        backupPassphraseMismatch: 'Passphrases do not match',
-        confirmBackupDisable: 'Disable backup? This device will stop syncing with the server.',
-        backupForgotPassphraseLink: 'Forgot your passphrase?',
-        confirmBackupReset: 'Your existing backup can no longer be restored and will be recreated with a new passphrase. Continue?',
-        toastBackupEnabled: '🔒 Backup enabled',
-        toastBackupDisabled: 'Backup disabled',
-        toastBackupRestored: '✅ Restored from backup',
-        toastBackupError: '⚠️ Something went wrong. Please try again',
-        toastBackupPassphraseWrong: 'Incorrect passphrase',
       }
     };
 
-    function getLang() { return localStorage.getItem('sg_lang') || 'ja'; }
-    function t(key) { const s = STRINGS[getLang()]; return (s && s[key] !== undefined) ? s[key] : (STRINGS.ja[key] || key); }
+    // 英語対応(i18n)は廃止済み（設計書189）。getLang()は常に'ja'を返す簡易実装として残す
+    // （呼び出し元19箇所を個別に書き換える代わりに、この関数自体を簡略化することで影響範囲を最小化している）
+    function getLang() { return 'ja'; }
+    function t(key) { const s = STRINGS.ja; return (s && s[key] !== undefined) ? s[key] : key; }
 
     // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
     // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
@@ -762,8 +570,7 @@
       const el = document.getElementById('dark-mode-label');
       if (!el) return;
       const mode = getTheme();
-      const isJa = getLang() === 'ja';
-      const labels = isJa ? { auto: '自動', light: 'オフ', dark: 'オン' } : { auto: 'Auto', light: 'Off', dark: 'On' };
+      const labels = { auto: '自動', light: 'オフ', dark: 'オン' };
       el.textContent = labels[mode] || labels.light;
     }
     function cycleTheme() {
@@ -907,21 +714,19 @@
       updateCityUI();
       updateTabLabels();
       const meta = CITY_META[city];
-      showToast(`${meta.flag} ${getLang() === 'en' ? meta.nameEn : meta.nameJa}に切り替えました`);
+      showToast(`${meta.flag} ${meta.nameJa}に切り替えました`);
     }
 
     function updateCityUI() {
       const city = getCity();
       const meta = CITY_META[city] || CITY_META.sg;
-      const lang = getLang();
 
       buildCitySelect();
 
       const shareDescEl = document.getElementById('share-settings-desc');
       if (shareDescEl) {
         const descJa = { sg: 'シンガポール在住の友達にこのアプリを紹介しよう！', bkk: 'バンコク在住の友達にこのアプリを紹介しよう！', syd: 'シドニー在住の友達にこのアプリを紹介しよう！' };
-        const descEn = { sg: 'Share this app with your friends in Singapore!', bkk: 'Share this app with your friends in Bangkok!', syd: 'Share this app with your friends in Sydney!' };
-        shareDescEl.textContent = lang === 'en' ? (descEn[city] || descEn.sg) : (descJa[city] || descJa.sg);
+        shareDescEl.textContent = descJa[city] || descJa.sg;
       }
     }
 
@@ -934,26 +739,12 @@
       document.querySelectorAll('[data-i18n-ph]').forEach(el => {
         el.placeholder = t(el.dataset.i18nPh);
       });
-      const isEn = getLang() === 'en';
-      const langFlag = document.getElementById('lang-toggle-flag');
-      const langName = document.getElementById('lang-toggle-name');
-      if (langFlag) langFlag.textContent = isEn ? '🇬🇧' : '🇯🇵';
-      if (langName) langName.textContent = isEn ? 'English' : '日本語';
       buildCitySelect();
       updateTabLabels();
       _syncRecommendChip();
       updateThemeUI();
       if (typeof initSettingsProfile === 'function') initSettingsProfile();
       if (typeof initSettingsGenres === 'function') initSettingsGenres();
-    }
-
-    function setLang(lang) {
-      localStorage.setItem('sg_lang', lang);
-      applyI18n();
-      updateCityUI();
-      updateThemeUI();
-      renderEventCards();
-      showToast(lang === 'en' ? '🇬🇧 Switched to English' : '🇯🇵 日本語に切り替えました');
     }
 
     // 祝日・学校休暇データは data/sg/calendar-events.json + GET /api/calendar に一本化済み
@@ -1051,10 +842,8 @@
       const pins = getPins();
       const pinned = !!pins[e.id];
 
-      // 言語対応コンテンツ
-      const lang = getLang();
-      const displayContent = (lang === 'en' && e.content_en) ? e.content_en : (e.content || '');
-      const rawTips = (lang === 'en' && Array.isArray(e.tips_en) && e.tips_en.length) ? e.tips_en : e.tips;
+      const displayContent = e.content || '';
+      const rawTips = e.tips;
 
       // タブラベル
       const tabLabels = {
@@ -1290,10 +1079,7 @@
       if (!publishedAt) return '';
       const d = new Date(publishedAt);
       if (isNaN(d.getTime())) return '';
-      const lang = getLang();
-      return lang === 'ja'
-        ? `${d.getMonth() + 1}/${d.getDate()}`
-        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return `${d.getMonth() + 1}/${d.getDate()}`;
     }
 
     // 新着リボン（1日以内に登録、イベントカードの newRibbon ロジックと同一基準）
@@ -1302,9 +1088,8 @@
     }
 
     function _lifeInfoCardHtml(item) {
-      const lang = getLang();
-      const title = (lang === 'ja' ? item.title : item.title_en) || item.title || '';
-      const summary = (lang === 'ja' ? item.summary : item.summary_en) || item.summary || '';
+      const title = item.title || '';
+      const summary = item.summary || '';
       const dateStr = _formatLifeInfoDate(item.publishedAt);
       const catKey = LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || '';
       const catLabel = catKey ? t(catKey) : '';
@@ -1332,8 +1117,7 @@
 
     // ホーム画面プレビュー専用の軽量カード（タイトルのみ・横スクロール、要約文は含めない）
     function _lifeInfoPreviewCardHtml(item) {
-      const lang = getLang();
-      const title = (lang === 'ja' ? item.title : item.title_en) || item.title || '';
+      const title = item.title || '';
       const catKey = LIFE_INFO_CATEGORY_LABEL_KEYS[item.category] || '';
       const catLabel = catKey ? t(catKey) : '';
       const url = (item.sourceUrl || '').replace(/'/g, '&#39;');
@@ -1416,7 +1200,7 @@
         return new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0);
       });
       const countEl = document.getElementById('news-result-count');
-      if (countEl) countEl.textContent = getLang() === 'ja' ? `${filtered.length}件` : `${filtered.length}`;
+      if (countEl) countEl.textContent = `${filtered.length}件`;
       if (filtered.length === 0) {
         list.innerHTML = '';
         if (empty) empty.style.display = 'block';
@@ -2439,7 +2223,6 @@
         if (e.target.closest('#clear-pins-item'))   { e.preventDefault(); clearPins();    return; }
         if (e.target.closest('#do-share-btn'))      { e.preventDefault(); openQrShareSheet(); return; }
         if (e.target.closest('#feedback-send-btn')) { e.preventDefault(); sendFeedback(); return; }
-        if (e.target.closest('#lang-toggle-btn'))   { e.preventDefault(); setLang(getLang() === 'ja' ? 'en' : 'ja'); return; }
         if (e.target.closest('#push-toggle-btn'))   { e.preventDefault(); togglePush(); return; }
         if (e.target.closest('#google-login-btn'))  { e.preventDefault(); handleGoogleLoginClick(); return; }
         if (e.target.closest('#apple-login-btn'))    { e.preventDefault(); handleAppleLoginClick();  return; }
@@ -3244,11 +3027,10 @@
       const container = document.getElementById('genre-chips-container');
       if (!container) return;
       const selected = new Set(getGenreList());
-      const isEn = getLang() === 'en';
       container.innerHTML = GENRE_LIST.map(g => `
         <button class="genre-chip${selected.has(g.id) ? ' selected' : ''}"
           data-genre="${g.id}"
-          onclick="toggleGenre('${g.id}')">${g.emoji} ${isEn ? g.labelEn : g.label}</button>
+          onclick="toggleGenre('${g.id}')">${g.emoji} ${g.label}</button>
       `).join('');
       _syncGenreStatusBadge();
     }
@@ -3286,13 +3068,8 @@
     function initSettingsProfile() {
       const who = getWhoList();
       const ages = getAgeList();
-      const isEn = getLang() === 'en';
-      const whoMap = isEn
-        ? { solo: 'Solo', couple: 'Couple', family: 'Family', group: 'Group' }
-        : { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
-      const ageMap = isEn
-        ? { baby: '0–2 yrs', preschool: '3–6 yrs', school: 'School age+' }
-        : { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
+      const whoMap = { solo: 'ひとりで', couple: '夫婦・カップル', family: 'ファミリー', group: 'グループ' };
+      const ageMap = { baby: '0〜2歳', preschool: '3〜6歳', school: '小学生以上' };
 
       ['solo', 'couple', 'family', 'group'].forEach(w => {
         const dot = document.getElementById('who-dot-' + w);
@@ -3319,10 +3096,10 @@
           const ageLabel = ageMap[ages[0]];
           if (ageLabel) {
             parts = parts.filter(p => p !== whoMap['family']);
-            parts.push(isEn ? `Family (${ageLabel})` : `ファミリー（${ageLabel}）`);
+            parts.push(`ファミリー（${ageLabel}）`);
           }
         }
-        labelEl.textContent = parts.length ? parts.join(isEn ? ', ' : '・') : t('genreStatusUnset');
+        labelEl.textContent = parts.length ? parts.join('・') : t('genreStatusUnset');
       }
 
     }
