@@ -16,7 +16,8 @@
 - SSL: Let's Encrypt (Cloudflare DNS)
 
 ## サブドメイン
-- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開、2026-07-09ルートバグ修正、2026-09-09設計書188で現行アイコン・現行機能に合わせて最新化、同日中にモバイル表示不具合2件を追加修正、同日中に周辺静的ページの配色統一も実施）
+- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開、2026-07-09ルートバグ修正、2026-09-09設計書188で現行アイコン・現行機能に合わせて最新化、同日中にモバイル表示不具合2件を追加修正、同日中に周辺静的ページの配色統一も実施、同日中にスマホモックアップのタイトル文字薄れ不具合も修正）
+  - **スマホモックアップのタイトル文字薄れ不具合（2026-09-09）**: モックアップ4枚の高さ統一（`.phone-img-wrap{aspect-ratio:1170/2309}`+`.phone img{object-fit:cover;object-position:top}`）を適用した際、元々iPhoneステータスバー領域を背景色に馴染ませる演出だった`.phone-img-wrap::after`の48px高さグラデーションが、既にステータスバーをクロップ済みの現行スクリーンショットでは実際の画面タイトル文字（「くらし情報」等）の上に重なってしまい文字が薄く見える不具合が発生。`::after`疑似要素を完全に削除して解消（縮小ではなく削除を採用、Sharpでの角丸合成確認・目視で違和感なしと判断）
   - ファイル: `public/about.html`
   - nginx: `/etc/nginx/sites-available/dosuru.app`内の3つ目のserverブロックに同居（Node.jsへプロキシ）
   - Express route: `GET /about` → `public/about.html`（パスベース）。`GET /`（ルートパス、Hostヘッダーが`about.dosuru.app`の場合のみ`about.html`を返す）は`server.js`内`express.static`直前に配置（2026-07-09追加）
