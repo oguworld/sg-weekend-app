@@ -3862,18 +3862,16 @@
           currentMonth = month;
           const monthNum = Number(month.slice(5));
           const seasonTags = MONTH_SEASONAL_TAGS[monthNum] || [];
-          const seasonIconsHtml = seasonTags.length
-            ? `<span class="cal-month-season-icons">` +
+          const seasonBadgeHtml = seasonTags.length
+            ? `<span class="cal-month-season-badge">` +
                 seasonTags.map(tag =>
                   `<button class="cal-season-icon-btn" data-note="${escapeHtml(tag.note)}" aria-label="季節の話題を見る" onclick="if(!_touchCapableDetected) toggleMonthSeasonNote(this)">${tag.icon}</button>`
                 ).join('') +
               `</span>`
             : '';
-          html += `<div class="cal-month-card" data-month="${month}">
-            <div class="cal-month-head">
-              <span class="cal-month-head-label">${monthNum}月</span>
-              ${seasonIconsHtml}
-            </div>
+          html += `<div class="cal-month-head-outer">${monthNum}月</div>
+          <div class="cal-month-card${seasonTags.length ? ' has-season-badge' : ''}" data-month="${month}">
+            ${seasonBadgeHtml}
             <div class="cal-month-season-bubble"></div>`;
         }
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
