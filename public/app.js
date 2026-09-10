@@ -3770,7 +3770,9 @@
         scrollEl.scrollTo({ top: 0, behavior: 'instant' });
         return;
       }
-      const cards = [...document.querySelectorAll('.cal-month-card')];
+      // スクロール先の基準は月ラベル(.cal-month-head-outer)。カード自体を基準にすると、
+      // ラベルがカードの外(上)にあるため、ラベルが画面上端より上に隠れてしまう（2026-09-10修正）
+      const cards = [...document.querySelectorAll('.cal-month-head-outer[data-month]')];
       const target = cards.find(c => c.dataset.month === nowMonthKey) || cards.find(c => c.dataset.month > nowMonthKey);
       if (!target) { scrollEl.scrollTo({ top: 0, behavior: 'instant' }); return; }
       const scrollRect = scrollEl.getBoundingClientRect();
@@ -3869,7 +3871,7 @@
                 ).join('') +
               `</span>`
             : '';
-          html += `<div class="cal-month-head-outer">${monthNum}月</div>
+          html += `<div class="cal-month-head-outer" data-month="${month}">${monthNum}月</div>
           <div class="cal-month-card${seasonTags.length ? ' has-season-badge' : ''}" data-month="${month}">
             ${seasonBadgeHtml}
             <div class="cal-month-season-bubble"></div>`;
