@@ -444,6 +444,7 @@
         shareSettingsBtn: '友達にシェアする',
         qrShareTitle: 'アプリを共有',
         qrShareDesc: 'このQRコードを友達に読み取ってもらうと、アプリのダウンロードページが開きます',
+        qrShareLinkBtn: 'シェア',
         bannerToday: '⏰ 本日まで',
         bannerTomorrow: '⏰ 明日まで',
         bannerDaysLeft: '⏰ あと{d}日',
@@ -2250,9 +2251,7 @@
       ['backup-passphrase-overlay', () => closeBackupPassphraseSheet()],
       ['backup-passphrase-submit-btn', () => submitBackupPassphrase()],
       ['qr-share-overlay', () => closeQrShareSheet()],
-      ['qr-share-app-btn', () => shareQrModalLink('app')],
-      ['qr-share-about-btn', () => shareQrModalLink('about')],
-      ['qr-share-x-btn', () => shareQrModalLink('x')],
+      ['qr-share-link-btn', () => doShare()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -3185,20 +3184,15 @@
       }
     }
 
-    // QR共有シート内の3つの共有先（アプリ/紹介ページ/X）。設定画面「公式サイト・SNS」と同じURLを使う
-    const QR_SHARE_LINKS = {
-      app:   { url: 'https://apps.apple.com/app/id6787159354', text: () => `${(CITY_META[getCity()] || CITY_META.sg).subtitleJa}！週末どうする？はここで決まる👇` },
-      about: { url: 'https://about.dosuru.app', text: () => 'SG在住Naviの紹介ページです' },
-      x:     { url: 'https://x.com/willoa_sg', text: () => 'SG在住Navi公式Xアカウントです' },
-    };
-    async function shareQrModalLink(kind) {
-      const cfg = QR_SHARE_LINKS[kind];
-      if (!cfg) return;
-      const data = { title: 'SG在住Navi', text: cfg.text(), url: cfg.url };
+    // QR共有シートの「シェア」ボタン。紹介ページ・アプリ両方のリンクを含めて送る
+    async function doShare() {
+      const cityMeta = CITY_META[getCity()] || CITY_META.sg;
+      const text = `${cityMeta.subtitleJa}！週末どうする？はここで決まる👇\n\n紹介ページ: https://about.dosuru.app\nアプリ: https://apps.apple.com/app/id6787159354`;
+      const data = { title: 'SG在住Navi', text };
       if (navigator.share) {
         try { await navigator.share(data); } catch(e) {}
       } else {
-        await navigator.clipboard.writeText(cfg.url);
+        await navigator.clipboard.writeText(text);
         showToast(t('toastUrlCopied'));
       }
     }
