@@ -1271,9 +1271,9 @@
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     #calendar-filter-row::-webkit-scrollbar { display: none; }
     .cal-month-card { position: relative; background: var(--warm-white); border-radius: 16px; padding: 16px 16px 4px; margin-bottom: 16px; box-shadow: var(--shadow-soft); }
-    .cal-month-card.has-season-badge { margin-top: 18px; }
-    /* 月見出し（カードの外、設計書194→2026-09-10配置変更） */
-    .cal-month-head-outer { font-size: 18px; font-weight: 800; color: var(--caramel); padding: 0 4px; margin-bottom: 8px; }
+    .cal-month-card.has-season-badge { margin-top: 10px; }
+    /* 月見出し（カードの外、設計書194→2026-09-10配置変更、同日中に中央寄せ・間隔詰めに再調整） */
+    .cal-month-head-outer { font-size: 18px; font-weight: 800; color: var(--caramel); text-align: center; padding: 0 4px; margin-bottom: 4px; }
     /* カード右上に半分乗り上げる季節アイコン。1個ずつ独立した丸ボタンにしてタップしやすくする */
     .cal-month-season-badge {
       position: absolute; top: -16px; right: 12px; z-index: 5;
