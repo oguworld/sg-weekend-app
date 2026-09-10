@@ -3185,9 +3185,10 @@
     }
 
     // QR共有シートの「シェア」ボタン。紹介ページ・アプリ両方のリンクを含めて送る
+    // 文言はabout.htmlのヒーロー見出しと表現を揃えている（「週末」限定の旧文言は
+    // くらし情報・カレンダー等を含む現在の機能構成と合わなくなったため2026-09-11変更）
     async function doShare() {
-      const cityMeta = CITY_META[getCity()] || CITY_META.sg;
-      const text = `${cityMeta.subtitleJa}！週末どうする？はここで決まる👇\n\n紹介ページ: https://about.dosuru.app\nアプリ: https://apps.apple.com/app/id6787159354`;
+      const text = `シンガポールの出来事を日本語でまるごとチェック👇\n\n紹介ページ: https://about.dosuru.app\nアプリ: https://apps.apple.com/app/id6787159354`;
       const data = { title: 'SG在住Navi', text };
       if (navigator.share) {
         try { await navigator.share(data); } catch(e) {}
