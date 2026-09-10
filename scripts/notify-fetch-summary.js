@@ -127,6 +127,26 @@ async function main() {
 
   const lines = [`🌴 SG在住Navi 取込み結果`, `📅 ${now}（SGT）`, ''];
 
+  // くらし情報セクションを先に表示（2026-09-10、ユーザー要望によりおでかけ情報より前に変更）
+  try {
+    const li = loadLifeInfoLatestSummary('sg');
+    if (li) {
+      lines.push('━━ 🏛️ くらし情報（今回の取り込み結果）━━');
+      lines.push(`📰 ${li.accepted}件採用 / ${li.rawTotal}件取得`);
+      const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
+      if (catLine) {
+        lines.push(`  ${catLine}`);
+      } else if (li.accepted > 0) {
+        lines.push(`  （${li.accepted}件は重複のため新規追加なし）`);
+      } else {
+        lines.push('  （新着なし）');
+      }
+      lines.push('');
+    }
+  } catch (e) {
+    console.warn('生活情報サマリーの読み込みに失敗:', e.message);
+  }
+
   let totalAccepted = 0;
 
   lines.push('━━ 🏖️ おでかけ情報（今回の取り込み結果）━━');
@@ -153,26 +173,6 @@ async function main() {
   }
 
   lines.push(`合計 ${totalAccepted}件採用`);
-
-  // くらし情報セクションを追記（今回1回分のみ、設計書187）
-  try {
-    const li = loadLifeInfoLatestSummary('sg');
-    if (li) {
-      lines.push('');
-      lines.push('━━ 🏛️ くらし情報（今回の取り込み結果）━━');
-      lines.push(`📰 ${li.accepted}件採用 / ${li.rawTotal}件取得`);
-      const catLine = formatCatCounts(li.catCounts, LIFE_INFO_CAT_LABELS);
-      if (catLine) {
-        lines.push(`  ${catLine}`);
-      } else if (li.accepted > 0) {
-        lines.push(`  （${li.accepted}件は重複のため新規追加なし）`);
-      } else {
-        lines.push('  （新着なし）');
-      }
-    }
-  } catch (e) {
-    console.warn('生活情報サマリーの読み込みに失敗:', e.message);
-  }
 
   // ソース分析セクションを追記（当日のJSONが存在する場合のみ）
   try {
