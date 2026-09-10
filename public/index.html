@@ -588,10 +588,23 @@
     <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
       <div id="qr-code-canvas" style="display:flex;justify-content:center;align-items:center;background:#fff;border-radius:14px;padding:20px;margin-bottom:12px;"></div>
       <div style="font-size:13px;color:var(--warm-gray);line-height:1.6;text-align:center;margin-bottom:16px;" data-i18n="qrShareDesc">このQRコードを友達に読み取ってもらうと、アプリのダウンロードページが開きます</div>
-      <button id="qr-share-link-btn" onclick="if(!_touchCapableDetected) doShare()"
-        style="width:100%;box-sizing:border-box;padding:12px;background:var(--caramel);border:none;border-radius:12px;
-               font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
-        data-i18n="qrShareLinkBtn">リンクを共有</button>
+      <div style="display:flex;justify-content:space-around;align-items:flex-start;margin-bottom:16px;">
+        <button id="qr-share-app-btn" onclick="if(!_touchCapableDetected) shareQrModalLink('app')"
+          style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--midnight);font-family:inherit;">
+          <span style="font-size:22px;line-height:1;">📱</span>
+          <span style="font-size:11px;color:var(--warm-gray);">アプリ</span>
+        </button>
+        <button id="qr-share-about-btn" onclick="if(!_touchCapableDetected) shareQrModalLink('about')"
+          style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--midnight);font-family:inherit;">
+          <span style="font-size:22px;line-height:1;">🌐</span>
+          <span style="font-size:11px;color:var(--warm-gray);">紹介ページ</span>
+        </button>
+        <button id="qr-share-x-btn" onclick="if(!_touchCapableDetected) shareQrModalLink('x')"
+          style="background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--midnight);font-family:inherit;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          <span style="font-size:11px;color:var(--warm-gray);">X</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -602,7 +615,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20260910n"></script>
+  <script src="/app.js?v=20260910o"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
