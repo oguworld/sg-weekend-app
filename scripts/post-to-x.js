@@ -42,6 +42,12 @@ SGのローカルカルチャーや歴史、ホーカーフードにも興味が
 一言であっても、誠実で丁寧な人柄と、この国・この暮らしへの敬意が伝わる書き方にする。
 文末は敬語（です・ます調）にする。「〜だ」「〜た」で言い切る常体は使わない（例: 「驚いた」ではなく「驚きました」、「残った」ではなく「残りました」）。`;
 
+const TONE_GUIDE = `【トーン】
+丁寧語（です・ます調）で書く。「〜だ」「〜た」で言い切る常体は使わない。
+愚痴・不満・ネガティブな表現は書かない。
+斜に構えた言い方、皮肉、茶化す言い回し、上から目線の評価はしない。
+事実を淡々と、誠実で丁寧な言葉遣いで伝える。`;
+
 const anthropic = new Anthropic();
 
 // ─── 引数解析 ─────────────────────────────────────────────────────
@@ -95,18 +101,36 @@ function getActiveEvents(events) {
   return events.filter(e => !e.end_date || e.end_date >= today);
 }
 
+const EVENT_POOL_WINDOW_HOURS = 24;
+
 function pickEvent(events, history) {
   const { eventIds = [], postedStores = [] } = history;
   const unseen = events.filter(e => !eventIds.includes(e.id) && !postedStores.includes(e.store));
   const candidates = unseen.length > 0 ? unseen : events.filter(e => !eventIds.includes(e.id));
-  // 投稿は取り込み直後に走る運用のため、まず「今日取り込んだ」ものを優先する。
-  // 今日分が無ければ（取り込み0件・タイミングずれ等）従来通り新着順にフォールバックする
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todaysPool = candidates.filter(e => (e.fetched_at || '').slice(0, 10) === todayStr);
-  const pool = (todaysPool.length > 0 ? todaysPool : candidates)
-    .sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''))
-    .slice(0, 15);
-  return pool[Math.floor(Math.random() * pool.length)];
+
+  // 過去24時間以内に取り込まれたものだけを候補プールとする（暦日一致ではなく実時間ベース）
+  const windowStart = Date.now() - EVENT_POOL_WINDOW_HOURS * 60 * 60 * 1000;
+  const recentPool = candidates.filter(e => {
+    if (!e.fetched_at) return false;
+    const t = new Date(e.fetched_at).getTime();
+    return !isNaN(t) && t >= windowStart;
+  });
+
+  if (recentPool.length === 0) return null; // 24時間以内に候補なし → 呼び出し元でスキップ
+
+  // score降順。score欠落(undefined/null/非数値)は最も低い優先度として末尾に回す。
+  // 全件欠落の場合はfetched_at降順（最新優先）で並べる。
+  const hasAnyScore = recentPool.some(e => typeof e.score === 'number' && !isNaN(e.score));
+  const sorted = hasAnyScore
+    ? [...recentPool].sort((a, b) => {
+        const sa = (typeof a.score === 'number' && !isNaN(a.score)) ? a.score : -1;
+        const sb = (typeof b.score === 'number' && !isNaN(b.score)) ? b.score : -1;
+        if (sb !== sa) return sb - sa;
+        return (b.fetched_at || '').localeCompare(a.fetched_at || ''); // 同点はfetched_at降順でタイブレーク
+      })
+    : [...recentPool].sort((a, b) => (b.fetched_at || '').localeCompare(a.fetched_at || ''));
+
+  return sorted[0];
 }
 
 // ─── 生活情報・ニュース取得（設計書172。events.jsonとは完全に独立したデータソース） ───
@@ -178,9 +202,9 @@ async function generateEventPost(event) {
     max_tokens: 300,
     messages: [{
       role: 'user',
-      content: `以下の人物として、このイベントを見かけてふと思ったことをX投稿として書いてください。
+      content: `以下のトーンで、このイベントの内容を紹介する文章を書いてください。
 
-${PERSONA}
+${TONE_GUIDE}
 
 【イベント情報】
 都市: ${conf.nameJa}
@@ -191,18 +215,14 @@ ${periodText}
 ${tipsText ? `ポイント: ${tipsText}` : ''}
 
 【要件】
-- 「〜開催中です」「ぜひご参加を」などの告知・アナウンス文は禁止
-- 実際には行っていない。ネットや情報収集で見かけた程度の距離感で書く
-- 「行ってきた」「食べた」など実体験のように書かない
-- 行きたいとは思うけど結局行かないかも、くらいの温度感でいい
-- 「〜が好きだな」「〜っていいな」など、まとめるような感想で締めない
+- このイベント/お店の内容を1〜2文・日本語80文字程度以内で紹介する
+- 個人的な感想・意見・気づきは書かない
 - 一人称は使わない（「俺」「私」「僕」は書かない）
-- 皮肉・茶化す言い方・上から目線の評価は禁止。誠実で丁寧な人柄が伝わる言葉遣いにする
-- オチや気づきは不要。思ったことをそのまま書く
-- 深読みしない、分析しない、教えようとしない
+- ネガティブな表現は禁止
+- 皮肉・上から目線の評価は禁止
+- 「必見です」「見逃せません」など過度な煽り文句は使わない。事実を淡々と紹介する
 - 絵文字は0〜2個（国旗絵文字🇸🇬🇹🇭🇦🇺は使わない）
 - URLとハッシュタグは含めない（別途追加します）
-- ひとことでいい。日本語40文字以内に厳守（短いほど良い、無理に文章にしない）
 - 日本語のみ。完成した投稿文のみ出力（前置き・説明不要）`,
     }],
   });
@@ -260,9 +280,9 @@ async function generateNewsPost(article) {
     max_tokens: 300,
     messages: [{
       role: 'user',
-      content: `以下の人物として、このシンガポールの生活情報・ニュースを見かけてふと思ったことをX投稿として書いてください。
+      content: `以下のトーンで、このシンガポールの生活情報・ニュースの内容を紹介する文章を書いてください。
 
-${PERSONA}
+${TONE_GUIDE}
 
 【ニュース・生活情報】
 ${catLabel ? `カテゴリ: ${catLabel}` : ''}
@@ -270,17 +290,14 @@ ${catLabel ? `カテゴリ: ${catLabel}` : ''}
 概要: ${article.summary || ''}
 
 【要件】
-- 「〜だそうです」「知っておきたい」「要チェック」など告知・お知らせ調は禁止
-- 実際に確認した・体験したことのように書かない。ニュースとして見かけた・知った程度の距離感で書く
-- 「〜が好きだな」「〜っていいな」など、まとめるような感想で締めない
+- このニュース・生活情報の内容を1〜2文・日本語80文字程度以内で紹介する
+- 個人的な感想・意見・気づきは書かない
 - 一人称は使わない（「俺」「私」「僕」は書かない）
-- 皮肉・茶化す言い方・上から目線の評価は禁止。誠実で丁寧な人柄が伝わる言葉遣いにする
-- オチや気づきは不要。思ったことをそのまま書く
-- 深読みしない、分析しない、教えようとしない
-- 愚痴・不満・ネガティブな感想は絶対に書かない
+- ネガティブな表現は禁止
+- 皮肉・上から目線の評価は禁止
+- 「必見です」「見逃せません」など過度な煽り文句は使わない。事実を淡々と紹介する
 - 絵文字は0〜2個（国旗絵文字🇸🇬は使わない）
 - URLとハッシュタグは含めない（別途追加します）
-- ひとことでいい。日本語40文字以内に厳守（短いほど良い、無理に文章にしない）
 - 日本語のみ。完成した投稿文のみ出力（前置き・説明不要）`,
     }],
   });
@@ -388,6 +405,10 @@ async function main() {
       return;
     }
     const event = pickEvent(events, history);
+    if (!event) {
+      console.log('[post-to-x] 直近24時間の新着イベントなし。終了します。');
+      return;
+    }
     const conf = CITY_CONFIG[event.city] || CITY_CONFIG.sg;
     console.log(`[post-to-x] 選択イベント: ${event.store} (${conf.nameJa})`);
     const result = await generateEventPost(event);
