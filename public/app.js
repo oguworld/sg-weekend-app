@@ -3798,6 +3798,8 @@
     }
     // 月見出しの季節アイコン（気候・食べ物・GSS）タップで説明の吹き出しを表示（設計書194）。
     // 月カード直下の吹き出し要素1つを使い回し、タップされたアイコンのnoteに差し替える方式。
+    // 複数アイコンがある月では、タップしたアイコンの実際の位置に吹き出し（と矢印）を追従させる
+    // （固定位置だと「別のアイコンを指しているように見える」ズレが生じるため）。
     function toggleMonthSeasonNote(btn) {
       const card = btn.closest('.cal-month-card');
       const bubble = card?.querySelector('.cal-month-season-bubble');
@@ -3806,11 +3808,18 @@
       const isSameAndVisible = bubble.classList.contains('visible') && bubble.dataset.activeNote === note;
       document.querySelectorAll('.cal-note-bubble.visible, .cal-month-season-bubble.visible')
         .forEach(b => b.classList.remove('visible'));
-      if (!isSameAndVisible) {
-        bubble.textContent = note;
-        bubble.dataset.activeNote = note;
-        bubble.classList.add('visible');
-      }
+      if (isSameAndVisible) return;
+      bubble.textContent = note;
+      bubble.dataset.activeNote = note;
+      bubble.classList.add('visible');
+      const cardRect = card.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      const btnCenter = btnRect.left - cardRect.left + btnRect.width / 2;
+      let left = btnCenter - 19; // 矢印(中心から-5px位置)がボタン中央に来るような基準オフセット
+      const maxLeft = card.clientWidth - bubble.offsetWidth - 8;
+      left = Math.max(8, Math.min(left, maxLeft));
+      bubble.style.left = left + 'px';
+      bubble.style.setProperty('--arrow-left', Math.max(10, Math.min(btnCenter - left - 5, bubble.offsetWidth - 20)) + 'px');
     }
     // 吹き出し表示中に他の場所をタップしたら閉じる
     document.addEventListener('touchend', e => {

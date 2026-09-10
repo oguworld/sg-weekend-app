@@ -1306,8 +1306,9 @@
       transform: rotate(45deg);
     }
     /* ─── 月見出しの季節アイコン用吹き出し（設計書194） ─── */
+    /* left/矢印位置はJS(toggleMonthSeasonNote)がタップされたアイコンの位置に合わせて動的に設定する */
     .cal-month-season-bubble {
-      position: absolute; top: 40px; right: 16px; z-index: 20;
+      position: absolute; top: 40px; left: 16px; z-index: 20;
       display: none; width: max-content; max-width: 220px;
       font-size: 12px; line-height: 1.6; color: var(--midnight); font-weight: 400;
       background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: 10px;
@@ -1315,7 +1316,7 @@
     }
     .cal-month-season-bubble.visible { display: block; }
     .cal-month-season-bubble::before {
-      content: ''; position: absolute; top: -6px; right: 14px; width: 10px; height: 10px;
+      content: ''; position: absolute; top: -6px; left: var(--arrow-left, 14px); width: 10px; height: 10px;
       background: var(--warm-white); border-left: 1px solid var(--sand-dark); border-top: 1px solid var(--sand-dark);
       transform: rotate(45deg);
     }
