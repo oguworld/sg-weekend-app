@@ -19276,3 +19276,38 @@ TestFlightは新ビルドが利用可能になった際、自動更新設定で�
 - iOSアプリの見た目の不具合（アイコン・画像等）の調査では、「サーバー側の設定・CI側の生成ロジック」だけでなく「iOS端末側のキャッシュ・複数バージョン混在」の可能性を早期に切り分けるため、ユーザーに対して常に「該当端末のTestFlightビルド番号」「一度アンインストールしての再確認結果」を確認する運用にする
 
 ### 未実施（コードは一切変更していない、読み取り専用調査のみ）
+
+---
+
+### 設計書195 実装記録（2026-09-10/11、builder→checker→closer、ユーザー承認済み。CIビルド実行を含む）
+
+上記「修正方針（案、未実装）」の1・4を実装し、ユーザー承認のもと通常運用の例外として実際に`release`ブランチへpush・CIビルドを実行し動作確認まで完了した。
+
+#### 変更ファイル
+- `.github/workflows/ios-deploy.yml`: 「(通知アイコン修正) Add Notifications icon sizes...」ステップを「(通知アイコン修正v2) Replace single-size AppIcon with full-size icon set including Notifications (20pt)」に全面書き換え。
+  - `npx capacitor-assets generate --ios`が生成した既存のシングルサイズpng・`Contents.json`は使わず、`ios-app/resources/icon.png`からiOS標準フルサイズAppIconセット一式（iPhone 20/29/40/60pt×2x/3x、iPad 20/29/40/76/83.5pt×1x/2x、ios-marketing 1024x1024の計18ファイル）を`sharp`で生成
+  - 生成前に`AppIcon.appiconset`ディレクトリ内の既存`.png`を`fs.readdirSync`で全削除してから新規生成（新旧ファイルの混在を防止）
+  - `Contents.json`を新しい18エントリの配列＋`info:{author:"xcode",version:1}`で丸ごと置き換え
+  - `AppIcon-1024.png`（ios-marketing用）は`.flatten({background:'#ffffff'})`でアルファチャンネル無しを保証し、生成後に`sharp().metadata()`で`hasAlpha`をチェックして念のため防御的に`.removeAlpha()`する処理も追加
+- `ios-app/fastlane/Fastfile`: `build_app`実行後・`upload_to_testflight`前に、`~/Library/Developer/Xcode/Archives`配下から最新の`.xcarchive`を探し、その中の`Products/Applications/*.app/Assets.car`に対して`xcrun assetutil --info`を実行し、20x20関連のみ`grep`相当のフィルタで抽出してログに出す診断ステップを追加。`begin/rescue`で全体を囲み、診断失敗時もデプロイを止めず`UI.important`で警告を出すだけに留めている
+
+#### 実際のCIビルド結果（run 34541731709、2026-09-10 23:2x UTC、release ff-mergeでトリガー）
+- ビルドは成功、TestFlightへのアップロードも成功（`Successfully uploaded package to App Store Connect`）
+- 「(通知アイコン修正v2)」ステップのログで18ファイル全ての生成・`Contents.json`置き換えを確認（`REMOVE stale icon AppIcon-512@2x.png` → `CREATE ios icon ...` ×18 → `Contents.json replaced with full-size icon set:`）。アルファ再エンコードは発生せず（元々アルファ無しのため正常）
+- `Deploy to App Store`ステップの`Emplaced`ログには（設計書195の状況証拠時と同様）`AppIcon60x60@2x.png`と`AppIcon76x76@2x~ipad.png`の2つしか出現しない（これはXcodeが`CFBundleIcons`用に直下へコピーする2つの代表ファイルのログであり、`Assets.car`本体のコンパイル結果ログではないため、20x20が出ないこと自体は異常ではないと判断）
+- **新設した`assetutil --info`診断ステップが実際に動作し、直接的な証拠を得られた**: 生成された`.xcarchive`内`Assets.car`を検査した結果、
+  ```
+  [icon-check] 20x20-related Assets.car entries:
+  [icon-check] "20x20 index:1 idiom:phone",
+  [icon-check] "20x20 index:1 idiom:pad",
+  ```
+  と出力され、**iPhone・iPad両方の20x20サイズアイコンが実際にコンパイル済みのAsset Catalogに含まれていることを直接確認できた**。設計書190時点はContents.jsonへの追記が実際のビルド成果物に反映されているかを検証する手段が無かったが、今回はその検証を初めて実機CI環境で完了できた
+- 🔴Critical・🟡・🟢いずれのエラーも検出されず、ビルド・アップロードとも一発成功（修正やリトライは不要だった）
+
+#### 受け入れ基準の充足状況
+- 「`Deploy to App Store`ステップ中に20x20が`Emplaced`または`actool`のコンパイル対象として出現」→ `Emplaced`ログ自体には出現しなかったが、代替として設計された`assetutil --info`診断ステップで`Assets.car`内に20x20（phone/pad）が含まれることを直接確認できたため、実質的な受け入れ基準は満たしたと判断
+- 「実機のTestFlightビルドで通知アイコンが新デザインになっていること」→ **CI側の確認はここまでで完了。実機での見た目確認はユーザー側の作業待ち**（下記「ユーザーへの依頼事項」参照）
+- 「他のアイコン関連表示への悪影響なし」→ ホーム画面用アイコン生成ロジック自体は変更しておらず（`Generate app icons and splash screen`ステップは無変更）、フルサイズセットはiOS標準の伝統的な構成のため悪影響なし。ビルド・署名・アップロードも正常完了
+
+#### ユーザーへの依頼事項（重要、next.mdにも記載）
+CI側の修正は完了し、実際のビルドで20ptアイコンが`Assets.car`に組み込まれていることを直接確認したが、設計書195の原因仮説Cで指摘した**iOS端末側の通知アイコンキャッシュ・複数世代混在の可能性は今回の対応では解消されていない**。ユーザーには、今回の新ビルド（run 34541731709、TestFlightへアップロード済み）がTestFlightに配信された後、**一度アプリを完全に削除（アンインストール）してからTestFlightで再インストールした上で**、プッシュ通知の小アイコン表示を再確認してもらう必要がある。それでも直らない場合は、原因仮説B（通知アイコンはホーム画面アイコンをOSがダウンスケール表示しているだけで20ptアセット自体は無関係という可能性）や、その他の未確認要因をさらに調査する必要がある。
