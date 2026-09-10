@@ -1280,11 +1280,11 @@
     .cal-month-head-label { font-size: 18px; font-weight: 800; color: var(--caramel); }
     .cal-month-season-badge { display: flex; align-items: center; gap: 6px; }
     .cal-season-icon-btn {
-      width: 26px; height: 26px; flex-shrink: 0;
+      width: 32px; height: 32px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       border: 1px solid var(--sand-dark); border-radius: 50%;
       background: var(--warm-white); box-shadow: var(--shadow-soft);
-      padding: 0; margin: 0; font-size: 13px; line-height: 1; cursor: pointer;
+      padding: 0; margin: 0; font-size: 17px; line-height: 1; cursor: pointer;
     }
     .cal-season-icon-btn:active { opacity: 0.6; }
     .cal-day-group { margin-bottom: 12px; }
