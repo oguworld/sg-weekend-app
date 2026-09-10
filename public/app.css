@@ -1270,6 +1270,9 @@
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     #calendar-filter-row::-webkit-scrollbar { display: none; }
+    /* 先頭の月見出しが画面最上端ぴったりに来た時、季節アイコンの丸ボタンの影が
+       スクロールコンテナの上端で切れてしまうのを防ぐ余白（2026-09-10） */
+    #calendar-list { padding-top: 6px; }
     .cal-month-card { position: relative; background: var(--warm-white); border-radius: 16px; padding: 16px 16px 4px; margin-bottom: 16px; box-shadow: var(--shadow-soft); }
     /* 月見出し（カードの外、設計書194→2026-09-10配置変更を経て、同日中に季節アイコンも
        同じ行に統合する形に再変更。月見出しとアイコンが離れて見えるとの指摘のため） */

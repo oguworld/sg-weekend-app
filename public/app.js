@@ -3778,7 +3778,10 @@
       const scrollRect = scrollEl.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
       const maxScrollTop = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
-      const rawTop = targetRect.top - scrollRect.top + scrollEl.scrollTop;
+      // 季節アイコンの丸ボタンの影が画面上端でちょうど切れてしまうのを防ぐため、
+      // 月ラベルのすぐ上に少しだけ余白(SCROLL_TOP_BUFFER)を残してスクロールする（2026-09-10）
+      const SCROLL_TOP_BUFFER = 10;
+      const rawTop = targetRect.top - scrollRect.top + scrollEl.scrollTop - SCROLL_TOP_BUFFER;
       scrollEl.scrollTo({ top: Math.min(Math.max(rawTop, 0), maxScrollTop), behavior: 'instant' });
     }
 
