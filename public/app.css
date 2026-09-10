@@ -1274,7 +1274,7 @@
     /* 月見出し（カードの外、設計書194→2026-09-10配置変更を経て、同日中に季節アイコンも
        同じ行に統合する形に再変更。月見出しとアイコンが離れて見えるとの指摘のため） */
     .cal-month-head-outer {
-      position: relative; display: flex; align-items: center; gap: 8px;
+      position: relative; display: flex; align-items: center; justify-content: space-between;
       padding: 0 4px; margin-bottom: 8px;
     }
     .cal-month-head-label { font-size: 18px; font-weight: 800; color: var(--caramel); }
