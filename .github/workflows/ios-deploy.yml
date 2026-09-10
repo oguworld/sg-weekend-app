@@ -32,14 +32,20 @@ jobs:
           cd ios-app
           npx capacitor-assets generate --ios
 
-      # 設計書190: @capacitor/assets（v3系）はXcode 14+の「シングルサイズアイコン」方式で
-      # 1024×1024の1ファイルのみをAppIcon.appiconsetに生成し、他の全個別サイズエントリを
-      # rmSync/Contents.json書き換えで削除してしまう。ホーム画面用(60pt/76pt)はXcodeの
-      # シングルサイズ機能で自動生成されるが、通知センター用の20pt(40×40px/60×60px)は
-      # 自動生成の対象に含まれず、プッシュ通知に古いアイコンが表示され続ける原因になっていた。
-      # ここで20pt用の2ファイルを直接生成し、Contents.jsonに個別エントリとして追記する。
-      # 既存のuniversal 1024×1024エントリ（ホーム画面用）は変更しない。
-      - name: (通知アイコン修正) Add Notifications icon sizes (20pt) missing from single-size AppIcon
+      # 設計書190（旧方式、廃止）: @capacitor/assets（v3系）が生成するXcode 14+の
+      # 「シングルサイズアイコン」（1024×1024の1エントリのみのContents.json）に対し、
+      # 通知センター用20pt(40×40px/60×60px)の2ファイルだけを個別エントリとして「追記」する
+      # 方式を採っていた。しかし設計書195の調査で、実際のxcodebuildビルドログ(Emplaced)には
+      # 20x20系のファイルが一度も出現せず、60pt/76ptのみが自動生成されていることが判明。
+      # 「Contents.jsonに1エントリのみ」というシングルサイズモードの前提を個別サイズの追記で
+      # 崩したことで、Xcodeのビルドシステムが20ptサイズを正しく取り込めていない可能性が高いと
+      # 判断し、設計書195で方針転換。
+      #
+      # 設計書195（新方式）: シングルサイズ運用・追記方式を廃止し、Notifications用20ptを含む
+      # iOS標準のフルサイズAppIconセット一式（iPhone/iPad各サイズ×スケール、計18ファイル）を
+      # ios-app/resources/icon.png から生成し、Contents.jsonを丸ごと置き換える「フルサイズ運用」
+      # 方式に切り替える。Xcodeの自動生成メカニズムに一切依存しない、完全に決定的な構成にする。
+      - name: (通知アイコン修正v2) Replace single-size AppIcon with full-size icon set including Notifications (20pt)
         run: |
           cd ios-app
           npm install --no-save sharp
@@ -52,9 +58,26 @@ jobs:
           const APPICONSET_DIR = path.join(__dirname, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset');
           const CONTENTS_JSON_PATH = path.join(APPICONSET_DIR, 'Contents.json');
 
-          const NOTIFICATION_SIZES = [
-            { filename: 'AppIcon20x20@2x.png', px: 40, scale: '2x' },
-            { filename: 'AppIcon20x20@3x.png', px: 60, scale: '3x' },
+          // iOS標準フルサイズAppIconセット（iPhone/iPad、Xcode13以前互換の伝統的な構成）
+          const ICON_SET = [
+            { idiom: 'iphone', size: '20x20',     scale: '2x', px: 40,   filename: 'AppIcon-20@2x.png' },
+            { idiom: 'iphone', size: '20x20',     scale: '3x', px: 60,   filename: 'AppIcon-20@3x.png' },
+            { idiom: 'iphone', size: '29x29',     scale: '2x', px: 58,   filename: 'AppIcon-29@2x.png' },
+            { idiom: 'iphone', size: '29x29',     scale: '3x', px: 87,   filename: 'AppIcon-29@3x.png' },
+            { idiom: 'iphone', size: '40x40',     scale: '2x', px: 80,   filename: 'AppIcon-40@2x.png' },
+            { idiom: 'iphone', size: '40x40',     scale: '3x', px: 120,  filename: 'AppIcon-40@3x.png' },
+            { idiom: 'iphone', size: '60x60',     scale: '2x', px: 120,  filename: 'AppIcon-60@2x.png' },
+            { idiom: 'iphone', size: '60x60',     scale: '3x', px: 180,  filename: 'AppIcon-60@3x.png' },
+            { idiom: 'ipad',   size: '20x20',     scale: '1x', px: 20,   filename: 'AppIcon-20~ipad.png' },
+            { idiom: 'ipad',   size: '20x20',     scale: '2x', px: 40,   filename: 'AppIcon-20@2x~ipad.png' },
+            { idiom: 'ipad',   size: '29x29',     scale: '1x', px: 29,   filename: 'AppIcon-29~ipad.png' },
+            { idiom: 'ipad',   size: '29x29',     scale: '2x', px: 58,   filename: 'AppIcon-29@2x~ipad.png' },
+            { idiom: 'ipad',   size: '40x40',     scale: '1x', px: 40,   filename: 'AppIcon-40~ipad.png' },
+            { idiom: 'ipad',   size: '40x40',     scale: '2x', px: 80,   filename: 'AppIcon-40@2x~ipad.png' },
+            { idiom: 'ipad',   size: '76x76',     scale: '1x', px: 76,   filename: 'AppIcon-76.png' },
+            { idiom: 'ipad',   size: '76x76',     scale: '2x', px: 152,  filename: 'AppIcon-76@2x.png' },
+            { idiom: 'ipad',   size: '83.5x83.5', scale: '2x', px: 167,  filename: 'AppIcon-83.5@2x.png' },
+            { idiom: 'ios-marketing', size: '1024x1024', scale: '1x', px: 1024, filename: 'AppIcon-1024.png' },
           ];
 
           async function main() {
@@ -65,29 +88,42 @@ jobs:
               throw new Error(`AppIcon.appiconset not found: ${APPICONSET_DIR}`);
             }
 
-            for (const { filename, px } of NOTIFICATION_SIZES) {
+            // capacitor-assetsが生成した既存の(シングルサイズ)pngファイルを全削除し、
+            // 新旧ファイルの混在を避ける。
+            for (const entry of fs.readdirSync(APPICONSET_DIR)) {
+              if (entry.toLowerCase().endsWith('.png')) {
+                fs.unlinkSync(path.join(APPICONSET_DIR, entry));
+                console.log(`REMOVE stale icon ${entry}`);
+              }
+            }
+
+            for (const { filename, px } of ICON_SET) {
               const outPath = path.join(APPICONSET_DIR, filename);
-              await sharp(SOURCE_ICON).resize(px, px).png().toFile(outPath);
-              console.log(`CREATE ios notification icon ${outPath} (${px}x${px})`);
+              let pipeline = sharp(SOURCE_ICON).resize(px, px);
+              if (filename === 'AppIcon-1024.png') {
+                // App Store提出要件: ios-marketing(1024)アイコンはアルファチャンネルを含んではいけない
+                pipeline = pipeline.flatten({ background: '#ffffff' });
+              }
+              await pipeline.png().toFile(outPath);
+
+              // 防御的チェック: 万一アルファチャンネルが付与されていたら除去して再書き出し
+              const meta = await sharp(outPath).metadata();
+              if (meta.hasAlpha) {
+                await sharp(outPath).removeAlpha().png().toFile(outPath + '.tmp');
+                fs.renameSync(outPath + '.tmp', outPath);
+                console.log(`REMOVE-ALPHA re-encoded ${filename} (had alpha channel)`);
+              }
+              console.log(`CREATE ios icon ${outPath} (${px}x${px})`);
             }
 
-            const contents = JSON.parse(fs.readFileSync(CONTENTS_JSON_PATH, 'utf8'));
-            const existingFilenames = new Set((contents.images || []).map((i) => i.filename));
+            const newContents = {
+              images: ICON_SET.map(({ idiom, size, scale, filename }) => ({ idiom, size, scale, filename })),
+              info: { author: 'xcode', version: 1 },
+            };
 
-            for (const { filename, scale } of NOTIFICATION_SIZES) {
-              if (existingFilenames.has(filename)) continue;
-              contents.images.push({
-                idiom: 'iphone',
-                size: '20x20',
-                filename,
-                scale,
-                platform: 'ios',
-              });
-            }
-
-            fs.writeFileSync(CONTENTS_JSON_PATH, JSON.stringify(contents, null, 2));
-            console.log('Contents.json updated with Notifications (20pt) entries:');
-            console.log(JSON.stringify(contents.images, null, 2));
+            fs.writeFileSync(CONTENTS_JSON_PATH, JSON.stringify(newContents, null, 2));
+            console.log('Contents.json replaced with full-size icon set:');
+            console.log(JSON.stringify(newContents.images, null, 2));
           }
 
           main().catch((e) => {

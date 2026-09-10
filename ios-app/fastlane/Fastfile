@@ -44,6 +44,35 @@ platform :ios do
       }
     )
 
+    # 設計書195: 「Contents.jsonに書いた」だけでなく「実際にxcodebuildがコンパイルした
+    # Assets.carに含まれている」ことを継続的に確認するための診断ステップ。あくまでログ出力
+    # 目的のため、失敗してもデプロイ全体を止めないようbegin/rescueで包む。
+    begin
+      archive_glob = File.expand_path("~/Library/Developer/Xcode/Archives/**/*.xcarchive")
+      archives = Dir.glob(archive_glob).sort_by { |p| File.mtime(p) }
+      if archives.empty?
+        UI.important("[icon-check] No .xcarchive found under #{archive_glob}, skipping Assets.car diagnostic")
+      else
+        latest_archive = archives.last
+        assets_car = Dir.glob(File.join(latest_archive, "Products", "Applications", "*.app", "Assets.car")).first
+        if assets_car.nil? || !File.exist?(assets_car)
+          UI.important("[icon-check] Assets.car not found under #{latest_archive}, skipping diagnostic")
+        else
+          UI.message("[icon-check] Inspecting #{assets_car}")
+          dump = sh("xcrun assetutil --info '#{assets_car}' || true", log: false)
+          matched_lines = dump.lines.select { |l| l =~ /20x20|"Name":"AppIcon-20|Notification/i }
+          if matched_lines.empty?
+            UI.important("[icon-check] No 20x20 related entries found in Assets.car output (this may indicate the Notifications icon is still missing)")
+          else
+            UI.message("[icon-check] 20x20-related Assets.car entries:")
+            matched_lines.each { |l| UI.message("[icon-check] #{l.strip}") }
+          end
+        end
+      end
+    rescue => e
+      UI.important("[icon-check] Diagnostic step failed (non-fatal, continuing deploy): #{e.message}")
+    end
+
     api_key = app_store_connect_api_key(
       key_id:      ENV['ASC_KEY_ID'],
       issuer_id:   ENV['ASC_ISSUER_ID'],
