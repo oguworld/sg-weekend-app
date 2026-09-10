@@ -1936,8 +1936,14 @@
       }, { passive: false });
     }
 
-    // ─── カレンダー画面 予定のinfoボタン 即時タップ対応（動的に再描画されるため#calendar-listへのイベント委譲） ───
+    // ─── カレンダー画面 予定のinfoボタン・月見出しの季節アイコン 即時タップ対応（動的に再描画されるため#calendar-listへのイベント委譲） ───
     document.getElementById('calendar-list')?.addEventListener('touchend', e => {
+      const seasonBtn = e.target.closest('.cal-season-icon-btn');
+      if (seasonBtn) {
+        e.preventDefault();
+        toggleMonthSeasonNote(seasonBtn);
+        return;
+      }
       const btn = e.target.closest('.cal-info-btn');
       if (!btn) return;
       e.preventDefault();
@@ -3676,6 +3682,35 @@
       'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '文化・催し',
       'school-vacation': '学校行事',
     };
+    // 月ごとに毎年繰り返す季節の話題（気候・食べ物・GSS）。年に依存しない固定マッピング。
+    // calendar-events.json（年次の日付レンジイベント）とは別の性質のデータのため静的定数として保持する（設計書194）。
+    const MONTH_SEASONAL_TAGS = {
+      1:  [{ icon: '☂️', note: '北東モンスーン(雨季)の後半で、大雨が続きやすい時期です' }],
+      2:  [],
+      3:  [{ icon: '☂️', note: '北東モンスーンの終盤です' }],
+      4:  [],
+      5:  [],
+      6:  [
+        { icon: '🍈', note: 'ドリアンのシーズンが始まります' },
+        { icon: '🛍️', note: 'GSS(グレートシンガポールセール)が始まる時期です' },
+      ],
+      7:  [
+        { icon: '🍈', note: 'ドリアンの最盛期で、価格が下がりやすい時期です' },
+        { icon: '🛍️', note: 'GSS期間中です' },
+      ],
+      8:  [
+        { icon: '🍈', note: 'ドリアンの最盛期終盤にあたる時期です' },
+        { icon: '🌫️', note: 'ヘイズ(近隣国からの煙害)が出やすくなる時期です' },
+        { icon: '🛍️', note: 'GSS終盤です' },
+      ],
+      9:  [{ icon: '🌫️', note: 'ヘイズが最も懸念される時期です' }],
+      10: [{ icon: '🌫️', note: 'ヘイズの可能性がまだ残る時期です' }],
+      11: [
+        { icon: '☂️', note: '北東モンスーンが始まり雨が増える時期です' },
+        { icon: '🍈', note: 'ドリアンの副シーズンでもあります' },
+      ],
+      12: [{ icon: '☂️', note: '北東モンスーンが本格化し、大雨のピークを迎えます' }],
+    };
     // フィルターチップの表示文言をCALENDAR_CATEGORY_LABELSと連動させる（index.html側に別途ハードコードしない。
     // カテゴリ名を変更する際はCALENDAR_CATEGORY_LABELSを直すだけでバッジ・チップ両方に反映される）
     document.querySelectorAll('#calendar-filter-row .filter-chip').forEach(chip => {
@@ -3755,12 +3790,31 @@
       const bubble = btn.nextElementSibling;
       const wasVisible = bubble?.classList.contains('visible');
       document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
+      document.querySelectorAll('.cal-month-season-bubble.visible').forEach(b => b.classList.remove('visible'));
       if (bubble && !wasVisible) bubble.classList.add('visible');
+    }
+    // 月見出しの季節アイコン（気候・食べ物・GSS）タップで説明の吹き出しを表示（設計書194）。
+    // 月カード直下の吹き出し要素1つを使い回し、タップされたアイコンのnoteに差し替える方式。
+    function toggleMonthSeasonNote(btn) {
+      const card = btn.closest('.cal-month-card');
+      const bubble = card?.querySelector('.cal-month-season-bubble');
+      if (!bubble) return;
+      const note = btn.dataset.note || '';
+      const isSameAndVisible = bubble.classList.contains('visible') && bubble.dataset.activeNote === note;
+      document.querySelectorAll('.cal-note-bubble.visible, .cal-month-season-bubble.visible')
+        .forEach(b => b.classList.remove('visible'));
+      if (!isSameAndVisible) {
+        bubble.textContent = note;
+        bubble.dataset.activeNote = note;
+        bubble.classList.add('visible');
+      }
     }
     // 吹き出し表示中に他の場所をタップしたら閉じる
     document.addEventListener('touchend', e => {
-      if (e.target.closest('.cal-info-btn') || e.target.closest('.cal-note-bubble')) return;
+      if (e.target.closest('.cal-info-btn') || e.target.closest('.cal-note-bubble')
+          || e.target.closest('.cal-season-icon-btn') || e.target.closest('.cal-month-season-bubble')) return;
       document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
+      document.querySelectorAll('.cal-month-season-bubble.visible').forEach(b => b.classList.remove('visible'));
     }, { passive: true });
 
     function renderCalendarList() {
@@ -3794,7 +3848,21 @@
         if (month !== currentMonth) {
           if (currentMonth !== null) html += `</div>`; // 前の月カードを閉じる
           currentMonth = month;
-          html += `<div class="cal-month-card" data-month="${month}"><div class="cal-month-head">${Number(month.slice(5))}月</div>`;
+          const monthNum = Number(month.slice(5));
+          const seasonTags = MONTH_SEASONAL_TAGS[monthNum] || [];
+          const seasonIconsHtml = seasonTags.length
+            ? `<span class="cal-month-season-icons">` +
+                seasonTags.map(tag =>
+                  `<button class="cal-season-icon-btn" data-note="${escapeHtml(tag.note)}" aria-label="季節の話題を見る" onclick="if(!_touchCapableDetected) toggleMonthSeasonNote(this)">${tag.icon}</button>`
+                ).join('') +
+              `</span>`
+            : '';
+          html += `<div class="cal-month-card" data-month="${month}">
+            <div class="cal-month-head">
+              <span class="cal-month-head-label">${monthNum}月</span>
+              ${seasonIconsHtml}
+            </div>
+            <div class="cal-month-season-bubble"></div>`;
         }
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
         dayItems.forEach(it => {

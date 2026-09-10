@@ -1270,8 +1270,11 @@
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     #calendar-filter-row::-webkit-scrollbar { display: none; }
-    .cal-month-card { background: var(--warm-white); border-radius: 16px; padding: 16px 16px 4px; margin-bottom: 16px; box-shadow: var(--shadow-soft); }
-    .cal-month-head { font-size: 15px; font-weight: 800; color: var(--caramel); margin-bottom: 12px; }
+    .cal-month-card { position: relative; background: var(--warm-white); border-radius: 16px; padding: 16px 16px 4px; margin-bottom: 16px; box-shadow: var(--shadow-soft); }
+    .cal-month-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 800; color: var(--caramel); margin-bottom: 12px; }
+    .cal-month-season-icons { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .cal-season-icon-btn { border: none; background: none; padding: 2px; margin: 0; font-size: 16px; line-height: 1; cursor: pointer; }
+    .cal-season-icon-btn:active { opacity: 0.55; }
     .cal-day-group { margin-bottom: 12px; }
     .cal-day-head { font-size: 13px; font-weight: 700; color: var(--warm-gray); margin-bottom: 6px; }
     .cal-item {
@@ -1299,6 +1302,20 @@
     .cal-note-bubble.visible { display: block; }
     .cal-note-bubble::before {
       content: ''; position: absolute; top: -6px; left: 10px; width: 10px; height: 10px;
+      background: var(--warm-white); border-left: 1px solid var(--sand-dark); border-top: 1px solid var(--sand-dark);
+      transform: rotate(45deg);
+    }
+    /* ─── 月見出しの季節アイコン用吹き出し（設計書194） ─── */
+    .cal-month-season-bubble {
+      position: absolute; top: 40px; right: 16px; z-index: 20;
+      display: none; width: max-content; max-width: 220px;
+      font-size: 12px; line-height: 1.6; color: var(--midnight); font-weight: 400;
+      background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: 10px;
+      padding: 8px 10px; box-shadow: var(--shadow-card);
+    }
+    .cal-month-season-bubble.visible { display: block; }
+    .cal-month-season-bubble::before {
+      content: ''; position: absolute; top: -6px; right: 14px; width: 10px; height: 10px;
       background: var(--warm-white); border-left: 1px solid var(--sand-dark); border-top: 1px solid var(--sand-dark);
       transform: rotate(45deg);
     }

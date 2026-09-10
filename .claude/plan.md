@@ -18923,3 +18923,263 @@ if (!event) {
 - 候補プールが恒常的に空になる可能性がある点（フォールバック廃止のため）は運用しながら様子を見る。今回はスコープ外
 - スコア最上位固定選定によりプールが小規模な場合はランダム性が失われるが、これはユーザー確定要件のため設計通り進める
 
+# 設計書194 — カレンダー月見出しへの季節アイコン表示機能（気候・食べ物・GSS）
+
+## 背景
+`#screen-calendar`の各月カード（`.cal-month-card`）は現在、月見出し（`.cal-month-head`、例:「9月」）のテキストのみを表示している。シンガポールでは月ごとに繰り返される季節の話題（モンスーン・ドリアンシーズン・ヘイズ・GSS等）があり、これを月見出しに軽く示したいという要望。既存の`data/sg/calendar-events.json`は「年に紐づく日付レンジイベント」を管理する仕組みであり、今回追加したいのは「年に依存せず毎年同じ月に繰り返される固定の季節タグ」という性質が異なる情報のため、JSONデータファイルではなく`public/app.js`内の静的JS定数として持たせる方針とする。
+
+ユーザーと開発者間で以下のマッピングが確定済み（気候・自然現象・食べ物・GSS〈ショッピングセール〉のみが対象。クリスマスイルミネーション・F1は生活・イベント系として明示的にスコープ外とする）。アイコンセットの代替案（傘☔・マスク😷・霞んだ街並み🌁等）も検討したが、ユーザーは現行案（☂️/🍈/🌫️/🛍️）で確定した。
+
+### 最終確定マッピング
+
+| 月 | アイコン | 説明文（アイコンごとに個別） |
+|---|---|---|
+| 1月 | ☂️ | 北東モンスーン(雨季)の後半で、大雨が続きやすい時期です |
+| 2月 | (なし) | — |
+| 3月 | ☂️ | 北東モンスーンの終盤です |
+| 4月 | (なし) | — |
+| 5月 | (なし) | — |
+| 6月 | 🍈🛍️ | 🍈: ドリアンのシーズンが始まります／🛍️: GSS(グレートシンガポールセール)が始まる時期です |
+| 7月 | 🍈🛍️ | 🍈: ドリアンの最盛期で、価格が下がりやすい時期です／🛍️: GSS期間中です |
+| 8月 | 🍈🌫️🛍️ | 🍈: ドリアンの最盛期終盤にあたる時期です／🌫️: ヘイズ(近隣国からの煙害)が出やすくなる時期です／🛍️: GSS終盤です |
+| 9月 | 🌫️ | ヘイズが最も懸念される時期です |
+| 10月 | 🌫️ | ヘイズの可能性がまだ残る時期です |
+| 11月 | ☂️🍈 | ☂️: 北東モンスーンが始まり雨が増える時期です／🍈: ドリアンの副シーズンでもあります |
+| 12月 | ☂️ | 北東モンスーンが本格化し、大雨のピークを迎えます |
+
+**GSSについての注記**: GSS(Great Singapore Sale)は伝統的に6月中旬〜8月中旬頃に開催される商業セールイベント（年によって開催時期が変動し、近年は5月末〜7月に前倒しされるケースもある）。日付が年ごとに変動するため、月単位の大まかな目安として6〜8月に配置する（8月は「終盤」という位置づけ）。
+
+## ユーザーストーリー
+- シンガポール在住者として、カレンダー画面で月をめくったときに、その月ならではの気候・食べ物・セール時期の話題をパッと見て把握したい
+- 気になったアイコンをタップして、簡単な説明を確認したい
+
+## 受け入れ基準
+
+### 正常系
+- カレンダー画面の各`.cal-month-card`の`.cal-month-head`（例:「9月」）の右端に、上記マッピング表に基づく月のアイコンが0〜3個、横並びで表示される
+- アイコンをタップ（またはクリック）すると、そのアイコンに対応する説明文が吹き出し（ポップオーバー）で表示される
+- 複数アイコンがある月（6月・7月・8月・11月）で、いずれか1つのアイコンをタップすると、そのアイコンに対応する説明文のみが表示される（他のアイコンの説明は出ない）
+- 8月のように3つのアイコンが並ぶ場合も、崩れずに表示される
+- 吹き出し表示中に他の場所（画面上のどこでも）をタップすると吹き出しが閉じる
+- 同時に開ける吹き出しは1つのみ（既存の`.cal-note-bubble`と同様、新しく開いたら他は閉じる。季節アイコンの吹き出し同士だけでなく、既存の予定`.cal-info-btn`の吹き出しとも排他的に1つだけ表示されることが望ましい）
+- 年をまたいで表示年（`_calendarYear`）が変わっても、同じ月番号であれば同じアイコン・同じ説明文が表示される
+- 「すべて」表示・カテゴリ絞り込み表示（祝日/文化・催し/学校行事/日本の祝日）のいずれであっても、その月の`.cal-month-card`自体が表示されている限り、季節アイコンも表示される（`CALENDAR_HIDDEN_IN_ALL`等の既存カテゴリフィルタの影響を受けない）
+- タッチデバイス（実機・スマホ）でタップした際に正しく反応する（`touchend`委譲）
+- PC等マウス操作でのクリックでも動作する（`onclick`属性、`_touchCapableDetected`による二重発火防止）
+
+### 失敗系
+- 該当月にアイコンが無い月（2月・4月・5月）は、`.cal-month-head`にアイコン領域自体を出さない
+- 説明文データが万一欠落・不整合な場合でも、アイコン自体の表示やタップ操作自体がエラーで壊れない
+
+### エッジケース
+- 同じ月カード内で季節アイコンの吹き出しと、個別予定の`.cal-info-btn`の吹き出し（`.cal-note-bubble`）を続けてタップした場合、常に直前に開いたものだけが表示され、古いものは自動的に閉じる
+- 月をまたいで複数の`.cal-month-card`が画面に同時表示されている状態で、ある月のアイコンをタップした後に別の月のアイコンをタップしても、正しく対象の吹き出しだけが表示される
+- カレンダー再描画（`renderCalendarList()`の再実行、カテゴリ切り替え時等）で吹き出しの開閉状態がリセットされる（既存の`.cal-info-btn`と同じ挙動を踏襲するだけでよい）
+
+## スコープ外
+- ショッピングセール以外の「生活・イベント系」情報（クリスマスイルミネーション、F1シンガポールグランプリ等）をこの季節アイコン機能に含めること
+- GSS以外の年次日付レンジが不確定な「日付が変動する」商業イベント・セールの追加
+- 月ごとのアイコン情報を`data/`配下のJSONファイルやAPI経由で管理する仕組み
+- GSSの実際の開催日程を`calendar-events.json`に日付レンジイベントとして追加すること
+- 季節アイコンの内容をユーザーが個別にカスタマイズ・非表示にする設定
+- 多言語対応（日本語のみ）
+- 年をまたいでの過去年アーカイブ表示との整合性検証
+
+## 変更対象一覧
+
+### `public/app.js`
+
+1. **新規定数 `MONTH_SEASONAL_TAGS`の追加**（配置場所案: 既存の`CALENDAR_CATEGORY_COLORS`/`CALENDAR_CATEGORY_LABELS`定数の近く、`renderCalendarList()`より前）
+
+```js
+// 月ごとに毎年繰り返す季節の話題（気候・食べ物・GSS）。年に依存しない固定マッピング。
+// calendar-events.json（年次の日付レンジイベント）とは別の性質のデータのため静的定数として保持する。
+const MONTH_SEASONAL_TAGS = {
+  1:  [{ icon: '☂️', note: '北東モンスーン(雨季)の後半で、大雨が続きやすい時期です' }],
+  2:  [],
+  3:  [{ icon: '☂️', note: '北東モンスーンの終盤です' }],
+  4:  [],
+  5:  [],
+  6:  [
+    { icon: '🍈', note: 'ドリアンのシーズンが始まります' },
+    { icon: '🛍️', note: 'GSS(グレートシンガポールセール)が始まる時期です' },
+  ],
+  7:  [
+    { icon: '🍈', note: 'ドリアンの最盛期で、価格が下がりやすい時期です' },
+    { icon: '🛍️', note: 'GSS期間中です' },
+  ],
+  8:  [
+    { icon: '🍈', note: 'ドリアンの最盛期終盤にあたる時期です' },
+    { icon: '🌫️', note: 'ヘイズ(近隣国からの煙害)が出やすくなる時期です' },
+    { icon: '🛍️', note: 'GSS終盤です' },
+  ],
+  9:  [{ icon: '🌫️', note: 'ヘイズが最も懸念される時期です' }],
+  10: [{ icon: '🌫️', note: 'ヘイズの可能性がまだ残る時期です' }],
+  11: [
+    { icon: '☂️', note: '北東モンスーンが始まり雨が増える時期です' },
+    { icon: '🍈', note: 'ドリアンの副シーズンでもあります' },
+  ],
+  12: [{ icon: '☂️', note: '北東モンスーンが本格化し、大雨のピークを迎えます' }],
+};
+```
+
+2. **`renderCalendarList()`の月カード生成部分を変更**
+
+現状（`app.js:3797`付近）:
+```js
+html += `<div class="cal-month-card" data-month="${month}"><div class="cal-month-head">${Number(month.slice(5))}月</div>`;
+```
+
+変更後（擬似コード、実際のHTMLエスケープ・既存コーディング規約に合わせて実装すること）:
+```js
+const monthNum = Number(month.slice(5));
+const seasonTags = MONTH_SEASONAL_TAGS[monthNum] || [];
+const seasonIconsHtml = seasonTags.length
+  ? `<span class="cal-month-season-icons">` +
+      seasonTags.map((tag, idx) =>
+        `<button class="cal-season-icon-btn" data-note="${escapeHtml(tag.note)}"
+           aria-label="季節の話題を見る"
+           onclick="if(!_touchCapableDetected) toggleMonthSeasonNote(this)">${tag.icon}</button>`
+      ).join('') +
+    `</span>`
+  : '';
+html += `<div class="cal-month-card" data-month="${month}">
+  <div class="cal-month-head">
+    <span class="cal-month-head-label">${monthNum}月</span>
+    ${seasonIconsHtml}
+  </div>
+  <div class="cal-month-season-bubble"></div>
+  ...`;
+```
+（既存の`escapeHtml()`ヘルパーがコード内にあれば使用すること。無ければ`tag.note`に`"`や`<`が含まれないため実害はないが、念のため確認すること）
+
+- 吹き出し本体（`.cal-month-season-bubble`）は月カード直下に1つだけ配置し、タップされたアイコンに応じて`textContent`を動的に差し替える方式とする（`data-note`属性から取得）。8月で3個ボタンそれぞれに個別の吹き出しdivを持たせるより、1個の吹き出し要素を使い回して表示内容を切り替える方がDOM構造がシンプル。
+
+3. **新規関数 `toggleMonthSeasonNote(btn)` の追加**（既存`toggleCalNote()`のすぐ近くに配置し、UXパターンを踏襲）
+
+擬似コード:
+```js
+function toggleMonthSeasonNote(btn) {
+  const card = btn.closest('.cal-month-card');
+  const bubble = card?.querySelector('.cal-month-season-bubble');
+  if (!bubble) return;
+  const note = btn.dataset.note || '';
+  const isSameAndVisible = bubble.classList.contains('visible') && bubble.dataset.activeNote === note;
+  // 既存の吹き出し（予定note用も含む）を全て閉じる
+  document.querySelectorAll('.cal-note-bubble.visible, .cal-month-season-bubble.visible')
+    .forEach(b => b.classList.remove('visible'));
+  if (!isSameAndVisible) {
+    bubble.textContent = note;
+    bubble.dataset.activeNote = note;
+    bubble.classList.add('visible');
+  }
+}
+```
+
+4. **既存の「他タップで閉じる」`document`への`touchend`委譲（`app.js:3760-3764`付近）を拡張**
+
+現状:
+```js
+document.addEventListener('touchend', e => {
+  if (e.target.closest('.cal-info-btn') || e.target.closest('.cal-note-bubble')) return;
+  document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
+}, { passive: true });
+```
+
+変更後（`.cal-season-icon-btn`/`.cal-month-season-bubble`も除外対象・閉じる対象に追加）:
+```js
+document.addEventListener('touchend', e => {
+  if (e.target.closest('.cal-info-btn') || e.target.closest('.cal-note-bubble')
+      || e.target.closest('.cal-season-icon-btn') || e.target.closest('.cal-month-season-bubble')) return;
+  document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
+  document.querySelectorAll('.cal-month-season-bubble.visible').forEach(b => b.classList.remove('visible'));
+}, { passive: true });
+```
+
+5. **`#calendar-list`への既存`touchend`委譲（`app.js:1939-1945`付近）に季節アイコン用の分岐を追加**
+
+現状:
+```js
+document.getElementById('calendar-list')?.addEventListener('touchend', e => {
+  const btn = e.target.closest('.cal-info-btn');
+  if (!btn) return;
+  e.preventDefault();
+  toggleCalNote(btn);
+}, { passive: false });
+```
+
+変更後:
+```js
+document.getElementById('calendar-list')?.addEventListener('touchend', e => {
+  const seasonBtn = e.target.closest('.cal-season-icon-btn');
+  if (seasonBtn) {
+    e.preventDefault();
+    toggleMonthSeasonNote(seasonBtn);
+    return;
+  }
+  const btn = e.target.closest('.cal-info-btn');
+  if (!btn) return;
+  e.preventDefault();
+  toggleCalNote(btn);
+}, { passive: false });
+```
+
+### `public/app.css`
+
+1. **`.cal-month-head`をflexレイアウトに変更**
+
+現状:
+```css
+.cal-month-head { font-size: 15px; font-weight: 800; color: var(--caramel); margin-bottom: 12px; }
+```
+
+変更後:
+```css
+.cal-month-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 800; color: var(--caramel); margin-bottom: 12px; }
+.cal-month-season-icons { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.cal-season-icon-btn { border: none; background: none; padding: 2px; margin: 0; font-size: 16px; line-height: 1; cursor: pointer; }
+.cal-season-icon-btn:active { opacity: 0.55; }
+```
+
+2. **`.cal-month-season-bubble`のスタイル追加**（`.cal-note-bubble`パターンを踏襲、右寄せに変更。基準位置のため`.cal-month-card`に`position:relative`が必要）
+
+```css
+.cal-month-card { /* 既存プロパティに追加 */ position: relative; }
+.cal-month-season-bubble {
+  position: absolute; top: 40px; right: 16px; z-index: 20;
+  display: none; width: max-content; max-width: 220px;
+  font-size: 12px; line-height: 1.6; color: var(--midnight); font-weight: 400;
+  background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: 10px;
+  padding: 8px 10px; box-shadow: var(--shadow-card);
+}
+.cal-month-season-bubble.visible { display: block; }
+.cal-month-season-bubble::before {
+  content: ''; position: absolute; top: -6px; right: 14px; width: 10px; height: 10px;
+  background: var(--warm-white); border-left: 1px solid var(--sand-dark); border-top: 1px solid var(--sand-dark);
+  transform: rotate(45deg);
+}
+```
+
+（モックで確認済みの見た目: 月見出し右端にアイコンを並べ、タップすると月見出し右下に吹き出しが出る。ユーザーはこのモック〈9月=1アイコン、8月=3アイコンのケース〉を確認し承認済み）
+
+## データモデルの変更
+**なし。** `data/`配下のJSONファイル（`calendar-events.json`含む）は一切変更しない。`public/app.js`内に新規の静的JS定数`MONTH_SEASONAL_TAGS`を1つ追加するのみ。サーバーサイド（`server.js`）の変更もなし。
+
+## APIの変更
+**なし。** `/api/calendar`を含む既存の全APIエンドポイントは無変更。
+
+## データ共有への影響（Web版・iOS App Store版）
+- **後方互換性**: 影響なし。今回の変更は`public/app.js`（フロントエンドの静的コード）内で完結する追加のみであり、APIレスポンス構造・データファイル構造のいずれも変更しない。旧バージョンのApp Storeアプリは今回変更した`app.js`を含んでいないため影響を受けない
+- **影響範囲**: `public/app.js`はWeb版・iOS版（Capacitorのローカルバンドル）の両方が同じファイルを参照するため、次回Web版デプロイ時にWeb版へ即座に反映され、次回iOSビルド時にiOS版へも反映される
+- **リリースタイミング**: API変更・データ構造変更を伴わないため、Web版とiOSアプリのリリースタイミングを揃える必要は無い
+
+## フロントエンドの変更
+- `public/app.js`: 新規定数`MONTH_SEASONAL_TAGS`追加、`renderCalendarList()`の月カード生成部分変更、新規関数`toggleMonthSeasonNote()`追加、`document`への`touchend`委譲拡張、`#calendar-list`への`touchend`委譲拡張
+- `public/app.css`: `.cal-month-head`のflex化、`.cal-month-season-icons`/`.cal-season-icon-btn`/`.cal-month-season-bubble`の新規追加、`.cal-month-card`への`position:relative`追加
+
+## リスク・注意事項
+- 8月の3アイコン表示のレイアウトは、絵文字の`font-size`を16px程度に抑えることで「8月」の文字との共存に問題ないと想定されるが、実装後にごく短い月表記との横幅バランスを目視確認すること
+- 吹き出しの表示位置は「月見出し右下の固定位置」に統一し、内容だけを差し替える方式とする（アイコンごとに個別の吹き出し要素は持たせない）
+- GSSの実際の開催時期は年によって前後する可能性があるが、月単位の目安表示として運用する（正確性より簡潔さを優先する、ユーザー確認済みの前提）
+- キャッシュバスティング（`index.html`の`app.css`/`app.js`の`?v=`クエリ、`sw.js`の`CACHE_NAME`）を通常運用ルールに従って更新すること
+
