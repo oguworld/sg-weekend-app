@@ -19311,3 +19311,290 @@ TestFlightは新ビルドが利用可能になった際、自動更新設定で�
 
 #### ユーザーへの依頼事項（重要、next.mdにも記載）
 CI側の修正は完了し、実際のビルドで20ptアイコンが`Assets.car`に組み込まれていることを直接確認したが、設計書195の原因仮説Cで指摘した**iOS端末側の通知アイコンキャッシュ・複数世代混在の可能性は今回の対応では解消されていない**。ユーザーには、今回の新ビルド（run 34541731709、TestFlightへアップロード済み）がTestFlightに配信された後、**一度アプリを完全に削除（アンインストール）してからTestFlightで再インストールした上で**、プッシュ通知の小アイコン表示を再確認してもらう必要がある。それでも直らない場合は、原因仮説B（通知アイコンはホーム画面アイコンをOSがダウンスケール表示しているだけで20ptアセット自体は無関係という可能性）や、その他の未確認要因をさらに調査する必要がある。
+
+# 設計書196 — Android版リリースに向けた設計（現状調査・意思決定ポイント整理）
+
+## 背景・目的
+現在iOS版（Capacitorベース、App Store配信のみ）のこのアプリについて、Android版リリースに向けた全体設計を行う。本設計書は「実際にいつ作るか」を決めるものではなく、必要な作業・意思決定ポイントを明確にすることが目的（ユーザーはまだ実装のゴーサインを出していない）。
+
+## ユーザーストーリー
+- 開発者（WILLOA PTE. LTD.）として、Android端末を使うシンガポール在住日本人ユーザーにもSG在住Naviを届けたい。
+- 既存のiOS版・Web版と同じHTML/CSS/JSバンドルを流用し、開発・保守コストを抑えつつAndroid版を追加したい。
+- Android版でも、Web版・iOS版と同じデータ（イベント・生活情報・ピン留め・アカウント）を違和感なく利用できるようにしたい。
+
+---
+
+## 1. 現状コードベースの調査結果
+
+### 1.1 iOSプロジェクトの構成（`ios-app/`）
+- `ios-app/package.json`: Capacitor 6系（`@capacitor/core`等は`^6.0.0`）。iOS固有プラグインとして`@codetrix-studio/capacitor-google-auth`（Google Sign-In）・`@capacitor-community/apple-sign-in`（Apple専用、Androidには存在しない）。
+- `ios-app/capacitor.config.js`: `appId: 'app.dosuru'`、`appName: 'SG在住Navi'`、`webDir: '../public'`（Web版と完全に同じ静的ファイルをバンドル）。`ios`セクションに`contentInset`・`backgroundColor`。`plugins.GoogleAuth`に`iosClientId`をハードコード。`plugins.Keyboard.resize: 'none'`（過去のキーボード表示バグ対策、実機で重要な既存回避策）。
+- `.github/workflows/ios-deploy.yml`: `release`ブランチpushで`macos-latest`ランナーが起動し、`npx cap add ios`→アイコン生成（`@capacitor/assets`→設計書195のフルサイズ置き換え）→Podfile調整（プライバシーマニフェスト・最小iOSバージョン）→Google Sign-In用URL Scheme注入（plistlib）→App.entitlements作成（APNs + Sign in with Apple）→Fastlane `deploy`実行、という一連の自動化。多くのステップがiOS固有のバイナリ形式（`.plist`, `.entitlements`, `Assets.xcassets`, `xcodeproj`）を直接操作するPythonスクリプト・Ruby(`xcodeproj`gem)で構成されている。
+- `ios-app/fastlane/Fastfile`: `deploy`レーンのみ。証明書インポート→`build_app`（`.ipa`生成）→診断（`assetutil`でアイコン確認）→`upload_to_testflight`。App Store本番申請自体は含まれない（TestFlight配信まで）。
+- `ios-app/README.md`: 初回セットアップ手順書。ただし`appId`の記述が旧`app.dosuru.odenavi`のままで、CLAUDE.mdに記載されている「実際の値は`app.dosuru`」という訂正が反映されていない（要修正だが本設計のスコープ外）。
+
+これらはいずれも**iOSのビルド成果物形式（Xcodeプロジェクト、Info.plist、entitlements、xcarchive）に強く依存**しており、Android版の対応する仕組み（Gradleプロジェクト、`AndroidManifest.xml`、`.aab`、keystore署名）はゼロから別途構築する必要がある。ロジックの考え方（CIでプラットフォーム設定を自動注入する、アイコンをスクリプト生成する、fastlaneでストアにアップロードする）は再利用できるが、**具体的なコード資産（Python/Ruby/YAMLの中身）はほぼ再利用不可**。
+
+### 1.2 サーバー側（`server.js`）
+
+**認証（Google/Apple Sign-In）**
+- `POST /api/auth/google`: `idToken`をGoogleに検証させ、`sub`のみでユーザーをupsertし自前JWTを発行。audienceは`[GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID]`のいずれかにマッチすればOKという設計（`server.js:1536`）。**Android用クライアントIDは現状このaudience配列に含まれていない**ため、Android版を追加する場合は`GOOGLE_ANDROID_CLIENT_ID`のような環境変数を追加し、audience配列に加える必要がある（サーバー側の変更は最小限、1行〜数行）。
+- `POST /api/auth/apple`・`GET /api/auth/apple/state`・`POST /api/auth/apple/callback`: Sign in with Apple。Androidにはネイティブの「Sign in with Apple」の仕組みは存在しない。Apple自体はWebベースのSign in with Apple JS SDKをAndroid上のWebViewからも技術的には呼び出せなくはないが、Capacitor Android上で`@capacitor-community/apple-sign-in`はサポート外（iOS専用プラグイン）。
+- `GET /api/config`は`googleWebClientId`/`appleServiceId`/`appleRedirectUri`を返す（`server.js:613`付近）。Android版がWeb版と同じ「Google Identity Services SDK」方式を使うのか、専用のCapacitorプラグイン（`@codetrix-studio/capacitor-google-auth`はAndroidもサポート、要検証）を使うのかで、ここに`googleAndroidClientId`を足すかどうかが変わる。
+
+**プッシュ通知**
+- APNs実装（`server.js:16-110`）は`@parse/node-apn`ベースで、`sendApnToToken()`・`apnProvider`など**iOS専用の実装**。
+- `data/push-subscriptions.json`（プロジェクトルート直下、都市非依存のグローバル1ファイル）のスキーマは`{platform:'web', endpoint, keys}`または`{platform:'ios', deviceToken, registeredAt}`の2種類（`subPlatform()`関数で`platform`未設定時は`'web'`にフォールバックする後方互換処理あり、`server.js:80-83`）。
+- `sendPushToAll()`（`server.js:84-110`）は`subPlatform(sub) === 'ios'`のときだけAPNs分岐、それ以外は全てWeb Push(`webpush.sendNotification`)として扱う。**Android版を追加する場合、この分岐に`platform === 'android'`のFCM送信ロジックを新設する必要があり、`sendApnToToken`と同等の`sendFcmToToken()`のような関数を追加する形になる**。
+- エンドポイント名`/api/push-subscribe-ios`・`/api/push-subscribe-ios`(DELETE)は**命名自体がiOS専用**（`server.js:1695,1709`）。Android版のトークン登録には新規エンドポイント（例: `/api/push-subscribe-android`）が必要になる可能性が高い（既存エンドポイントを汎用化してリネームすると、リクエストパスが変わり旧バージョンiOSアプリを壊すリスクがあるため、後方互換の観点からは「iOS用は現状維持、Android用は新設」が無難と考えられる。詳細は「データ共有への影響」節参照）。
+
+### 1.3 クライアント側（`public/app.js`）
+
+- `_isCapacitorApp`（`app.js:2`）は`window.Capacitor?.isNativePlatform?.()`の真偽値のみを見ており、**iOS/Androidを区別する変数・分岐は現状どこにも存在しない**。つまり現在のコードは「Capacitorネイティブか、そうでない（Web）か」の2値分岐であり、Android版を追加すると全ての`_isCapacitorApp`分岐が「iOSとAndroidの両方」に適用されることになる。
+  - これは多くの箇所（外部リンクの`Browser.open()`分岐、SW登録スキップ、GA4無効化等）では問題にならない（プラットフォーム非依存の処理のため）。
+  - しかし**Apple Sign-In関連**（`handleAppleLoginClick()`が`_isCapacitorApp`ならほぼ無条件で`_handleAppleLoginIOS()`を呼ぶ、`app.js:2990`）は、Android版でこのボタンが表示されたままだと動作しない（`SignInWithApple`プラグイン自体がAndroidでは存在しないため、`AppleAuthPlugin`が取得できず`showToast(toastLoginError)`になるだけで済むが、UI上にボタンが出ること自体がユーザー体験として不適切）。**Android版では設定画面のUIレベルでApple Sign-Inボタンを非表示にする分岐が新たに必要**。
+  - Google Sign-In（`_handleGoogleLoginIOS()`、実際は`_isCapacitorApp`全般で呼ばれる関数、`app.js:2936`）は関数名こそ`IOS`だが中身は`window.Capacitor.Plugins.GoogleAuth`のプラグイン呼び出しのみで、iOS固有の処理はない。`@codetrix-studio/capacitor-google-auth`がAndroidもサポートしていれば、そのまま動く可能性が高い（要実機検証）。
+- プッシュ通知処理（`_initNativePush()`, `_toggleNativePush()`, `app.js:3399-3482`）は`@capacitor/push-notifications`のプラグインAPI（`checkPermissions`/`requestPermissions`/`register`/`addListener('registration', ...)`）を使っており、**このプラグイン自体はiOS/Android共通API**（Capacitor公式ドキュメントの一般的な設計として、内部でAPNs/FCMを吸収する想定になっているはずだが、本調査ではコード上の実装詳細までは確認できておらず「不明」）。ただし、`_registerNativePushToken()`が叩くエンドポイントが`/api/push-subscribe-ios`固定（`app.js:3486,3496`）になっているため、**Android版ではこの関数もプラットフォーム分岐してエンドポイントを切り替える必要がある**（もしくはサーバー側でエンドポイントを共通化し、リクエストボディに`platform`を含める設計に変える必要がある）。
+- `localStorage`のキー名にも`app_ios_push_token`（`app.js:2292`ほか多数）のように**iOS前提の命名**が使われている。Android版でも同じキー名を流用するとコード上の意味が「iOS専用トークン」から外れてしまうため、リネームするか、Android版は別キー（例: `app_android_push_token`）にするかの設計判断が必要（未解決の質問として後述）。
+
+### 1.4 アイコン・スプラッシュ生成
+- `@capacitor/assets`（`ios-app/package.json`の`devDependencies`、v3系）は公式にAndroidの`--android`フラグにも対応しているはず（一般的な`@capacitor/assets`パッケージの仕様として、iOS/Android両対応が謳われているが、**本プロジェクトでの実際の動作確認はしていないため未確認**）。
+- ただし設計書195の教訓（`@capacitor/assets`が生成するiOSアイコンがXcodeの新方式に完全対応しておらず、Notifications用20ptサイズが欠落する不具合が発生し、結局`sharp`で手動生成する独自スクリプトに置き換えた経緯）を踏まえると、**Android版でも`@capacitor/assets`任せにせず、生成結果を実際に検証するステップが必要**。Androidのアイコン形式は`mipmap-mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi`の複数解像度ディレクトリ＋Adaptive Icon（`foreground`/`background`のレイヤー分離、`ic_launcher.xml`）という、iOSのシングルSet方式ともAssets.xcassets方式とも異なる構造であるため、既存のiOS対応スクリプト（`ios-deploy.yml`内のNode.jsインラインスクリプト）はそのまま流用できず、Android用に新規に書く必要がある。
+- プッシュ通知の小アイコン（Androidは通知バーの小アイコンがモノクロシルエット推奨、iOSと表示ルールが異なる）も別途用意が必要になる可能性が高い（詳細は「未解決の質問」参照）。
+
+### 1.5 既存の類似パターン（iOS版のCI/CD設計思想）
+- 「webDir配下（`public/`）をそのままバンドルし、プラットフォーム差分はネイティブプロジェクトの設定ファイル・プラグインでのみ吸収する」という設計方針は、iOS版で確立されており、Android版でも同じ思想（Web版のUIコード自体はほぼ変更しない）を踏襲するのが自然。
+- 「CIでプラットフォームプロジェクトを都度`npx cap add`し、設定をスクリプトで冪等に注入してからビルド・アップロードする」というパターンも、Android版のGitHub Actionsワークフロー（Ubuntu runner + JDK + Gradle）で同様に構築可能と考えられる。
+
+---
+
+## 2. 受け入れ基準
+
+本設計書の受け入れ基準は「実装が完了していること」ではなく、「意思決定に必要な材料が揃っていること」である。
+
+### 正常系
+- Android版の実現に必要な作業項目（プロジェクト構成／CI/CD／プッシュ通知／認証／アイコン／ストア掲載準備／段階的リリース）が、各項目ごとに現状の実装との差分・必要な追加作業として整理されていること。
+- 既存のiOS版・Web版のコード（`server.js`, `public/app.js`, `data/push-subscriptions.json`）への影響箇所が具体的な行番号・関数名レベルで特定されていること。
+
+### 失敗系（本設計書が扱わないこと）
+- 実際のコード変更・Android Studioでの動作確認・実機テストは行わない（調査のみ）。
+- Google Play Consoleへの実際のアカウント登録作業は行わない。
+
+### エッジケース
+- 「旧バージョンのiOSアプリ（App Store配信中、まだ更新していないユーザー）が、サーバー側APIの変更によって壊れないか」を各変更ごとに明記する（後述「データ共有への影響」）。
+
+---
+
+## 3. スコープ外（今回作らないもの）
+
+- Android版の実装コード一式（`android-app/`ディレクトリ、Gradleファイル、Kotlin/Javaコード等）
+- Google Play Consoleアカウントの実際の作成・法人確認書類の提出
+- FCM（Firebase Cloud Messaging）のFirebaseプロジェクト自体の作成
+- Google Cloud ConsoleでのAndroid用OAuthクライアントIDの実際の発行
+- Android版のUIデザイン変更（Material Designへの最適化等は行わない前提、既存iOSと同じUIをそのまま使う想定）
+- ストア掲載文言（タイトル・説明文・スクリーンショット）の作成
+- 実際のリリース日程・投資判断
+
+---
+
+## 4. 各観点ごとの設計
+
+### 4.1 プロジェクト構成
+- `npx cap add android`を`android-app/`（iOSの`ios-app/`と対になる命名）で実行すると、Capacitor公式のAndroidテンプレート（Gradleプロジェクト、`app/src/main/AndroidManifest.xml`、`app/src/main/java/`、`app/src/main/assets/public/`にwebDirがコピーされる構成）が生成される。
+- `webDir: '../public'`はiOS版の`capacitor.config.js`と同じ値をAndroid版の`capacitor.config.js`（または共通configファイルを作り`ios`/`android`両方から参照する形に統合するか、`ios-app/`と同様に`android-app/`直下に独立して置くか、は設計判断が必要）にも設定すれば、**Web版と全く同じHTML/CSS/JSがそのままAndroid版でも使われる**。ここは既存方式の完全な再利用が可能。
+- `ios-app/package.json`の依存関係のうち、`@capacitor/core`, `@capacitor/app`, `@capacitor/browser`, `@capacitor/keyboard`, `@capacitor/preferences`, `@capacitor/push-notifications`, `@capacitor/splash-screen`, `@capacitor/status-bar`はいずれも一般的にAndroidもサポートする想定（Capacitor公式プラグインとして両OS対応が基本のため）。ただし実際にpackage単位でAndroid対応版が存在するか・バージョン間の非互換がないかは**未確認**。
+- `@codetrix-studio/capacitor-google-auth`はGitHub上でAndroidサポートを謳っているはずだが、**このプロジェクトでの実地検証はできていない**（要確認事項）。
+- `@capacitor-community/apple-sign-in`はAndroid非対応（そもそもApple製品専用の概念のため、Android版の`package.json`には含めない）。
+
+### 4.2 CI/CD
+- 新規ワークフローファイル案: `.github/workflows/android-deploy.yml`（`releaseブランチpush`をトリガーにするか、iOSと同じトリガーにするか、別ブランチにするかは要検討）。
+- `runs-on: ubuntu-latest`（AndroidビルドはmacOS runnerが不要でLinuxで完結するため、iOS版よりCIコストは低い可能性が高い）。
+- ビルドの流れ（想定）: `npx cap add android` → アイコン・スプラッシュ生成 → `AndroidManifest.xml`へのパーミッション・Deep Link設定注入（Google Sign-InのリダイレクトURI、FCM設定等）→ `google-services.json`配置（FCM用、GitHub Secretsからデコードして配置する想定、iOS版の証明書配置パターンと同じ考え方）→ signing keystoreの設定（GitHub Secretsにbase64化したkeystoreを保存し復元、iOS版の`DIST_CERT_BASE64`と同じパターン）→ Gradleで`.aab`（Android App Bundle、Google Play推奨形式）をビルド→ `fastlane supply`でGoogle Play Console（内部テスト/クローズドテストトラック）へアップロード。
+- Fastlane: iOS版は`fastlane/Fastfile`の`platform :ios do ... end`ブロックのみだが、Fastlaneは`platform :android do ... end`も同一Fastfile内に共存できる（Fastlane自体はマルチプラットフォーム対応）。ただし`android-app/`を独立ディレクトリにする場合、Fastfile自体も`android-app/fastlane/Fastfile`として別に持つのが既存のiOS方式に忠実（`ios-app/fastlane/Fastfile`との対称性を優先する場合）。
+- Google Play向けのFastlaneアクションは`supply`（`upload_to_play_store`）。App Store Connect API Keyに相当するものとして、Google Play Console側のサービスアカウントJSON鍵が必要（GitHub Secretsに追加）。
+- **再利用度合い**: ワークフローの「構造」（トリガー→依存インストール→プラットフォーム追加→アイコン生成→設定注入→ビルド→ストアアップロード、という段階分け）は完全に踏襲可能。しかし各ステップの中身（PlistBuddy/plistlib相当のAndroidManifest操作、証明書形式、Fastlaneのプラグイン）はほぼゼロから書く必要がある。
+
+### 4.3 プッシュ通知
+- **FCM導入は必須**（Android版でAPNsと同等のプッシュ通知を実現する唯一の一般的な方法）。
+- 必要な作業:
+  1. Firebaseプロジェクトの新規作成（Google Cloud Consoleと連携、WILLOA PTE. LTD.のGoogleアカウント配下）
+  2. `google-services.json`をAndroidプロジェクトに配置（CIではSecretsから復元）
+  3. サーバー側（`server.js`）に`firebase-admin`SDK（または`node-fcm`等）を追加し、`sendFcmToToken()`のような関数を新設。既存の`sendApnToToken()`と対になる実装イメージ。
+  4. `data/push-subscriptions.json`のスキーマに`{platform:'android', deviceToken, registeredAt}`のような3つ目のバリアントを追加（既存のweb/iOSのレコードは無変更、後方互換）
+  5. `sendPushToAll()`内の分岐を`if (subPlatform(sub) === 'ios') {...} else if (subPlatform(sub) === 'android') {...} else {...web...}`のように拡張
+  6. クライアント側は`@capacitor/push-notifications`のAPIが共通のはずなので、`_initNativePush()`/`_toggleNativePush()`のロジック自体は流用可能性が高いが、**登録先エンドポイント（`/api/push-subscribe-ios`固定）をプラットフォーム別に振り分ける改修が必要**。案としては(a) 新規`/api/push-subscribe-android`エンドポイントを追加、(b) 既存の2エンドポイントを`/api/push-subscribe-native`のような汎用名に統合しリクエストボディに`platform`を含める、のいずれか。(b)は既存iOSクライアントが送るリクエストのURLを変えない限りは後方互換だが、エンドポイント名の意味が変わる。（b')既存の`/api/push-subscribe-ios`はそのまま残し、Android用だけ新設エンドポイントを追加、という設計が最も安全（後述リスク参照）。
+- **投資判断が必要な点**: FCM導入は「Firebaseプロジェクト管理」「サーバー側の新規送信ロジック」という恒久的な保守コストが増える。プッシュ通知を最初のリリースでは見送り、後続フェーズで追加する設計も可能（段階的リリース案参照）。
+
+### 4.4 認証
+- **Google Sign-In**: Androidでも動く前提だが、Googleの一般的な仕様として、Android用のOAuthクライアントIDはWeb用・iOS用とは別に、Google Cloud Consoleで「Androidアプリ」タイプとして発行し、アプリの署名SHA-1フィンガープリントを登録する必要がある（一般的なGoogle Sign-In on Androidの要件、本プロジェクト固有の設定は未確認）。サーバー側は`GOOGLE_ANDROID_CLIENT_ID`をaudience配列に追加するだけで対応可能（`server.js:1536`の配列に1要素追加）。
+- **Apple Sign-In**: Androidには存在しない。設計判断が必要な点（後述「未解決の質問」）:
+  - (a) Android版では設定画面からApple Sign-Inボタンを完全に非表示にする（最もシンプル）
+  - (b) 代替として何も出さない（Googleログインのみ提供）
+  - (c) Apple自体が提供する「Sign in with Apple for Web」フローをAndroid上のWebViewで擬似的に使う設計も理論上あり得るが、UXが悪化しやすく非推奨
+  - 現状のCLAUDE.mdの認証まわり記載を踏まえると、(a)が最も実装コストが低く自然な選択に見えるが、**「Apple SignInで既にログインしているiOS版ユーザーが、同じアカウントでAndroid版を使いたい場合にどうするか」は未解決の重要な問題**（Apple SignInのsubはGoogleのsubと別物であり、そもそも同一ユーザーをクロスプラットフォームで紐づける仕組みが現状ない。これはAndroid版固有の問題ではなく、現行の認証設計自体の限界）。
+
+### 4.5 アイコン・スプラッシュ
+- `@capacitor/assets`のAndroid対応(`--android`フラグ)を試す価値はあるが、設計書195の教訓（iOSでは公式ツールの自動生成が実際のビルドに正しく反映されない不具合があった）を踏まえ、**生成後に実機/エミュレータで実際にアイコンが正しく表示されるか検証するステップを必ず設けるべき**。
+- 対応不十分だった場合の代替案: iOS版と同様に`sharp`で`mipmap-*`各解像度のPNGを直接生成するNode.jsスクリプトをCIに組み込む方式（実績のある手法をAndroid用に書き直す）。
+- Adaptive Icon（Android 8.0+標準、前景レイヤーと背景レイヤーを分離する形式）への対応要否は、最低限のリリースでは「legacy単一アイコン」のみでも公開自体は可能なはずだが、**Google Playのアイコン品質ガイドライン上Adaptive Icon対応が事実上推奨されているかは未確認**。
+
+### 4.6 ストア掲載準備
+- **Google Play Consoleアカウント種別**: **Organization（法人）アカウントを推奨**。理由: 2023-11-13以降に作成された個人(Personal)アカウントには「12人のテスターに14日間の非公開テストを実施する」という新しい審査要件が課されるが、法人アカウントはこの要件が免除される（ユーザー確認済みの事実）。ユーザーの法人WILLOA PTE. LTD.は既に存在するため、Organizationとして登録すれば審査面で有利。**ただし、法人確認のためにGoogle Play Console側でどのような書類（登記簿謄本、DUNS番号等）が必要になるかは未確認**（Google側の要件は変更される可能性があり、実際の登録作業時に最新情報の確認が必要）。
+- **プライバシーポリシー**: 既存`public/privacy.html`は流用可能な土台だが、**現状の内容が既に廃止済みの機能（位置情報・写真＝探訪機能、Stripe決済）に言及しており、実態と乖離している**（調査で確認: `privacy.html`第1章に「探訪」機能の位置情報・写真収集の記述が残っているが、CLAUDE.mdによれば探訪機能は設計書178で完全削除済み。第4章にもStripe決済・GA4の記述があるが、Stripeコードは設計書192で削除済み）。Android版リリース前に、iOS版・Web版共通のプライバシーポリシー自体を実態に合わせて更新すべき（Android版固有の追加事項というよりは、既存の不整合の是正が前提）。Android版固有で追記が必要になりうる項目: FCMを使う場合「プッシュ通知トークン（FCM）」の文言追加、Google Play Consoleのデータセーフティフォームとの整合。
+- **データセーフティフォーム**（Google Play Console提出物）: 開示が必要になる可能性が高い項目
+  - Google/Appleアカウント識別子（sub）→「ユーザーID」として収集ありと申告
+  - プッシュ通知トークン（FCMデバイストークン）→ デバイスID相当として申告要否を確認
+  - フィードバック文章 → 個人情報ではないが「ユーザーが作成したコンテンツ」として申告要否を確認
+  - 収集データが暗号化通信で送信されるか、削除依頼にどう対応するか、等の付随質問への回答が必要
+  - **具体的な記入内容はGoogle Play Consoleの実際のフォーム項目を見ながら決める必要があり、本調査だけでは断定できない（不明点として明記）**
+
+### 4.7 段階的リリース計画（提案）
+1. **フェーズ0（意思決定）**: 本設計書の各論点についてユーザーが判断（後述「未解決の質問」）
+2. **フェーズ1（内部テスト）**: `android-app/`ディレクトリ作成、基本ビルドが通ることを確認。プッシュ通知・Apple代替ログイン等の対応は最小限（例: プッシュ通知は最初は見送り、Googleログインのみ対応）。Google Play Consoleの内部テストトラック（最大100人、審査基本的に不要）でWILLOA関係者のみ動作確認。
+3. **フェーズ2（クローズドテスト）**: Organizationアカウントの審査要件を踏まえつつ、限定ユーザーへ配布。FCM対応やアイコン最終調整など、フェーズ1で洗い出した課題を解消。
+4. **フェーズ3（本番リリース）**: Google Playストア一般公開。
+
+### 4.8 見積もり（大まかな規模感）
+- **既存インフラの再利用度**: HTML/CSS/JS本体（`public/`配下）はほぼ100%再利用可能（Web版・iOS版と共通のUIロジックのため、プラットフォーム分岐の追加のみで足りる）。
+- **新規に書く必要がある部分**: CI/CDワークフロー全体（Gradle・keystore・Google Play API連携）、アイコン生成スクリプト（Android形式）、FCM関連のサーバーサイドコード、認証UIのプラットフォーム分岐（Apple非表示）、プッシュ通知エンドポイントの追加。
+- 規模感としては、iOS版の初期構築（`ios-app/`一式・CI・Fastlane・APNs対応・審査対応諸々）に投じられた工数と同程度〜やや軽い（Apple Sign-In相当の複雑な対応が不要な分やや軽いが、FCM新規導入・Google Playの初回審査対応の学習コストがある分、単純に「半分で済む」とは言えない）というのが妥当な感覚値。**正確な工数見積もりは本調査のスコープ外（実装フェーズでの見積もりが必要）**。
+
+---
+
+## 5. 変更/新規作成するファイル一覧（想定、実装フェーズで確定）
+
+### 新規作成
+- `android-app/`ディレクトリ一式（`npx cap add android`の生成物、`capacitor.config.js`または`.ts`、`package.json`）
+- `android-app/README.md`（iOSの`ios-app/README.md`に相当するセットアップ手順書）
+- `.github/workflows/android-deploy.yml`（新規CIワークフロー）
+- `android-app/fastlane/Fastfile`・`Appfile`（Google Play向け`supply`レーン）
+- Android用アイコン・スプラッシュ生成スクリプト（CIワークフロー内インラインまたは`scripts/`配下）
+
+### 変更が想定されるファイル
+- `server.js`: 
+  - `POST /api/auth/google`のaudience配列に`GOOGLE_ANDROID_CLIENT_ID`追加
+  - FCM送信ロジック新設（`sendFcmToToken()`等）、`sendPushToAll()`の分岐拡張
+  - 新規プッシュ購読エンドポイント（`/api/push-subscribe-android`等）追加
+  - `GET /api/config`にAndroid向け設定値追加の要否検討
+- `public/app.js`:
+  - プラットフォーム判定の拡張（iOS/Android区別が必要な箇所、特にApple Sign-Inボタンの表示制御）
+  - `_registerNativePushToken()`/`_deregisterNativePushToken()`のエンドポイント振り分け
+  - localStorageキー名の設計（`app_ios_push_token`をAndroidでも使うか、別キーにするか）
+- `public/index.html`: Apple Sign-InボタンをAndroid版で非表示にするための条件分岐（CSS/JS）
+- `public/privacy.html`: FCM追加に伴う文言更新（既存の実態不整合の是正も合わせて推奨）
+- `package.json`（ルート）: `firebase-admin`等のFCM送信用サーバー依存追加
+
+### データファイル
+- `data/push-subscriptions.json`: 新しい`platform: 'android'`のレコード追加（既存レコードは無変更、後方互換）
+
+---
+
+## 6. データモデルの変更
+
+### `data/push-subscriptions.json`
+現行:
+```json
+{ "platform": "web", "endpoint": "...", "keys": {...} }
+{ "platform": "ios", "deviceToken": "...", "registeredAt": "..." }
+```
+変更後（追加、既存2種は無変更）:
+```json
+{ "platform": "android", "deviceToken": "...", "registeredAt": "..." }
+```
+- 既存の`subPlatform()`関数のフォールバック処理（`platform`未設定→`'web'`扱い）はそのまま影響なし。
+- `sendPushToAll()`の分岐拡張が必要（`server.js:84-110`）。
+
+### `data/users.json`
+- スキーマ自体（`userId`/`provider`/`providerSub`/`createdAt`/`lastLoginAt`/`subscriptions`）は無変更で足りる見込み（`provider`は既に`'google'`/`'apple'`の文字列を持つ設計のため、Android版のGoogleログインも同じ`provider: 'google'`として扱える）。
+
+---
+
+## 7. APIの変更
+
+| エンドポイント | 変更内容 | 影響範囲 |
+|---|---|---|
+| `POST /api/auth/google` | audience配列にAndroid用クライアントID追加 | サーバーのみ。既存トークン検証ロジックの拡張で後方互換 |
+| `POST /api/push-subscribe-android`（新規） | Androidデバイストークンの登録 | 新規追加のみ、既存に影響なし |
+| `DELETE /api/push-subscribe-android`（新規） | Androidデバイストークンの解除 | 新規追加のみ、既存に影響なし |
+| `GET /api/config` | `googleAndroidClientId`等の追加要否 | クライアント側でAndroid固有の設定取得が必要な場合のみ |
+
+**既存の`/api/auth/apple`系エンドポイントは変更しない**（Android版では呼び出さない設計のため）。
+
+---
+
+## 8. フロントエンドの変更（想定）
+- 設定画面: Android版ではApple Sign-Inボタン（`#apple-login-btn-container`相当）を非表示にする条件分岐追加。
+- プッシュ通知トグルUI: 現状`_isCapacitorApp`分岐のみで足りている箇所が大半だが、エンドポイント振り分けの内部ロジックのみプラットフォーム別に分岐（UI自体の見た目は変更不要な可能性が高い）。
+- ボタンのビジュアル（Google/Appleの公式ロゴSVG自前描画、`.oauth-btn`系CSS）は、Android版でAppleボタンを消すだけであれば大きな変更は不要。
+
+---
+
+## 9. データ共有への影響（Web版・iOS版との整合性、重要）
+
+このプロジェクトはWeb版（テスト環境）とiOS App Store版（本番）がデータを共有しており、Android版追加時も同様の配慮が必要。
+
+### 9.1 後方互換性（旧バージョンiOSアプリへの影響）
+- **`server.js`のaudience配列拡張**（`GOOGLE_ANDROID_CLIENT_ID`追加）: 既存の検証ロジックに要素を追加するだけであり、既存のiOS版・Web版のGoogleログインには一切影響しない（配列に要素が増えても既存要素のマッチングロジックは変わらない）。**安全**。
+- **プッシュ通知の新規エンドポイント追加**（`/api/push-subscribe-android`）: 完全に新規のパスであり、既存の`/api/push-subscribe-ios`・`/api/push-subscribe`（Web用）には触れない設計を推奨。**この設計を守れば旧バージョンiOSアプリは一切壊れない**。
+- **`sendPushToAll()`の分岐拡張**（`platform === 'android'`の追加）: 既存の`platform === 'ios'`分岐・elseのWeb Push分岐はそのまま残す前提であれば、**既存ユーザーへの配信ロジックに影響なし**。ただし実装時にif-else構造を壊さないよう注意が必要（例えば`else`の意味を「web」から「android以外」のように誤って広げてしまうと、既存iOSユーザーへの送信が壊れるリスクがある。これは実装フェーズでの注意点）。
+
+### 9.2 影響範囲（Web版だけか、App Store版にも影響するか）
+- 上記のサーバー側変更（`server.js`）は、Web版・iOS版・Android版すべてが参照する**単一の本番サーバー**への変更であるため、デプロイした瞬間から**Web版・iOS版（既存ユーザー含む）にも同時に影響する**。
+- ただし、上記で設計している変更内容（新規エンドポイント追加、audience配列への追加、新規分岐の追加）はいずれも「既存の分岐・既存のエンドポイントには一切手を入れない、追加のみ」という設計にしているため、**理論上は既存ユーザーへの機能的な影響はゼロになるよう設計可能**。ここが崩れる実装（例: 既存の`/api/push-subscribe-ios`を`/api/push-subscribe-native`にリネームしてAndroidと共通化する等）を選んだ場合は、**サーバー更新後、まだ更新していない旧バージョンのApp Storeアプリが新しいエンドポイント名を知らないため、プッシュ通知登録が壊れる**。この設計書では「iOS用エンドポイントは現状維持し、Android用は完全新規」という安全側の方針を推奨する。
+
+### 9.3 リリースタイミング
+- サーバー側の変更（audience拡張、新規エンドポイント追加）は「追加のみ」であるため、**Android版アプリのリリースを待たずに先行してデプロイしても安全**（クライアント側が新エンドポイントを叩かない限り何も起きないため）。
+- ただし、FCM送信ロジックやAndroid向け新規コードを本番サーバーに入れる場合、**環境変数未設定時にサーバー起動やAPNs等の既存機能に悪影響を与えないこと**（既存のAPNsが`APNS_ENABLED`のフラグで安全にスキップされる設計を踏襲し、FCMも同様に「Firebase認証情報未設定なら`fcmEnabled = false`で安全にスキップ」という設計にすべき、というのが本調査からの推奨）。
+
+---
+
+## 10. リスク・未解決の質問
+
+### リスク
+1. **プッシュ通知トークンの命名衝突リスク**: `localStorage`の`app_ios_push_token`のようなiOS前提の命名を、コードコピー時にAndroid版でもそのまま使ってしまうと、変数の意味が曖昧になり将来のバグ源になる（実装時の注意点）。
+2. **`sendPushToAll()`のif-else構造を壊すリスク**: Android分岐を追加する際、既存のiOS/Web分岐のロジックに誤って影響を与えると、App Store版ユーザーへの通知が届かなくなる重大リグレッションになりうる（後方互換性の観点で最重要）。
+3. **`@capacitor/assets`のAndroid生成結果の信頼性が未検証**: iOS版で公式ツールの生成結果が実際のビルドに正しく反映されない不具合が過去にあった（設計書190→195）。Android版でも同様の落とし穴がある可能性があり、事前に実機/エミュレータでの検証工程を設計に組み込む必要がある。
+4. **Google Playの法人確認プロセスの詳細が未確認**: Organizationアカウントに必要な書類・確認プロセスの所要時間が見積もれておらず、リリーススケジュールに影響する可能性がある。
+5. **既存プライバシーポリシーの実態不整合**: `privacy.html`が既に削除済みの機能（探訪の位置情報・写真、Stripe）に言及したままであり、Android版のデータセーフティフォーム提出時にこの不整合が問題になる可能性がある（Android版固有の問題ではないが、リリース前に是正が必要）。
+
+### 未解決の質問（ユーザーの意思決定が必要）
+1. **Apple Sign-InがないAndroidでアカウント連携機能をどう扱うか**: (a) Androidでは単純にApple Sign-Inボタンを非表示にしGoogleログインのみ提供する、(b) 何らかの代替手段を用意する、のどちらの方針か。またiOS版でApple IDログイン済みのユーザーがAndroid版に移行したい場合の救済策（現状は用意できない見込み）をどう案内するか。
+2. **FCM導入にどこまで投資するか**: 最初のリリースからプッシュ通知をフル対応させるか、まずはプッシュ通知なしでリリースし後続フェーズで追加するか。
+3. **Google Play Consoleのアカウント登録主体**: WILLOA PTE. LTD.名義でのOrganizationアカウント登録を進める前提でよいか（Apple Developer Programの時と同様の法人確認プロセスが必要になる可能性がある）。
+4. **`android-app/`のディレクトリ構成・CI設計をどこまでiOS版に似せるか**: 完全に対称な構成（`android-app/fastlane/Fastfile`等）にするか、Capacitor公式の標準的なmonorepo構成に寄せるか。
+5. **プッシュ通知エンドポイントの設計方針**: 新規エンドポイント追加方式（本設計書の推奨）か、既存エンドポイントの汎用化・リネーム方式か。後者を選ぶ場合、旧バージョンiOSアプリへの影響を避けるための移行戦略（例: 新旧エンドポイント併存期間を設ける）が別途必要になる。
+6. **localStorage/Preferencesのキー命名規則**: `app_ios_push_token`のようなiOS前提の命名を、Android版のために汎用化（リネーム）するか、Android版だけ別キーにするか。前者は既存iOSユーザーのデータ移行を伴うため慎重な検討が必要。
+7. **Google Play Consoleのデータセーフティフォームの具体的な記入内容**: 実際のフォーム項目を確認しながら、既存の認証・プッシュ通知の実装内容とどうマッピングするかは、Google Play Console登録作業時に別途確認が必要（本調査だけでは断定できない）。
+8. **`@capacitor/assets`・`@codetrix-studio/capacitor-google-auth`のAndroid実地対応状況**: 本調査はコードとドキュメントの確認にとどまり、実際にAndroidプロジェクトを生成してビルド・実機検証を行っていないため、両パッケージの動作は「公式ドキュメント上はサポートしているはず」という推測の域を出ない。実装フェーズの早い段階で技術検証（スパイク）を行うことを推奨する。
+9. **既存`privacy.html`の実態不整合の是正タイミング**: Android版リリースに合わせて修正するか、それより前に（Web版・iOS版向けとして）先行して修正するか。
+
+---
+
+# 設計書197 — アプリアイコンの差し替え(スカイライン背景を削除した無地版へ、2026-09-13設計)
+
+## 背景
+現行のアプリアイコン(`dosuru-icon.png`)は「オリーブグリーンのピン型輪郭＋内側に赤/白のコンパス針」に、背景としてシンガポールスカイライン(マリーナベイサンズ・観覧車・ビル群)と下部の波線装飾を配したデザインだった。ユーザー依頼「スカイラインだけ消してピンとコンパス針はそのまま」に基づき用意された新アイコン画像に差し替える。
+
+新アイコン画像ファイル(2000x2000px, PNG, RGB, アルファチャンネルなし):
+`/home/masahiko/.claude/uploads/2899e138-7514-45e4-8e51-203c38b6c8a1/c3885ca7-SG__Navi________.png`
+
+デザイン内容: ピン型輪郭・コンパス針は現行と同一、背景のスカイライン・波線装飾を削除し無地の白背景にしたもの。
+
+**今回のスコープは「アプリアイコンのみ」であり、iOSスプラッシュ画面(`splash.png`/`splash-dark.png`)は変更しない。**
+
+## 実施手順(この順で実行)
+
+1. sharpで新アイコン画像を1024x1024にリサイズし、`/home/masahiko/sg-weekend-app/dosuru-icon.png`に上書きする
+2. `cd /home/masahiko/sg-weekend-app && node generate-icons.js` を実行し、Web版アイコン一式(`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`)を再生成する
+3. 同じ新アイコン画像を1024x1024・アルファチャンネルなしにして`/home/masahiko/sg-weekend-app/ios-app/resources/icon.png`に上書きする(App Store提出要件によりアルファ除去が必須)
+4. `/home/masahiko/sg-weekend-app/public/sw.js`の`CACHE_NAME`を+1インクリメントする
+5. 絶対に変更しないもの: `splash.png`・`splash-dark.png`、`ios-app/package.json`のバージョン番号、`.github/workflows/ios-deploy.yml`、`release`ブランチへのpush
+
+## 実装記録(2026-09-13、builder→checker→closer実行)
+
+- `dosuru-icon.png`を新デザイン(無地白背景＋ピン+コンパス針)に差し替え、1024x1024・RGB・アルファなしで生成
+- `node generate-icons.js`実行により`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`を再生成
+- `ios-app/resources/icon.png`を新デザイン・1024x1024・アルファチャンネルなし(`hasAlpha:false`)で上書き
+- `public/sw.js`の`CACHE_NAME`を`'sg-weekend-v911'`→`'sg-weekend-v912'`にインクリメント
+- `splash.png`・`splash-dark.png`・`ios-app/package.json`は変更なし(タイムスタンプ・内容とも変更されていないことを確認)
+- iOS版への反映は次回`release`ブランチpush→TestFlight配信が必要（今回のスコープには含まれない）

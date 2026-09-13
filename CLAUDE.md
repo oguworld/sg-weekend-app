@@ -148,8 +148,10 @@ Google Sign-In・Sign in with Appleに対応。予定表データ/共有カレ�
 - **SW登録（`navigator.serviceWorker.register('/sw.js')`）は`public/app.js`の初期化処理内に存在**（Web版プッシュ通知の`navigator.serviceWorker.ready`依存＋SW更新時の自動反映のために必要）。登録時に`navigator.serviceWorker.controller`が既にあった場合（＝既存訪問者のSW更新時）のみ`controllerchange`で1回だけ`location.reload()`し、新デザイン等の反映漏れを防止。新規訪問者では初回の`controllerchange`では自動リロードしない（フラグ`_hadController`で判定）
 - 既知の残存事項（対応不要・スコープ外）: `public/index.html`に到達不能な`#install-modal`（「ホーム画面に追加する」手順モーダル）が残存。開く関数`openInstallModal()`が存在せずorphaned markup。ボタンの`onclick="handleInstall()"`は関数削除済みで無効だが、到達不能なため実害なし
 
-## アプリアイコン・スプラッシュ画面（2026-09-08刷新、設計書179・180。ダークスプラッシュのロゴ配色は2026-09-08に再修正、同日中にロゴ+テキストブロックの縮小・上寄せ調整も実施）
+## アプリアイコン・スプラッシュ画面（2026-09-08刷新、設計書179・180。ダークスプラッシュのロゴ配色は2026-09-08に再修正、同日中にロゴ+テキストブロックの縮小・上寄せ調整も実施。2026-09-13設計書197でアプリアイコンのみ背景を無地化）
 アイコンデザインを「シンガポール島スカイライン＋コンパス針のピン」に刷新（旧デザインにあった雲と「S」の文字は削除）。Web版・iOS版アイコン、iOSスプラッシュ画面（ライト/ダーク）を統一して差し替え済み。
+
+**アプリアイコンの背景を無地白へ変更（2026-09-13、設計書197、builder→checker→closer）**: ユーザー依頼「スカイラインだけ消してピンとコンパス針はそのまま」に基づき、`dosuru-icon.png`・`ios-app/resources/icon.png`の背景（シンガポールスカイライン＋下部波線装飾）を削除し、無地の白背景に差し替えた。ピン型輪郭（オリーブグリーン）・内側の赤/白コンパス針は変更なし。**このスコープはアプリアイコンのみで、`splash.png`/`splash-dark.png`（iOSスプラッシュ画面）は無変更**（タイムスタンプ・md5ハッシュとも変更なしを確認済み）。手順は`node generate-icons.js`でWeb版アイコン一式（`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`）を再生成、`ios-app/resources/icon.png`は`.flatten({background:'#ffffff'})`でアルファチャンネルなし・1024x1024を維持。`public/sw.js`の`CACHE_NAME`を`'sg-weekend-v911'`→`'sg-weekend-v912'`にインクリメント。iOS版への反映は次回`release`ブランチpush→TestFlight配信が必要（本作業のスコープには含まれない、ローカルコミットのみ）。
 - **Web版**: `dosuru-icon.png`（1024x1024マスター）→`node generate-icons.js`で`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`を生成。アイコンを差し替える際は必ずこの手順（マスター差し替え→スクリプト再実行）を踏む
 - **iOSネイティブアイコン**: `ios-app/resources/icon.png`（1024x1024、App Store提出要件によりRGB・アルファチャンネルなし）
 - **iOSスプラッシュ画面**: `ios-app/resources/splash.png`（ライト、クリーム背景RGB 250,250,248）・`splash-dark.png`（ダーク、黒背景RGB 27,30,25）とも2732x2732。中央上寄りのロゴ正方形部分を`composite()`で新ロゴに置き換える方式を採用。
