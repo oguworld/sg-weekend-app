@@ -19598,3 +19598,65 @@ CI側の修正は完了し、実際のビルドで20ptアイコンが`Assets.car
 - `public/sw.js`の`CACHE_NAME`を`'sg-weekend-v911'`→`'sg-weekend-v912'`にインクリメント
 - `splash.png`・`splash-dark.png`・`ios-app/package.json`は変更なし(タイムスタンプ・内容とも変更されていないことを確認)
 - iOS版への反映は次回`release`ブランチpush→TestFlight配信が必要（今回のスコープには含まれない）
+
+---
+# 設計書198 — Web版へのプルトゥリフレッシュ(PTR)有効化(くらし・おでかけ両画面、2026-09-13設計)
+
+### 背景・経緯
+2026-07-12の設計書19により、`_initPtr(container, indicatorId, onRefresh, watchSwipeIntent)`共通ヘルパー(`public/app.js` 202行目付近)を用いたPTRが実装され、当時「Web版でもPTRを有効化するか」はユーザー未回答のままデフォルト方針(iOS版のみ有効化)で実装された。今回ユーザーから「Web版にもくらし・おでかけ両方につけたい」との明確な依頼があり、この未解決事項への回答が確定した。
+
+現在`_initPtr`が適用されているのはホーム(おでかけ、`#home-scroll-content`)画面とくらし(`#news-scroll-content`)画面の2箇所のみ(コース画面は設計書178で機能自体削除済み)。
+
+### 調査済みの事実(builderはこれを踏まえて実装すること)
+
+1. `_initPtr`内部にCapacitor限定APIの依存はない(標準DOM APIとスタイル操作のみ)。Web版で有効化する変更は、関数冒頭の`if (!_isCapacitorApp) return;`という1行を削除するだけで機能上は成立する
+2. スクロールコンテナ(`#home-scroll-content`/`#news-scroll-content`、`.screen-scroll-content`クラス)は`flex:1; min-height:0; overflow-y:auto; overscroll-behavior:none;`という独立したスクロールコンテナ構成で、ページ全体(`html`/`body`)はスクロールしない。CSSレベルの`overscroll-behavior:none`は`html`/`body`/`.screen-scroll-content`いずれも`_isCapacitorApp`条件なしで既にWeb版にも適用済み
+3. くらし画面には独自の横スワイプ機構(`_newsSwipeIntent`)があるが、`_initPtr`のくらし画面呼び出しは`watchSwipeIntent=false`のため独立して動作し、新しい衝突は生じない
+4. デスクトップブラウザ(タッチ非対応)では`touchstart`/`touchmove`/`touchend`イベント自体が発火しないため実害なし
+
+### 実装手順
+
+1. `public/app.js`の`_initPtr`関数冒頭(203行目付近)にある以下の行を削除する:
+   ```js
+   if (!_isCapacitorApp) return; // Web版は対象外（設計書19、デフォルト方針）
+   ```
+2. `public/app.js`の`_initPtr`呼び出し元2箇所(2374〜2383行目付近、ホーム画面・くらし画面それぞれの呼び出し)の近くにある「iOS版のみ有効化」等のコメントがあれば「iOS版・Web版両方で有効化（設計書198）」に更新する
+3. `public/sw.js`の`CACHE_NAME`(現行`'sg-weekend-v912'`のはず。実装直前に実際の現在値を確認してから+1すること)をインクリメントする
+4. `CLAUDE.md`の「PTR(プルトゥリフレッシュ)」節の記述を「iOS版のみ有効化」から「iOS版・Web版両方で有効化(設計書198)」に更新する
+
+### 変更しないファイル(明示)
+- `server.js`(サーバーサイドロジック変更なし)
+- `public/index.html`(DOM構造変更不要)
+- `public/app.css`(既存の`.ptr-indicator`系スタイルはCapacitor非依存のクラスセレクタのため無変更)
+- データファイル一式
+- iOS側(`ios-app/`配下)一式
+
+### 検証項目(checker担当)
+
+- `_initPtr`関数から`_isCapacitorApp`によるWeb版除外の早期returnが削除されていること
+- `public/sw.js`の`CACHE_NAME`が確かにインクリメントされていること
+- `git diff`で`server.js`・`public/index.html`・`public/app.css`・`ios-app/`配下に変更がないこと(意図しない変更がないことの確認)
+- ホーム画面・くらし画面の呼び出し元コードが引き続き正しく`_initPtr`を呼んでいること(誤って壊していないか)
+- 横スワイプ機構(`_newsSwipeIntent`関連コード)が変更されていないこと
+
+### closer担当
+- `.claude/plan.md`に設計書198として記録(既にユーザー承認済みのテキストがある。実装結果・実際に使ったCACHE_NAME新値等の実施記録を末尾に追記する形で残すこと)
+- CLAUDE.mdのPTR節を更新(上記手順4、closerが最終確認・記録してもよい)
+- GitHubへのバックアップ(commit。mainブランチへのcommitのみ。**releaseブランチへのpush・TestFlight関連操作は今回のスコープ外、行わないこと**。Web版の変更はWebに影響するのみでiOS版ビルドは不要)
+
+## 注意
+- 今回はWeb版の静的ファイル変更のみ。`pm2 restart sg-weekend`の要否はユーザー判断に委ね、自動では実施しないこと
+- `release`ブランチへのpushは絶対に行わないこと(今回のスコープ外、ユーザーの別途指示が必要)
+- 実機検証(iOS Safari/Android Chrome)は開発環境の制約上実施できないため、最終報告に「実機での二重発火・ヘッダーずれ確認はユーザー側で実施が必要」と明記すること
+
+## 設計書198 実装記録（2026-09-13、builder→checker→closer実行）
+
+- `public/app.js`の`_initPtr`関数冒頭にあった`if (!_isCapacitorApp) return; // Web版は対象外（設計書19、デフォルト方針）`の1行を削除し、Web版でもPTRが機能するようにした
+- `_initPtr`呼び出し元2箇所（ホーム画面`#home-scroll-content`・くらし画面`#news-scroll-content`）の直上コメントを「iOS版のみ有効化」から「iOS版・Web版両方で有効化（設計書198）」に更新
+- `public/sw.js`の`CACHE_NAME`を`'sg-weekend-v912'`→`'sg-weekend-v913'`にインクリメント
+- `CLAUDE.md`の「PTR（プルトゥリフレッシュ）」節を更新済み
+- `git diff`で`server.js`・`public/index.html`・`public/app.css`・`ios-app/`配下は差分ゼロを確認。`_newsSwipeIntent`関連コードも無変更を確認
+- `node --check`で`public/app.js`・`public/sw.js`とも構文エラーなし
+- checkerで🔴Criticalなし、🟡🟢の指摘もなし
+- `pm2 restart sg-weekend`は実施していない（ユーザー判断待ち）。ローカルコミットのみ実施、`main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外）
+- **要ユーザー確認**: 実機（iOS Safari/Android Chrome等）でのPTR二重発火・ヘッダーずれの有無は開発環境の制約上検証できていないため、ユーザー側での実機確認が必要

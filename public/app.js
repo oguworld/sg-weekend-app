@@ -200,7 +200,6 @@
     //   参照して衝突を回避する。コース画面には横スワイプ機構自体が存在しないため false にする
     //   （設計書19 4.1節: コース画面側は _swipeIntent のような共有判定を作らず単独判定にする方針）。
     function _initPtr(container, indicatorId, onRefresh, watchSwipeIntent) {
-      if (!_isCapacitorApp) return; // Web版は対象外（設計書19、デフォルト方針）
       if (!container || container._ptrInit) return;
       container._ptrInit = true;
 
@@ -2371,12 +2370,12 @@
       }
     }
 
-    // Pull to Refresh（設計書19、イベント画面。iOS版のみ有効化。既存の横スワイプ機構と共存させるためwatchSwipeIntent=true）
+    // Pull to Refresh（設計書19、イベント画面。iOS版・Web版両方で有効化（設計書198）。既存の横スワイプ機構と共存させるためwatchSwipeIntent=true）
     _initPtr(document.getElementById('home-scroll-content'), 'ptr-indicator-home', async () => {
       await loadEventData();
     }, true);
 
-    // Pull to Refresh（ニュース画面。iOS版のみ有効化。ニュース画面に横スワイプ機構はあるが
+    // Pull to Refresh（ニュース画面。iOS版・Web版両方で有効化（設計書198）。ニュース画面に横スワイプ機構はあるが
     // 独立判定のためコース画面と同様 watchSwipeIntent=false）
     _initPtr(document.getElementById('news-scroll-content'), 'ptr-indicator-news', async () => {
       await loadLifeInfoNewsScreen();

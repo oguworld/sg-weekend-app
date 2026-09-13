@@ -440,7 +440,7 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市�
 **例外: パスフレーズ入力シート（`#backup-passphrase-sheet`/`#cal-passphrase-sheet`）はテキスト入力中に限りbottom-navを一時的に隠す**
 → モバイルSafariは`position:fixed;bottom:0`要素のキーボード表示時可視領域追従がbottom-navとシートとで同期せず、ボタン行が重なる問題があったための例外措置。`document`レベルの`focusin`/`focusout`リスナーで、対象2シート内のINPUT/TEXTAREAにフォーカスがある間だけ`.bottom-nav`を`visibility:hidden`にする（Web版・iOS版共通）
 
-**PTR（プルトゥリフレッシュ）**: `_initPtr(container, indicatorId, onRefresh, watchSwipeIntent)`共通ヘルパーでiOS版のみ有効化（`_isCapacitorApp`、Web版は対象外）。現在ホーム画面（`#home-scroll-content`）・くらし画面（`#news-scroll-content`）に適用。スクロールコンテナ内の`.ptr-indicator`要素の`height`/`opacity`のみを操作し、ヘッダー・`html`/`body`には一切触れない設計。リフレッシュ確定閾値60px
+**PTR（プルトゥリフレッシュ）**: `_initPtr(container, indicatorId, onRefresh, watchSwipeIntent)`共通ヘルパーでiOS版・Web版両方で有効化（設計書198、2026-09-13。設計書19実装時点ではiOS版のみだったが、ユーザー依頼によりWeb版も有効化）。現在ホーム画面（`#home-scroll-content`）・くらし画面（`#news-scroll-content`）に適用。スクロールコンテナ内の`.ptr-indicator`要素の`height`/`opacity`のみを操作し、ヘッダー・`html`/`body`には一切触れない設計。リフレッシュ確定閾値60px
 → **iOS overscroll防止JS（下記）・StatusBar Info.plist設定の2箇所を変更しないことが、PTRが正常動作する前提条件**（過去にこの2箇所の不備でPTRのヘッダーずれ・白いステータスバー問題が起きたため）。変更する場合はPTR・ヘッダー位置・ステータスバー色を実機で回帰確認すること
 
 ### ⚠️ `position:fixed`要素は、キーボード表示・非表示の過渡期間中にタッチイベントの配送先が親要素にずれることがある（2026-07-11）
