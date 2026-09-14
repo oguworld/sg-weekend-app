@@ -89,6 +89,8 @@ const CITY_CONFIG = {
       { url: 'https://www.straitstimes.com/news/singapore/rss.xml',                                  name: 'Straits Times' },
       { url: 'https://www.jcci.org.sg/feed/',                                                         name: 'JCCI' },
       { url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10296',  name: 'CNA Sport' },
+      { url: 'https://expatliving.sg/feed/',          name: 'Expat Living' },
+      { url: 'https://singaporemotherhood.com/feed/', name: 'SingaporeMotherhood' },
     ],
   },
 };

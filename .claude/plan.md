@@ -19952,3 +19952,47 @@ Sonnetへのバッチ呼び出しは計4回実施（1回目: 119〜152字、2回
 - `data/sg/life-info.json`は`.gitignore`対象のためコミット対象外。`scripts/fetch-life-info.js`・`.claude/plan.md`・`CLAUDE.md`のみをmainブランチへローカルコミット
 - pm2再起動は実施せず（データ・スクリプトのみの変更のため次回API呼び出し時から反映される、設計書202の注意書き通り）
 - `main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外、ユーザーの明示指示があるまで待機）
+
+---
+
+## 設計書203: くらし側(fetch-life-info.js)へのRSSソース2件追加(Expat Living Singapore / SingaporeMotherhood)
+
+### 背景
+「くらし・おでかけ両方の取り込み件数が少ないので、使えるソースを増やせるだけ増やしたい」との依頼を受け、Web調査で新規候補を発見した。おでかけ側(`data/sources.json`)への5件追加(Expat Living Singapore/Sassy Mama SG/SingaporeMotherhood/i eat i shoot i post/AspirantSG)は既に直接編集で完了済み(`status:"active"`, `addedAt:"2026-09-14"`)。本タスクはくらし側(`scripts/fetch-life-info.js`)のみが対象で、このうち2件(Expat Living Singapore、SingaporeMotherhood)を追加する。
+
+### 変更内容(確定)
+`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`配列末尾に以下2エントリを追加:
+```js
+{ url: 'https://expatliving.sg/feed/',          name: 'Expat Living' },
+{ url: 'https://singaporemotherhood.com/feed/', name: 'SingaporeMotherhood' },
+```
+他の関数(`fetchNewItems`/`filterBatch`/`enrichBatch`/`filterOutDuplicateStories`/`filterAndSaveLifeInfo`/`main`)は変更しない。
+
+## 設計書203 実装記録（2026-09-14、builder→checker→closer実行）
+
+### 実行タイミング確認
+- 実装前・`--dry-run`実行前の2回、`ps aux | grep -iE "fetch-life-info|run-fetch"`でcronジョブが動作していないことを確認済み
+
+### 実装内容
+`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`配列末尾に設計書通り2エントリを追加。`git diff --stat`は1ファイル2行追加のみ（`scripts/fetch-life-info.js`）。他関数・`CATEGORIES`配列は無変更を確認済み。
+
+### `--dry-run`実行結果（1回のみ実施、コスト最小化方針通り）
+7ソース（CNA/Mothership/Straits Times/JCCI/CNA Sport/Expat Living/SingaporeMotherhood）全てへのHTTPリクエストが行われ、スクリプト全体は最後まで正常完走した。
+- **SingaporeMotherhood**: 疎通成功（7件取得→新着フィルター後2件→Haiku選別→Sonnet要約→2件採用: 「産前・産後マッサージサービスのおすすめ」(health)・「乳児保育施設を選ぶ際の10の質問」(education)）
+- **Expat Living**: HTTP 403でフェッチ失敗。原因を切り分けたところ、Cloudflare WAF（`wpewaf.com`、ページタイトル「Attention Required! | Cloudflare」）がNode.js標準`fetch`（undici、本スクリプトが使用するクライアント）からのリクエストのみをブロックしていることを確認（`curl`・`rss-parser`の`parseURL()`〈別実装〉では同一URLに対し200が返ることを検証済み）。該当ソースのみスキップされ、他6ソースの処理・スクリプト全体の正常終了には影響なし（エラーハンドリングは設計通り機能）
+- 合計取得36件→重複除外後36件→Haiku一次選別で7件採用→Sonnet要約→意味的重複3件除外→最終4件（Expat Livingの寄与はゼロ、SingaporeMotherhoodから2件）
+- `data/life-info-fetch-state.json`・`data/sg/life-info.json`は`--dry-run`のため未更新（本番反映は次回cron実行に委ねる、設計書の手順通り）
+
+### checker結果
+- 🔴Criticalなし
+- `CITY_CONFIG.sg.feeds`に2エントリが正しいurl/name形式で追加されていることを確認
+- `git diff --stat`は`scripts/fetch-life-info.js`のみ（+2行）、他ファイルへの変更なし
+- `fetchNewItems`/`filterBatch`/`enrichBatch`/`filterOutDuplicateStories`/`filterAndSaveLifeInfo`/`main`は差分ゼロ
+- `CATEGORIES`配列（6種）は無変更
+- 🟡軽微な注意点: Expat LivingはCloudflare WAFにより現状Node.js `fetch`からのアクセスが恒常的に403でブロックされる状態。実装バグではなく外部サイト側のボット対策によるものだが、追加した2ソースのうち実質的に機能するのはSingaporeMotherhoodのみという点は運用上留意が必要。将来的にUser-Agentの偽装強化やcurl系クライアントへの切り替え等で回避を試みる余地はあるが、今回のスコープ（設計書203は2エントリの追加のみ）には含まれないため対応は見送り、`.claude/next.md`に申し送り事項として記録する
+
+### closer
+- `.claude/plan.md`（本記録）・`CLAUDE.md`の「シンガポール在住日本人向け生活情報・ニュースのキュレーション機能」節に、フィード追加の経緯・Expat Livingが現状403でブロックされている事実・くらし側には`analyze-sources.js`のような自動評価除外の仕組みが無く採用率は当面手動モニタリングが必要である旨を追記
+- `data/sg/life-info.json`・`data/life-info-fetch-state.json`は`.gitignore`対象のためコミット対象外。`scripts/fetch-life-info.js`・`.claude/plan.md`・`CLAUDE.md`のみをmainブランチへローカルコミット
+- pm2再起動は実施せず（データ・cron実行スクリプトのみの変更のため、Expressサーバープロセス自体には影響しない。設計書の注意書き通り）
+- `main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外、ユーザーの明示指示があるまで待機）
