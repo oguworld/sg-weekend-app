@@ -19730,3 +19730,95 @@ CI側の修正は完了し、実際のビルドで20ptアイコンが`Assets.car
 - **checker結果**: 🔴Criticalなし。`git diff`は`scripts/fetch-life-info.js`のみが対象で他ファイルへの変更なし。JSON抽出ロジック（337〜341行目）は無変更。プロンプト文言中の「在住日本人にとって」という表現は「〜のような読者への補足・呼びかけは書かないこと」という禁止指示の一部としてのみ残存しており、設計書199の承認済み文言と完全一致（要約に呼びかけを書かせる意図の記述ではない）。`node --check`で構文エラーなし
 - `pm2 restart sg-weekend`は実施していない（次回cron実行時から新プロンプトが自動適用される。設計書199の注意書き通り、必須ではないため自動実施していない）
 - ローカルコミットのみ実施、`main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外）
+
+## 設計書200: 新着5件のくらし情報要約を新プロンプト仕様で再生成する(既存データの部分的な遡及更新)
+
+### 背景
+設計書199で`scripts/fetch-life-info.js`の`enrichBatch()`内のSonnetプロンプトを変更し(「在住日本人にとって〜」除去、180〜220文字に厚みを持たせる)、今後の新規取り込み分にのみ適用される設計にした。ユーザーから「新着の記事だけ要約を作り直して」との依頼があり、「24時間以内に取り込まれ、アプリの『新着』フィルターに表示されている記事」が対象と確認済み。
+
+### 対象の5件(`data/sg/life-info.json`より、これ以外は一切触れないこと)
+
+- `li_1789304443025_khnvx` (建設現場でホース直撃、作業員死亡) — https://www.straitstimes.com/singapore/worker-dies-after-being-struck-by-hose-at-jurong-port-road-construction-site-mom-investigating
+- `li_1789304443025_4ccm2` (PSLE直前、親子の不安を和らげるには) — https://www.straitstimes.com/singapore/parenting-education/staying-calm-with-a-little-over-a-week-to-written-psle-exams
+- `li_1789304443025_lgrgz` (若者34人が「技能五輪」上海大会へ) — https://www.straitstimes.com/singapore/parenting-education/34-youth-gear-up-to-represent-singapore-at-olympics-of-vocational-skills-in-shanghai
+- `li_1789304443025_ob531` (美容コースで世界舞台への道を開く) — https://www.straitstimes.com/singapore/parenting-education/i-was-really-lost-beauty-course-helped-n-level-student-find-her-calling-on-the-world-stage
+- `li_1789304443025_a9jsv` (おもちゃのヘリからドローン開発者へ) — https://www.straitstimes.com/singapore/parenting-education/a-toy-helicopter-sparked-his-interest-now-hes-building-drones
+
+全て`source: "Straits Times"`、`fetched_at: "2026-09-13T13:00:43.025Z"`。全58件中この5件のみが対象。
+
+### ユーザー承認済みの方針
+1. **フォールバック方針**: RSS再取得・OGPスクレイピングいずれからも十分な材料(タイトル以外に1文以上の説明文)が取れない記事は、**その記事はスキップして旧summaryのまま残す**(旧summaryを入力に無理に書き直すことはしない)
+2. **titleは対象外**: `summary`フィールドのみ再生成する。`title`は現行のまま一切変更しない(`enrichBatch()`相当のロジックが`title_ja`も同時に返しても、書き込みは`summary`のみに限定すること)
+
+### 対象データの取得方法(優先順位)
+1. **第一候補**: Straits TimesのRSS(`https://www.straitstimes.com/news/singapore/rss.xml`、`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`で実際のURLを確認すること)を取得し、`item.link`が対象5件の`sourceUrl`と一致するものを探す。一致すれば`contentSnippet`/`summary`/`content`(`fetch-life-info.js`のdescription抽出ロジックと同じ優先順位)を採用
+2. **第二候補**(RSSに残っていない記事のみ): `scripts/filter-events.js`の`fetchArticleContent(url)`関数(23〜51行目)と同等のロジック(HTML取得→`<title>`タグ・OGP `og:description`/`og:title`メタタグを正規表現抽出→600文字に切り詰め)を一時スクリプト内に複製して使用する(`filter-events.js`自体は変更しない、参照してロジックをコピーするだけ)
+3. **どちらでも材料不足なら**: 上記ユーザー承認方針の通り、その記事はスキップし旧summaryのまま維持。理由をログ・実装記録に残すこと
+
+### 実装手順
+1. 一時検証スクリプト(例: `scripts/scratch/resummarize-5articles.js`)を新規作成する。恒久スクリプト(`scripts/fetch-life-info.js`・`scripts/filter-events.js`)は一切変更しない
+2. スクリプト内に対象5件の`id`/`sourceUrl`/`title`/`category`をハードコードする
+3. 各記事についてRSS→OGPの順で材料取得を試みる
+4. 取得できた記事について、設計書199で変更済みの`instructionText`(`scripts/fetch-life-info.js`の`enrichBatch()`内、304〜314行目付近)と同一のプロンプト文言・同一のJSON入出力形式(`{index, category, title, description, source}` → `{index, title_ja, summary_ja}`)でSonnet(`claude-sonnet-4-6`)に1バッチ投げて`summary_ja`を取得する
+5. 生成結果をまずコンソール出力し、新旧summaryを比較できる形で表示する(この時点ではファイルを書き換えない)
+6. 問題なければ`data/sg/life-info.json`を読み込み、**該当する取得成功分の`id`一致する要素の`summary`フィールドのみ上書き**する。書き込みは一時ファイルに書き出してから`fs.renameSync`で原子的に差し替える方式にする(本番共有データのため)。取得できず材料不足だった記事は書き換えず、その旨をログに残す
+7. `title`・`category`・`source`・`sourceUrl`・`publishedAt`・`fetched_at`・`id`はいずれも変更しないこと。他の53件にも一切触れないこと
+8. 書き込み前後で他の53件が完全に元のまま(値も含め)であることをdiffで確認する
+9. 作業完了後、一時スクリプト(`scripts/scratch/resummarize-5articles.js`)を削除する
+
+### 実行タイミングの注意
+- cron実行スケジュール(`run-fetch-all.sh`: 7:00 SGT、`run-fetch-extra.sh`: 12:00/21:00 SGT)と重ならないタイミングで実施すること。実行前に`ps aux | grep fetch-life-info`等でcronジョブが動作中でないか確認すること
+
+### 検証項目(checker担当)
+- 対象5件のうち実際に書き換わったものについて、`summary`が新しい文体(「〜にとって」等の呼びかけが無い、180〜220文字程度に近い)になっていること
+- 材料不足でスキップされた記事があれば、旧summaryのまま変更されていないこと
+- 更新前後のファイル全体をdiffし、変更行が対象5件の`summary`行のみであること(他53件・他フィールドに差分がないこと)
+- JSON構文が壊れていないこと(`node -e "JSON.parse(require('fs').readFileSync('data/sg/life-info.json'))"`)
+- `title`・`category`・`source`・`sourceUrl`・`publishedAt`・`fetched_at`・`id`がいずれも変更されていないこと
+- `scripts/fetch-life-info.js`・`scripts/filter-events.js`・`server.js`等の恒久コードファイルに変更がないこと(`git diff`で確認)
+- 一時スクリプトが削除されていること
+
+### closer担当
+- `.claude/plan.md`の設計書200に実装結果(どの記事がどの方法で取得できたか、スキップした記事があればその理由)を追記する形で記録
+- GitHubへのバックアップ(commit。`data/`ディレクトリは`.gitignore`対象のため、実際にはコミット対象になるファイルは無い可能性が高い。もし`.claude/plan.md`のみの変更であればそれをコミットする。mainブランチへのcommitのみ、pushは不要)
+
+## 注意
+- 本番稼働中の共有データ(`data/sg/life-info.json`)を直接編集する作業のため、原子的書き込み(rename方式)を徹底すること
+- 5件のみの小規模作業のためSonnet呼び出しコストは軽微だが、無駄な繰り返し実行は避けること
+- pm2再起動は不要(データファイルのみの変更、次回API呼び出し時から反映される)
+
+## 設計書200 実装記録（2026-09-14、builder→checker→closer実行）
+
+### 実行タイミング確認
+- 実装開始前に`ps aux | grep -iE "fetch-life-info|fetch-events|run-fetch"`でcronジョブが動作していないことを確認済み（SGT 08:07時点、直近の7:00 SGT実行は完了済み、次回12:00 SGTまで余裕あり）
+
+### 取得結果（5件全てRSSで取得成功、OGPフォールバックは不要だった）
+対象5件は全てStraits TimesのRSS(`https://www.straitstimes.com/news/singapore/rss.xml`)に現存しており(取り込みから24時間以内のためフィードに残っていた)、`item.link`が`sourceUrl`と完全一致。RSSの`contentSnippet`/`summary`/`content`から十分な説明文(英語原文)が取得できたため、OGPスクレイピングのフォールバックは1件も発動しなかった。スキップも0件。
+
+- `li_1789304443025_khnvx`: RSS取得成功 → summary更新（96字→150字）
+- `li_1789304443025_4ccm2`: RSS取得成功 → summary更新（87字→172字）
+- `li_1789304443025_lgrgz`: RSS取得成功 → summary更新（105字→168字）
+- `li_1789304443025_ob531`: RSS取得成功 → summary更新（99字→167字）
+- `li_1789304443025_a9jsv`: RSS取得成功 → summary更新（103字→168字）
+
+### 実装手順
+1. `scripts/scratch/resummarize-5articles.js`を新規作成（対象5件の`id`/`sourceUrl`/`title`/`category`をハードコード、RSS→OGPフォールバック→Sonnet 1バッチ呼び出し→原子的書き込みの流れを実装）
+2. まず`--write`無しで実行し、コンソールで新旧summary比較を確認（5件ともRSSヒット、材料十分と判定）
+3. 問題なしと判断し、バックアップ(`life-info.json.before`をスクラッチパッドに保存)を取った上で`--write`付きで再実行。Sonnetへの2回目の呼び出しとなったため、生成結果は1回目のdry-run出力とは字句が異なる(いずれも新プロンプト仕様に沿った内容であることを確認済み)
+4. 書き込みは`data/sg/life-info.json.tmp`へ書き出してから`fs.renameSync`で原子的に差し替え
+5. 作業完了後、`scripts/scratch/resummarize-5articles.js`および`scripts/scratch/`ディレクトリを削除済み
+
+### checker結果
+- 🔴Criticalなし
+- 対象5件のsummaryは全て新文体（「〜にとって」等の呼びかけ表現の出現なし、正規表現`/にとって|方は注意|が必須です/`で非該当を確認）。文字数は150〜172字（目安180〜220字にはやや届かないが、旧仕様87〜105字から明確に厚みが増している。設計書199の実装記録時点でも同様の傾向〈172/177/192字〉があり、許容範囲内と判断）
+- 材料不足でスキップされた記事は0件
+- 更新前後のファイル全体をdiffし、変更行が対象5件の`summary`行のみ（20行diff = 5件×新旧2行、他53件・他フィールドに差分なし）であることを確認
+- `node -e "JSON.parse(...)"`でJSON構文が壊れていないことを確認
+- `title`・`category`・`source`・`sourceUrl`・`publishedAt`・`fetched_at`・`id`はいずれもプログラムで完全一致検証済み（変更なし）
+- `git diff --stat scripts/fetch-life-info.js scripts/filter-events.js server.js`で差分ゼロを確認（恒久コードファイルへの変更なし）
+- 一時スクリプト・`scripts/scratch/`ディレクトリとも削除済みを確認
+
+### closer
+- `data/`ディレクトリは`.gitignore`対象のため、今回の実データ変更(`life-info.json`)自体はコミット対象にならない。`.claude/plan.md`（本記録）・`CLAUDE.md`・`.claude/session-log.md`の変更のみをmainブランチへローカルコミット
+- pm2再起動は実施せず（データファイルのみの変更のため次回API呼び出し時から反映される、設計書200の注意書き通り）
+- `main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外、ユーザーの明示指示があるまで待機）
