@@ -19996,3 +19996,78 @@ Sonnetへのバッチ呼び出しは計4回実施（1回目: 119〜152字、2回
 - `data/sg/life-info.json`・`data/life-info-fetch-state.json`は`.gitignore`対象のためコミット対象外。`scripts/fetch-life-info.js`・`.claude/plan.md`・`CLAUDE.md`のみをmainブランチへローカルコミット
 - pm2再起動は実施せず（データ・cron実行スクリプトのみの変更のため、Expressサーバープロセス自体には影響しない。設計書の注意書き通り）
 - `main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外、ユーザーの明示指示があるまで待機）
+
+---
+
+## 設計書204: くらし側(fetch-life-info.js)へのRSSソース1件追加(AsiaX)
+
+### 背景
+ユーザーが提供したAsiaX(`@AsiaXbiz`)のXスクリーンショットから、在住日本人向けオリジナル日本語記事を発信するメディアであることが判明。`data/sources.json`(おでかけ側)には既にAsiaXが`status:"rejected"`(2026-09-05、理由「RSSフィードに`<item>`が0件」)として登録されていたが、調査の結果、登録URLの`https://www.asiax.biz/feed/`が単に間違っていただけと判明。正しいURLは`https://www.asiax.biz/news/feed/`で、10件取得できスクリーンショットの記事と完全一致することをユーザーが確認済み。
+
+ユーザーは「くらし側のみに追加」を希望(おでかけ側`data/sources.json`のstatus変更は行わない)。また、`rejectedReason`欄には訂正メモを追記することを承認済み。
+
+### 変更内容(確定)
+
+**1. `scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`配列末尾(SingaporeMotherhoodの後)に追加:**
+```js
+{ url: 'https://www.asiax.biz/news/feed/', name: 'AsiaX' },
+```
+
+**2. `data/sources.json`のAsiaXエントリ(`primaryType:"mixed"`, `status:"rejected"`, `addedAt:"2026-06-24"`, `rejectedAt:"2026-09-05"`)の`rejectedReason`に訂正を追記(statusは`rejected`のまま変更しない):**
+
+現在:
+```json
+"rejectedReason": "RSSフィードに<item>が0件（フィード自体が空、2026-09-05確認）"
+```
+
+新:
+```json
+"rejectedReason": "RSSフィードに<item>が0件（フィード自体が空、2026-09-05確認）※2026-09-14判明: 実際はURL自体が誤りだった（正: https://www.asiax.biz/news/feed/）。おでかけ側への再追加は今回は見送り（ユーザー判断）"
+```
+
+### 実装手順
+1. `scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`配列末尾にAsiaXのエントリを追加
+2. `data/sources.json`のAsiaXエントリの`rejectedReason`を上記の通り更新(`status`等の他フィールドは変更しない)
+3. `node --check scripts/fetch-life-info.js`で構文確認
+4. `node -e "JSON.parse(require('fs').readFileSync('data/sources.json','utf8'))"`でJSON構文確認
+5. 実行前に`ps aux | grep -iE "fetch-life-info|run-fetch"`でcronジョブが動作中でないことを確認
+6. `node scripts/fetch-life-info.js --city=sg --dry-run`を1回実行し、AsiaXへのHTTPリクエストが行われ記事が正常に取得できること、取得した記事のタイトル・要約が文字化けしていないこと(UTF-8エンコーディング確認)を目視確認する
+7. `--dry-run`のため`data/sg/life-info.json`・`data/life-info-fetch-state.json`は更新されない。本番反映は次回cron実行(7:00/12:00/21:00 SGT)に委ねてよい
+8. CLAUDE.mdの「シンガポール在住日本人向け生活情報・ニュースのキュレーション機能」節のフィード一覧記述を更新(7件→8件、AsiaX追加を明記)
+9. pm2再起動は不要(データ・cron実行スクリプトの変更のみ)
+
+### 変更しないファイル(明示)
+- `data/sources.json`の`status`フィールド(AsiaXは`rejected`のまま、`rejectedReason`のみ訂正)
+- `public/app.js`・`public/index.html`・CSS一式
+- `server.js`
+- `filterBatch()`・`enrichBatch()`のプロンプトロジック自体(日本語ソース向けの特別扱いは行わない)
+
+## 設計書204 実装記録（2026-09-14、builder→checker→closer実行）
+
+### 実行タイミング確認
+- 実装前・`--dry-run`実行前の2回、`ps aux | grep -iE "fetch-life-info|run-fetch"`でcronジョブが動作していないことを確認済み
+
+### 実装内容
+`scripts/fetch-life-info.js`の`CITY_CONFIG.sg.feeds`配列末尾（SingaporeMotherhoodの後）に設計書通りAsiaXのエントリ（`{ url: 'https://www.asiax.biz/news/feed/', name: 'AsiaX' }`）を追加。`data/sources.json`のAsiaXエントリ（`data/`配下のためgitignore対象、git管理外）は`rejectedReason`のみ設計書通りの訂正メモを追記し、`status`（`rejected`のまま）/`url`/`name`/`primaryType`/`addedAt`/`rejectedAt`は無変更を確認。`git status --short`は`scripts/fetch-life-info.js`のみ（+1行）で他ファイルへの意図しない変更なし。
+
+### `--dry-run`実行結果（1回のみ実施、コスト最小化方針通り）
+8ソース（CNA/Mothership/Straits Times/JCCI/CNA Sport/Expat Living/SingaporeMotherhood/AsiaX）全てへのHTTPリクエストが行われ、スクリプト全体は最後まで正常完走した。
+- **AsiaX**: 疎通成功。10件取得→新着フィルター後10件（ハイウォーターマーク初回のため全件が新着扱い）→Haiku一次選別→Sonnet要約を経て3件が最終候補に到達（「COE小型車カテゴリーが過去最高更新」category:community／「猛暑・ヘイズでホーカー売上2〜3割減」category:weather／「True Fitnessが全店突然閉鎖」category:community〈意味的重複除外により最終不採用〉）。取得記事のタイトル・要約とも文字化けなし（UTF-8正常）
+- **Expat Living**: 既知の通りHTTP 403（設計書203で確認済みのCloudflare WAFによるブロック、AsiaX追加とは無関係の既存事象）。他7ソースの処理・スクリプト全体の完走には影響なし
+- 合計取得52件→重複除外後52件→Haiku一次選別で9件採用→Sonnet要約→意味的重複3件除外→最終6件（うちAsiaXから2件: COE高値更新・ホーカー売上減）
+- `data/life-info-fetch-state.json`・`data/sg/life-info.json`は`--dry-run`のため未更新（本番反映は次回cron実行に委ねる、設計書の手順通り）
+
+### checker結果
+- 🔴Criticalなし
+- `CITY_CONFIG.sg.feeds`配列にAsiaXのエントリが正しいurl/name形式で追加されていることを確認
+- `data/sources.json`のAsiaXエントリは`rejectedReason`のみ更新、`status`(`rejected`)/`url`/`name`/`primaryType`/`addedAt`/`rejectedAt`は無変更を確認
+- `git status --short`は`scripts/fetch-life-info.js`のみ（+1行）、他ファイルへの変更なし（`data/sources.json`はgitignore対象のため元々git追跡対象外）
+- JSON構文・JS構文とも正常（`node --check`・`JSON.parse`で確認済み）
+- `--dry-run`実行でAsiaXから10件取得でき、文字化けなしを確認
+- `filterBatch()`・`enrichBatch()`・`CATEGORIES`配列（6種、無変更）を確認済み
+
+### closer
+- `.claude/plan.md`（本記録）・CLAUDE.mdの「シンガポール在住日本人向け生活情報・ニュースのキュレーション機能」節（フィード一覧を7件→8件に更新、AsiaX追加の経緯を追記）を更新
+- `data/sg/life-info.json`・`data/life-info-fetch-state.json`・`data/sources.json`は`.gitignore`対象のためコミット対象外。`scripts/fetch-life-info.js`・`.claude/plan.md`・`CLAUDE.md`のみをmainブランチへローカルコミット
+- pm2再起動は実施せず（データ・cron実行スクリプトのみの変更のため、設計書の注意書き通り）
+- `main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外、ユーザーの明示指示があるまで待機）

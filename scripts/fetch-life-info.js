@@ -91,6 +91,7 @@ const CITY_CONFIG = {
       { url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10296',  name: 'CNA Sport' },
       { url: 'https://expatliving.sg/feed/',          name: 'Expat Living' },
       { url: 'https://singaporemotherhood.com/feed/', name: 'SingaporeMotherhood' },
+      { url: 'https://www.asiax.biz/news/feed/', name: 'AsiaX' },
     ],
   },
 };
