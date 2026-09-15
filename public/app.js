@@ -630,6 +630,11 @@
       psi: '大気汚染の程度を示す指標です',
       dengue: '現在活動中のデング熱クラスター(流行地区)の数です。日々の新規感染者数ではありません',
     };
+    // 指標レベル→絵文字マッピング（PSIのみ実装。将来デング熱等に展開する場合はキーを追加するだけでよい構造。
+    // server.jsのpsiLevel()のレベル文字列と一致させること）
+    const STAT_LEVEL_EMOJI = {
+      psi: { '良好': '😊', '普通': '😐', '要注意': '😷', '健康に悪い': '😫', '危険': '☠️' },
+    };
     const _statCurrentLevel = { psi: null, dengue: null };
 
     function toggleStatCriteria(kind) {
@@ -660,7 +665,11 @@
         const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
         const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
         if (data.exchangeRate) setText('stat-fx', data.exchangeRate.toFixed(1) + '円');
-        if (data.psi) { setHTML('stat-psi', `${data.psi.value}<span class="stat-val-level">(${data.psi.level})</span>`); _statCurrentLevel.psi = data.psi.level; }
+        if (data.psi) {
+          const psiEmoji = STAT_LEVEL_EMOJI.psi[data.psi.level] || '';
+          setHTML('stat-psi', `${psiEmoji ? `<span class="stat-val-emoji">${psiEmoji}</span> ` : ''}${data.psi.value}<span class="stat-val-level">(${data.psi.level})</span>`);
+          _statCurrentLevel.psi = data.psi.level;
+        }
         if (data.dengue) { setHTML('stat-dengue', `${data.dengue.clusterCount}区<span class="stat-val-level">(${data.dengue.level})</span>`); _statCurrentLevel.dengue = data.dengue.level; }
         if (data.weather) {
           setText('stat-temp', Math.round(data.weather.temp) + '°');

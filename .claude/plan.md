@@ -20352,3 +20352,54 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 3. **追加修正2**: 公開日(`eventDateStr`)表示も削除（**最終表示順: カテゴリ→ソース→期間→バッジ**）
 
 結果として、最終的にフロントエンドのカード表示上は「ソース名」のみが新規要素として追加され、エリア・公開日の表示は元の状態（エリアは削除、公開日は表示なし）に近い形へ収束した。ただし、バックエンド（`scripts/filter-events.js`）の`publishedAt`収集ロジック自体は3段階を通じて一度も削除されておらず、新規イベントには引き続き`publishedAt`が付与・保存され続けている（表示に使っていないだけで、将来また表示する場合はデータ収集からやり直す必要はない）。`e.location`/`e.area`のデータ収集ロジックも同様に無変更のまま保持されている。
+
+---
+
+## 設計書208: くらし画面PSI指標ウィジェットに、数値に応じた顔の絵文字を追加する
+
+### 背景
+くらし画面(`#screen-news`)上部の指標ウィジェットのPSI(大気質指数)表示(現在「72(良好)」のような表示)に、数値の視覚的直感性を高めるため顔の絵文字を追加する。テキストラベルは残したまま、絵文字を先頭に追加する。
+
+### 確定仕様(ユーザー承認済み)
+- 絵文字マッピング: 良好=😊 / 普通=😐 / 要注意=😷 / 健康に悪い=😫 / 危険=☠️
+- 絵文字と数値の間に半角スペースを入れる(例:「😊 72(良好)」)
+- デング熱(`#stat-dengue`)側への展開は今回のスコープ外
+
+### 変更内容(確定)
+`public/app.js`の`loadWidgetStats()`内、PSI表示行(614行目付近`STAT_CRITERIA`の近く)に`STAT_LEVEL_EMOJI`定数を追加し、PSI表示行を絵文字付きに変更する。マッピングに存在しない値(想定外ケース)の場合は絵文字を付けず従来表示にフォールバックする。
+
+### 変更するファイル一覧
+1. `public/app.js` — `STAT_LEVEL_EMOJI`定数の追加、PSI表示行の変更
+2. `public/app.css` — 必要と判断した場合のみ軽微なスタイル調整
+3. `public/sw.js` — `CACHE_NAME`のインクリメント
+4. `public/index.html` — `app.js`のキャッシュバスティングクエリ更新
+
+### 変更しないファイル(明示)
+- `server.js`(`psiLevel()`・APIレスポンス構造は無変更)
+- `#stat-dengue`・`#stat-fx`・`#stat-temp`・`#stat-rain`・`#stat-nowcast`関連のコード
+- データファイル一式
+
+### 実装記録（2026-09-15、builder→checker→closer実行）
+
+**実装内容:**
+- `public/app.js`: `STAT_CRITERIA_DESC`定義の直後に`STAT_LEVEL_EMOJI`定数を追加（`{ psi: { '良好':'😊','普通':'😐','要注意':'😷','健康に悪い':'😫','危険':'☠️' } }`）。`loadWidgetStats()`内のPSI表示行を、`STAT_LEVEL_EMOJI.psi[data.psi.level] || ''`で絵文字を取得し、`<span class="stat-val-emoji">絵文字</span> `を数値の前に付加する形に変更（マッピング外の値は絵文字なしの従来表示にフォールバック）
+- `public/app.css`: `.stat-val`の直後に`.stat-val-emoji { font-size: 13px; }`を追加。実ブラウザでのレイアウト実測ができない環境制約（Playwright等のブラウザ自動化ツールが本サーバー環境で利用不可）のため、375px幅での欠け(ellipsis)リスクを安全側に倒して絵文字を数値よりやや小さく表示する対応を採用（builder判断、設計書で許容されていた任意対応）
+- `public/sw.js`: `CACHE_NAME`を`sg-weekend-v918`→`sg-weekend-v919`にインクリメント
+- `public/index.html`: `app.js`キャッシュバスティングを`?v=20260915e`→`?v=20260915f`に更新
+- `server.js`・データファイル一式は無変更
+
+### 検証（builder→checker）
+- Node.jsシミュレーションでPSI値5段階代表値（30/75/150/250/350）に対し`psiLevel()`相当ロジック→`STAT_LEVEL_EMOJI.psi[level]`が期待する絵文字（😊/😐/😷/😫/☠️）を返すことを確認
+- 絵文字と数値の間に半角スペースが入ることをHTML出力で確認（`<span class="stat-val-emoji">😊</span> 30<span class="stat-val-level">(良好)</span>`）
+- マッピング外の値（想定外ケース）で絵文字部分が空文字となり、余分なスペースや`undefined`が入らないことをシミュレーションで確認
+- `server.js`の`psiLevel()`のレベル文字列（良好/普通/要注意/健康に悪い/危険）と`STAT_LEVEL_EMOJI.psi`のキーが完全一致することをコードで確認
+- `git diff`で変更行がPSI表示関連のみであること（デング熱・気温等の実変更行なし）を確認
+- `node --check public/app.js`正常
+- `pm2 restart sg-weekend`実施、`GET /`・`GET /app.js`・`GET /api/widget-stats?city=sg`いずれもHTTP 200/正常レスポンス（実データPSI値110→「要注意」で確認、`data.psi`のフィールド構造`{value, level}`は無変更）
+- 🔴Criticalなし
+
+### closer
+- `.claude/plan.md`（本記録）を追記
+- `public/app.js`・`public/app.css`・`public/sw.js`・`public/index.html`・`.claude/plan.md`をmainブランチへローカルコミット
+- `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+- iOS側は今回のスコープ外のため未実施（Web版のみで完結する変更）
