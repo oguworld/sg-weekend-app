@@ -20437,4 +20437,19 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 - `GET /api/events`・`GET /api/life-info`とも200で正常応答することを確認
 - 🔴Criticalなし
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+
+### 設計書205 追加修正2: card-sub-rowのgapを拡大（2026-09-15、コーディネーターからの追加指示・ユーザー要望に基づく）
+
+上記のレイアウト不具合修正（`justify-content: flex-end`への変更）に続き、ユーザーから「ピン留めと元記事を見るリンクの間、もうちょっとスペース空けたい」との要望があった。
+
+**修正内容**:
+- `public/app.css`の`.card-sub-row`の`gap`を`8px`→`16px`に変更（456〜462行目）。参考値としてコメント機能削除前は「ピン留め+リンク」をまとめていた内側divの`gap`が`14px`だったため、見た目のバランスを踏まえ16px程度を採用
+- キャッシュバスティング更新: `public/index.html`の`app.css?v=20260915c`→`?v=20260915d`、`public/sw.js`の`CACHE_NAME`を`sg-weekend-v921`→`sg-weekend-v922`にインクリメント
+- `pm2 restart sg-weekend`実施、online確認
+
+**検証**:
+- `git diff`で変更が`public/app.css`の1箇所（`gap`変更）＋キャッシュバスティング2箇所（`public/index.html`のapp.cssクエリ、`public/sw.js`のCACHE_NAME）のみであることを確認
+- `GET /api/events`・`GET /api/life-info`とも200で正常応答することを確認
+- 🔴Criticalなし
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
