@@ -20182,3 +20182,77 @@ localStorageキー`app_web_promo_visit_count`。ページ読み込みごとに`_
 - pm2再起動はbuilder段階で実施済み(Web版反映のため)
 - iOS側(`release`ブランチへのpush・TestFlight配信)は今回のスコープ外のため未実施(`_isCapacitorApp`ガードにより実行時には影響しないため急ぎのリリース同期は不要、設計書の注意書き通り)
 - `main`・`release`いずれのリモートへのpushも未実施(ユーザーの明示指示があるまで待機)
+
+---
+
+## 設計書207: おでかけイベントカードに「本当の公開日」を新規収集し、カード表示に追加する（2026-09-15、builder→checker→closer、ユーザー承認済み・最終版）
+
+### 背景
+くらし画面のニュースカードには「ソース名+本当の公開日(publishedAt、RSSのpubDateから算出)」が表示されているが、おでかけ画面のイベントカードにはこの情報が無かった(`events.json`に`publishedAt`相当のフィールドが存在しない)。ユーザーから、おでかけカードのタイトル上の情報行に「ソース+公開日+エリア+開催期間」の順で表示したいとの依頼があり実装した。**最終確定方針: エリア・期間は削除せず残したまま、ソースと公開日を新たに追加する**（設計書の初期ドラフトでは「エリア・期間を削除してソース+日付に置き換える」だったが、ユーザーとの最終確認で「全部残して追加する」方針に変更された上での実装）。
+
+### 実装内容（2段階）
+
+**1. バックエンド（`scripts/filter-events.js`）**: `filterAndSave()`内、`item`オブジェクト組み立て直前に本当の公開日時算出ロジックを追加。
+
+```js
+// 元記事の本当の公開日時（RSSのpubDate由来）。パース不能・欠落時は取得時刻にフォールバック
+// （くらし側 scripts/fetch-life-info.js の enrichBatch() と同じ考え方）
+const pub = original.pubDate ? new Date(original.pubDate) : new Date();
+const publishedAt = isNaN(pub.getTime()) ? new Date().toISOString() : pub.toISOString();
+```
+
+`item`オブジェクトの`fetched_at: new Date().toISOString(),`の直後に`publishedAt,`を追加。`original`（`fetch-events.js`が作る中間オブジェクト、`pubDate: item.pubDate || new Date().toISOString()`で既に保持済み）から取得。他のフィールドは一切変更していない。**この変更は今後新規に取得されるイベントにのみ適用され、既存のevents.json内のイベント（実装時点で126件、`publishedAt`フィールドを持たない）には遡って適用しない。**
+
+**2. フロントエンド（`public/app.js`の`renderEventCard()`）**: `metaRowHtml`をソース→公開日→エリア→期間の順で追加、エリア・期間は削除せず維持。
+
+```js
+const eventDateStr = _formatLifeInfoDate(e.publishedAt || e.fetched_at);
+const metaRowHtml = (catLabel || e.source || eventDateStr || e.location || e.period || e.hours || inlineBadgeHtml)
+  ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--warm-gray);">
+      ${catLabel ? `<span style="background:${catColor.bg};color:${catColor.color};border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
+      ${e.source ? `<span>${e.source}</span>` : ''}
+      ${eventDateStr ? `<span>${eventDateStr}</span>` : ''}
+      ${e.location ? `<span>${e.location}</span>` : ''}
+      ${(e.period || e.hours) ? `<span>${e.period || e.hours}</span>` : ''}
+      ${inlineBadgeHtml}
+    </div>` : '';
+```
+
+表示順序: カテゴリバッジ → ソース名 → 公開日(M/D形式) → エリア → 開催期間 → （右端に自動的に寄る）New/残り日数バッジ。`_formatLifeInfoDate()`（くらし画面と共用の既存の汎用日付フォーマッタ）をそのまま流用。`e.publishedAt || e.fetched_at`により、`publishedAt`を持つ新規イベントは本当の公開日、持たない既存イベントは取り込み日にフォールバックして表示される。
+
+### 変更したファイル一覧
+1. `scripts/filter-events.js` — `publishedAt`算出・付与ロジックの追加
+2. `public/app.js` — `metaRowHtml`の書き換え（エリア・期間は削除せず残したまま、ソース+公開日を追加）
+3. `public/sw.js` — `CACHE_NAME`を`sg-weekend-v915`→`sg-weekend-v916`にインクリメント
+4. `public/index.html` — `app.js`のキャッシュバスティングクエリを`?v=20260915b`→`?v=20260915c`に更新
+
+### 変更しなかったファイル
+- `public/app.css`（新規CSSは不要、既存の`<span>`スタイルをそのまま流用）
+- `server.js`（`GET /api/events`は`{ ...e, tab, tabs }`のスプレッド構文で全フィールドを透過するため変更不要、確認済み）
+- `scripts/fetch-events.js`（`pubDate`は既に中間オブジェクトに保持されている、変更不要）
+- `scripts/post-to-x.js`（fetched_atベースのロジックは無変更のまま）
+- Instagram埋め込み分岐（`renderEventCard()`内`igSc`が真の場合の別レンダリング）は対象外（現在Instagram由来イベントは0件のため触らず）
+
+### checker結果
+- 🔴Criticalなし
+- `filter-events.js`の`publishedAt`算出ロジック（`original.pubDate`優先、パース不能・欠落時は取得時刻フォールバック）をNode.jsシミュレーション（正常pubDate／欠落／不正文字列の3パターン）で検証、想定通りの動作を確認
+- `original.pubDate`の参照経路（`fetch-events.js`が中間オブジェクトに`pubDate: item.pubDate || new Date().toISOString()`として保持）をgrepで確認。`fetched_at: new Date().toISOString(),`の既存行が`git diff`で変更されていないことを確認
+- `metaRowHtml`が「カテゴリバッジ→ソース→公開日→エリア→期間→バッジ」の順で構築されていることをコードレビューで確認
+- `eventDateStr = _formatLifeInfoDate(e.publishedAt || e.fetched_at)`のフォールバック動作をシミュレーションで確認（新規イベント想定→publishedAt採用、既存イベント想定〈publishedAtなし〉→fetched_at採用の両方を実測）
+- `git diff --stat`で変更ファイルが想定通り4ファイル（`scripts/filter-events.js`/`public/app.js`/`public/sw.js`/`public/index.html`）のみであることを確認
+- `data/sg/events.json`の実データ（126件全件）を確認したところ全件`publishedAt`欠落（想定通り）。`e.location`/`e.period`/`e.hours`のフォールバックロジック自体は無変更のため表示崩れの心配はないと判断
+- `GET /api/events`・`GET /api/life-info`・`GET /`・`GET /app.js`・`GET /sw.js`いずれもHTTP 200を確認。`server.js`のスプレッド構文（`{ ...e, tab: ..., tabs }`）により、新規イベントに`publishedAt`が付与され次第自動的にAPIレスポンスにも含まれることをコードで確認（実データはまだ新規取得前のため、レスポンス上には未出現。これは想定通り、次回のcron実行〈`fetch-events.js`〉以降に新規追加されるイベントから反映される）
+- `node --check public/app.js`・`node --check scripts/filter-events.js`とも正常
+- `filter-events.js`にはdry-runフラグが存在せず（実行にはClaude API通信が必要）、実データでの完全実行テストは行わずコードレビュー+シミュレーションで代替した
+
+### PM2再起動
+`pm2 restart sg-weekend`を実施、正常起動（online）を確認。Web版のみ反映。iOS版（release/TestFlight）への対応は今回のスコープ外のため未実施。
+
+### closer
+- `.claude/plan.md`（本記録）を追記
+- CLAUDE.md「イベント取り込みパイプライン構成」節に`publishedAt`収集の追記を実施（下記参照）
+- `scripts/filter-events.js`・`public/app.js`・`public/sw.js`・`public/index.html`・`.claude/plan.md`・`.claude/session-log.md`・`.claude/next.md`・`CLAUDE.md`をmainブランチへローカルコミット
+- pm2再起動はbuilder段階で実施済み（Web版反映のため）
+- iOS側（`release`ブランチへのpush・TestFlight配信）は今回のスコープ外のため未実施
+- `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+- 既存の126件のevents.jsonデータには`publishedAt`を遡って付与していない（今後の新規取得分のみ反映される。次回`fetch-events.js`実行〈毎日7:00/12:00/21:00 SGT〉以降に新規追加されるイベントから順次`publishedAt`が付与され、カード上の公開日表示に反映されていく）

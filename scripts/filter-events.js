@@ -474,10 +474,16 @@ async function filterAndSave(items, { eventsPath, cityKey = 'sg' } = {}) {
                    : isFallbackTravelEndDate ? ''
                    : formatPeriod(f.start_date, endDate);
 
+    // 元記事の本当の公開日時（RSSのpubDate由来）。パース不能・欠落時は取得時刻にフォールバック
+    // （くらし側 scripts/fetch-life-info.js の enrichBatch() と同じ考え方）
+    const pub = original.pubDate ? new Date(original.pubDate) : new Date();
+    const publishedAt = isNaN(pub.getTime()) ? new Date().toISOString() : pub.toISOString();
+
     const item = {
       id,
       city:        cityKey,
       fetched_at:  new Date().toISOString(),
+      publishedAt,
       type:        validType,
       emoji:       f.emoji || '📌',
       image:       f.image || original.image || null,
