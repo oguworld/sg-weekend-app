@@ -20301,3 +20301,54 @@ const metaRowHtml = (catLabel || e.source || eventDateStr || e.period || e.hours
 - `public/app.js`・`public/sw.js`・`public/index.html`・`.claude/plan.md`をmainブランチへローカルコミット
 - `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
 - iOS側は今回のスコープ外のため未実施
+
+---
+
+## 設計書207 追加修正2: おでかけイベントカードのmetaRowHtmlから公開日(eventDateStr)表示のみを削除（2026-09-15、ユーザー追加依頼）
+
+### 背景
+設計書207・追加修正1の実装後、ユーザーからさらに追加の修正依頼があった。表示順「カテゴリバッジ→ソース→公開日→期間→New/残り日数バッジ」のうち、**公開日(`eventDateStr`)の表示のみを削除**し、ソース・期間・カテゴリバッジ・New/残り日数バッジはそのまま残す方針。
+
+### 実装内容
+`public/app.js`の`renderEventCard()`内`metaRowHtml`から、`${eventDateStr ? \`<span>${eventDateStr}</span>\` : ''}`の行を削除し、表示条件式（三項演算子の条件部分）からも`eventDateStr`を除去した。
+
+**変更後の最終表示順**: カテゴリバッジ → ソース → 期間 → New/残り日数バッジ
+
+```js
+const eventDateStr = _formatLifeInfoDate(e.publishedAt || e.fetched_at);
+const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeHtml)
+  ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--warm-gray);">
+      ${catLabel ? `<span style="background:${catColor.bg};color:${catColor.color};border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
+      ${e.source ? `<span>${e.source}</span>` : ''}
+      ${(e.period || e.hours) ? `<span>${e.period || e.hours}</span>` : ''}
+      ${inlineBadgeHtml}
+    </div>` : '';
+```
+
+`eventDateStr`変数自体（`_formatLifeInfoDate(e.publishedAt || e.fetched_at)`の算出）は、将来また表示させたくなる可能性を考慮し削除せず残置した（未使用変数だがlintエラー等は発生しないことを`node --check`で確認済み）。`scripts/filter-events.js`側の`publishedAt`収集ロジックは変更していない（表示に使わないだけで、データとしては引き続き収集・保存され続ける）。
+
+### 変更したファイル
+1. `public/app.js` — `metaRowHtml`から`eventDateStr`のspan・条件式参照を削除（変数定義自体は残置）
+2. `public/sw.js` — `CACHE_NAME`を`sg-weekend-v917`→`sg-weekend-v918`にインクリメント
+3. `public/index.html` — `app.js`のキャッシュバスティングクエリを`?v=20260915d`→`?v=20260915e`に更新
+
+### 検証
+- `node --check public/app.js`正常
+- `git diff`で`public/app.js`の変更が「`eventDateStr`のspan行1行削除＋条件式からの除去」のみであることを確認（他行は無変更）
+- `scripts/filter-events.js`は今回のdiff対象に含まれておらず、`publishedAt`収集ロジックは無変更であることを確認
+- `pm2 restart sg-weekend`実施、online確認
+- `GET /api/events`・`GET /app.js`・`GET /sw.js`いずれもHTTP 200を確認
+- 🔴Criticalなし
+
+### closer
+- `.claude/plan.md`（本記録）を追記
+- `public/app.js`・`public/sw.js`・`public/index.html`・`.claude/plan.md`をmainブランチへローカルコミット
+- `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+- iOS側は今回のスコープ外のため未実施
+
+### 総括（設計書207本体＋追加修正1・2、同日3段階の変更）
+1. **本体実装**: おでかけカードに公開日情報を新規収集・表示追加（表示順: カテゴリ→ソース→公開日→エリア→期間→バッジ）
+2. **追加修正1**: エリア(`e.location`)表示を削除（表示順: カテゴリ→ソース→公開日→期間→バッジ）
+3. **追加修正2**: 公開日(`eventDateStr`)表示も削除（**最終表示順: カテゴリ→ソース→期間→バッジ**）
+
+結果として、最終的にフロントエンドのカード表示上は「ソース名」のみが新規要素として追加され、エリア・公開日の表示は元の状態（エリアは削除、公開日は表示なし）に近い形へ収束した。ただし、バックエンド（`scripts/filter-events.js`）の`publishedAt`収集ロジック自体は3段階を通じて一度も削除されておらず、新規イベントには引き続き`publishedAt`が付与・保存され続けている（表示に使っていないだけで、将来また表示する場合はデータ収集からやり直す必要はない）。`e.location`/`e.area`のデータ収集ロジックも同様に無変更のまま保持されている。
