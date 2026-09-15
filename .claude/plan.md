@@ -20403,3 +20403,20 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 - `public/app.js`・`public/app.css`・`public/sw.js`・`public/index.html`・`.claude/plan.md`をmainブランチへローカルコミット
 - `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
 - iOS側は今回のスコープ外のため未実施（Web版のみで完結する変更）
+
+### 設計書208 追加修正: PSIウィジェットの固定アイコン(🌫️)を削除（2026-09-15、ユーザー追加依頼）
+
+設計書208本体実装直後、ユーザーから「動的な顔絵文字(😊😐😷😫☠️)を追加したので、固定のスモーク絵文字🌫️アイコンは不要になった。下に『PSI』というテキストラベルもあるので指標が何かは引き続きわかる」との追加依頼。`public/index.html`の`#stat-psi`を含む`.stat-row`から`<span class="stat-icon">🌫️</span>`のみを削除（`.stat-row`のdiv自体・`#stat-psi`の`.stat-val`span・`.stat-sub`(PSIテキストラベル)は無変更で維持）。
+
+- `public/index.html`: PSIウィジェット部分(155行目付近)から固定アイコンspanを削除
+- 他の指標(`#stat-fx`の💱、`#stat-temp`の🌡️、`#stat-rain`の☔、`#stat-nowcast`の⛈️、`#stat-dengue`の🩺)は無変更（対象はPSIのみ）
+- `public/app.css`の`.stat-icon`クラス定義自体は他の指標で引き続き使われているため無変更のまま維持
+- `public/sw.js`: `CACHE_NAME`を`sg-weekend-v919`→`sg-weekend-v920`にインクリメント
+- `public/index.html`: `app.js`キャッシュバスティングを`?v=20260915f`→`?v=20260915g`に更新（app.js自体の内容は今回変更なし、index.html変更に伴う慣習的更新）
+
+**検証**:
+- `git diff`で変更が`public/index.html`の1箇所（PSIアイコンspan削除）＋キャッシュバスティングクエリ更新、`public/sw.js`の`CACHE_NAME`のみであることを確認
+- `pm2 restart sg-weekend`実施、online確認
+- `GET /`・`GET /app.js`いずれもHTTP 200を確認。提供される`index.html`の`#stat-psi`周辺に🌫️アイコンが含まれていないことを確認、他5指標のアイコン(💱🌡️☔⛈️🩺)は維持されていることを確認
+- 🔴Criticalなし
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
