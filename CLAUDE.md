@@ -68,7 +68,6 @@ sg-weekend-app/
 │   ├── sg/
 │   │   ├── events.json
 │   │   ├── life-info.json          ← 生活情報・ニュース（gitignore対象）
-│   │   ├── comments.json           ← コメント機能
 │   │   ├── model-courses.json / community-courses.json / affiliate-links.json / stamp-spots.json
 │   │   │   ← コース・探訪機能削除済み（設計書178）の残置データ。`server.js`側のCOURSE API（9エンドポイント）自体は設計書192（2026-09-10）で削除済みだが、データファイル自体の削除はスコープ外のため引き続き残置
 │   │   └── school-calendar.json / sponsored-cards.json 等
@@ -108,7 +107,7 @@ sg-weekend-app/
 - **ピン留め** 📌（`#screen-pins` / `#nav-pins`）: くらし・おでかけ両方の保存済みアイテムを1画面に統合表示（`#news-pin-list-content`/`#pin-list-content`の2セクション構成）。この機能を単独で説明したセクションは本ファイル内に存在しないため、詳細はコード（`public/index.html`の`#screen-pins`、`public/app.js`のpin関連関数）を直接参照すること
 - **設定** ⚙️（`#screen-settings` / `#nav-settings`）: プロフィール（ニックネーム・アバター。設計書157/158で一度非表示化されたが、設計書174〈CLAUDE.md未記録〉で再表示に戻っている）・アカウント連携（Google/Apple Sign-In）・データバックアップ・言語切替・アカウント削除等
 
-コメント機能（`postComment()`等）・全データバックアップ・Sign-Inは上記4タブ横断で現役。詳細は各セクション参照。
+全データバックアップ・Sign-Inは上記4タブ横断で現役。詳細は各セクション参照。**コメント機能（設計書174で実装、くらし・おでかけ両カードの💬コメントボタン＋インライン展開欄）は設計書205（2026-09-15）でユーザー判断により完全削除済み**（バックエンドAPI4本・フロントエンドのヘルパー関数群・CSS・`data/sg/comments.json`・`scripts/post-to-x.js`のアプリ内コメント転記副次機能`postCommentForItem()`を全て削除。`generateEventPost()`/`generateNewsPost()`が返す`commentText`フィールド自体・X投稿・LINE通知本体ロジックは無変更で残置）。
 
 ## 広告表示機能（PRカード・Klookアフィリエイトウィジェット、2026-07-13実装 → 同月中に両方とも非表示化）
 2つの広告枠を実装したが、広告掲載準備が整うまでの一時停止として2026-07-16設計書47でいずれも非表示化した。**コード自体は削除しておらず、残置されたまま停止中**。

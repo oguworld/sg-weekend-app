@@ -20071,3 +20071,67 @@ Sonnetへのバッチ呼び出しは計4回実施（1回目: 119〜152字、2回
 - `data/sg/life-info.json`・`data/life-info-fetch-state.json`・`data/sources.json`は`.gitignore`対象のためコミット対象外。`scripts/fetch-life-info.js`・`.claude/plan.md`・`CLAUDE.md`のみをmainブランチへローカルコミット
 - pm2再起動は実施せず（データ・cron実行スクリプトのみの変更のため、設計書の注意書き通り）
 - `main`・`release`いずれのリモートへのpushも未実施（今回のスコープ外、ユーザーの明示指示があるまで待機）
+
+## 設計書205: コメント機能の完全削除(くらし・おでかけ両画面から)
+
+### 背景
+くらし(news)画面のニュースカードとおでかけ(event)画面のイベントカードにあるコメント機能を、ユーザー判断により完全に削除する。ピン留め画面も同じカード描画関数を再利用しているため自動的に巻き込まれる。カレンダー・設定画面・ピン留め詳細モーダルには元々コメント機能は無い。
+
+### ユーザー承認済みの3点
+1. `data/sg/comments.json`(全件bot投稿32件、実ユーザーデータ無し)は**バックアップせず完全削除**
+2. iOS側のUI更新(release push・TestFlight)は**今回は行わない**。Web版のみ反映し、iOSは次回まとめて対応
+3. `scripts/post-to-x.js`の「X/LINE投稿をアプリ内コメント欄にも転記する」副次機能(`postCommentForItem()`)も**廃止する**
+
+### 変更の全体像(4カテゴリ)
+1. バックエンド(`server.js`): コメント専用ヘルパー3関数・API 4エンドポイントを削除。共有ミドルウェア(`requireAppAuth`等)自体は無変更
+2. フロントエンド(`public/app.js`): コメント機能専用の関数群10個・カード描画箇所の呼び出し元・コメント数一括取得の呼び出し元4箇所・i18n文字列9キーを削除
+3. CSS(`public/app.css`): `.tips-toggle-btn`系3クラス・コメント機能専用CSSブロック一式を削除(`.tips-box--collapsible`/`.tips-box`は削除しない)
+4. データ・スクリプト・ドキュメント: `data/sg/comments.json`削除、`scripts/post-to-x.js`の`postCommentForItem()`・`pendingComment`関連削除(`commentText`フィールド自体・X投稿・LINE通知本体ロジックは無変更)、CLAUDE.md更新
+
+### 検証方法(checker担当)
+1. 構文確認: `node --check server.js`・`node --check scripts/post-to-x.js`
+2. API疎通確認: pm2再起動後、削除した4エンドポイントの検証
+3. 他APIへの影響がないこと
+4. `grep`でコメント関連HTML生成コードの完全除去、`.card-sub-row`の中身確認
+5. `.tips-box`/`.tips-box--collapsible`/`#nickname-input`が無変更であることを確認
+6. `node scripts/post-to-x.js --dry-run --type=event/news`の完走確認
+7. `git status --short`で意図しない変更がないことを確認
+
+## 設計書205 実装記録（2026-09-15、builder→checker→closer実行）
+
+### 実装内容
+設計書の指示通り、以下の順序で実装した。
+1. `scripts/post-to-x.js`: `postCommentForItem()`関数定義・呼び出し2箇所・`pendingComment`変数関連コードを削除。`commentText`フィールド自体（`generateEventPost()`/`generateNewsPost()`の返り値）・`postToX()`/`notifyLine()`本体ロジックは無変更で確認済み
+2. `public/app.js`のカード描画呼び出し元を先に削除: `renderEventCard()`内`tipsList`/`tipsContent`変数と埋め込み箇所（`.card-sub-row`直下、内側の余分な`<div style="display:flex...">`ラッパーも整理し`pinLinkHtml`と元記事リンクを`.card-sub-row`の直接の子要素に変更）、`_lifeInfoCardHtml()`内の同等箇所、コメント数一括取得の呼び出し元4箇所（`renderNewsList()`/`renderEventCards()`/`renderPinList()`/`renderNewsPinList()`）
+3. `public/app.js`のヘルパー・処理関数10個（`_commentDomId`/`_commentBtnId`/`_getMyUserIdFromToken`/`toggleCardComments`/`_loadComments`/`_renderCommentBox`/`_updateCommentCountLabel`/`postComment`/`deleteComment`/`_applyCommentCounts`）を一括削除。`getUserName()`も`postComment()`削除に伴い唯一の呼び出し元が消滅したため削除（`#nickname-input`は`localStorage.getItem('user_name')`を直接読み書きしており`getUserName()`に非依存であることを確認済み、影響なし）
+4. `STRINGS.ja`の9キー（`commentsBtnLabel`/`commentEmpty`/`commentPlaceholder`/`commentDeleteLink`/`commentAuthGate`/`confirmDeleteComment`/`toastCommentSent`/`toastCommentDeleted`/`toastCommentError`）を削除
+5. `public/app.css`の`.tips-toggle-btn`/`.tips-toggle-btn.active`/`.tips-arrow`の3クラスと、コメント機能専用CSSブロック一式（`.comment-box`〜`.comment-auth-gate`まで）を削除。`.tips-box--collapsible`（同じブロック内に隣接していたが孤立クラスのため残置）・`.tips-box`（`openPinDetail()`のひとことメモ表示用、無関係）はいずれも無変更で確認済み
+6. `server.js`のコメント専用ヘルパー3関数（`commentsPath`/`loadComments`/`saveComments`）とAPI 4エンドポイント（`GET /api/comments`・`GET /api/comments/counts`・`POST /api/comments`・`DELETE /api/comments/:id`）を削除。`requireAppAuth`/`verifyAppJwtOptional`/`withFileLock`/`resolveCity`の関数定義自体は無変更（他エンドポイントで現役使用中のため）
+7. `data/sg/comments.json`（bot投稿32件のみ、ユーザー承認済み）を削除
+8. キャッシュバスティング更新: `public/index.html`の`app.css?v=20260910o`→`?v=20260915a`、`app.js?v=20260910q`→`?v=20260915a`、`public/sw.js`の`CACHE_NAME`を`sg-weekend-v913`→`sg-weekend-v914`にインクリメント
+9. CLAUDE.mdを更新（フォルダ構成コメントの`comments.json`記述削除、「コメント機能・全データバックアップ・Sign-Inは上記4タブ横断で現役」の記述からコメント機能を除去し削除済み・変更範囲を追記）
+
+### PM2再起動
+`pm2 restart sg-weekend`を実施、正常起動を確認（Web版のみ反映、iOS側は今回のスコープ外のため`release`ブランチへのpush・TestFlight配信は実施していない）。
+
+### checker結果
+- 🔴Criticalなし
+- `node --check server.js`・`node --check scripts/post-to-x.js`とも正常
+- 削除した4エンドポイントのPOST/DELETEは404を確認。GETはExpressの既存`app.get('*', ...)` SPAフォールバック仕様により200+HTMLを返すが、これはこのプロジェクト全体の既存挙動（存在しない任意のGETパスが同様に200を返すことをコントロールチェックで実証済み）であり、設計書205による新規の不具合ではないと判断
+- 他API（`/api/events`/`/api/life-info`/`/api/auth/me`/`/api/user-plans/me`/`/api/calendar`/`/api/widget-stats`/`/api/sponsored-cards`）は全て正常応答を確認
+- `grep`によるコメント関連コードの残存確認: server.js/app.js/app.css/post-to-x.jsから完全に除去済み（`commentText`フィールドのみ意図的に残置、他に日本語の「コメント」という単語が無関係な文脈で1箇所残るのみで無害）
+- `.card-sub-row`はイベントカード・くらしカードとも、ピン留め(📌)・元記事リンク(🔗)の2項目のみが残ることを確認
+- `.tips-box`/`.tips-box--collapsible`/`#nickname-input`/`initProfileChips()`は`git diff`で変更が含まれていないことを確認
+- `goToAccountLinking()`・`requireAppAuth`等の共有関数定義自体は無変更で残存を確認（呼び出し元が`.comment-auth-gate`削除により減少したのは設計書の想定通り）
+- `node scripts/post-to-x.js --dry-run --type=event`・`--type=news`とも正常完走（実際のX投稿・LINE送信は発生せず）
+- `git status --short`は意図した7ファイル（`CLAUDE.md`/`public/app.css`/`public/app.js`/`public/index.html`/`public/sw.js`/`scripts/post-to-x.js`/`server.js`）のみの変更を確認。`data/sg/comments.json`削除は`.gitignore`対象のため`git status`に非表示（意図通り）
+- PM2 `sg-weekend`はonline・安定稼働を確認
+
+### closer
+- `.claude/plan.md`（本記録）を追記
+- CLAUDE.mdは既にbuilder段階で更新済み（フォルダ構成・機能構成節）、closerとして内容を最終確認
+- `data/sg/comments.json`は`.gitignore`対象外の実ファイルだが今回削除のみでgit管理外（元々コミットされていなかったため、削除もgit上の差分としては現れない）
+- `CLAUDE.md`・`public/app.css`・`public/app.js`・`public/index.html`・`public/sw.js`・`scripts/post-to-x.js`・`server.js`をmainブランチへローカルコミット
+- pm2再起動はbuilder段階で実施済み（Web版反映のため）
+- iOS側（`release`ブランチへのpush・TestFlight配信）は今回のスコープ外のため未実施
+- `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）

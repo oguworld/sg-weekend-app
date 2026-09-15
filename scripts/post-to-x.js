@@ -372,26 +372,6 @@ async function notifyLine(text) {
   });
 }
 
-// ─── 生成した投稿文をアプリ内コメントとしても残す ─────────────────────
-// POST /api/comments はrequireAppAuth(ユーザーJWT)必須だが、このスクリプトは
-// 特定ユーザーとして動くものではないため、server.js側でADMIN_SECRETヘッダーによる
-// 代替認証(bot投稿)を追加してある。ADMIN_SECRET未設定の場合は静かにスキップする。
-async function postCommentForItem(itemType, itemId, text) {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) { console.log('  ⚠️ ADMIN_SECRET未設定のためコメント投稿をスキップ'); return; }
-  try {
-    const res = await fetch('http://localhost:3000/api/comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
-      body: JSON.stringify({ itemType, itemId, text, nickname: 'SG在住Navi' }),
-    });
-    if (res.ok) console.log('  💬 アプリ内コメントとしても投稿しました');
-    else console.log(`  ⚠️ コメント投稿に失敗しました(${res.status})`);
-  } catch (e) {
-    console.log(`  ⚠️ コメント投稿でエラー: ${e.message}`);
-  }
-}
-
 // ─── メイン ───────────────────────────────────────────────────────
 async function main() {
   const { type: rawType, city, dryRun, toLine } = parseArgs();
@@ -401,7 +381,6 @@ async function main() {
   console.log(`[post-to-x] 開始 type=${type} city=${city} (${now})`);
 
   let text;
-  let pendingComment = null; // { itemType, itemId, text } — event/newsタイプのみ、生成後にアプリ内コメントとしても投稿する
 
   if (type === 'event') {
     const events = getActiveEvents(loadEvents(city));
@@ -418,7 +397,6 @@ async function main() {
     console.log(`[post-to-x] 選択イベント: ${event.store} (${conf.nameJa})`);
     const result = await generateEventPost(event);
     text = result.text;
-    pendingComment = { itemType: 'event', itemId: event.id, text: result.commentText };
     history.eventIds = [event.id, ...history.eventIds].slice(0, HISTORY_MAX);
     history.postedStores = [event.store, ...(history.postedStores || [])].slice(0, HISTORY_MAX);
 
@@ -438,7 +416,6 @@ async function main() {
     console.log(`[post-to-x] 選択記事: ${article.title} (${article.source || ''})`);
     const result = await generateNewsPost(article);
     text = result.text;
-    pendingComment = { itemType: 'news', itemId: article.id, text: result.commentText };
     history.newsIds = [article.id, ...(history.newsIds || [])].slice(0, HISTORY_MAX);
 
   }
@@ -458,7 +435,6 @@ async function main() {
     try {
       await notifyLine(text);
       console.log('[post-to-x] ✅ LINEに下書きを送信しました');
-      if (pendingComment) await postCommentForItem(pendingComment.itemType, pendingComment.itemId, pendingComment.text);
     } catch (err) {
       console.error('[post-to-x] LINE送信エラー:', err.message);
       throw err;
@@ -474,7 +450,6 @@ async function main() {
       const tweetUrl = `https://x.com/i/web/status/${tweetId}`;
       console.log(`[post-to-x] ✅ 投稿完了: ${tweetUrl}`);
       await notifyLine(`【X投稿】\n${text}\n\n${tweetUrl}`);
-      if (pendingComment) await postCommentForItem(pendingComment.itemType, pendingComment.itemId, pendingComment.text);
     }
   } catch (err) {
     console.error('[post-to-x] エラー:', err.message);
