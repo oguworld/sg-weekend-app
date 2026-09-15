@@ -20256,3 +20256,48 @@ const metaRowHtml = (catLabel || e.source || eventDateStr || e.location || e.per
 - iOS側（`release`ブランチへのpush・TestFlight配信）は今回のスコープ外のため未実施
 - `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
 - 既存の126件のevents.jsonデータには`publishedAt`を遡って付与していない（今後の新規取得分のみ反映される。次回`fetch-events.js`実行〈毎日7:00/12:00/21:00 SGT〉以降に新規追加されるイベントから順次`publishedAt`が付与され、カード上の公開日表示に反映されていく）
+
+---
+
+## 設計書207 追加修正: おでかけイベントカードのmetaRowHtmlからエリア(e.location)表示のみを削除（2026-09-15、ユーザー追加依頼）
+
+### 背景
+設計書207実装直後、ユーザーから追加の修正依頼があった。表示順「カテゴリバッジ→ソース→公開日→エリア→期間→バッジ」のうち、**エリア(`e.location`)の表示のみを削除**し、ソース・公開日・期間・カテゴリバッジ・New/残り日数バッジはそのまま残す方針。
+
+### 実装内容
+`public/app.js`の`renderEventCard()`内`metaRowHtml`から、`${e.location ? \`<span>${e.location}</span>\` : ''}`の行を削除し、表示条件式（三項演算子の条件部分）からも`e.location`を除去した。
+
+**変更後の最終表示順**: カテゴリバッジ → ソース → 公開日 → 期間 → New/残り日数バッジ
+
+```js
+const eventDateStr = _formatLifeInfoDate(e.publishedAt || e.fetched_at);
+const metaRowHtml = (catLabel || e.source || eventDateStr || e.period || e.hours || inlineBadgeHtml)
+  ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--warm-gray);">
+      ${catLabel ? `<span style="background:${catColor.bg};color:${catColor.color};border-radius:20px;padding:2px 8px;font-weight:700;">${catLabel}</span>` : ''}
+      ${e.source ? `<span>${e.source}</span>` : ''}
+      ${eventDateStr ? `<span>${eventDateStr}</span>` : ''}
+      ${(e.period || e.hours) ? `<span>${e.period || e.hours}</span>` : ''}
+      ${inlineBadgeHtml}
+    </div>` : '';
+```
+
+`e.location`/`e.area`フィールド自体はデータ・バックエンド側（`scripts/filter-events.js`の`location`/`area`収集ロジック）では削除していない。表示から取り除いただけで、データとしては引き続き保持されている（将来また表示に使う可能性を考慮した最小限の変更）。
+
+### 変更したファイル
+1. `public/app.js` — `metaRowHtml`から`e.location`のspan・条件式参照を削除
+2. `public/sw.js` — `CACHE_NAME`を`sg-weekend-v916`→`sg-weekend-v917`にインクリメント
+3. `public/index.html` — `app.js`のキャッシュバスティングクエリを`?v=20260915c`→`?v=20260915d`に更新
+
+### 検証
+- `node --check public/app.js`正常
+- `git diff`で`public/app.js`の変更が「`e.location`のspan行1行削除＋条件式からの除去」のみであることを確認（他行は無変更）
+- `scripts/filter-events.js`は今回のdiff対象に含まれておらず、`location`/`area`データ収集ロジックは無変更であることを確認
+- `pm2 restart sg-weekend`実施、online確認
+- `GET /api/events`・`GET /app.js`・`GET /sw.js`いずれもHTTP 200を確認
+- 🔴Criticalなし
+
+### closer
+- `.claude/plan.md`（本記録）を追記
+- `public/app.js`・`public/sw.js`・`public/index.html`・`.claude/plan.md`をmainブランチへローカルコミット
+- `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+- iOS側は今回のスコープ外のため未実施
