@@ -20135,3 +20135,50 @@ Sonnetへのバッチ呼び出しは計4回実施（1回目: 119〜152字、2回
 - pm2再起動はbuilder段階で実施済み（Web版反映のため）
 - iOS側（`release`ブランチへのpush・TestFlight配信）は今回のスコープ外のため未実施
 - `main`・`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+
+---
+
+## 設計書206: Web版ユーザーへのiOSアプリ切り替え案内ポップアップの新規実装（2026-09-15、builder→checker→closer）
+
+### 背景・目的
+Web版(`dosuru.app`、`_isCapacitorApp === false`)を継続利用しているユーザーに対し、iOSアプリ版(App Store配信)への切り替えを促す案内モーダルを新規実装する。デザイン(中央モーダル・文言・CTA)はユーザーと事前に確定済み。
+
+### 確定仕様
+1. 表示形式: 中央モーダル(オーバーレイ+カード型、✕閉じるボタン)
+2. 表示対象: Web版のみ(`_isCapacitorApp`が`false`の場合のみ)
+3. 表示頻度: アクセス10回に1回(「今後表示しない」機能は実装しない)
+4. モーダルの中身: アプリアイコン(`/icons/icon-192.png`)、見出し「アプリ版はもっと快適です」、説明文、メリット一覧3項目(🔔通知/🏠ホーム画面起動/⚡表示速度)、CTAボタン「App Storeで開く」(`https://apps.apple.com/app/id6787159354`、`target="_blank"`)、「今はしない」テキストリンク
+
+### カウントロジック
+localStorageキー`app_web_promo_visit_count`。ページ読み込みごとに`_isCapacitorApp===false`の場合のみインクリメントし、`count > 1 && count % 10 === 1`の時のみ表示(11, 21, 31...回目)。
+
+### 実装結果
+1. `public/index.html`: `#qr-share-sheet`の閉じタグ直後にモーダルHTML構造を追加(`#promo-modal-overlay`/`#promo-modal`、z-index 3603/3604)。既存の`#backup-passphrase-overlay`/`#qr-share-overlay`(z-index 3601/3602)と重複しないことを確認
+2. `public/app.css`: `.plan-modal-body`定義直後・「DARK MODE」コメント直前に`.promo-modal*`系CSS一式を追加(`.promo-modal-overlay`/`.promo-modal`/`.promo-modal-close`/`.promo-modal-icon`/`.promo-modal-title`/`.promo-modal-desc`/`.promo-modal-benefits`/`.promo-modal-benefit-icon`/`.promo-modal-cta`/`.promo-modal-dismiss`)。`classList.toggle('visible')`方式に準拠、`display`直書きなし
+3. `public/app.js`: `maybeShowWebPromoModal()`/`openPromoModal()`/`closePromoModal()`の3関数を`checkNavParam();`直後に追加、`maybeShowWebPromoModal();`呼び出しも同箇所に追加。既存の「オーバーレイ・モーダル閉じる 即時タップ対応」配列に`['promo-modal-overlay', () => closePromoModal()]`・`['promo-modal-dismiss-link', () => closePromoModal()]`の2エントリを追加。✕ボタンは`data-close`属性により既存共通ハンドラで処理されるため個別登録不要。CTAボタン(`#promo-modal-cta-btn`)は`target="_blank"`のデフォルト遷移を妨げないよう、この配列には追加せず`onclick`ガードのみとした(設計書通り)
+4. `public/sw.js`: `CACHE_NAME`を`sg-weekend-v914`→`sg-weekend-v915`にインクリメント
+5. `public/index.html`: キャッシュバスティングを`app.css?v=20260915a`→`?v=20260915b`、`app.js?v=20260915a`→`?v=20260915b`に更新
+6. ダークモード配色確認: `.promo-modal`が使用する`--warm-white`(dark:#14160F)/`--midnight`(dark:#EDEAE3)/`--caramel-pale`(dark:#1E241A)/`--warm-gray`(dark:#9C9A8E)は既存の`.plan-modal`系モーダルと同じCSS変数であり、コードレビューにより視認性に問題がないと判断。個別のダークモード上書きは追加不要と結論
+
+### PM2再起動
+`pm2 restart sg-weekend`を実施、正常起動を確認(Web版のみ反映。iOS側は今回のスコープ外のため`release`ブランチへのpush・TestFlight配信は実施していない)。`curl`で`/`・`/app.css`・`/app.js`・`/sw.js`いずれもHTTP 200、新しいHTML/キャッシュバスティングクエリが反映されていることを確認。
+
+### checker結果
+- 🔴Criticalなし
+- `_isCapacitorApp===true`時、`maybeShowWebPromoModal()`は関数冒頭の`if (_isCapacitorApp) return;`により即座return、localStorage操作・DOM操作とも一切発生しないことをコードレビューで確認
+- カウント判定式`count > 1 && count % 10 === 1`をNode.jsで1〜50回のシミュレーションを実施、`[11, 21, 31, 41]`回目に表示されることを確認(設計書仕様と一致)
+- z-index(3603/3604)が既存の他モーダル(3601/3602が最大値)と重複していないことを`grep`で確認
+- `classList.toggle`規約(add/remove('visible')のみ)に従っていること、`display`直書きが無いことを確認
+- localStorageに`'10'`をセットしてリロードした際に表示される動作の実ブラウザ確認は、本環境のChromium実行に必要な共有ライブラリ(`libatk-1.0.so.0`)が不足しsudo権限も無いため実施不可(CLAUDE.md記載の既知の構造的制約)。カウントロジック自体はNode.jsシミュレーションで検証済みのためリスクは低いと判断
+- ✕ボタン(`data-close`共通ハンドラ)・「今はしない」・オーバーレイタップの3箇所とも、`onclick`属性ガード＋`touchend`配列登録の二重対応が入っていることをコードレビューで確認
+- CTAボタンのリンク先が`https://apps.apple.com/app/id6787159354`、`target="_blank"`であることを確認
+- `git diff --stat`で`public/{index.html,app.css,app.js,sw.js}`の4ファイルのみの変更であることを確認
+- 既存モーダル(`closeQrShareSheet`/`closeBackupPassphraseSheet`)の定義・呼び出し元は無変更であり、今回追加したpromo-modal関連のDOM・関数とは完全に独立しているため影響なしと判断
+
+### closer
+- `.claude/plan.md`(本記録)を追記
+- `CLAUDE.md`は今回はPWA・Service Worker節等の既存記載と直接の重複がなく、新規の恒久的な仕様変更というよりは単発のプロモーション施策であるため追記は見送り、`.claude/session-log.md`への記録のみとした
+- `public/index.html`・`public/app.css`・`public/app.js`・`public/sw.js`・`.claude/plan.md`・`.claude/session-log.md`・`.claude/next.md`をmainブランチへローカルコミット
+- pm2再起動はbuilder段階で実施済み(Web版反映のため)
+- iOS側(`release`ブランチへのpush・TestFlight配信)は今回のスコープ外のため未実施(`_isCapacitorApp`ガードにより実行時には影響しないため急ぎのリリース同期は不要、設計書の注意書き通り)
+- `main`・`release`いずれのリモートへのpushも未実施(ユーザーの明示指示があるまで待機)

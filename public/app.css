@@ -1470,6 +1470,84 @@
     .plan-modal.visible { display: flex; transform: translateY(0); }
     .plan-modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 20px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; min-height: 0; }
 
+    /* ─── PROMO MODAL（Web版→iOSアプリ誘導、中央モーダル、設計書206） ─── */
+    .promo-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(44,36,32,0.45);
+      z-index: 3603;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+      display: none;
+    }
+    .promo-modal-overlay.visible {
+      display: block; opacity: 1; pointer-events: auto;
+    }
+    .promo-modal {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.95);
+      width: min(340px, calc(100vw - 40px));
+      max-height: 85vh;
+      overflow-y: auto;
+      background: var(--warm-white);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      padding: 28px 24px 24px;
+      z-index: 3604;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .promo-modal.visible {
+      display: flex; opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .promo-modal-close {
+      position: absolute; top: 14px; right: 14px;
+      background: var(--sand); border-radius: 50%;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; border: none; cursor: pointer; color: var(--warm-gray);
+    }
+    .promo-modal-icon {
+      width: 64px; height: 64px; border-radius: 16px;
+      margin-bottom: 14px;
+    }
+    .promo-modal-title {
+      font-family: var(--font-heading); font-size: 18px; font-weight: 700;
+      color: var(--midnight); margin-bottom: 10px;
+    }
+    .promo-modal-desc {
+      font-size: 13px; color: var(--warm-gray); line-height: 1.6;
+      margin-bottom: 18px;
+    }
+    .promo-modal-benefits {
+      list-style: none; width: 100%;
+      background: var(--caramel-pale); border-radius: 14px;
+      padding: 14px 16px; margin-bottom: 20px;
+      display: flex; flex-direction: column; gap: 10px;
+      text-align: left;
+    }
+    .promo-modal-benefits li {
+      font-size: 13px; color: var(--midnight);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .promo-modal-benefit-icon { font-size: 15px; flex-shrink: 0; }
+    .promo-modal-cta {
+      display: block; width: 100%; box-sizing: border-box;
+      padding: 13px; background: var(--caramel); color: white;
+      border-radius: var(--radius-btn); border: none;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      text-decoration: none; cursor: pointer; margin-bottom: 14px;
+    }
+    .promo-modal-dismiss {
+      font-size: 12px; color: var(--warm-gray);
+      text-decoration: underline; cursor: pointer;
+    }
+
     /* ─── DARK MODE ─── */
     html[data-theme="dark"] {
       --cream: #1B1E19;

@@ -2096,6 +2096,8 @@
       ['backup-passphrase-submit-btn', () => submitBackupPassphrase()],
       ['qr-share-overlay', () => closeQrShareSheet()],
       ['qr-share-link-btn', () => doShare()],
+      ['promo-modal-overlay', () => closePromoModal()],
+      ['promo-modal-dismiss-link', () => closePromoModal()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -3807,6 +3809,37 @@
     }
 
     checkNavParam();
+
+    // ─── PROMO MODAL（Web版→iOSアプリ誘導、設計書206） ───
+    function maybeShowWebPromoModal() {
+      if (_isCapacitorApp) return;
+      try {
+        let count = parseInt(localStorage.getItem('app_web_promo_visit_count') || '0', 10);
+        if (isNaN(count) || count < 0) count = 0;
+        count += 1;
+        localStorage.setItem('app_web_promo_visit_count', String(count));
+        if (count > 1 && count % 10 === 1) {
+          openPromoModal();
+        }
+      } catch (_) {}
+    }
+
+    function openPromoModal() {
+      const overlay = document.getElementById('promo-modal-overlay');
+      const modal = document.getElementById('promo-modal');
+      if (!overlay || !modal) return;
+      overlay.classList.add('visible');
+      modal.classList.add('visible');
+    }
+
+    function closePromoModal() {
+      const overlay = document.getElementById('promo-modal-overlay');
+      const modal = document.getElementById('promo-modal');
+      if (overlay) overlay.classList.remove('visible');
+      if (modal) modal.classList.remove('visible');
+    }
+
+    maybeShowWebPromoModal();
 
     // ─── SHARE APP ───
     async function shareApp(spotName, eventUrl) {
