@@ -20420,3 +20420,21 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 - `GET /`・`GET /app.js`いずれもHTTP 200を確認。提供される`index.html`の`#stat-psi`周辺に🌫️アイコンが含まれていないことを確認、他5指標のアイコン(💱🌡️☔⛈️🩺)は維持されていることを確認
 - 🔴Criticalなし
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
+
+### 設計書205 追加修正: card-sub-rowレイアウト不具合（2026-09-15、コーディネーターからの追加指示・ユーザー報告に基づく）
+
+設計書205実装後、ユーザーから「おでかけ・くらし両カードで、ピン留めと元記事リンクの配置が左右に離れてしまっている」との報告があった。原因は`.card-sub-row`（`public/app.css`）が`justify-content: space-between`のままだったこと。コメント機能削除前は「コメントボタン(左)＋[ピン留め+リンク]のグループ(右)」という2グループ構成だったため`space-between`で正しく機能していたが、コメントボタンを削除した結果、`.card-sub-row`の直接の子要素が「ピン留め」「リンク」の2つだけになり、`space-between`によってピン留めが左端・リンクが右端という意図しない配置になっていた。
+
+**修正内容**:
+- `public/app.css`の`.card-sub-row`の`justify-content`を`space-between`→`flex-end`に変更（456〜462行目）。ピン留め・元記事リンクの2要素が順序そのまま（ピンが左・リンクが右）で行の右端にまとまって表示される、コメント削除前と同じ見た目に復元
+- `.card-sub-row`の使用箇所は`public/app.js`の`renderEventCard()`（おでかけカード、962行目）・`_lifeInfoCardHtml()`（くらしカード、1070行目）の2箇所のみであることを`grep`で確認済み（他画面・他機能への影響なし）
+- キャッシュバスティング更新: `public/index.html`の`app.css?v=20260915b`→`?v=20260915c`（CSS変更のためapp.css側のみ更新）、`public/sw.js`の`CACHE_NAME`を`sg-weekend-v920`→`sg-weekend-v921`にインクリメント
+- `pm2 restart sg-weekend`実施、online確認
+
+**検証**:
+- `git diff`で変更が`public/app.css`の1箇所（`justify-content`変更）＋キャッシュバスティング2箇所（`public/index.html`のapp.cssクエリ、`public/sw.js`のCACHE_NAME）のみであることを確認
+- `grep -n "card-sub-row" public/app.js public/app.css`で他に影響範囲が無いことを再確認
+- `GET /api/events`・`GET /api/life-info`とも200で正常応答することを確認
+- 🔴Criticalなし
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
