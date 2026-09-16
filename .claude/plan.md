@@ -20421,6 +20421,23 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 - 🔴Criticalなし
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
 
+### 設計書208 追加修正3: 為替アイコンを💴に変更（2026-09-15、コーディネーターからの追加指示・ユーザー報告に基づく）
+
+実機(iOS)でユーザーが確認したところ、為替(SGD→JPY)アイコン💱(為替マーク)の見た目が不自然との指摘があり、💴(円の紙幣)に変更することになった。
+
+- `public/index.html`: `#stat-fx`を含む`.stat-row`のアイコンspanを`<span class="stat-icon">💱</span>`→`<span class="stat-icon">💴</span>`に変更（150行目付近）。`.stat-row`のdiv自体・`.stat-val`span・`.stat-sub`（SGD→JPYラベル）は無変更
+- 他の指標（PSI・`#stat-temp`🌡️・`#stat-rain`☔・`#stat-nowcast`⛈️・`#stat-dengue`🩺）は無変更（対象は為替アイコンのみ）
+- `public/app.css`の`.stat-icon`クラス定義自体は他の指標で引き続き使われているため無変更のまま維持
+- `public/sw.js`: `CACHE_NAME`を`sg-weekend-v922`→`sg-weekend-v923`にインクリメント
+- `public/index.html`: `app.js`キャッシュバスティングを`?v=20260915g`→`?v=20260915h`に更新（app.js自体の内容は今回変更なし、index.html変更に伴う慣習的更新）
+
+**検証**:
+- `git diff`で変更が`public/index.html`の1箇所（為替アイコン変更）＋キャッシュバスティングクエリ更新、`public/sw.js`の`CACHE_NAME`のみであることを確認
+- `pm2 restart sg-weekend`実施、online確認
+- `GET /`いずれもHTTP 200を確認。提供される`index.html`の`#stat-fx`周辺が💴に変わっていること、PSI（アイコンなし）・デング熱🩺・気温🌡️・降水確率☔・2時間予報⛈️のアイコンは変更されていないことを確認
+- 🔴Criticalなし
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
+
 ### 設計書205 追加修正: card-sub-rowレイアウト不具合（2026-09-15、コーディネーターからの追加指示・ユーザー報告に基づく）
 
 設計書205実装後、ユーザーから「おでかけ・くらし両カードで、ピン留めと元記事リンクの配置が左右に離れてしまっている」との報告があった。原因は`.card-sub-row`（`public/app.css`）が`justify-content: space-between`のままだったこと。コメント機能削除前は「コメントボタン(左)＋[ピン留め+リンク]のグループ(右)」という2グループ構成だったため`space-between`で正しく機能していたが、コメントボタンを削除した結果、`.card-sub-row`の直接の子要素が「ピン留め」「リンク」の2つだけになり、`space-between`によってピン留めが左端・リンクが右端という意図しない配置になっていた。
