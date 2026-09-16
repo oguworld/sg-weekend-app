@@ -20438,6 +20438,30 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 - 🔴Criticalなし
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
 
+### 設計書208 追加修正4: 為替・デング熱アイコン削除＋PSI基準吹き出しに顔マーク追加（2026-09-16、コーディネーターからの追加指示・ユーザー依頼〈音声入力〉に基づく）
+
+3点の追加依頼を実装した。
+
+**1. 為替(💴)アイコンを削除**: `public/index.html`の`#stat-fx`を含む`.stat-row`から`<span class="stat-icon">💴</span>`を削除（数値・下の「SGD→JPY」ラベルは維持）
+
+**2. デング熱(🩺)アイコンを削除**: 同様に`#stat-dengue`を含む`.stat-row`から`<span class="stat-icon">🩺</span>`を削除（数値・下の「デング熱」ラベルは維持）
+
+**3. PSIタップ時の基準一覧(吹き出し)に顔マークを追加**: `STAT_CRITERIA.psi`配列の各要素に`STAT_LEVEL_EMOJI.psi`と同じ絵文字（良好😊/普通😐/要注意😷/健康に悪い😫/危険☠️）を`emoji`フィールドとして追加。`toggleStatCriteria()`内のチップ生成ロジックを、`it.emoji`があれば先頭に半角スペース区切りで表示するよう変更。`STAT_CRITERIA.dengue`配列には`emoji`を追加していないため、`it.emoji`は`undefined`となりデング熱側のチップ表示は従来通り（絵文字なし）のまま
+
+- `public/index.html`: 為替・デング熱の`stat-icon`span 2箇所を削除。`app.js`キャッシュバスティングを`?v=20260915h`→`?v=20260915i`に更新
+- `public/app.js`: `STAT_CRITERIA.psi`各要素に`emoji`フィールドを追加、`toggleStatCriteria()`のチップ生成テンプレートリテラルを更新
+- `public/sw.js`: `CACHE_NAME`を`sg-weekend-v923`→`sg-weekend-v924`にインクリメント
+- 気温🌡️・降水確率☔・2時間予報⛈️（おでかけ画面側）、`#stat-psi`本体の顔マーク表示ロジック（`STAT_LEVEL_EMOJI`・`loadWidgetStats()`）、`public/app.css`の`.stat-icon`クラス定義は無変更
+
+**検証**:
+- Node.jsシミュレーションで`STAT_CRITERIA.psi`の全5チップに絵文字が先頭付与されること、`currentLevel`一致時の`active`クラス付与が引き続き正しく機能すること、`STAT_CRITERIA.dengue`の全4チップが絵文字なしのまま従来通り表示されることを確認
+- `node --check public/app.js`正常
+- `git diff`で変更が`public/index.html`（アイコン2箇所削除＋キャッシュクエリ）・`public/app.js`（`STAT_CRITERIA.psi`のemoji追加＋チップ生成テンプレート1行）・`public/sw.js`（`CACHE_NAME`）のみであることを確認。`STAT_CRITERIA.dengue`・`STAT_LEVEL_EMOJI`・`loadWidgetStats()`のPSI本体表示ロジックはdiffに一切現れず無変更であることを確認
+- `pm2 restart sg-weekend`実施、online確認
+- `GET /`・`GET /app.js`いずれもHTTP 200を確認。配信される`index.html`から為替・デング熱のアイコンが消えていること、気温・降水確率・2時間予報のアイコンは維持されていることを確認
+- 🔴Criticalなし
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
+
 ### 設計書205 追加修正: card-sub-rowレイアウト不具合（2026-09-15、コーディネーターからの追加指示・ユーザー報告に基づく）
 
 設計書205実装後、ユーザーから「おでかけ・くらし両カードで、ピン留めと元記事リンクの配置が左右に離れてしまっている」との報告があった。原因は`.card-sub-row`（`public/app.css`）が`justify-content: space-between`のままだったこと。コメント機能削除前は「コメントボタン(左)＋[ピン留め+リンク]のグループ(右)」という2グループ構成だったため`space-between`で正しく機能していたが、コメントボタンを削除した結果、`.card-sub-row`の直接の子要素が「ピン留め」「リンク」の2つだけになり、`space-between`によってピン留めが左端・リンクが右端という意図しない配置になっていた。

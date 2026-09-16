@@ -613,11 +613,11 @@
     // PSI・デング熱の判定基準（server.jsのpsiLevel()/dengueLevel()と一致させること）
     const STAT_CRITERIA = {
       psi: [
-        { label: '良好', range: '0-50' },
-        { label: '普通', range: '51-100' },
-        { label: '要注意', range: '101-200' },
-        { label: '健康に悪い', range: '201-300' },
-        { label: '危険', range: '301+' },
+        { label: '良好', range: '0-50', emoji: '😊' },
+        { label: '普通', range: '51-100', emoji: '😐' },
+        { label: '要注意', range: '101-200', emoji: '😷' },
+        { label: '健康に悪い', range: '201-300', emoji: '😫' },
+        { label: '危険', range: '301+', emoji: '☠️' },
       ],
       dengue: [
         { label: '警報なし', range: '0区' },
@@ -646,7 +646,7 @@
       }
       const currentLevel = _statCurrentLevel[kind];
       const chips = STAT_CRITERIA[kind].map(it =>
-        `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.label} ${it.range}</span>`
+        `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
       ).join('');
       popover.innerHTML = `<div class="stat-criteria-desc">${STAT_CRITERIA_DESC[kind]}</div><div class="stat-criteria-chips">${chips}</div>`;
       popover.dataset.kind = kind;
