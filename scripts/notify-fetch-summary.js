@@ -160,7 +160,8 @@ async function main() {
 
     totalAccepted += s.accepted;
 
-    lines.push(`【${s.cityLabel}】${s.accepted}件採用 / ${s.rawTotal}件取得`);
+    const dedupNote = s.dedupRemoved > 0 ? `（うち重複除外${s.dedupRemoved}件）` : '';
+    lines.push(`【${s.cityLabel}】${s.accepted}件採用${dedupNote} / ${s.rawTotal}件取得`);
 
     const catLine = formatCatCounts(s.catCounts, EVENT_CAT_LABELS);
     if (catLine) {

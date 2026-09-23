@@ -274,7 +274,7 @@ function deduplicateItems(newItems, eventsPath) {
 // ─── 取得結果をファイルに保存（8:00のサマリー通知で集計）────────
 // run-fetch-extra.shにより1日に複数回実行されるため、最新1回分の上書きだけでなく
 // 過去24時間分を合算できるよう履歴ファイル（JSONL）にも追記する（2026-09-07）
-function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, rawTotal, uniqueTotal, sourceStats }) {
+function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, rawTotal, uniqueTotal, sourceStats, dedupRemoved }) {
   const summaryPath = path.join(__dirname, '..', 'logs', `fetch-summary-${cityKey}.json`);
   const historyPath = path.join(__dirname, '..', 'logs', `fetch-summary-history-${cityKey}.jsonl`);
   const catCounts = {};
@@ -288,6 +288,8 @@ function saveFetchSummary({ cityKey, cityLabel, accepted, rejected, newItems, ra
     uniqueTotal,
     sourceStats: sourceStats || {},
     catCounts,
+    // 重複除外で削除された件数（設計書209）。0件の場合は従来どおり通知に内訳行を出さない。
+    dedupRemoved: dedupRemoved || 0,
     newItems: (newItems || []).map(e => ({ emoji: e.emoji, store: e.store, period: e.period || e.start_date || '', source: e.source || '' })),
     date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' }),
     updatedAt: new Date().toISOString(),
@@ -385,7 +387,7 @@ async function main() {
   const result = await filterAndSave(uniqueItems, { eventsPath: conf.eventsPath, cityKey });
 
   console.log('\n🧹 全体重複チェック中...');
-  deduplicateSaved(conf.eventsPath);
+  const dedupRemoved = deduplicateSaved(conf.eventsPath);
 
   console.log('\n🖼 画像なしイベントを Unsplash で補完中...');
   const { fillImages } = require('./fill-images');
@@ -393,15 +395,19 @@ async function main() {
 
   console.log('\n🎉 fetch-events.js 完了\n');
 
+  // LINE通知の「採用件数」は events.json に実際に残った件数と一致させる。
+  // filterAndSave() 時点の result.accepted は重複除外（deduplicateSaved）前の速報値のため、
+  // ここで重複削除件数を差し引いて補正する（設計書209）。
   saveFetchSummary({
     cityKey,
     cityLabel:   conf.nameJa,
-    accepted:    result.accepted,
+    accepted:    Math.max(0, result.accepted - dedupRemoved),
     rejected:    result.rejected,
     newItems:    result.newItems,
     rawTotal:    rawItems.length,
     uniqueTotal: uniqueItems.length,
     sourceStats: result.sourceStats,
+    dedupRemoved,
   });
 }
 

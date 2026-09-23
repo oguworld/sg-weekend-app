@@ -20686,3 +20686,31 @@ LINE通知の「10件採用」は、取り込み直後・重複チェック前�
 - BKK/SYD（停止中都市）への対応
 
 **注記**: 起票時点では「設計書209」として指示されていたが、同時並行の別調査タスクが「設計書209」（LINE通知/新着表示件数の差異調査）として`plan.md`に先に追記されたため、コーディネーターの指示により本機能は「設計書210」として番号を繰り下げて記録する。コード内コメントも`sed`で一括置換し「設計書210」に統一済み。
+
+---
+
+## 設計書209 実装記録（2026-09-24、builder→checker→closer実行）
+
+上記「設計書209: LINE通知「採用件数」とアプリ「新着」表示件数の差異調査」で判明したバグ（重複削除件数がLINE通知の採用件数に反映されない）について、ユーザー承認（「採用については重複排除後の件数にして」）に基づき実装を実施。
+
+### 内容（builder）
+- `scripts/fetch-events.js`の`deduplicateSaved()`（314〜349行目）は元々削除件数`removed`を`return`していた（呼び出し元が受け取っていなかっただけ）。`main()`内388行目付近の呼び出しを`const dedupRemoved = deduplicateSaved(conf.eventsPath);`に変更し戻り値を受け取るよう修正
+- `saveFetchSummary()`呼び出し（396行目付近）で、渡す`accepted`を`Math.max(0, result.accepted - dedupRemoved)`に補正（Haiku採用件数から重複削除件数を差し引く。マイナスにならないようガード）
+- `saveFetchSummary()`関数自体にも`dedupRemoved`パラメータを追加し、`logs/fetch-summary-sg.json`に`dedupRemoved`フィールドとして記録するよう変更（0件の場合は`0`を明示的に記録、後方互換のため未指定時も`|| 0`でフォールバック）
+- `scripts/notify-fetch-summary.js`側に軽微な追加: `s.dedupRemoved > 0`の場合のみ通知文に「（うち重複除外N件）」を付記。0件または未定義（既存ログとの互換）の場合は従来通りの文言のまま変化なし
+- `scripts/filter-events.js`・`public/app.js`は設計書記載通り無変更
+
+### 検証（checker）
+- `node --check scripts/fetch-events.js` / `node --check scripts/notify-fetch-summary.js`とも構文エラーなし
+- 本番`data/sg/events.json`をscratchpadにコピーしテスト専用コピー上で`deduplicateSaved()`と同一ロジックを実行、意図的に追加した類似タイトルのダミーイベント1件が正しく検出・削除されることを確認（本番データは無変更、テスト後にコピーは削除済み）
+- `accepted`補正計算のロジック検証: 設計書209実例（10件採用・2件重複削除→8件）、重複削除0件のケース（10件のまま、後方互換）、削除件数が採用件数を上回る極端ケース（0でガード、マイナスにならない）の3パターンとも期待通り
+- 通知文言の後方互換性検証: `dedupRemoved`が0・未定義（既存の`logs/fetch-summary-sg.json`は本フィールド未保持）いずれの場合も従来通りの文言、削除発生時のみ内訳が追記されることを確認
+- くらし情報側（`scripts/fetch-life-info.js`）の同様バグ有無を確認（修正はせず記録のみ、今回のスコープ外）: `filterAndSaveLifeInfo()`内`totalAccepted`（464行目、Haiku採否時点の`filtered.length`）が、その後の意味的重複除外（534行目`filterOutDuplicateStories()`）・要約生成失敗による除外（499行目付近）を反映しないまま`return`されており（571行目）、イベント側と**同じ構造のバグ**が存在する可能性が高い。次回別タスクでの対応を推奨（`.claude/next.md`に記録）
+- 🔴Critical: なし
+
+### pm2再起動の要否
+今回の変更は`scripts/fetch-events.js`・`scripts/notify-fetch-summary.js`のみ（いずれもシステムcrontabから起動されるバッチスクリプトで、`server.js`本体・常駐プロセスは無変更）。`pm2 status`で`sg-weekend`がonline稼働中であることを確認した上で、**`pm2 restart`は実施せず**（次回cron実行時から新ロジックが自動的に反映される）。
+
+### 申し送り
+- `data/`配下は無変更（`.gitignore`対象、テストもscratchpad上のコピーで実施し本番へ影響なし）
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
