@@ -1,0 +1,663 @@
+# CLAUDE_HISTORY.md（SG在住Navi）
+
+このファイルは`CLAUDE.md`から分離した詳細な経緯アーカイブです（2026-09-20、トークン消費削減のため分離。SGBusNaviで先行実施した同じ整理をこちらにも適用）。`CLAUDE.md`は毎ターン自動読み込みされるため要点・現在値・技術的ルールのみの簡潔な記述にとどめ、「なぜその実装に至ったか」「過去にどんな不具合・微調整があったか」の詳細な物語(特にabout.dosuru.appのレイアウト調整履歴、通知アイコン対応の変遷、カレンダー機能の文言・カテゴリ変遷等)はこちらに残す。**自動読み込みされないので、必要な時だけ明示的にReadすること**。CLAUDE.md本体の見出しとほぼ対応しているので、目的の節をgrepしてから読むとよい。
+
+---
+
+以下、分離前の記述をそのまま保持:
+
+# SG在住Navi (dosuru.app) - CLAUDE.md（旧全文）
+
+## プロジェクト概要
+シンガポール在住日本人向け週末おでかけ情報PWA。
+ブランド名: Willoa / アプリ名: SG在住Navi（旧名: おでかけNavi）
+
+## ターゲットユーザー
+シンガポール在住の日本人駐在員・家族（30〜40代中心）
+日本語UI必須。スマホファースト。
+
+## サーバー情報
+- VPS: Contabo (IP: 194.233.82.43)
+- ユーザー: masahiko
+- プロジェクトパス: /home/masahiko/sg-weekend-app/
+- ドメイン: dosuru.app（アプリ本体）/ about.dosuru.app（紹介LP）
+- SSL: Let's Encrypt (Cloudflare DNS)
+
+## サブドメイン
+- **about.dosuru.app**: アプリ紹介LP（2026-07-04公開、2026-07-09ルートバグ修正、2026-09-09設計書188で現行アイコン・現行機能に合わせて最新化、同日中にモバイル表示不具合2件を追加修正、同日中に周辺静的ページの配色統一も実施、同日中にスマホモックアップのタイトル文字薄れ不具合も修正、同日中にモックアップ上端の余白も調整、同日中にモックアップ角丸と見出し3行化の微調整も実施、さらに同日中にモックアップ角丸を四辺一律に再修正、さらに同日中に文言修正とダークモード機能カード削除も実施、さらに同日中に「こんな方におすすめ」セクションの文言も価値訴求型に修正、さらに同日中に同セクション3つ目の項目の文言を再修正、さらに同日中にモックアップCSSの構造を整理（padding-topの二重管理を解消）、さらに同日中にモックアップのタイトル文字が角丸カーブに一部かかる不具合を修正、さらに同日中にモックアップの角丸をさらに縮小し余白を微増、さらに同日中に実機と比べ過大になっていた余白を縮小し角丸をタイトにする方向へ再調整、さらに同日中に外側フレームの角丸を内側画像と調和させる方向へ再調整、さらに同日中にスクリーンショット4枚を再クロップしタイトル上に自然な余白を追加、さらに同日中に`screen-pins.jpg`をグレーアウト部分を残す新スクリーンショットへ再差し替え、さらに同日中に「FEATURES」セクション機能カードの並び順を修正、さらに同日中に「CTA BOTTOM」セクションに大きめのアプリアイコンを追加
+  - **モックアップのタイトル文字が角丸カーブに一部かかる不具合の修正（2026-09-09、plan.md追記なしの直接依頼）**: 上記の構造整理直後、ユーザーが実機で確認したところ「くらし情報」「おでかけ情報」「カレンダー」「ピン留め」いずれもタイトル先頭文字の左上が`.phone-img-wrap`の`border-radius:30px`カーブにわずかにかかって隠れる不具合が判明。原因は`.phone`側の左右padding(10px)が同カーブの半径に対して不足していたこと。`.phone`の`padding`を`10px`→`14px`に増加（`padding-top:26px`の上書きは無変更）、`.phone-img-wrap`の`border-radius`を`30px`→`26px`に縮小する組み合わせで解消（padding増加のみ〈16px試行〉では「ピン留め」の「ピ」の半濁点等が依然カーブに接触し不十分と判明したため両方を調整）。Sharpで実CSS数値を再現合成する検証手法（前回セッション確立）を用い、4枚全てでタイトル先頭文字が角丸カーブから完全にクリアになること、`.phone`外枠（border-radius:40px）との視覚バランスも不自然でないことを数値・目視の両面で確認済み
+  - **モックアップの角丸をさらに縮小し余白を微増（2026-09-09、plan.md追記なしの直接依頼）**: 上記修正を実機確認したユーザーから「少しよくなったが、もう少し小さくして。白いスペースを少し入れてもいいかもしれません」とのフィードバックを受け再調整。`.phone-img-wrap`の`border-radius`を`26px`→`22px`にさらに縮小、`.phone`の`padding`を`14px`→`18px`に増加（`padding-top:26px`の上書きは無変更）。検証は前回のSharp合成目視に加え、タイトル文字の左上端の暗ピクセル座標をラスタースキャンで実測し、CSS候補値ごとに角丸円弧との幾何学的な安全マージン（px単位）を算出して比較する手法を新たに導入（padding15〜20px×radius16〜24pxの全組み合わせを一括評価）。`padding18px/radius22px`は4画面全てで安全マージン約1.68px以上を確保しつつ、角丸縮小・padding増加の両要求を満たすことを確認して採用（直前値`padding14px/radius26px`のマージンは約2.9pxだった）。副産物として`.phone`外枠`border-radius:40px`からpadding18pxを引いた値(22px)が内側`.phone-img-wrap`のradiusと一致し、視覚バランス上も自然な同心円状の比率になっている
+  - **実機と比べ過大になっていた余白を縮小し角丸をタイトにする方向へ再調整（2026-09-09、builder→checker→closer、plan.md追記なしの直接依頼）**: 上記2件の対応（角丸カーブとの重なり回避のためpaddingを段階的に10px→14px→18pxへ増加）の結果、重なり自体は解消したものの、ユーザーが実際のアプリ本体（実機スクリーンショット）とabout.htmlのモックアップを並べて比較したところ、モックアップ側のタイトル左・上マージンが実機に比べて明らかに過大・不自然になっていることが判明（「角丸対策で余白を積み増しすぎて実機の見た目から離れた」状態）。「paddingを増やして重なりを回避する」アプローチ自体を見直し、`.phone`の`padding`を`18px`→`10px`、`padding-top`を`26px`→`14px`に縮小する一方、`.phone-img-wrap`の`border-radius`を`22px`→`16px`にさらに縮小することで、余白は実機に近い小ささへ戻しつつ角丸を小さく・タイトに保つことで重なりを回避する方針に転換した。検証は、(1) 4枚のスクリーンショット上のタイトル文字左上端の実ピクセル座標をSharpのラスタースキャンで実測（news:146,160 / home:207,163 / calendar:55,149 / pins:63,106、画像px座標系）、(2) ユーザー提供の実機スクリーンショット（`dosuru.app`くらし画面、1290×2796px）からタイトル左マージンの幅比率を算出（約5.6%）し、旧CSS値でのモックアップ上のマージン比率（約12.5%）が実機の2倍以上に肥大化していたことを定量的に確認、(3) padding候補(8〜18px)×radius候補(12〜22px)の全組み合わせについて角丸コーナー中心とタイトル文字左上端との幾何学的距離から安全マージンを算出し、`padding=10px/radius=16px`が4画面全てで角丸の影響領域外（完全に安全、最小マージンの`screen-pins`でもtx=10.77px・ty=18.12pxがradius=16pxを上回る）となることを確認して採用。Sharpによる新旧比較の合成レンダリング目視でも過剰だった余白の解消と角丸非重なりの両方を確認済み
+  - **外側フレームの角丸を内側画像と調和させる方向へ再調整（2026-09-09、builder→checker→closer、plan.md追記なしの直接依頼）**: 上記対応で`.phone-img-wrap`（内側の画像クリップ用ボックス）の`border-radius`を22px→16pxに縮小した際、外側フレーム`.phone`の`border-radius:40px`は据え置きのままだったため、ユーザーが実機で確認したところ外側フレームの丸みが内側画像に対して明らかに大きすぎ二重の異なる丸みのリングのように見えて不自然との指摘があった。「外側の角丸半径≒内側の角丸半径+パディング幅」の一般則から、`.phone`の左右・下padding(10px)基準の理想値26px・上padding(14px)基準の理想値30pxを算出し、24px/26px/27px/28px/40px(現状)を実際のCSSボックスモデル通りに合成描画するSharpスクリプトで4枚全てのスクリーンショット左上コーナーを比較。現状の40pxのみ二重リング状に見え、24〜28pxはいずれも自然に調和しタイトル文字も角丸に重ならないことを確認した上で、左右padding基準の理想値かつ`.phone`のside padding(10px)+内側radius(16px)と正確に一致する26pxを採用（`.phone`の`border-radius`を`40px`→`26px`に変更、他プロパティは無変更）。フルサイズの4画面合成でも二重リング感のない調和を最終確認済み
+  - **スクリーンショット4枚を再クロップしタイトル上に自然な余白を追加（2026-09-09、builder→checker→closer、plan.md追記なしの直接依頼）**: これまでスクリーンショット4枚（`screen-news.jpg`/`screen-home.jpg`/`screen-calendar.jpg`/`screen-pins.jpg`）はタイトル真上ギリギリでクロップされており（タイトルが画像最上端から直接始まる状態）、タイトル上の余白は`.phone`の`padding-top:14px`（単色背景による疑似的な余白）で作られていた。ユーザーから「タイトルの上をもう少し隠さず表示して」との要望を受け、CSSの疑似余白ではなく画像自体に本来のアプリ背景の自然な余白を残す方式に変更。元画像4枚（1290×2796px）でタイトル文字上端のy座標をラスタースキャンで実測（news/home:259, calendar:261, pins:521）し、ステータスバー下端（y≈100）を含めない範囲でタイトル上端から1170px幅換算で約27px（元画像換算約30px）上の位置を新クロップ開始位置に採用（news/home:229, calendar:231, pins:491）。幅1170px・高さ2309pxに統一（pinsのみ下端に白背景218pxを追加）、JPEG品質82で書き出し。`.phone`の`padding-top:14px`は削除し通常の`padding:10px`に統一（画像側に自然な余白ができたためCSS疑似余白との二重加算を解消。Sharp合成比較で`padding-top:14px`維持案は間延びして見えることを確認した上での判断）。4画面ともタイトル文字左上端の実測座標が角丸コーナー矩形範囲（半径16px）から最小27.7px離れており角丸カーブとの重なりが再発しないことを幾何学的に確認済み。`about.html`の該当4枚の`<img>`キャッシュバスティングクエリを更新（news/home/pins: `?v=4`→`?v=5`、calendar: `?v=2`→`?v=3`）。`screen-pins.jpg`の上部にわずかに写り込む薄暗い背景（前画面「おでかけ情報」のグレーアウト部分の名残）は今回も除去対象とせず残置（ユーザー了承済み、ボトムシートの角丸より下のみをクロップ範囲としているため実際にはグレーアウト部分は含まれていない）
+  - **DATA SOURCES・機能紹介文言の修正、ダークモード機能カード削除（2026-09-09、plan.md追記なしの直接依頼）**: 「DATA SOURCES」セクション見出し（「主要メディアから毎週自動収集」）と「おでかけ情報」機能カードの説明文の「毎週」表記が、実際の取り込み頻度（`fetch-events.js`は1日3回実行、下記「イベント取り込みパイプライン構成」参照）と異なっていたため「毎日」に修正。あわせてDATA SOURCESのリード文に、取りこぼし対策（高頻度ソースの1日3回取得）・重複対策（`filterOutDuplicateStories`による意味的重複除去）に軽く触れる一文「取りこぼしや重複ができるだけ出ないよう工夫しています。」を追加。さらにユーザーから「ダークモードは機能として触れなくていい」との要望を受け、「6つの便利な機能」セクションの「🌙 ダークモード対応」カードを削除し、見出しを「5つの便利な機能」に修正（残る5枚: くらし情報/おでかけ情報/カレンダー/ピン留め/気温・PSI・為替）
+  - **「こんな方におすすめ」セクションの文言修正（2026-09-09、plan.md追記なしの直接依頼）**: `audience-list`の4項目が、ユーザー属性の描写（例:「シンガポール赴任中の日本人駐在員・ご家族」）に留まり、アプリが解決する困りごとが伝わりにくいとの指摘を受け、価値訴求型の文言に差し替え。3つ目の絵文字を✈️（駐在員向け）から📅（カレンダー、祝日・学校行事の見落とし防止）に変更。
+  - **「こんな方におすすめ」セクション3つ目の項目の文言再修正（2026-09-09、plan.md追記なしの直接依頼）**: 上記差し替え直後の3つ目の項目「祝日や学校行事をうっかり見落として予定がバッティングするのを防ぎたいご家族」が、カレンダー機能の実態（個人の予定と連携してバッティングを防ぐ機能ではなく、年間の祝日・行事をまとめて見られる一覧機能）とズレているとの指摘を受け再修正。現行文言（4項目とも最新）: 🎯「いくつものサイトを見て回らず、シンガポールの情報を日本語でまとめて把握したい方」／🗓「気になるイベント・お店を見逃さず、毎週末の『何しよう』をサクッと解決したい方」／📅「シンガポール・日本の祝日や学校行事を、1年分まとめて把握しておきたいご家族」／👶「子どもと楽しめるスポットを、探す手間なく見つけたい方」
+  - **スマホモックアップのタイトル文字薄れ不具合（2026-09-09）**: モックアップ4枚の高さ統一（`.phone-img-wrap{aspect-ratio:1170/2309}`+`.phone img{object-fit:cover;object-position:top}`）を適用した際、元々iPhoneステータスバー領域を背景色に馴染ませる演出だった`.phone-img-wrap::after`の48px高さグラデーションが、既にステータスバーをクロップ済みの現行スクリーンショットでは実際の画面タイトル文字（「くらし情報」等）の上に重なってしまい文字が薄く見える不具合が発生。`::after`疑似要素を完全に削除して解消（縮小ではなく削除を採用、Sharpでの角丸合成確認・目視で違和感なしと判断）
+  - **モックアップ上端の余白調整（2026-09-09）**: 上記`::after`削除後、画面タイトル文字が角丸フレーム上端にぴったりくっついて窮屈に見える旨のユーザー指摘（実機確認）を受け、`.phone-img-wrap`に`padding-top:14px`+`background:#DCE5D6`（`.phone`と同じ背景色）+`box-sizing:content-box`を追加。`aspect-ratio`の分母を増やす方法（`object-fit:cover`により画像が拡大され左右がクロップされてしまう）は避け、画像の外側（角丸の内側・画像の上）に色付きの余白を追加する方式を採用。画像自体の`object-fit:cover;object-position:top`・`aspect-ratio:1170/2309`は無変更、`.phone`側の既存`padding:10px`（外枠フレーム内側）とは別階層のため二重余白にはならない
+  - **モックアップ角丸と見出し3行化の再微調整（2026-09-09）**: 上記2件の対応後、ユーザーが実機で再確認した2つの追加フィードバックに対応。(1) `padding-top:14px`追加分の帯部分の角が`.phone`全体の丸み（`border-radius:40px`）に比べて四角く見える指摘に対し、`.phone-img-wrap`の`border-radius`を`30px`（四辺一律）から`34px 34px 30px 30px`（上2辺のみ34pxに強化、下2辺は既存30px据え置き）に変更。(2) `.hero h1`のモバイル1行目「シンガポールの出来事を、」がフォントサイズに対し幅不足で「シンガポールの出来事」/「を、」に自然改行され、意図した3行ではなく4行になっていた不具合に対し、`@media (max-width:480px)`内に`.hero h1{font-size:calc((100vw - 48px) / 13.6)}`を追加してモバイル時のみ`clamp()`の下限32pxを上書き（`.hero`の左右padding計48px分を除いたコンテンツ幅を基準に、1行目13文字が確実に収まる比率で算出）。デスクトップ幅（481px以上）の`clamp(32px,8vw,52px)`は無変更。
+    - **検証手法**: 本番相当のブラウザ実描画確認がサーバー環境の制約（Playwrightの`chromium_headless_shell`が`libatk-1.0.so.0`等の共有ライブラリ不足で起動不可、sudo権限なし）で従来から不可能だった問題に対し、今回は実際のNoto Sans JPフォントファイル（Google Fontsリポジトリから取得）をSharpでSVGテキストとしてレンダリングし、ピクセル走査で行ごとの実文字幅を実測する代替検証手法を確立。320px〜480pxの範囲で1〜3行目いずれもコンテンツ幅に収まることを数値的に確認済み（実ブラウザでの最終目視確認はユーザー実機に委ねる）
+  - **モックアップ角丸を四辺一律に再修正（2026-09-09）**: 上記の`34px 34px 30px 30px`（上部のみ強め）をユーザーが実機で確認したところ、上下で丸みの半径が異なりかえって不揃い・不自然に見えるとの指摘があり、「スクショの丸みは下側にあわせたものにして」との要望を受けて`.phone-img-wrap`の`border-radius`を`30px`（四辺一律）に再度統一した。他のプロパティ（`padding-top:14px`・`aspect-ratio:1170/2309`・`.phone img`の`object-fit:cover;object-position:top`等）は無変更
+  - **モックアップCSSの構造整理（padding-topの二重管理を解消、2026-09-09）**: 上記一連の角丸調整は、`.phone-img-wrap`が「画像クリップ用の箱」と「上部余白確保用の箱（`padding-top:14px`+`.phone`と同色の`background:#DCE5D6`）」を兼務していたことが根本原因（余白部分がフレームと同化して視覚的に繋がり、上部だけ角丸が弱く見える）と判明したため、役割を分離する構造整理を実施。`.phone-img-wrap`から`padding-top`・`background`・`box-sizing:content-box`を削除し、`border-radius:30px`（四辺一律）・`aspect-ratio:1170/2309`のみを持つ、画像を均一の角丸でクリップするだけのシンプルな箱に戻した。上部余白は`.phone`側の`padding-top:26px`（既存の4辺共通`padding:10px`を上のみ上書き、旧`.phone`padding10px+旧`.phone-img-wrap`padding-top14px≒24pxに近い値）に一本化。Sharpによる4隅の角丸半径ピクセル実測で四辺が均一であることを数値確認済み
+  - ファイル: `public/about.html`
+  - nginx: `/etc/nginx/sites-available/dosuru.app`内の3つ目のserverブロックに同居（Node.jsへプロキシ）
+  - Express route: `GET /about` → `public/about.html`（パスベース）。`GET /`（ルートパス、Hostヘッダーが`about.dosuru.app`の場合のみ`about.html`を返す）は`server.js`内`express.static`直前に配置（2026-07-09追加）
+  - App StoreのURL: `https://apps.apple.com/sg/app/sg%E5%9C%A8%E4%BD%8Fnavi/id6787159354`（現行スラッグ。2026-09-09確認: `curl`でリダイレクト先・ページタイトルとも「SG在住Navi」の正しいアプリページであることを実証済み）
+  - 「5つの便利な機能」セクション（2026-09-09にダークモードカード削除に伴い「6つ」から改称）は現行機能と一致（設計書184で廃止済みの配色3択機能の説明は削除済み、ダークモード機能自体はアプリに存在するが2026-09-09にユーザー要望でLP上の紹介からは外した）。スクリーンショット4枚（`screen-calendar.jpg`/`screen-home.jpg`/`screen-news.jpg`/`screen-pins.jpg`）は2026-09-09時点の実機最新版に差し替え済み、全て1170×2309pxに統一（`screen-pins.jpg`は当初1170×1992pxで据え置かれていたが、同日中に「ピン留め」ボトムシートを画面いっぱいに表示した新スクリーンショットへ差し替え、白背景での高さ合わせにより1170×2309pxへ統一。下記「`screen-pins.jpg`差し替え」参照）。about.html自体はダークモードCSS非対応（LP自体は常にライト表示）
+  - **`screen-pins.jpg`差し替え（2026-09-09、plan.md追記なしの直接依頼）**: 旧`screen-pins.jpg`（1170×1992px）は「おでかけ情報画面＋薄暗いピン留めシートのオーバーレイ」という中途半端な構図で他3枚とアスペクト比も異なっていた。ユーザー提供の新スクリーンショット（ピン留めボトムシートを画面いっぱいに表示したもの、元1290×2796px）を、「ピン留め」タイトル上端でクロップ（薄暗い背景・ステータスバー除去）→幅1170pxにリサイズ→白背景キャンバスで高さ2309pxに統一（画像アスペクト比が既存3枚より横長のまま`object-fit:cover`に渡すと左右がクロップされる不具合をSharpでのシミュレーションで検出したため、高さを揃えて回避）→JPEG品質82（264KB）で書き出し。`about.html`の該当`<img>`のキャッシュバスティングクエリを`?v=3`→`?v=4`に更新
+  - **`screen-pins.jpg`再差し替え（グレーアウト部分を残す新スクショへ、2026-09-09、builder→checker→closer、plan.md追記なしの直接依頼）**: ユーザーから「ピン留め」機能紹介用のより良い新しいスクリーンショット（元1290×2796px、上部に薄暗い「くらし情報」タイトルが写り込む構図）が提供され、「このスクショを使って、モーダルの裏でグレーアウトしている部分もそのまま残して」との明確な指示のもと再差し替え。Sharpのラスタースキャンでステータスバーの範囲（y=64〜108で暗ピクセル検出）を実測し、y=110からクロップすることでステータスバーのみを除去しグレーアウトした「くらし情報」タイトル部分（y≈259〜320）はそのまま残置。幅1170pxにリサイズ後、高さが目標2309pxより127px大きかったため下部（ボトムシート内の次カード画像が部分的に見切れている箇所）を適度にクロップして統一（白背景の追加は不要だった）。JPEG品質82で書き出し（252,637バイト、既存3枚と同水準）。新画像はアスペクト比0.506713が`.phone-img-wrap`の`aspect-ratio:1170/2309`と完全一致するため`object-fit:cover`によるクロップは理論上発生しない。`about.html`の該当`<img>`キャッシュバスティングクエリを`?v=5`→`?v=6`に更新。CSS（`.phone`/`.phone-img-wrap`）・他3枚のスクリーンショットは無変更
+  - **モバイル表示の不具合修正（2026-09-09）**: (1) `.hero h1`見出しが固定`<br>`構造のためモバイル幅で単語途中改行される不具合を、`<em>日本語で</em>`と`まるごとチェック。`の間にモバイル限定（`max-width:480px`）の`<br class="mobile-break">`を追加して解消。(2) `screen-pins.jpg`（1170×1992px、他3枚は1170×2309px）だけスマホモックアップの高さが揃わない不具合を、`.phone-img-wrap`に`aspect-ratio:1170/2309`、`.phone img`に`object-fit:cover;object-position:top`を追加する形で解消（画像ファイル自体は無編集、CSS側の根本対応のため今後スクリーンショットを更新してもアスペクト比違いで再発しない）
+  - **プライバシーポリシー・お問い合わせページ（`public/privacy.html`/`public/contact.html`、Express `GET /privacy`・`GET /contact`）の配色統一（2026-09-09）**: `about.dosuru.app`のフッターからリンクされるこの2ページが柳グリーン化(設計書186)から取り残され旧キャラメル(オレンジ)配色のままだった不具合を修正。原因は両ページが共有する`public/css/about-shared.css`の`:root`にオレンジ系の`--caramel`/`--caramel-dark`/`--caramel-pale`（`about.html`は独自`<style>`内で柳グリーンに再定義してオーバーライド済みだったが、この2ページには同様のオーバーライドがなかった）。`about-shared.css`側の3変数を`about.html`と同じ柳グリーン値に修正し解消。アイコン（`icon-128.png`/`favicon.png`）は既に最新デザインを参照済みのため無変更。`about.html`からリンクされる静的ページはこの2つのみ（利用規約等は存在しない）
+  - **「FEATURES」セクション機能カードの並び順修正（2026-09-09、builder→checker→closer、plan.md追記なしの直接依頼）**: `.feature-grid`内5枚のうち末尾2枚「📌ピン留め」「🌡️気温・PSI・為替をひと目で確認」の出現順序をユーザー希望に合わせて入れ替え（旧: くらし情報→おでかけ情報→カレンダー→ピン留め→気温・PSI・為替をひと目で確認 → 新: くらし情報→おでかけ情報→カレンダー→気温・PSI・為替をひと目で確認→ピン留め）。各カードの中身（アイコン・見出し・説明文）は無変更、`<div class="feature-card">`ブロック2つの順序入れ替えのみ
+  - **「CTA BOTTOM」セクションへの大きめアプリアイコン追加（2026-09-09、builder→checker→closer、plan.md追記なしの直接依頼）**: ヘッダー（`.nav-logo`、32px小サイズ）にしかアイコンが表示されていなかったため、`<section class="cta-bottom" id="download">`内`<h2>今すぐ始めよう</h2>`の直前に高解像度`/icons/icon-512.png`を96px（`.cta-bottom-icon`クラス、`border-radius:22px`、柳グリーン系`box-shadow`）で表示するよう追加。大きいアイコン→見出し→ダウンロードボタンの定番導線パターン。他要素・他セクションは無変更
+
+## 起動・操作コマンド
+pm2 restart sg-weekend
+pm2 logs sg-weekend
+pm2 status
+
+## スタック
+- バックエンド: Node.js / Express
+- フロントエンド: Vanilla JS / Tailwind CSS / PWA
+- インフラ: nginx / PM2 / Let's Encrypt
+- データ: events.json / sales.json（ファイルベース、DBなし）
+
+## フォルダ構成（2026-09-03時点）
+sg-weekend-app/
+├── server.js
+├── scripts/
+│   ├── fetch-events.js             ← おでかけイベント取り込み
+│   ├── filter-events.js            ← イベントのHaiku分類・Sonnet記事生成
+│   ├── fetch-life-info.js          ← 生活情報・ニュースのRSS取り込み（設計書172/175）
+│   ├── fill-images.js              ← 既存イベントへの画像補完
+│   └── lib/
+│       └── unsplash.js             ← Unsplash API ユーティリティ
+├── data/
+│   ├── sg/
+│   │   ├── events.json
+│   │   ├── life-info.json          ← 生活情報・ニュース（gitignore対象）
+│   │   ├── model-courses.json / community-courses.json / affiliate-links.json / stamp-spots.json
+│   │   │   ← コース・探訪機能削除済み（設計書178）の残置データ。`server.js`側のCOURSE API（9エンドポイント）自体は設計書192（2026-09-10）で削除済みだが、データファイル自体の削除はスコープ外のため引き続き残置
+│   │   └── school-calendar.json / sponsored-cards.json 等
+│   ├── bkk/ (同様)
+│   └── syd/ (同様)
+├── public/
+│   ├── index.html                  ← ボトムナビ4タブ: ホーム/ニュース/ピン留め/設定
+│   └── sw.js
+├── ios-app/                       ← iOSアプリ化（Capacitor）2026-07-03追加
+│   ├── package.json
+│   ├── capacitor.config.ts
+│   ├── Gemfile
+│   ├── fastlane/
+│   │   ├── Appfile
+│   │   └── Fastfile
+│   ├── resources/
+│   │   ├── icon.png    ← 1024×1024px
+│   │   └── splash.png  ← 2732×2732px
+│   └── README.md       ← MacInCloud初回セットアップ手順
+├── .github/
+│   └── workflows/
+│       └── ios-deploy.yml  ← releaseブランチpushで自動デプロイ
+└── .claude/
+    ├── plan.md
+    ├── next.md
+    └── session-log.md
+
+## データ構造
+カテゴリ: event / gourmet / sale / edu
+主要フィールド: title, date, url, who, age, major_score
+
+## 現在の主要機能構成（2026-09-03時点、コード確認済み）
+探訪（スタンプラリー）・コース・予定表・共有カレンダー機能は設計書178で完全削除済み（下記「探訪（スタンプラリー）機能・コース機能・予定表機能の完全削除」節参照）。現在`public/index.html`のボトムナビは以下4タブのみ（アイコン付き、`data-i18n`表示ラベル基準）:
+
+- **くらし** 🏛️（`#screen-news` / `#nav-news`）: 暮らしの情報＝日本人在住者向けニュースサイトのキュレーション表示。カテゴリ: 新着/SG政府/交通/医療・健康/天候・災害/コミュニティ/教育・子育ての7種。下記「シンガポール在住日本人向け生活情報・ニュースのキュレーション機能」節参照
+- **おでかけ** 🏖️（`#screen-home` / `#nav-home`）: イベント情報のキュレーション。カテゴリ: 新着/イベント/展示・公演/グルメ・フェア/プロモ・お得/新規オープン/**旅行**の7種（`data-cat="travel"`、設計書175→176でこの画面のカテゴリタブとして再配置済み）。**PRカード**（スポンサー広告枠、現状非表示中）もこの一覧に条件付きで挿入される。下記「イベント取り込みパイプライン構成」「広告表示機能」節参照
+- **ピン留め** 📌（`#screen-pins` / `#nav-pins`）: くらし・おでかけ両方の保存済みアイテムを1画面に統合表示（`#news-pin-list-content`/`#pin-list-content`の2セクション構成）。この機能を単独で説明したセクションは本ファイル内に存在しないため、詳細はコード（`public/index.html`の`#screen-pins`、`public/app.js`のpin関連関数）を直接参照すること
+- **設定** ⚙️（`#screen-settings` / `#nav-settings`）: プロフィール（ニックネーム・アバター。設計書157/158で一度非表示化されたが、設計書174〈CLAUDE.md未記録〉で再表示に戻っている）・アカウント連携（Google/Apple Sign-In）・データバックアップ・言語切替・アカウント削除等
+
+全データバックアップ・Sign-Inは上記4タブ横断で現役。詳細は各セクション参照。**コメント機能（設計書174で実装、くらし・おでかけ両カードの💬コメントボタン＋インライン展開欄）は設計書205（2026-09-15）でユーザー判断により完全削除済み**（バックエンドAPI4本・フロントエンドのヘルパー関数群・CSS・`data/sg/comments.json`・`scripts/post-to-x.js`のアプリ内コメント転記副次機能`postCommentForItem()`を全て削除。`generateEventPost()`/`generateNewsPost()`が返す`commentText`フィールド自体・X投稿・LINE通知本体ロジックは無変更で残置）。
+
+## 広告表示機能（PRカード・Klookアフィリエイトウィジェット、2026-07-13実装 → 同月中に両方とも非表示化）
+2つの広告枠を実装したが、広告掲載準備が整うまでの一時停止として2026-07-16設計書47でいずれも非表示化した。**コード自体は削除しておらず、残置されたまま停止中**。
+- **PRカード**（スポンサー広告枠、設計書29）: `data/{city}/sponsored-cards.json`が空配列のため`_pickSponsoredCardForToday()`が`null`を返し非表示。再開は同ファイルに本番データを追記するだけ（`GET /api/sponsored-cards`・`renderSponsoredCard()`等は無変更）
+- **Klookアフィリエイトウィジェット**（設計書30/31）: `renderEventCards()`内のマーカー挿入`splice`をコメントアウトして停止中。再開はコメントアウト解除のみ（`_createKlookWidgetEl()`等は無変更）
+- 詳細な実装ロジックが必要な場合はコード（`public/app.js`の`_pickSponsoredCardForToday`/`_createKlookWidgetEl`周辺）を直接参照
+
+## Google/Apple Sign-In認証基盤（iOS版+Web版、2026-09-03時点で現行仕様のみ記載）
+Google Sign-In・Sign in with Appleに対応。予定表データ/共有カレンダーとのユーザー紐づけは未実装。
+
+- **認証情報最小化**: サーバーが保存・利用するのは`idToken`の`sub`クレームのみ。`data/users.json`のスキーマは`userId`/`provider`/`providerSub`/`createdAt`/`lastLoginAt`/`subscriptions`のみ（email・氏名・画像は含まない）。Google同意画面には仕様上email/profileへのアクセス許可が表示されるが（回避不可能、実機で確認済み）、サーバー側では保存・利用しない。Appleはemail/fullNameを個別に許可/拒否でき、emailは実アドレスかプライベートリレーかを選択できる
+- **サーバー（`server.js`）**: `POST /api/auth/google`（`google-auth-library`でidToken検証、`sub`のみ抽出して`data/users.json`をupsert、自前JWTを発行・有効期限30日）／`POST /api/auth/apple`・`GET /api/auth/apple/state`・`POST /api/auth/apple/callback`（`apple-signin-auth`で検証。Web版はCSRF対策のワンタイム`state`＋`response_mode:'form_post'`受信後URLフラグメント経由でJWTを渡す）／`GET /api/auth/me`（JWT検証、`{userId,provider,createdAt}`を返す）／`DELETE /api/auth/me`（アカウント削除。`data/users.json`削除＋`data/user-plans/{userId}.json`削除＋全都市`community-courses.json`の該当`authorId`を`null`に匿名化、コース自体は削除しない）／`GET /api/config`（`googleWebClientId`/`appleServiceId`/`appleRedirectUri`を返す）。`verifyAppJwtOptional()`はコース公開/削除系エンドポイントの後方互換認証（JWTなしなら旧来通り無検証で動作）に使用
+- **iOS版（Capacitor）**: `@codetrix-studio/capacitor-google-auth`・`@capacitor-community/apple-sign-in`。Google用URL Scheme（Reversed Client ID）はCIで`Info.plist`の`CFBundleURLTypes`に自動注入（`plistlib`使用、ネスト配列構造のためPlistBuddy不使用）。`App.entitlements`に`applesignin` capability。ボタンは公式ロゴのインラインSVGで自前描画（`.oauth-btn`系CSS、ダークモード時はAppleボタンに薄い枠を付与）
+- **Web版**: Google Identity Services SDKの`renderButton()`方式（One Tap `prompt()`は使わない、ログアウト後の再表示不可問題を回避するため）／Apple公式JSボタン（`scope:''`指定で同意画面を出さない設計）
+- **トークン保存**: `authedFetch()`が`localStorage`の`app_auth_token`を自動付与。iOS版は`@capacitor/preferences`をソースオブトゥルースとする3層ハイブリッド方式（`_authTokenCache`同期変数／`localStorage`ミラー／`Preferences`永続化）で、アプリ完全終了後の再起動でも連携が維持される。`refreshLoginUI()`はサーバーエラー時（401以外）はトークンを破棄せず楽観的に「連携中」表示を維持する
+- **設定画面UI**: 「アカウント」セクション（ログイン+バックアップ統合、見出しは「アカウント連携」）。ボタンはGoogle/Apple共通で`_isCapacitorApp`により自前描画/公式SDK描画を切り替え。ログアウトは確認ダイアログあり
+- **アカウント削除**（App Store Review Guideline 5.1.1(v)対応）: 「アカウント」セクションとは別に、設定画面最下部に見出しなし・中央寄せテキストのみ（`--terracotta`色）で独立配置、未ログイン時は非表示。削除は`confirm()`後にサーバー側削除→ローカルのJWT・バックアップ鍵material・saltを一括クリア。500系エラー時はローカル状態を保持（サーバー側削除確認後にのみクリア）
+
+## プライバシーポリシー更新（2026-07-19実装、設計書65）
+`public/privacy.html`第1章「収集する情報」に「Google/Appleアカウントの識別子（sub のみ保存、email/氏名/画像は保存しない。同意画面表示は各社仕様上回避不可能である旨も明記）」「予定表・マイコース等のバックアップデータ（ゼロ知識暗号化、パスフレーズはサーバー未送信）」「共有カレンダーのデータ（パスフレーズ暗号化）」の3項目を追記。第6章「情報の保管と削除」に「アカウントの削除」（設定画面からいつでも削除可能、公開コースは匿名化されるのみで削除されない旨）を追記。**章番号は変更せず既存章の拡張のみ**（第1〜8章の構成は維持）。最終更新日を2026年7月19日に更新。文言はCLAUDE.mdに記録された技術的事実の範囲でのみ記述（誇大な安全性主張はしない方針）。
+
+## データバックアップ（端末移行用、ゼロ知識暗号化。2026-09-03時点でバックアップ対象は縮小済み）
+設定画面から任意でパスフレーズを設定すると、端末移行用に一部データをサーバーへゼロ知識暗号化（PBKDF2+AES-256-GCM、サーバーはパスフレーズ自体を保存しない）バックアップできるオプトイン機能（2026-07-17設計書54実装）。
+
+⚠️ **当初は「予定表・マイコース・共有カレンダー等を含む全データ」を対象にしていたが（設計書58）、その後の設計書178フェーズ1〜3（コース・探訪・予定表機能の削除）で対象フィールドが順次剥がされ、2026-09-03時点で`_collectBackupPayload()`が実際に送るのは`{version, genres, who, ageList, avatar}`（ジャンル設定・家族構成・年齢リスト・アバター絵文字のみ）に縮小している。** また「アカウント連携時にバックアップを必須にする」方針（設計書118）も後に撤回され、現在は完全にオプトインの任意機能（`app.js:3041`のコメント「アカウント連携だけで完結させる方針に変更。バックアップパスフレーズの必須化は廃止」参照）。
+
+- **API**: `GET/PUT /api/user-plans/me`（`requireAppAuth`必須、`data/user-plans/{userId}.json`に`{userId, salt, encryptedData, updatedAt}`のみ保存）
+- **UI**: 設定画面「アカウント」セクション内、`renderBackupSection()`＋パスフレーズ入力シート（`#backup-passphrase-sheet`）
+- 実装の詳細経緯（タッチ不発バグ修正・パスフレーズシートのレイアウト修正・必須化とその撤回等）はコード内コメント・git履歴を参照
+
+- **設定画面構成**: プロフィール→アカウント（ログイン+バックアップ統合、見出し「アカウント連携」）→アプリ設定→サポート・情報→フィードバック→アカウント削除（見出しなし・中央寄せ、下記「Google/Apple Sign-In認証基盤」参照）の6セクション構成
+- **App Store審査対応（プライバシーマニフェスト）**: `@codetrix-studio/capacitor-google-auth`が古いGoogleSignIn SDKに依存し審査で`ITMS-91061: Missing privacy manifest`エラーになったため、CIで`GoogleSignIn`/`GTMAppAuth`/`GTMSessionFetcher`用の`PrivacyInfo.xcprivacy`（`ios-app/PrivacyManifests/`に格納）をビルド時に注入する方式で対応。`scripts/ensure-privacy-manifests.py`が生成済み`Podfile`の`post_install`フックにコピー処理を冪等に挿入する（`.github/workflows/ios-deploy.yml`の`Sync Capacitor`直後で実行）
+
+## PWA・Service Worker
+- 「ホーム画面に追加」誘導バナー（`#install-banner`）と「アプリが更新されました」バナー（`#update-banner`）はUIごと削除済み（iOSアプリ（App Store配信）を正式な運用形態とするため）。`handleInstall()`/`showInstallBanner()`/`dismissInstallBanner()`は撤去済み
+- `openShareModal()`（設定画面「使い方」ボタンと共用のHOWTOモーダル）・`#share-modal`・`/api/version`・`@capacitor/app`バージョン取得処理はバナー廃止と無関係、従来通り残置
+- **SW登録（`navigator.serviceWorker.register('/sw.js')`）は`public/app.js`の初期化処理内に存在**（Web版プッシュ通知の`navigator.serviceWorker.ready`依存＋SW更新時の自動反映のために必要）。登録時に`navigator.serviceWorker.controller`が既にあった場合（＝既存訪問者のSW更新時）のみ`controllerchange`で1回だけ`location.reload()`し、新デザイン等の反映漏れを防止。新規訪問者では初回の`controllerchange`では自動リロードしない（フラグ`_hadController`で判定）
+- 既知の残存事項（対応不要・スコープ外）: `public/index.html`に到達不能な`#install-modal`（「ホーム画面に追加する」手順モーダル）が残存。開く関数`openInstallModal()`が存在せずorphaned markup。ボタンの`onclick="handleInstall()"`は関数削除済みで無効だが、到達不能なため実害なし
+
+## アプリアイコン・スプラッシュ画面（2026-09-08刷新、設計書179・180。ダークスプラッシュのロゴ配色は2026-09-08に再修正、同日中にロゴ+テキストブロックの縮小・上寄せ調整も実施。2026-09-13設計書197でアプリアイコンのみ背景を無地化）
+アイコンデザインを「シンガポール島スカイライン＋コンパス針のピン」に刷新（旧デザインにあった雲と「S」の文字は削除）。Web版・iOS版アイコン、iOSスプラッシュ画面（ライト/ダーク）を統一して差し替え済み。
+
+**アプリアイコンの背景を無地白へ変更（2026-09-13、設計書197、builder→checker→closer）**: ユーザー依頼「スカイラインだけ消してピンとコンパス針はそのまま」に基づき、`dosuru-icon.png`・`ios-app/resources/icon.png`の背景（シンガポールスカイライン＋下部波線装飾）を削除し、無地の白背景に差し替えた。ピン型輪郭（オリーブグリーン）・内側の赤/白コンパス針は変更なし。**このスコープはアプリアイコンのみで、`splash.png`/`splash-dark.png`（iOSスプラッシュ画面）は無変更**（タイムスタンプ・md5ハッシュとも変更なしを確認済み）。手順は`node generate-icons.js`でWeb版アイコン一式（`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`）を再生成、`ios-app/resources/icon.png`は`.flatten({background:'#ffffff'})`でアルファチャンネルなし・1024x1024を維持。`public/sw.js`の`CACHE_NAME`を`'sg-weekend-v911'`→`'sg-weekend-v912'`にインクリメント。iOS版への反映は次回`release`ブランチpush→TestFlight配信が必要（本作業のスコープには含まれない、ローカルコミットのみ）。
+- **Web版**: `dosuru-icon.png`（1024x1024マスター）→`node generate-icons.js`で`public/icons/icon-{72,96,128,144,152,192,384,512}.png`・`apple-touch-icon.png`・`favicon.png`を生成。アイコンを差し替える際は必ずこの手順（マスター差し替え→スクリプト再実行）を踏む
+- **iOSネイティブアイコン**: `ios-app/resources/icon.png`（1024x1024、App Store提出要件によりRGB・アルファチャンネルなし）
+- **iOSスプラッシュ画面**: `ios-app/resources/splash.png`（ライト、クリーム背景RGB 250,250,248）・`splash-dark.png`（ダーク、黒背景RGB 27,30,25）とも2732x2732。中央上寄りのロゴ正方形部分を`composite()`で新ロゴに置き換える方式を採用。
+  - **ライト版**: クリーム背景に載せる通常アイコン（コンパス外枠は柳グリーン、中央針は赤/白）をそのまま正方形パネルとして合成
+  - **ダーク版（2026-09-08再修正）**: 当初はライト版と同じクリーム背景アイコンをそのまま合成していたため、黒背景の中にクリーム色の四角いパネルが浮いて見える状態だった。Canva AIで新規作成した「ダークモード専用配色ロゴ」（背景黒、コンパス外枠・スカイラインを明るいセージグリーンに変更、中央の赤/白の針は共通）に差し替え済み。新ロゴの背景は完全な単色黒ではなくノイズを含むため、`composite()`前に輝度・彩度ベースの閾値判定で背景ピクセルをsplash-dark本来の背景色へブレンド補正し、さらに合成素材の外周3pxを同色でクランプ（リサイズ時のリンギングアーティファクト除去）してから合成することで、パネル境界を完全に背景色と一致させている
+  - **ロゴ+テキストブロックの縮小・上寄せ配置（2026-09-08、ユーザーフィードバック「もうちょっと小さい方がいい」対応）**: アイコン＋「SG在住Navi」テキストロゴを1ブロックとして扱い、外接バウンディングボックスをクロップ→18%縮小（scale 0.82）→キャンバス縦42.5%位置（横は従来通りキャンバス中心）に再配置する方式に変更。現在の実測ブロック中心位置は縦42.5%程度（完全中央の50%からやや上寄せ）、水平方向はキャンバス中心とほぼ一致。ライト版・ダーク版とも同じ縮小率・同じ縦位置比率を適用し一貫性を維持
+    - 実装上の注意点: 元画像にごく薄いグロー/影のグラデーション（アイコン本体の輪郭検出用の通常閾値では拾えない、輝度差5〜8程度のノイズ）が残っている場合があるため、単純なクロップ＋合成だと縮小後の境界に段差が視認されることがある。対策として、クロップ後・リサイズ後の両方で背景色に近い（閾値10前後）ピクセルを対象背景色へスナップする前処理・後処理を追加している
+    - ペイント（塗りつぶし）矩形は「旧ブロック位置」と「新ブロック位置」の両方を包含する範囲に広げること（配置を移動する場合、新旧どちらの位置にも background 残留がないようにするため）
+  - 次回アイコン自体（デザイン）を差し替える際は、上記のブロック縮小・配置調整とは別に、画像解析で背景色との差分ピクセル走査により正確な旧パネル境界を特定→新素材の背景を到達先の背景色に補正→`composite()`→境界をピクセル値で検証、という手順を踏むこと。特にダーク版は新素材の背景色が完全な黒でない限り、色補正なしの単純`composite()`では境界が浮いて見える点に注意
+- **Web Push通知アイコン**: `public/sw.js`は`public/icons/icon-192.png`/`icon-512.png`（PNG、`.svg`ではない）を参照する。過去に存在しない`.svg`パスを参照するバグがあったため、アイコン関連の変更時は`STATIC_ASSETS`配列と`showNotification()`内`icon`/`badge`のパスが実在するファイルと一致しているか必ず確認する
+- **iOSプッシュ通知アイコンが旧デザインのまま表示される不具合の修正（設計書190、2026-09-10 → 設計書195で方針転換、2026-09-10/11）**:
+  - **設計書190（旧方式、廃止）**: `ios-app`の`@capacitor/assets`（v3系）はXcode 14+の「シングルサイズアイコン」方式に対応しており、`npx capacitor-assets generate --ios`が1024×1024の1ファイルのみを`Assets.xcassets/AppIcon.appiconset/`に生成し、ホーム画面用(60pt/76pt)はXcodeのビルドシステムが自動生成する一方、Notifications用の20ptサイズ（40×40px=2x、60×60px=3x）は自動生成の対象に含まれず、プッシュ通知に旧アイコンが表示され続ける原因になっていた。当初は`ios-app/resources/icon.png`から`sharp`で20pt用2ファイルのみを生成し、`Contents.json`に`{idiom:"iphone", size:"20x20", scale:"2x"/"3x"}`の2エントリを「追記」する方式（既存のuniversal 1024×1024シングルサイズエントリは維持したまま）で対応したが、**9回のTestFlightビルドが成功したにもかかわらず実機で通知アイコンが旧デザインのままという報告があり、設計書195で再調査**した結果、実際のxcodebuildの`Emplaced`ログに20x20系のファイルが一度も出現せず60pt/76ptのみが自動生成されていたことが判明。「Contents.jsonに1エントリのみ」というシングルサイズモードの前提を個別サイズの追記で崩したことが原因の可能性が高いと判断された
+  - **設計書195（現行方式）**: シングルサイズ運用・追記方式を廃止し、`.github/workflows/ios-deploy.yml`の「(通知アイコン修正v2) Replace single-size AppIcon with full-size icon set including Notifications (20pt)」ステップで、`npx capacitor-assets generate --ios`が生成したシングルサイズの`Contents.json`・pngは使わず、`ios-app/resources/icon.png`からiOS標準のフルサイズAppIconセット一式（iPhone 20/29/40/60pt×2x/3x、iPad 20/29/40/76/83.5pt×1x/2x、ios-marketing 1024x1024の計18ファイル）を`sharp`（都度インストール、`ios-app/package.json`への永続追加はなし）で生成し、`AppIcon.appiconset`内の既存pngを事前に全削除した上で`Contents.json`を新しい18エントリの配列に丸ごと置き換える方式に変更。`AppIcon-1024.png`（ios-marketing用）は`.flatten({background:'#ffffff'})`でアルファチャンネル無しを保証し、生成後に`hasAlpha`を防御的に再チェックする処理も追加。あわせて`ios-app/fastlane/Fastfile`の`build_app`実行後・`upload_to_testflight`前に、生成された`.xcarchive`内の`Assets.car`を`xcrun assetutil --info`でダンプし20x20関連のみ抽出してログ出力する診断ステップを追加（`begin/rescue`で囲み、診断失敗時もデプロイを止めない）
+  - **実際のCIビルド（run 34541731709、2026-09-10/11）で動作確認済み**: ビルド・TestFlightアップロードとも成功。新設した`assetutil --info`診断ステップが実際に動作し、生成された`Assets.car`内に`"20x20 index:1 idiom:phone"`・`"20x20 index:1 idiom:pad"`の2エントリが実在することを直接確認できた（`Emplaced`ログ自体には引き続き60pt/76ptしか出現しないが、これは`CFBundleIcons`用の代表ファイルコピーログであり`Assets.car`本体のコンパイル結果とは別物と判明したため、`assetutil`側の確認で十分と判断）。**ただしiOS端末側の通知アイコンキャッシュ・複数世代混在の可能性は今回のCI側対応では解消されないため、ユーザーには新ビルドがTestFlightに配信された後、一度アプリを完全にアンインストールしてから再インストールした上で通知アイコン表示を再確認してもらう必要がある**（詳細は`.claude/plan.md`設計書195「設計書195 実装記録」節、`.claude/next.md`参照）
+
+## iOSアプリ化（Capacitor）2026-07-03実装
+- 方式: ローカルバンドル（webDir: `../public`）。Web版と同じHTMLをアプリ内に同梱
+- appId: `app.dosuru`（2026-07-10訂正: 以前`app.dosuru.odenavi`と誤記していたが、実際にApple Developer Portalに登録され署名・TestFlight配信に使われている値は`ios-app/capacitor.config.js`の`app.dosuru`） / appName: `SG在住Navi`（`ios-app/capacitor.config.js`で確認済み、旧名`おでかけNavi`から改名）
+- `_isCapacitorApp`: `window.Capacitor?.isNativePlatform?.()` で検出。app.js 先頭で定義
+- `API_BASE`: Capacitor環境では `https://dosuru.app`、Web環境では空文字列。全fetchに付与済み
+- GA4スキップ: `_isCapacitorApp` 時に `window.gtag = function(){}` でnoop化
+- 外部リンク: `a[target="_blank"]` クリックを `Capacitor.Plugins.Browser.open()` でデバイスブラウザに渡す
+- SW登録・インストールバナー: Capacitor環境でスキップ/非表示
+- Push通知UI: 2026-07-10よりCapacitor環境でも表示・利用可能（APNs対応。詳細は下記「APNsプッシュ通知対応」セクション参照）
+- CI/CD: `release` ブランチpush → GitHub Actions（macOS runner）→ Fastlane deploy → TestFlight配信（社内テストのみ、`distribute_external: false`）
+- Fastlane: レーンは `deploy` のみ。中身は `upload_to_testflight`（App Store本番申請は含まない）
+- App Store本番申請は現状このワークフローに含まれず、別途手動対応が必要
+- GitHub Secrets: ASC_KEY_ID / ASC_ISSUER_ID / ASC_PRIVATE_KEY / MATCH_PASSWORD / MATCH_GIT_BASIC_AUTH
+- 初回セットアップ: MacInCloudで `npx cap add ios` → Xcode確認 → `fastlane match init` → GitHub Secrets登録
+- 詳細手順: `ios-app/README.md` 参照
+
+## iOSアプリのAPNsプッシュ通知対応
+Web版（VAPID/Web Push）とは完全に独立した仕組みとしてiOSネイティブPush（APNs）に対応。既存のWeb Pushエンドポイント・データ構造とは無関係に並存する。
+
+- サーバーから`@parse/node-apn`経由でAPNsへ直接送信。`APNS_KEY_ID`/`APNS_TEAM_ID`/`APNS_BUNDLE_ID`/`APNS_PRIVATE_KEY`のいずれかが`.env`未設定なら`apnProvider = null`のまま正常起動し、iOS向け送信のみスキップ（Web Pushの可用性には影響しない）
+- データモデル: `data/push-subscriptions.json`等の購読情報に`platform`（`'web'`/`'ios'`）フィールドを持つ。web: `{platform:'web', endpoint, keys}` / ios: `{platform:'ios', deviceToken, registeredAt}`
+- API: `POST/DELETE /api/push-subscribe-ios`（既存Web Push系エンドポイントとは別）。`sendPushToAll()`内で`platform`別に振り分け送信。無効トークン（410/BadDeviceToken/Unregistered）は自動削除
+- クライアント（`public/app.js`）: `_isCapacitorApp`時は`_initNativePush()`/`_toggleNativePush()`（`@capacitor/push-notifications`）。デバイストークンは`@capacitor/preferences`をソースオブトゥルースとするハイブリッド方式で永続化（アプリ完全終了後の再起動でもトグルON表示が維持される）
+- **ユーザーのON/OFF意思とOS許可状態は別軸で管理**: `app_push_enabled`フラグをlocalStorage+Preferencesで永続化し、OS許可（granted）とアプリ内トグルのユーザー意思の両方が揃ったときのみ`register()`する。意思フラグ未設定時はトークン有無から「以前ON」を推定（後方互換）
+- 通知タップ時: `pushNotificationActionPerformed`リスナーで`switchNav('home')`
+- iOS/CI: `ios-app/package.json`に`@capacitor/push-notifications`。CIで`App.entitlements`に`aps-environment: production`を設定しXcodeビルド設定に紐付け。`scripts/ensure-apns-bridge.py`が`AppDelegate.swift`にAPNsブリッジメソッド（`didRegisterForRemoteNotificationsWithDeviceToken`等）を冪等に注入（無ければCI失敗させる）
+- スコープ外: Android版対応、通知既読管理・一覧UI、パーソナライズ配信、FCM導入、サイレントプッシュ、通知文言の多言語化
+
+## ジャンル・興味機能（2026-07-02実装、2026-09-03時点でUI非表示・実質不使用）
+設定画面「ジャンル・興味」セクションは`display:none`で非表示化済み（未記録の変更、`public/index.html`のコメント「ユーザー要望により非表示化。ロジック・関数は残置」参照）。ジャンルを設定する手段がないため、連動する「おすすめ」フィルターチップ（`data-cat="recommend"`、ジャンル未設定時は自動非表示）も実質常に非表示。ロジック（`GENRE_LIST`定数13種・`saveGenreList`/`getGenreList`・`genreMatch()`・`scripts/fill-genres.js`等）は削除されていないため、再開時はUI非表示を解除するだけで動く。
+
+## イベントカードのDOM差分更新
+`renderEventCards()`（`public/app.js`）は`grid.innerHTML`一括再代入ではなく、**イベントID+言語をキーにしたDOM要素キャッシュ（`_cardElCache`）による差分更新**方式を採用している（Instagram埋め込み等`<iframe>`を含むカードの不要な再読み込みを避けるため）。
+- 既存キャッシュがあれば`renderEventCard()`を呼ばずDOM要素を再利用し`insertBefore`でノード移動のみ行う。新規イベントのみ新規生成（`_getOrCreateCardEl()`）
+- フィルタで除外されたカードは破棄せず`display:none`で保持。`loadEventData()`（データ再フェッチ・都市切替時）冒頭で`_cardElCache.clear()`
+- 新規生成カードのみ`fadeUp`アニメーション、再利用カードは`.spot-card--reused`（`animation:none`）
+- 画像読み込み失敗時は`handleImgError()`が1.2秒待って1回だけ自動リトライしてから絵文字フォールバックに切り替える（メインカード・ピン詳細・ピン一覧の3箇所で共有）
+- 同様の「DOM要素キャッシュで差分更新」パターンを他画面に導入する際の注意: `grid.innerHTML`の丸ごと再代入が別の分岐に残っていると、そこでキャッシュ済みノード（iframe含む）がdocumentから切り離されて破棄される
+
+## i18n対応（2026-09-09設計書189で英語対応を廃止、日本語固定の内部実装として存続）
+英語対応（多言語切替）は「実際には使われておらず紛らわしい」というユーザー判断により2026-09-09に廃止した。**ただし`t(key)`関数・`data-i18n`属性（76箇所）・`applyI18n()`関数自体は削除せず残っている**（影響範囲が大きすぎるため温存、常に日本語を表示する内部実装として存続）。
+
+- **`STRINGS.en`は削除済み**。`STRINGS`オブジェクトは`STRINGS.ja`のみを持つ
+- **`getLang()`は常に`'ja'`を返す**（`localStorage.getItem('sg_lang')`は参照しない）。呼び出し元19箇所を個別に書き換える代わりに、関数自体を簡略化することで影響範囲を最小化する方針を採用した
+- `t(key)`は`STRINGS.ja`のみを参照する簡略化された実装
+- **設定画面の言語切替ボタン（`#lang-toggle-btn`）・`setLang()`関数は削除済み**。言語を切り替える手段はUI上に存在しない
+- `isEn`/`getLang()==='en'`のような条件分岐は、`getLang()`が常に`'ja'`を返すようになったことで到達不能になったコードとして全て削除済み（英語側の分岐を消し、日本語側の処理だけを残す形に整理。`updateThemeUI()`/`selectCity()`/`updateCityUI()`/`applyI18n()`/`initSettingsGenres()`/`initSettingsProfile()`/`_lifeInfoCardHtml()`/`_lifeInfoPreviewCardHtml()`/`_formatLifeInfoDate()`/`renderEventCard()`が対象だった）
+- **既存データの英語フィールド（`content_en`/`tips_en`/`title_en`/`summary_en`）は生成・保存されなくなった**。`scripts/filter-events.js`（イベント記事生成）・`scripts/fetch-life-info.js`（生活情報要約生成）のSonnetプロンプトから英語生成指示を削除済み。`data/sg/events.json`・`data/sg/life-info.json`から既存の`_en`フィールドも削除済み（クリーンアップは一時スクリプトで実行し、実行後にスクリプト自体は削除）
+  - 同様に`server.js`のLINE Bot経由イベント投稿生成（`generateEventDraft()`）・`scripts/fill-content.js`（空content補完）・`scripts/retip-events.js`（tips一括更新）も英語フィールド生成部分を削除済み。英語専用の補完スクリプト`scripts/fill-english.js`は削除済み
+  - `data/bkk/events.json`・`data/syd/events.json`（BKK/SYD、現在停止中都市）には`content_en`が残存しているが、意図的に未対応（BKK/SYD都市対応自体がスコープ外のため）
+- `CITY_META`の`nameEn`/`subtitleEn`、`GENRE_LIST`の`labelEn`のような**未使用の静的データフィールド自体は削除していない**（参照コードが無いため実害なし、コード整理の粒度としてデータ定義までは踏み込んでいない）
+- `/api/chat`（`server.js`）は当初`lang`パラメータのみ削除していたが、エンドポイント自体もフロントエンドから呼び出し箇所が存在しない未接続のデッドコードだったため、2026-09-10設計書192でエンドポイント自体を完全削除した（AIチャット機能はWeb版・iOS版いずれのUIにも現存しない）
+- 新しいUI文字列を追加する場合、`data-i18n`属性＋`STRINGS.ja`へのキー追加は従来通り可能（表示は常に日本語）。英語キー（`STRINGS.en`）は追加不要（存在しないため）
+
+## X自動投稿（scripts/post-to-x.js）
+- ペルソナ: 日本・SG両方フラットに見る30-40代男性。構造・逆説・気づきを提示するスタイル。「自分だから気づけたこと」を重視し、具体的な在住年数は書かない（個人特定リスク回避のため`PERSONA`定数には「長く」とだけ記載）。**`PERSONA`は`generateLifePost()`（生活つぶやき）専用として無変更のまま残置**
+- 投稿タイプ: event（イベント紹介）/ news（くらしニュース紹介）/ life（生活つぶやき）を自動選択
+- **文字数・文体はタイプごとに異なる（2026-09-10設計書193で変更）**: event/news = 本文日本語80文字程度以内、そのイベント/ニュースの内容を客観的に紹介する文章（個人の感想・意見・一人称は含めない、新設の`TONE_GUIDE`定数を使用）／life = 40文字以内、個人のつぶやきスタイル（`PERSONA`ペルソナを使用、無変更）
+- **イベント選定（`pickEvent()`、2026-09-10設計書193で変更）**: 候補プールを「過去24時間以内（現在時刻基準のローリングウィンドウ）に`fetched_at`されたもの」に絞り込み、その中で`score`（`filter-events.js`のHaiku採点、0-10）が最も高い1件を選ぶ。`score`欠落イベントは最も低い優先度として扱い、プール内全件が欠落している場合のみ`fetched_at`降順（最新優先）にフォールバックする。24時間以内に候補が無い場合は`null`を返し、`main()`側でログ出力の上スキップする（旧: 暦日一致優先＋ランダム選択だった）
+- **ニュース選定（`pickNewsArticle()`）は変更なし**: 引き続き暦日（`fetched_at`当日分）優先→フォールバックで`fetched_at`降順15件→ランダム1件を選ぶ方式のまま（スコア化はスコープ外として見送り）
+- 実行: `node scripts/post-to-x.js [--type=event|news|life] [--city=sg|bkk|syd|all] [--dry-run]`
+- **現在はX API自動投稿ではなく「投稿下書きのLINE通知」運用**（X APIのクレジット枯渇のため停止）: `--to-line`フラグ指定時、生成した投稿文をそのままLINEに送信し、ユーザーが手動でXに貼る。実際には1日2回、crontabは`0 2 * * *`（朝）/`0 12 * * *`（夜）= サーバー時刻(Europe/Berlin, CEST/UTC+2)基準で2:00/12:00 = SGT(CEST+6h)換算で8:00/18:00 cron実行（2026-09-10、朝を7:00→8:00 SGTに変更）、ログは`logs/post-to-x-draft.log`。X API送信経路自体は無変更で残置（`--to-line`を外せば復活可能）
+
+## アーキテクチャルール
+- ビジネスロジックはサーバーサイドに置く
+- フロントエンドはAPI経由でデータを取得する
+- DBは使わない、JSONファイルで管理する
+- `events.json`/`community-courses.json`等の`data/`配下JSONファイルは、`server.js`の各APIエンドポイントがリクエストの都度`fs.readFileSync`で直接読み込む方式（メモリキャッシュなし）。そのため**データファイルの内容のみを直接編集した場合は`pm2 restart`不要**（`server.js`本体のコード変更を伴う場合のみ再起動が必要）。なお`data/`ディレクトリは`.gitignore`対象のためgit管理外（git commit対象にならない）
+
+## UIルール
+- 日本語UI
+- スマホファースト
+- Tailwind CSSを使う
+- 既存のデザインパターンを踏襲する
+
+## UIスタイル規約（2026-07-01統一）
+- **カラー**: inline style で生の色値（`#C8804A` 等）を書かない。必ず `:root` のCSS変数（`var(--caramel)` 等）を使う
+- **閉じる ✕ ボタン**: `background:var(--sand); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-size:16px; border:none; cursor:pointer` を標準スタイルとして使う
+- **CSSクラスの二重定義禁止**: 既存クラスを再定義する場合は古い定義をその場で削除する
+- **カードタイトル**: font-size 16px / font-weight 700 を標準とする（メインイベントカード `.card-title` のみ 18px）
+- **border-radius**: カード系 16〜18px、ボタン系 `var(--radius-btn)`(14px) または 50px(pill) を基本とする
+- **z-index**: bottom-nav は `9999`固定。モーダル・ボトムシート・オーバーレイ系は原則`bottom-nav未満`（2026-07-09、全モーダルを10000番台→3000番台に統一。詳細は下記「z-index方針」参照）。overlay/modalのペアは相対的な重なり順（modalがoverlayより上）を維持すること
+- **画面ヘッダー上部余白**: 上部余白は`env(safe-area-inset-top, 0px) + 20px`の1回のみの加算で統一する。ホーム画面は`.app-header`に`padding-top: calc(env(safe-area-inset-top, 0px) + 20px)`。くらし/ピン留め/設定画面は共通の`.plan-title-header`（`align-items: flex-start;`固定）を使い、コンテナ側に`padding-top: env(safe-area-inset-top)`、ヘッダー側に`padding: 20px 20px 0`という2箇所分担で合計1回分にする
+  - ⚠️ 新しい画面を追加する際、コンテナとヘッダー要素の両方に`env(safe-area-inset-top)`を入れると二重加算になり、notch環境でタイトルがずれる。Web版（safe-area-inset-top=0）では気づけないため実機での確認が必須
+- **画面タイトルのマークアップ**: `<span class="screen-title" data-i18n="...">`は、装飾用の親ラッパー（`.app-title`等の独自クラス）で包まない。子孫セレクタ（例: `.app-title span`）による意図しないCSS詳細度衝突で`.screen-title`本来のスタイルが上書きされる事故があったため、ヘッダーコンテナ（`.header-top`/`.plan-title-header`等）の直接の子要素として配置する
+- **オーバーレイの表示切替は`classList.toggle('visible')`方式に統一する（2026-07-11追記）**: `display`/`opacity`のインラインstyle直書きによる表示制御は禁止。「表示側は4箇所でstyle操作・非表示側は1箇所だけ」のような取りこぼしパターンが発生しやすく、実際に`.plan-modal-overlay`でこの不統一が確認され、モーダル操作後にタップが効かなくなる重大バグの構造的リスク要因の一つとして`classList`方式へ統一した（`.claude/plan.md`「設計書5」参照）。新規オーバーレイ実装時も必ずCSS側に`.要素名.visible{display:block;opacity:1}`を定義し、JS側は`classList.add/remove('visible')`のみで制御する
+- **設定画面のピル型トグルボタンの枠線は`var(--sand-dark)`に統一する（2026-09-08修正）**: `#dark-mode-toggle-btn`/`#lang-toggle-btn`/`#push-toggle-btn`（`public/index.html`）等の類似トグルボタン群は枠線を`border:1.5px solid var(--sand-dark)`で揃える。`#push-toggle-btn`のみ誤って`var(--light-gray)`を使っており、柳グリーン基調パレットでは両変数の値が異なるため枠線の色味だけ浮いて見える不具合があった（ユーザー指摘・実機スクショで確認）。修正時は枠線のみを対象とし、`#push-toggle-btn`の文字色`color:var(--warm-gray)`等の他プロパティは変更しないこと
+- **「更新の通知」ボタン（`#push-toggle-btn`）の表示テキストも「ダークモード」ボタンと表記統一済み（2026-09-09修正）**: `STRINGS.ja/en`の`pushOn`/`pushOff`が日本語・英語とも「ON」「OFF」のままで、ダークモードボタンの表記（設計書185、ja:オン/オフ/自動、en:Off/On/Auto）と揃っていなかったため、`pushOn`/`pushOff`をja:「オン」/「オフ」、en:「On」/「Off」に修正（`public/app.js`のSTRINGS.ja 427-428行目、STRINGS.en 620-621行目）。トースト用の別文言`toastPushOn`/`toastPushOff`（「🔔 プッシュ通知をONにしました！」等）はこの統一の対象外で無変更のまま残置
+- **`#push-toggle-btn`の文字色も`#dark-mode-toggle-btn`と統一済み（2026-09-09修正）**: 上記枠線統一時点では`color:var(--warm-gray)`（通知未許可状態をグレーアウトして見せる意図的な配色の可能性があるとして維持）としていたが、実機スクリーンショットで「ダークモード」ボタンの「オフ」（濃い色）と「更新の通知」ボタンの「オン」（薄いグレー）の文字色に見た目の差があるとユーザーから明確な指摘を受け、`color:var(--midnight)`（`#dark-mode-toggle-btn`と同じ値）に統一。`_updatePushBtn()`（`public/app.js`）は`btn.textContent`のみを状態（オン/オフ/拒否済み）に応じて切り替えており、色を動的に変更するロジックは元々存在しないことを確認済み（状態表示ロジック・他要素への影響なし）
+
+## ダークモード機能（2026-09-08実装、設計書184で「配色機能」を廃止し復元／設計書186でライトモード配色を柳グリーンに再置換）
+2026-09-05に一度「配色」1項目（キャラメル/柳グリーン/ダークの3状態循環切替）に統合されたが、ユーザーの意向により2026-09-08設計書184で完全に廃止し、それ以前の「ダークモード」設定（自動(端末追従)/ライト/ダークの3択）に戻した。この時点ではライトモードの見た目を一時的にキャラメル基調へ戻したが、実機を見たユーザーが「クリーム/キャラメルはもう使わない、柳グリーンの方が良い」と判断したため、同日中に設計書186でライトモード・ダークモード双方の配色（CSS変数の固定値）を柳グリーン基調へ全面置換した。**配色切替UI（3択循環）自体は復活させていない**（`data-palette`属性・`sg_palette`関連ロジックは引き続き削除済みのまま）。「ダークモード」設定（自動/オン/オフの単純トグル）の仕組み自体は設計書184のまま無変更。
+- **状態管理**: `localStorage`の`sg_theme`キー（値: `auto`/`light`/`dark`）。旧`sg_palette`キーは廃止。`getTheme()`/`applyTheme()`/`cycleTheme()`/`updateThemeUI()`（`public/app.js`）
+- **既定値**: 新規ユーザー（`sg_theme`未設定）は`light`がデフォルト（`auto`ではない）。設定画面はタップで自動→ライト→ダーク→自動…と循環切替
+- **表示ラベル（2026-09-08設計書185で変更）**: 設定画面の値表示は内部値（`light`/`dark`/`auto`）と異なり「オフ」「オン」「自動」（英語: `Off`/`On`/`Auto`）。設定名が「ダークモード」であることに合わせた直感的な言い回しへの変更で、`light`→オフ、`dark`→オン、`auto`→自動（変更なし）。ラベル文言は`STRINGS.ja/en`ではなく`updateThemeUI()`（`public/app.js`）内のインライン`labels`オブジェクトに直接定義されている点に注意（他のi18n文言と実装方式が異なる）。切り替えロジック・保存値自体は無変更
+- **自動モード**: `window.matchMedia('(prefers-color-scheme: dark)')`でシステム設定を検知し`data-theme="dark"`属性の有無を切り替える。`matchMedia(...).addEventListener('change', ...)`でシステム設定変更にリアルタイム追従（自動モード時のみ有効）。iOS Capacitor(WKWebView)環境でこのメディアクエリが正しく機能するかは実機未検証
+- **ライト/ダーク固定モード**: `data-palette`属性は使用しない。`data-theme="dark"`属性の有無のみで制御
+- `public/index.html`の`<head>`内スクリプトは初期描画のちらつき防止のため`sg_theme`（または移行前の`sg_palette`）を読んで`data-theme`属性を先読み設定（`applyTheme()`実行前に反映するため）
+- **旧`sg_palette`からのマイグレーション**: 初回起動時に1回だけ実行（`public/app.js`内、`sg_theme`未設定の場合のみ）。旧値`dark`→`sg_theme='dark'`、旧値`default`/`willow`/未設定（新規ユーザー）→`sg_theme='light'`に変換し、`sg_palette`キーは削除
+- **配色の実態（2026-09-08設計書186で確定）**: ライトモードの既定配色（`:root`のCSS変数固定値）は柳グリーン基調（`--caramel`系変数も含め緑系の値、例: `--caramel: #6F8F63`）。キャラメル（オレンジ系）の値は完全に置換済みで一切残っていない。`--font-heading`も`'Noto Sans JP', sans-serif`（ゴシック体）に固定。`html[data-theme="dark"]`ブロックも柳グリーン系ダーク配色に統一（`--caramel-pale`等の「-pale」系変数、`--caramel-light`等の「-light」系変数もダークモード用に緑系へ上書き済み）。`.filter-chip`（カテゴリフィルターチップ）はピル塗り形状（`border-radius:50px`、active時`background:var(--caramel)`で緑塗り）、`.nav-item.active .nav-icon`はボトムナビの選択中アイコンに緑系ピルハイライト（`background:var(--caramel-pale)`）を常時適用（かつてのwillowパレット限定ではなく通常スタイルとして常時有効）。`--holiday-red`/`--festival-gold`（SG祝日・行事バッジ用）は柳グリーンに巻き込まれず赤/金の固定色のまま。`EVENT_CATEGORY_COLORS`/`LIFE_INFO_CATEGORY_COLORS`等のJS側カテゴリ色定義は全て`var(--xxx)`参照のため無変更で自動追従
+- i18n: `labelDarkMode`（ダークモード/Dark Mode）を復活。`labelPalette`は削除
+- **ボトムナビアイコン**（2026-09-05実装、本設計書184とは無関係のため無変更）: 絵文字を廃止し`currentColor`で塗るインラインSVGに置換済み。色は`.nav-icon-svg{color:var(--light-gray)}`／`.nav-item.active .nav-icon-svg{color:var(--caramel)}`（`public/app.css`）でCSS側から制御するためダークモード切り替えに画像差し替えなしで自動追従する
+
+## 指標ウィジェット（2026-09-06実装）
+おでかけ画面・くらし画面それぞれの最上部に3項目ずつ、外部データの実況値を表示。`GET /api/widget-stats?city=sg`（`server.js`）1本のAPIで全項目をまとめて返し、フロントは`loadWidgetStats()`（`public/app.js`、init時に1回呼び出し）で各`#stat-*`要素に反映する。
+- **おでかけ画面**（`#stat-widget-weather`）: 気温・降水確率(`#stat-temp`/`#stat-rain`、OpenWeatherMapの5日/3時間予報から直近の`pop`を%換算)・2時間予報(`#stat-nowcast`、後述のNEAナウキャスト)。ラベルは「今の空模様」→「スコール」→最終的に「2時間予報」に変更（2026-09-06。表示値が「晴れ」〜「激しい雷雨・突風」まで幅広く、「スコール」だと晴れの日に「スコール：晴れ」と矛盾して見えるため、値と矛盾しない中立的なラベルを採用。英語版は`Now`→`Squall`→`2-Hour Forecast`）
+- **くらし画面**（`#stat-widget-info`）: 為替SGD→JPY(`#stat-fx`)・PSI(`#stat-psi`)・デング熱クラスター警戒(`#stat-dengue`)
+- **PSI表示の顔絵文字（設計書208、2026-09-15実装）**: `#stat-psi`の数値の前に、判定レベルに応じた絵文字を半角スペース区切りで表示する（良好😊/普通😐/要注意😷/健康に悪い😫/危険☠️、例:「😊 72(良好)」）。マッピングは`STAT_LEVEL_EMOJI`（`public/app.js`、`STAT_CRITERIA_DESC`の近くに定義、`{psi: {レベル文字列: 絵文字}}`の構造）。`server.js`の`psiLevel()`のレベル文字列と一致させる必要がある点は`STAT_CRITERIA`と同様。マッピング外の値では絵文字部分ごと省略され従来表示にフォールバックする。絵文字は`.stat-val-emoji`（`public/app.css`、font-size:13px）で数値よりやや小さく表示し、375px幅でのellipsis欠けリスクを軽減。**デング熱(`#stat-dengue`)側には未展開**（`STAT_LEVEL_EMOJI`に`dengue`キーを追加するだけで拡張できる構造だが、今回はスコープ外として見送り）
+- **データソース**: 為替=Frankfurter API(無料・キー不要)／天気=OpenWeatherMap(`OPENWEATHER_API_KEY`、`.env`。2026-09-06までプレースホルダーのまま未設定で機能していなかった)／PSI・ナウキャスト・デング熱=data.gov.sg（シンガポール政府オープンデータ、SG都市限定）
+- **NEAナウキャスト**（スコール検知用）: `2-hour-weather-forecast`の全47エリア中、`classifyNowcast()`の深刻度テーブルで最も深刻な区分を採用し「2時間予報」欄として1つの値に集約（エリア別表示はしない）
+- **デング熱**: data.gov.sgの新API方式（`fetchDataGovSgDataset()`、`poll-download`でS3署名付きURLを取得してから本体を取得する2段階呼び出し。`User-Agent`ヘッダーが無いと403になる点に注意）でGeoJSONクラスター一覧を取得し、クラスター数から警戒レベル(`dengueLevel()`)を判定。表示している件数は**日次の新規感染者数ではなく、その時点で活動中のクラスター(流行地区)数のスナップショット**（クラスターは発生からケースが収まるまで数週間〜数ヶ月存在し続ける）。サブラベルは「流行地区数」への変更を一度試したが、後述のクライテリア表示を追加したことで誤解の懸念が解消したとして「デング熱」のラベルに戻した（2026-09-07）。アイコンは🦟(蚊)だと気分が良くないとの理由で🩺(聴診器)に変更。なお各クラスターの累計症例数を合算した`totalCases`もサーバー側では計算済みだが、現在UIには未表示
+- **PSI・デング熱のクライテリア表示（2026-09-07追加）**: `#stat-widget-info`内のPSI・デング熱の`.stat-col`（`data-stat-crit="psi"`/`"dengue"`）をタップすると、`#stat-criteria-popover`に指標の一言説明（`.stat-criteria-desc`、`STAT_CRITERIA_DESC`）＋レベル一覧のチップ（`.stat-criteria-chips`内に`.stat-criteria-chip`）を表示し、現在の値に該当するチップだけ`.active`で強調する。判定基準は`STAT_CRITERIA`（`public/app.js`）に定義（PSI: 良好0-50/普通51-100/要注意101-200/健康に悪い201-300/危険301+、デング熱: 警報なし0/注意1-5/警戒6-15/厳重警戒16+）。**`server.js`の`psiLevel()`/`dengueLevel()`としきい値・ラベル文言を必ず一致させること**（サーバー側のレベル文字列と`STAT_CRITERIA`のラベルを文字列一致でマッチングして強調表示しているため、ズレると強調が効かなくなる）。タップ判定は他のタッチ委譲パターンと同様`onclick`(マウス)＋`#stat-widget-info`への`touchend`委譲(タッチ)の両対応。他の場所をタップすると閉じる（`document`全体の`touchend`リスナーで`[data-stat-crit]`/`#stat-criteria-popover`以外へのタップを検知）。チップの見た目は当初ベタ塗りピルだったが「もうちょい形を変えたい」との要望でアウトライン形式（非アクティブは枠線のみ、アクティブだけ塗りつぶし）に変更
+- **キャッシュ設計**: `widgetStatsCache`はフィールド単位（為替/天気/PSI/nowcast/dengue）で個別に30分キャッシュ。1項目のAPIが失敗しても他項目の鮮度・表示に影響しない。取得失敗時はそのフィールドのキャッシュを更新せず、古い値が残っていればそれをそのまま返す（フォールバック）。一度も成功していないフィールドはJSONから欠落し、フロント側は該当項目を`--`のまま表示
+
+## カレンダー機能（2026-09-06実装、ボトムナビ4タブ目）
+ボトムナビは「くらし・おでかけ・カレンダー・設定」の4タブ構成（旧ピン留めタブは廃止、クリップFABに置き換え。後述）。`#screen-calendar`でその年(1〜12月)の祝日・主要行事・記念日・学校休暇を月カード(`.cal-month-card`)+日付グループ化リストで**1年分まとめて**一覧表示する（グリッドではなくリスト形式。月送りボタンは無く、縦スクロールのみで全月を閲覧する。2026-09-06に「月送りで一月ずつ」から「一年分を縦に並べる」方式へ変更、さらに各月をカードで囲む表示に変更済み）。**多言語化はしていない**（日本語固定、`data-i18n`不要）。行名の英語併記(「元日(New Year's Day)」等)も2026-09-06に撤去し、日本語のみに統一済み（振替休日等の補足はnoteフィールドに逃がすか、範囲表示(`〜MM/DD`)に任せて名前からは省く）。画面上部の「2026年」年表示(`#calendar-year-label`)は2026-09-06「取り急ぎいらない」との要望でHTML/CSSごと削除済み（`_calendarYear`自体はAPI呼び出し用に内部では引き続き保持）
+- **データソース**: `data/sg/calendar-events.json`（新規・gitignore対象・手動キュレーション、SG祝日/日本の祝日/主要行事/記念日/シンガポール現地校(MOE)休暇を収録。年1回の手動更新が必要）＋`school-calendar.json`（日本人学校(SIJS)の休暇、既存）を`GET /api/calendar?city=sg&year=YYYY`（`server.js`）が1年分フラットな配列にまとめて返す（`calendarEventsPath()`/`monthOverlap()`ヘルパー、既存`weekOverlap()`と同じロジックで月/年どちらの範囲判定にも使える）。**`events.json`の実イベントは意図的に対象外**（2026-09-06、件数が多くなりすぎるため一旦除外。以前は`category:'event-ingested'`として含めていたが削除）
+- **学校休暇の2系統**: 日本人学校(SIJS、`school-calendar.json`由来)とシンガポール現地校(MOE、`calendar-events.json`に直接収録)は休みの時期が異なるため両方載せる。名前の頭に`日本人学校: `/`現地校(MOE): `を付けて区別する（`server.js`の`/api/calendar`実装内でSIJS側にのみ動的にプレフィックスを付与、MOE側はデータに直書き）
+- **カテゴリ**: `holiday-sg`/`holiday-jp`/`festival`/`school-vacation`の4種（2026-09-06に`festival`/`seasonal`/`deadline`を`festival`(主要行事)へ統合。一時`observance`(記念日)を別カテゴリとして新設したが、直後に「主要行事と記念日はカテゴリ同じでいい」との指示で`festival`に統合し直し、現在トータル・ディフェンス・デー等もすべて`festival`扱い）。`CALENDAR_CATEGORY_COLORS`（`public/app.js`、既存`LIFE_INFO_CATEGORY_COLORS`と同じCSS変数参照方式）でバッジ色分け。`#calendar-filter-row`は既存`.filter-chip`をそのまま流用したタップ絞り込み(`setCalendarCategory()`)。**タッチ端末では他の`.filter-chip`系フィルター（`#filter-row-category`/`#news-filter-row`）と同じtouchstart/touchend委譲（`app.js`）が無いとタップが反応しない**ので、新規フィルター行を追加する際は必ずこのパターンを踏襲すること
+- **予定のinfoアイコン(`.cal-info-btn`)**: `note`フィールドを持つ予定（イスラム暦祝日の変動注意書き、振替休日の説明、祝祭日の簡単な解説など）には名前の右にⓘアイコンを表示し、タップでアイコン直下に**吹き出し(`.cal-note-bubble`、三角のツノ付きポップオーバー)**を表示する(`toggleCalNote()`。2026-09-06、当初は単純な下方向インライン展開だったが「吹き出しがいい」との要望で変更)。`.cal-name-wrap`に`position:relative`を付け、吹き出しはそれを基準に`position:absolute`で配置。他の場所をタップすると閉じる(`document`への`touchend`委譲、`.cal-info-btn`/`.cal-note-bubble`自身へのタップは除外)。動的に再描画される`#calendar-list`に対してイベント委譲(`touchend`)で対応しているため、個別ボタンへのリスナー再登録は不要
+  - **`holiday-jp`(日本の祝日)は対象外**: 「日本の祝日はinfoいらない」との要望により、`renderCalendarList()`内で`it.category !== 'holiday-jp'`の条件を付けて意図的に非表示にしている（振替休日・国民の休日には元々説明用のnoteが付いているが、この条件でアイコン自体を出さない。データ自体は残している）
+  - **`holiday-sg`/`festival`はほぼ全項目にnoteあり**: 2026-09-06「もうちょっと一言二言だけ説明を追加」との要望で、`calendar-events.json`のSG祝日・主要行事カテゴリはほぼ全アイテムに一言程度の短い説明を追加済み(元日/クリスマス等の自明なものにも簡潔なnoteを付与)。新しい祝日・行事データを追加する際もこの慣習に倣うこと
+- **月見出し・カード化**: `renderCalendarList()`が日付でグループ化する際、月が変わるタイミングで`.cal-month-card`（白背景+角丸+box-shadow、`data-month="YYYY-MM"`属性付き）を開始し、その中に`.cal-month-head`（例:「9月」）+日付見出し+予定を収める。該当月に1件も予定が無い場合は月カード自体を出さない
+- **月見出しの季節アイコン（気候・食べ物・GSS、設計書194、2026-09-10実装）**: `.cal-month-head`の右端に、月ごとに毎年繰り返す季節の話題（☂️モンスーン/🍈ドリアン/🌫️ヘイズ/🛍️GSS）を0〜3個のアイコン（`.cal-season-icon-btn`）で表示する。マッピングは`MONTH_SEASONAL_TAGS`（`public/app.js`、月番号1〜12をキーにした静的定数）で管理し、`calendar-events.json`（年次の日付レンジイベント）とは別の「年に依存しない固定データ」という性質のため、あえてJSONファイルではなくJS定数として持たせている。1月/3月/11月/12月=雨季(☂️)、6〜8月=ドリアン(🍈、8月は最盛期終盤)、8〜10月=ヘイズ(🌫️、9月が最も懸念)、6〜8月=GSS(🛍️、開催時期が年によって変動する商業セールのため月単位の目安表示)、2月/4月/5月はアイコンなし。アイコンをタップ（`toggleMonthSeasonNote()`）すると月カード直下の`.cal-month-season-bubble`（1個の吹き出し要素を使い回し、`textContent`をタップされたアイコンのnoteに差し替える方式）に説明文を表示する。予定のinfoアイコン用吹き出し（`.cal-note-bubble`）とは完全に相互排他（`toggleCalNote()`/`toggleMonthSeasonNote()`双方が両クラスの`.visible`を一括解除してから自分の吹き出しを開く）。タッチ端末対応は既存の`.cal-info-btn`パターンを踏襲し、`document`への`touchend`委譲（他タップで閉じる）と`#calendar-list`への`touchend`委譲（動的再描画される月カードへの即時タップ対応）の両方に`.cal-season-icon-btn`/`.cal-month-season-bubble`の分岐を追加。カテゴリフィルタ（`CALENDAR_HIDDEN_IN_ALL`等）の影響を受けず、月カード自体が表示されていれば常にその月の季節アイコンも表示される。GSSの実際の開催日程を`calendar-events.json`に日付レンジイベントとして追加することは意図的にスコープ外（正確性より簡潔な月単位表示を優先）
+- **ボトムナビからカレンダーを開くと今月までスクロールする**（2026-09-07、「今月にスクロールした状態で表示できる？」との要望より）: `loadCalendarScreen(true)`（`switchNav()`のcalendarブランチから呼ぶ時だけ`true`を渡す）→レンダー後に`_scrollCalendarToCurrentMonth()`を実行。`.cal-month-card[data-month]`から今月と一致するカード（無ければ今月より後の直近のカード）を探し、`getBoundingClientRect()`の差分で`#calendar-scroll-content`のスクロール位置を計算（`offsetTop`は使わない。`#calendar-list`がposition指定なしのため`offsetParent`が`#calendar-scroll-content`と一致する保証がなく不正確になるため）。表示中の年が実際の今年と異なる場合は先頭のまま。**カテゴリフィルターチップ切り替え時（`setCalendarCategory()`）にも同じ`_scrollCalendarToCurrentMonth()`を呼ぶ**（2026-09-07「すべては大丈夫だけど他のカテゴリを選んだ時外れる」との追加報告より。フィルターで表示内容が変わってもレンダー直後に今月へ再スクロールする）。**慣性スクロール残留への防御的対策（2026-09-07）**: `_scrollCalendarToCurrentMonth()`内で位置計算前に`scrollEl.style.overflowY = 'hidden'` → `void scrollEl.offsetHeight`（強制リフロー） → `scrollEl.style.overflowY = ''`という一瞬のoverflow切り替えで、直前の指の勢いが残っている場合の慣性スクロールを強制キャンセルしてから計算するようにした上、計算結果も`[0, scrollHeight - clientHeight]`にクランプ。実機で「9月・祝日フィルターでリスト最下部までスクロールしきる」不具合が報告されたが、調査の結果これは慣性スクロールではなく、**11月(対象月)を画面最上部に寄せようとしても後続コンテンツ(11月+12月)が1画面に満たずスクロール可能範囲でクランプされていただけの正常な挙動**と判明（バグではない）。防御的対策自体は無害なので残置
+- **今月合わせスクロールは「すべて」表示限定（2026-09-07）**: 上記の調査を受けて、「今月に合わせるのは全てのところだけで良い。それ以外は一月スタート(先頭)で大丈夫」との指示により、`_scrollCalendarToCurrentMonth()`は`_calendarCategory === ''`（すべて）の時だけ今月/次月ロジックを実行し、カテゴリを絞っている時は常に先頭(`scrollTo({top:0})`、1月)に戻すよう単純化。カテゴリ別データは疎らで対象月が year末近くにしかないことも多く、無理に今月合わせを試みない方針とした
+- **「すべて」表示時のみ末尾に必要な分だけ余白を確保**: 今月合わせスクロールの対象は「すべて」のみになったため、今月が12月でもきっちり画面最上部に寄せられるよう、`renderCalendarList()`で`_calendarCategory === ''`の時だけ`#calendar-list`に余白を動的付与（他のカテゴリでは`''`にリセット）。試行錯誤の末、最終的に**最後の月カード自身の高さを実測し、`scrollEl.clientHeight - lastCard.getBoundingClientRect().height`で必要最小限の余白だけを計算**する方式に落ち着いた（2026-09-07）。経緯: ①当初`scrollEl.clientHeight`（画面高さ分まるごと）→手動で一番下までスクロールした時に空白が大きすぎると指摘 ②固定値`140px`に縮小→今度は12月に届かないケースがあると再指摘 ③固定値では画面サイズ・カードの中身の量による過不足を吸収できないため、実測ベースの計算に変更して解決
+- **予定名の横位置揃え**: `.cal-item`はflexではなくCSS Grid(`grid-template-columns: 84px 1fr auto`)。カテゴリバッジの文字数が種類ごとにバラバラ(SG祝日=4文字、季節イベント=6文字等)でも、バッジ列を固定幅にすることで予定名が常に同じX位置から始まるようにしている。新しいカテゴリを追加してバッジの文言が84px列に収まらない場合は列幅を調整すること
+- **祝日データの一本化**: 従来`public/app.js`内に祝日データが2重に存在し、ウェサク・デー/ハリラヤ・ハジの日付が矛盾していた（Date配列版が誤り、`CITY_HOLIDAY_NAMES`が正しかった）。今回の実装でこれらのデッドコード（`CITY_HOLIDAY_NAMES`/`getCityHolidayName`/`LONG_VACATIONS_BY_CITY`/`getLongVacations`/`LONG_VACATIONS`/`CITY_HOLIDAYS`、呼び出し元なし確認済み）を削除し、`calendar-events.json`に一本化した
+- **SG祝日の名称はシンガポールで一般的に呼ばれる名称(カタカナ)を使う**（2026-09-06「建国記念日じゃなくてナショナルデー」との指摘より）: `holiday-sg`の名称は日本語訳(建国記念日/労働者の日/聖金曜日等)ではなく、現地で通用する呼び方をカタカナ表記する方針に統一（ナショナルデー/レイバーデー/グッドフライデー/ニューイヤーズデー/チャイニーズ・ニューイヤー/クリスマス・デー。ハリラヤ・プアサ/ハジ/ウェサク・デー/ディパバリは元々現地名なので変更なし）。新しいSG祝日を追加する際もこの命名規則に従うこと（`holiday-jp`は対象外、日本の祝日名は当然日本語のまま）
+- **ゴールデンウィーク/シルバーウィークは日ごとに分割**: 当初「憲法記念日〜みどりの日〜こどもの日〜振替休日(ゴールデンウィーク)」のように複数日をまとめた1件として登録していたが、2026-09-06に「日付で書いて」という要望を受け、5/3〜5/6・9/21〜9/23をそれぞれ単日の別アイテムに分割した（新しく祝日データを追加する際もまとめずに1日1件が基本方針）
+- **多民族の文化行事・全国統一試験も収録**（2026-09-06追加）: 中華系（元宵節/Chap Goh Meh・清明節・端午節・冬至）、インド系（ポンガル・プタンドゥ/タミル暦新年・ナヴラートリ）、マレー系（マウリドゥル・ラスール、SGでは祝日でないため`confirmed:false`＋noteでイスラム暦変動の注意書き）の代表的な行事を`festival`カテゴリに追加。さらにPSLE筆記試験・O-Level試験開始も同カテゴリに追加（全国一斉の試験も家庭にとって重要な予定という位置づけ）。**`calendar-events.json`はgitignore対象でこのファイルを直接編集するだけで反映され、pm2再起動やキャッシュバージョン更新は不要**（`GET /api/calendar`が毎回ファイルを読み直すため）
+- **noteは「何の日か」+「どこに行くといいか」の2点セットが基本方針**（2026-09-06、「近所のお寺とか、マリーナの会場とか」という要望より）。例: タイプーサムなら由来の説明に加え「スリ・スリニヴァサ・ペルマル寺院(セラングーンロード)からタンクロードまでの行列が見どころ」のように具体的な寺院名・地名を入れる。ただし清明節/冬至のように家庭単位で行われ公共の見どころが無い行事は「どこ」を無理に入れず由来のみに留める。新しい行事を追加する際は、WebSearchで寺院名・開催地区など固有名詞を実在確認してから記載すること（うろ覚えで地名を書かない）
+- **SG祝日バッジのみ固定で薄い赤**: `holiday-sg`だけは`--holiday-red`/`--holiday-red-pale`という専用CSS変数(`public/app.css`の`:root`)を使っており、他のカテゴリ色(`--gold`/`--sky`/`--plum`等)と違って常に赤のままになるよう意図的に設計している（2026-09-06「祝日のラベルはさすがに薄い赤にしよう」という要望より。日本のカレンダー文化で祝日=赤という直感に合わせるため、テーマの統一感より視認性を優先した例外。導入当初は柳グリーンパレット選択時にも上書きされない例外という文脈だったが、2026-09-08設計書184で柳グリーン自体を廃止したため現在は単純に固定色として存在）。**`holiday-jp`(日本の祝日)は対象外**で、従来通り`--sky`/`--sky-pale`(青系)のまま（2026-09-06「赤にするのはSGの祝日だけ、日本の祝日はそのまま」という訂正より）。**`--holiday-red-pale`/`--festival-gold-pale`ともダークモード専用の上書き値は無く**（`html[data-theme="dark"]`ブロックにこれらのpale変数の上書きは無いまま、他の`--terracotta-pale`/`--gold-pale`/`--sky-pale`等と同様に:root既定値のrgba()をダークモードでもそのまま使う。これは柳グリーン導入前からの既存の未対応事項であり2026-09-08設計書184で新たに生じたものではない）、文字色の`--holiday-red`/`--festival-gold`自体はライト/ダーク共通
+- **`festival`(主要行事)バッジも同様の理由で固定ゴールド**: `--gold`/`--gold-pale`は他カテゴリ(`holiday-jp`等)と色が近く見分けづらいケースがあったため、`--festival-gold: #B8860B`/`--festival-gold-pale`という専用の固定色を追加した(2026-09-06)。カテゴリ数が増えて配色が被る場合は、この2例のように`--holiday-red`/`--festival-gold`パターン(固定色の変数を`:root`に追加する)を踏襲すること
+- **カテゴリフィルターチップの並び順**: `#calendar-filter-row`は「すべて・祝日(旧SG祝日)・主要行事・学校休暇・日本の祝日」の順（2026-09-06「日本の祝日は学校行事の後にして」との要望で日本の祝日を最後に移動、「SG祝日」ラベルも「祝日」に短縮）。スワイプでのカテゴリ切り替え(`_switchCalCatBySwipe()`)はDOM順を動的に読むため、チップの並び替えだけでJS変更は不要
+- **「すべて」表示では日本の祝日・学校行事を除外する**（2026-09-06「日本の祝日はすべてに表示しないで」「学校行事のカテゴリもすべてには表示しないで」との2回の要望より）: `renderCalendarList()`内の`CALENDAR_HIDDEN_IN_ALL = ['holiday-jp', 'school-vacation']`に含まれるカテゴリは、`_calendarCategory`が空(＝「すべて」選択時)の場合のみ除外される。該当のフィルターチップを明示的にタップした時だけ表示される（データ自体は引き続き`/api/calendar`から返るので、除外はフロントエンドの表示ロジックのみ。「すべて」で常に見せたくないカテゴリが増えたら`CALENDAR_HIDDEN_IN_ALL`に追加するだけでよい）
+- **カテゴリ名・構成の変遷**（2026-09-06）: `school-vacation`は当初「学校休暇」（日本人学校/現地校の長期休み専用）だったが、「学校行事」に改称の上、PSLE/O-Level試験・ユース・デー・先生の日・こどもの日(SG)を`festival`から移動して統合（学校関連の予定を1カテゴリに集約する方針）。`festival`のラベルは「主要行事」→「文化・イベント」→最終的に「文化・催し」に落ち着いた（「学校行事」と"行事"が被る→「文化・イベント」も"イベント"がおでかけ画面の`catEvent`カテゴリと被るとの指摘が続き、最終的に"行事"も"イベント"も含まない「文化・催し」を採用）。`data/sg/calendar-events.json`のIRAS所得税確定申告期限は「文化・催し」カテゴリに馴染まないとして削除済み（2026-09-06、53→57件は他の変更との兼ね合いで前後）
+- **フィルターチップの表示文言は`CALENDAR_CATEGORY_LABELS`に一本化**（2026-09-06「カレンダー側のラベル名がカテゴリ名と連動していない」との指摘より）: 以前は`index.html`のチップ内テキストを手動で`CALENDAR_CATEGORY_LABELS`と同じ文言に保つ必要があったが、`CALENDAR_CATEGORY_LABELS`定義直後に`#calendar-filter-row .filter-chip`の`textContent`を`chip.dataset.calCat`から引いて自動セットする処理を追加。カテゴリ名を変更する際は`CALENDAR_CATEGORY_LABELS`を直すだけでバッジ・チップ両方に反映される（`index.html`側のテキストはJS無効時のフォールバック表示としてのみ残す）
+- **おでかけ画面の`catEvent`(`event`カテゴリ)を「イベント」→「限定イベント」に改称**（2026-09-06、カレンダーの「文化・イベント」と紛らわしいとの指摘より。`public/app.js`のJA/EN両方のi18n辞書、`index.html`のフォールバックテキストを更新）
+- **カテゴリの横スワイプ切り替え**: くらし・おでかけ画面と同じパターン(`_switchCatBySwipe()`/`_switchNewsCatBySwipe()`)で`#screen-calendar`にも横スワイプでのカテゴリ切り替えを実装(`_switchCalCatBySwipe()`)。`#calendar-filter-row`上で始まったタッチは除外(チップ行自体の横スクロールと誤爆しないように)、横方向50px以上のスワイプで前後のカテゴリチップへ切り替える
+- **スクロールトップFAB(`#fab-top`)はカレンダー画面にも対応**: 元々`home-scroll-content`/`news-scroll-content`のみ監視していたscrollリスナーと`fabScrollTop()`の遷移先判定に`calendar-scroll-content`を追加(2026-09-06)。新しい`.screen-scroll-content`を持つ画面を追加する際は、この2箇所(スクロールリスナー・`fabScrollTop()`のtargetId分岐)を必ず更新すること
+- **`#fab-pin`(くらし/おでかけ画面のクリップFAB)もtouchend委譲が必須**: 他のボトムナビ/フィルターチップと同じ理由で、`onclick`属性だけではタッチ端末で無反応になる。`app.js`の「FAB 即時タップ対応」ブロック(`{ id: 'fab-top', fn: ... }`の配列)に`{ id: 'fab-pin', fn: () => openPinSheet() }`を追加して解決(2026-09-06)。新しいFABを追加する際は必ずこの配列に登録すること
+
+### ピン留めのFAB化（カレンダー追加に伴う変更）
+ピン留めは独立したボトムナビタブではなく、**くらし・おでかけ画面のみに表示されるクリップ型FAB**（`#fab-pin`、`#fab-top`と反対の左下に配置）から開くボトムシート（`#pin-sheet-overlay`/`#pin-sheet`）に変更。中身（`#pins-sectioned-content`/`#news-pin-list-content`/`#pin-list-content`等のID）は旧`#screen-pins`から無変更で移設、`renderPinList()`/`renderNewsPinList()`も無変更で動作する。
+- **FABの表示条件**: ピン留めが1件も無い場合はFAB自体を非表示（`updatePinFabVisibility(screen)`、くらし・おでかけ画面かつピン件数>0の時だけ`.visible`クラス付与）。ピン留め/解除の全操作箇所（`togglePinById()`/`toggleNewsPinById()`/`removePin()`）末尾と、`switchNav()`・初期化時に呼び出して常に最新状態を反映
+- **開閉**: 新規オーバーレイのため`classList.toggle('visible')`方式（CLAUDE.mdの既存規約通り、`display`直書きはしない）
+- **バグ修正（2026-09-06、2段階）**: ピン留め件数が多い時、`.pin-sheet-scroll`が一番上/下までスクロールできず、はみ出したカードの📌ボタンに触れられない不具合があった。
+  1. まず`.pin-sheet-scroll`に`-webkit-overflow-scrolling: touch`/`overscroll-behavior: contain`/`flex: 1; min-height: 0`を追加（同じボトムシート系パターンの`.plan-modal-body`には最初から揃っていたのに漏れていた）。これ自体は正しい修正だが、**根本原因ではなかった**（ユーザーから「まだダメ」と再報告があり判明）。
+  2. **真因**: `.pin-sheet-overlay`(z-index:3200)/`.pin-sheet`(z-index:3201)が`.bottom-nav`(z-index:9999)より低かった。`.pin-sheet`は`bottom:0`で画面最下部まで届くため、**画面下部（ボトムナビと重なる帯）ではz-indexの高いボトムナビがヒットテストを奪い、その領域のタッチ（スクロール・ボタンタップ含め全て）が一切効かなくなっていた**。CDP経由の実タッチイベント（`Input.dispatchTouchEvent`、`element.dispatchEvent(new TouchEvent(...))`ではJSリスナーは発火するが実際のブラウザのスクロールジェスチャーは駆動されないため区別が必要）で`document.elementFromPoint()`を検証して発覚。修正は`.pin-sheet-overlay`/`.pin-sheet`のz-indexを10000/10001に引き上げ、`.bottom-nav`より確実に上にした。
+  - **教訓**: `bottom:0`で画面最下部まで届く新規`position:fixed`要素（シート・モーダル）を追加する際は、z-indexが`.bottom-nav`(9999)より高いか必ず確認すること。`.pin-detail-modal`(z-index:3301、同じく`bottom:0`)など他の同パターンモーダルにも同種の潜在バグが残っている可能性があり、触る際は要確認
+  - **デバッグ手法**: 実機不具合の再現には`element.dispatchEvent(new TouchEvent(...))`では不十分（JSリスナーは発火するがブラウザの実スクロールは動かない）。Playwrightの`context.newCDPSession(page)`→`Input.dispatchTouchEvent`で本物のタッチジェスチャーを再現し、`document.elementFromPoint(x,y)`で実際のヒット先要素を確認するのが有効
+
+## アプリ共有機能（2026-09-07実装）
+- 設定画面の「シェア」ボタン(`#do-share-btn`)のタップ動作を変更: 従来は`doShare()`が直接呼ばれ`navigator.share`(対応環境)/クリップボードコピー(非対応環境)のどちらかに即分岐していたが、**まずQRコード表示シートを開くように変更**(`onclick`を`openQrShareSheet()`に差し替え)。シート内に「リンクを共有」ボタン(`#qr-share-link-btn`)を新設し、そこから従来通り`doShare()`を呼ぶ(中身は無変更)。目の前にいる友達にその場でQRコードを見せてスキャンしてもらいたい、という要望から
+- QRコード生成は`public/qrcode-generator.js`(Kazuhiko Arase氏のMIT製、依存なしの純クライアントサイドライブラリ)を使用。このファイルは以前から存在していたが、削除済みのコース/スタンプラリー機能の名残でどこからも読み込まれていない未使用ファイルだったものを、新規依存追加せずこの既存ファイルを`app.js`より前に`<script src="/qrcode-generator.js">`で読み込んで再利用している。API: `qrcode(0,'M').addData(url); .make(); .createSvgTag(6,4)`でSVG文字列を取得し`#qr-code-canvas`に`innerHTML`で挿入(初回のみ生成しキャッシュ)。**`npm`の`qrcode`パッケージ（このファイルとは無関係の別物、未使用だった）は設計書192（2026-09-10コードクリーンアップ）で`package.json`から削除済み**
+- QRコードに埋め込むURLは既存の`doShare()`と同じApp Store URL(`https://apps.apple.com/app/id6787159354`)
+- シートの見た目・開閉パターンは既存の`#backup-passphrase-overlay`/`#backup-passphrase-sheet`(`.chat-overlay`+`.plan-modal`、`classList.add/remove('visible')`、`lockScroll()`/`unlockScroll()`)をそのまま踏襲
+- `#qr-code-canvas`の背景は`#fff`固定(CSS変数不使用)。ダークモードでも白背景を維持しQRコードの読み取り精度を落とさないため
+- **実装直後バグ（2026-09-07、教訓）**: `index.html`側の`onclick`属性は`doShare()`→`openQrShareSheet()`に差し替えたが、`#screen-settings`への`touchend`委譲リスナー（`public/app.js`内、設定画面の即時タップ対応ブロック）に**別途ハードコードされていた`doShare()`直呼び出しの更新を見落とし**、タッチデバイス（実機・スマホ）ではQRシートが開かず従来通りの共有動作のままになっていた。`_touchCapableDetected`がtrueになった後は`onclick`側は実行されず、この`touchend`委譲側が実質的な唯一の実行経路になるため、**同じアクションに複数の実行経路（`onclick`属性＋`touchend`委譲）がある機能を変更する際は、両方を必ず一緒に更新すること**。同様に新設した`#qr-share-overlay`（オーバーレイタップで閉じる）・`#qr-share-link-btn`（リンクを共有ボタン）も、既存の「オーバーレイ・モーダル閉じる 即時タップ対応」配列（`[[id, fn], ...].forEach(...)`）に追加が必要だった
+- tabs-section（いつ行く？4タブ）廃止
+- `#filter-row-category` カテゴリチップ横スクロール行を header 直下に常時表示（何も選ばない = 全件）
+- `#event-filter-btn` 絞り込みボタン → `#event-filter-sheet` ボトムシート（いつ行く？/誰と/エリア/キーワード）
+- JS変数: `filterCats` / `filterWeek` / `filterWho` / `filterAreas` / `filterKeyword` / `filterEnding`
+- プロフィールの who フィルターは廃止。filterWho（シート選択）で統一
+
+## 都市対応状況（2026-09-03時点）
+現状SG（シンガポール）のみ稼働中。BKK/SYDはイベント数が少なく一時停止中（`public/index.html`の`ACTIVE_CITIES = ['sg']`、`scripts/run-fetch-all.sh`・`scripts/run-source-analysis.sh`がSG固定）。設定画面の都市選択欄も選択肢が1つしかないため非表示化済み（設計書161、ロジック自体は残置）。再開時は`ACTIVE_CITIES`とスクリプトのcity指定を戻す作業になる。
+
+## SGエリア区分
+SGのエリア区分はCentral/East/West/North/North-East/Island-wide/Sentosaの7区分（Sentosaはケーブルカー・モノレールで渡る独立した「行き先」のため単独区分）。定義箇所: `public/index.html`の`#event-filter-sheet`内`.ef-chip`（イベント絞り込みシート）、`scripts/filter-events.js`の`CITY_AREAS.sg`（取り込みパイプラインのAI分類プロンプト用列挙値）。BKK/SYDはSentosa非対象。
+
+## イベント取り込みパイプライン構成（2026-09-09時点、crontab・コード確認済み。同日中に朝の実行時刻を6:30→7:00 SGTへ再調整、さらに同日中に追加実行の時刻を12:30/19:30→12:00/17:00へ変更、さらに同日中に夕方以降の記事の取りこぼしリスクを減らすため3回目の実行を17:00→21:00 SGTへ再変更）
+
+システムcrontabで動いているジョブは実質3本:
+
+| ジョブ | 内容 | 頻度 |
+|---|---|---|
+| `scripts/run-fetch-all.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `fetch-life-info.js --city=sg`（ユーザー向けプッシュ通知あり、詳細は下記参照）→ `notify-fetch-summary.js`（イベント＋生活情報をまとめて1通のLINE通知） | 毎日 7:00 SGT |
+| `scripts/run-fetch-extra.sh` | `fetch-events.js --city=sg` → `check-content-integrity.js --city=sg` → `fetch-life-info.js --city=sg --no-notify`（12:00・21:00ともユーザー向けプッシュ通知なし、詳細は下記参照）→ `notify-fetch-summary.js`（設計書187で追加。開発者向けLINE通知） | 毎日 12:00 SGT・21:00 SGT |
+| `scripts/run-source-analysis.sh` | `discover-sources.js --city=sg --no-notify` → `analyze-sources.js --city=sg --no-notify` | 水・日 7:30 SGT |
+
+BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中（「都市対応状況」参照）。**旧`refresh-courses.js`のcronエントリはコース機能削除（設計書178）に伴い完全に削除済み**（旧CLAUDE.mdに記載があったが実態と乖離していたため訂正）。生活情報取得も当初は独立cronエントリ（毎日7:15 SGT）だったが、後日`run-fetch-all.sh`内に統合され独立エントリは廃止済み。さらに設計書183で`run-fetch-extra.sh`にも組み込まれ1日3回化された（詳細は下記「生活情報・ニュースのキュレーション機能」参照）。
+
+- **`run-fetch-extra.sh`（2026-09-05追加、2026-09-08にくらし情報取得を追加、2026-09-09に開発者向けLINE通知を追加、同日中に実行時刻を12:30/19:30から12:00/17:00へ変更、さらに同日中に3回目の実行を17:00から21:00へ再変更）**: Goody Feed（推定12.6件/日、フィード窓19時間分）・The Smart Local（7.9件/日、窓30時間分）・Eatbook（7.8件/日、窓31時間分）のように、投稿頻度に対してRSSフィードの保持件数が少なく、1日1回の取得だけでは記事がフィードから流れ落ちて取りこぼされるリスクがあるソースへの対策。1日1回（7:00 SGT）だった取得を1日3回に増やし、取得漏れリスクを下げた。ハイウォーターマーク方式（`data/source-fetch-state.json`）により重複取得はされない。設計書183で`fetch-life-info.js --city=sg`の呼び出しも追加し、くらし情報も同様に1日3回化した。同一スクリプトが12:00/21:00両方でcron起動されるが、ユーザー向けプッシュ通知は2026-09-09の変更により`run-fetch-all.sh`（7:00 SGT）側に一本化されたため、このスクリプトの12:00/21:00両方とも常に`--no-notify`付きで呼ぶ（旧: 19:30側のみ`TZ=Asia/Singapore date +%H`で判定し通知ありで実行していたが、この判定分岐は撤去済み）。開発者向けLINE通知（`notify-fetch-summary.js`）は設計書187で12:00・21:00両方の末尾に追加済み（詳細は下記参照）。**3回目の実行時刻の再変更（2026-09-09、同日中の追加議論）**: 12:00/17:00へ変更した直後、ユーザーから「夕方以降（17:00以降）に出る記事が翌朝7:00まで拾われず取りこぼしリスクがある」との指摘があり議論の結果、3回目を17:00から21:00 SGTに変更（7:00・12:00は変更なし）。crontabのCEST表記は`0 11 * * *`（17:00 SGT）→`0 15 * * *`（21:00 SGT）
+- **開発者向けLINE通知は1日3回、その都度その回だけの件数を通知する方式（設計書187、2026-09-09）**: 2026-09-07に「通知は1日1回（6:30）のみ、過去24時間分を履歴ファイルから合算表示」する方式に変更していたが（`run-fetch-extra.sh`の12:00/17:00〈当時は12:30/19:30〉の採用件数がLINE通知上「消えて見える」不具合の対策）、ユーザー要望により1日3通に増えることを許容の上で元の「毎回・その回だけの件数」方式に戻した。`notify-fetch-summary.js`の`loadLatestSummary(cityKey)`が`logs/fetch-summary-${city}.json`（`fetch-events.js`の`saveFetchSummary()`が毎回上書きする最新1回分）を、`loadLifeInfoLatestSummary('sg')`が`logs/fetch-life-info-summary.json`（`fetch-life-info.js`が同様に毎回上書き）をそのまま読んで表示する。通知見出しは「今回の取り込み結果」（1回分であることを明示）。**過去24時間分を合算する`loadLast24hSummary()`/`loadLifeInfoLast24hSummary()`関数・履歴ファイル（`logs/fetch-summary-history-${city}.jsonl`・`logs/fetch-life-info-summary-history-sg.jsonl`、48時間分保持）への追記ロジック自体は削除しておらず、将来の分析・復元用途のため残置**（現在は`main()`から未呼び出し）。トレードオフとして、取得処理自体が失敗した回は直前の古いサマリーファイルの内容がそのまま再通知される可能性があるが、シンプルさを優先しユーザー確認の上で許容している
+- **LINE通知「新着なし」表示の分かりやすさ改善（設計書191、2026-09-10）**: `formatCatCounts()`はカテゴリ別件数を重複除外**後**の`newItems`から集計するのに対し、`accepted`（採用件数）は重複除外**前**の値を使っているため、「AIには関連ありと判定されたが既存記事と重複していたため実際には0件しか新規追加されなかった」ケースで「3件採用」と「（新着なし）」が矛盾して見える不具合があった。`notify-fetch-summary.js`のおでかけ・くらし両セクションで、`catLine`（カテゴリ内訳）が空でも`accepted>0`なら「（◯件は重複のため新規追加なし）」と実際の採用件数を含めた文言を表示し、`accepted`も0の場合のみ従来通り「（新着なし）」を表示するよう変更（`EVENT_CAT_LABELS`の`travel: '旅行'`ラベル自体は既存のまま無変更）
+
+- **ハイウォーターマーク方式**（`fetch-events.js`）: `data/source-fetch-state.json`にソースごとの`lastSeenGuids`/`lastFetchedAt`を保存し新着記事のみ抽出。初回は`daysBack=7`カットオフにフォールバック。取得失敗ソースは状態未更新（次回また試行）
+- **Haiku採否・記事生成**（`filter-events.js`）: `scoreThreshold=6`（`BATCH_SIZE=10`件ずつ、`max_tokens:6000`、失敗時1回リトライ）。カテゴリ比率が薄いカテゴリはscore5以上に緩和。採用イベントはSonnetで日本語記事を生成（`ENRICH_BATCH_SIZE=8`、`max_tokens:6000`、同じく1回リトライ。2026-09-09設計書189で英語記事生成は廃止済み、詳細は上記「i18n対応」節参照）
+- **`data/sources.json`のstatus運用**: `active`/`paused`/`rejected`の3値のみが実際の取得可否を左右する。`pausedAt`/`pausedReason`等は記録用メタデータのみで`fetch-events.js`は参照しない
+- **イベントカードの「本当の公開日」収集ロジック（設計書207、2026-09-15実装。同日中にユーザー追加依頼2回で表示側はエリア・公開日とも撤去、収集ロジックのみ残置）**: くらし側ニュースカードには元々あった「ソース+本当の公開日(publishedAt)」表示がおでかけ側イベントカードには無かったため、`filter-events.js`の`item`組み立て時に新規収集ロジックを追加した。`original.pubDate`（`fetch-events.js`が中間オブジェクトに保持するRSSのpubDate）から`publishedAt`（ISO文字列、パース不能・欠落時は取得時刻にフォールバック）を算出し`item.publishedAt`として保存。`fetched_at`（自システムへの取り込み日時）の既存ロジックとは独立、変更なし。**フロント表示は当初「カテゴリ→ソース→公開日→エリア→期間→バッジ」だったが、同日中の2回の追加依頼により「エリア(`e.location`)」「公開日(`eventDateStr`)」の順で表示からのみ撤去し、最終的な`public/app.js`の`renderEventCard()`の`metaRowHtml`表示順は「カテゴリバッジ→`e.source`（ソース名）→`e.period`/`e.hours`（開催期間）→New/残り日数バッジ」に収束している**。`eventDateStr = _formatLifeInfoDate(e.publishedAt || e.fetched_at)`の変数定義自体・`e.location`/`e.area`のデータ収集ロジック自体は削除せず残置（将来また表示する可能性を考慮）。**既存イベント（実装時点で126件）には`publishedAt`を遡って付与しておらず、今後新規に取り込まれるイベントにのみ付与される**。表示には使われていないが、`publishedAt`はバックエンドで新規イベントに継続して付与され続けている
+- **ユーザー向けWebプッシュ通知は完全停止済み（この「おでかけ」イベント取り込みパイプラインに限る）**（`notify-fetch-summary.js`は開発者向けLINE通知のみ、`sendPushToAll()`自体は将来の手動再送信用に関数として残置）。⚠️ **これはイベント側（`fetch-events.js`）に限った話であり、下記「生活情報・ニュースのキュレーション機能」の`fetch-life-info.js`側のユーザー向けプッシュ通知は現役で稼働中**（設計書183で1日1回・19:30 SGT固定に整理後、2026-09-09にユーザー要望で6:30 SGT固定に変更、同日中にユーザー要望で7:00 SGT固定へ再調整済み）。両者を混同しないこと
+- 画像URL疎通確認・discover-sources.jsのAPIエラー握りつぶし修正等の細かい改修履歴はgit履歴を参照
+
+**2026-09-03削除（コード変更）**:
+- **カテゴリ上限機能を完全削除**: `filter-events.js`から`CATEGORY_TARGET_RATIO`/`CATEGORY_CAP_BUFFER`定数・`enforceTypeCap()`関数・その呼び出しを削除。カテゴリ超過分の自動削除は行わなくなった（採用側のスコア緩和ロジック`categoryStats`/`thinCategories`は別機能のため維持）
+- **Instagram取り込みを完全削除**（`fetch-events.js`/`discover-sources.js`/`analyze-sources.js`の3ファイル）: 削除前時点でSGの全24アカウントが`paused`/`rejected`/`retired`で実際には1件も取得されていなかった（APIトークンは`.env`に設定済みだったが対象0件のため常にスキップ）。
+  - `fetch-events.js`: `fetchInstagramPosts()`関数・`CITY_CONFIG`各都市の`instagramAccounts`配列・`loadActiveSources()`のIG読み込みを削除
+  - `discover-sources.js`: `probeInstagram()`関数・`probeCity()`/`buildCandidates()`/`buildReport()`内のIG候補プローブ・スコアリング・レポート生成ロジックを削除（RSS候補のプローブ・分析機能は無変更で存続）
+  - `analyze-sources.js`: `activeIG`集計・IG停止済みソースの永久除外判定・IG候補への入れ替えロジックを削除。**Step2「rawTotal不足時の量補充」はIG候補のみで実装されていたため機能ごと削除**（RSS候補による代替実装は行っていない、rawTotal不足は警告ログのみになった）
+  - 3ファイルとも`node --check`・`--dry-run`実行で正常動作確認済み（Instagram関連の出力が一切出ないこと、RSS側の処理は従来通り動くことを確認）
+  - `data/sources.json`/`data/source-pool.json`/`data/source-candidates.json`内の既存`instagramAccounts`データ自体は削除していない（コードから参照されなくなっただけで、意図的にファイルには残置）
+- **`analyze-sources.js`のソース自動入れ替えロジックを廃止、直接「永久除外」する方式に変更**: ユーザー要望「入れ替えロジックとめていい、採用率が低いやつだけ永久除外のリストに追加するだけにして。ときどきチェックするので」を受けて変更。旧Step1（不良ソースを`paused`にして`source-candidates.json`の候補と自動で入れ替え）を撤去し、不良ソース（直近4回で採用率5%未満または4回連続0件）を検知したら直接`status:'rejected'`にするだけに単純化。候補との入れ替え・`source-candidates.json`の読み込み自体を`analyze-sources.js`から削除（`sortCandidatesByDiversity()`関数・`PATHS.candidates`・`cityCands`も不要になったため削除）。新規ソースの追加は今後ユーザーが手動で`data/sources.json`を編集する運用。`notify-fetch-summary.js`のソース分析セクション表示も「❌ 停止」「➕ 追加」の2行から「🚫 永久除外」の1行のみに変更。`--dry-run`実行で正常動作確認済み（不良ソースが直接rejectedになり、候補入れ替えが発生しないことを確認）
+
+## シンガポール在住日本人向け生活情報・ニュースのキュレーション機能（2026-08-28実装、設計書172。2026-09-03時点でコード確認済み）
+週末おでかけイベント取り込みパイプライン（`fetch-events.js`/`filter-events.js`）とはデータ・API・UIとも独立した機能。ボトムナビ「くらし」タブ（表示ラベル、内部id`#nav-news`）の中身。
+
+⚠️ 「旅行」カテゴリは設計書175で一度この機能に追加されたが、同日中に設計書176でロールバックされ、**現在は「おでかけ」画面（イベント一覧）のカテゴリタブとして再配置されている**（上記「イベント取り込みパイプライン構成」の`CATEGORY_TARGET_RATIO`参照）。以下は現在のコード基準の記述。
+
+- **カテゴリ**: 6種（admin/weather/transport/community/health/education）。`server.js`の`VALID_CATEGORIES`もこの6種（travelは含まれない）
+- **データ取得**（`scripts/fetch-life-info.js`）: RSS8件（CNA/Mothership/Straits Times/JCCI/CNA Sport〈設計書182で追加〉/Expat Living/SingaporeMotherhood〈設計書203、2026-09-14追加〉/AsiaX〈設計書204、2026-09-14追加〉、⚠️Straits Times追加の経緯は未記録）を`rss-parser`で取得、ハイウォーターマーク方式（`data/life-info-fetch-state.json`、イベント用の状態ファイルとは分離）。Haikuで在住日本人への関連性判定＋カテゴリ付与、Sonnetで日本語要約を生成し`data/sg/life-info.json`（gitignore対象）に保存（2026-09-09設計書189で英語要約生成は廃止済み）。リテンション期間は一律7日
+- **フィード1件追加・AsiaX（設計書204、2026-09-14、builder→checker→closer）**: ユーザーが提供したAsiaX（`@AsiaXbiz`）のXスクリーンショットから、在住日本人向けオリジナル日本語記事を発信するメディアであることが判明。おでかけ側`data/sources.json`には既にAsiaXが`status:"rejected"`（2026-09-05、理由「RSSフィードに`<item>`が0件」）として登録されていたが、登録URL`https://www.asiax.biz/feed/`が単に誤っていただけと判明（正: `https://www.asiax.biz/news/feed/`）。ユーザー希望により「くらし側のみ追加」とし、おでかけ側`data/sources.json`のstatusは`rejected`のまま変更せず、`rejectedReason`にのみ訂正メモを追記した（おでかけ側への再追加は今回は見送り、ユーザー判断）。`--dry-run`検証で正しいURLから10件取得でき、うち3件（COE小型車カテゴリー過去最高更新/猛暑・ヘイズによるホーカー売上減/True Fitness全店閉鎖〈意味的重複で最終除外〉）がHaiku一次選別→Sonnet要約を通過、文字化けなしを確認済み
+- **フィード2件追加（設計書203、2026-09-14、builder→checker→closer）**: 「くらし・おでかけ両方の取り込み件数が少ないので使えるソースを増やせるだけ増やしたい」との依頼を受けたWeb調査で発見した候補のうち、くらし側にはExpat Living Singapore・SingaporeMotherhoodの2件を追加（同時に発見したSassy Mama SG/i eat i shoot i post/AspirantSGはおでかけ側`data/sources.json`にのみ追加済み、対象外）。`--dry-run`検証の結果、**Expat Living（`https://expatliving.sg/feed/`）はCloudflare WAF（`wpewaf.com`）がNode.js標準`fetch`（undici）からのリクエストのみを403でブロックする状態**（`curl`・`rss-parser`の`parseURL()`では同一URLに200が返ることを確認済み、外部サイト側のボット対策でありスクリプトのバグではない）。エラーハンドリングは正常機能し該当ソースのみスキップ、他ソースの処理・スクリプト全体の完走には影響なし。SingaporeMotherhoodは正常動作を確認済み（`--dry-run`で2件採用実績あり）。**くらし側には`analyze-sources.js`のような自動評価・除外の仕組みが無い**（おでかけ側`scripts/analyze-sources.js`の不良ソース自動`rejected`化はイベント取り込みパイプライン専用で、生活情報パイプラインには適用されない）ため、Expat Livingが今後もブロックされ続け実質ゼロ件のまま残り続けても自動的には検知・除外されない。**採用率は当面手動モニタリングが必要**（LINE通知〈`notify-fetch-summary.js`〉のカテゴリ内訳・件数を継続的に確認し、Expat Livingからの採用が恒常的にゼロであれば手動でのフィード削除や代替手段（User-Agent偽装強化等）の検討をユーザー判断で行う）
+- **`summary_ja`のプロンプト文言変更（設計書199、2026-09-14）**: `enrichBatch()`（Sonnet要約生成）の`summary_ja`指示が「在住日本人にとってどう関係するか」という補足観点を含んでいたため、「〜が必要です」等の読者への呼びかけ調の結びが生成されやすい副作用があった。文字数目安を100〜150字→180〜220字に増やし、「記事の内容そのものを客観的に詳しく記述すること」「読者への補足・呼びかけは書かないこと」という指示に変更。`title_ja`の指示・`filterBatch()`（Haiku一次選別）・JSON抽出ロジックは無変更。既存の`data/sg/life-info.json`データは遡及的に書き換えず、今後の新規取得分にのみ適用される
+- **新着5件の既存summaryを新プロンプト仕様で部分的に遡及更新（設計書200、2026-09-14、builder→checker→closer）**: 設計書199は将来分のみ適用の設計だったが、ユーザーから「新着の記事だけ要約を作り直して」との依頼を受け、当時「新着」フィルターに表示中だった直近5件（全てStraits Times、`fetched_at: 2026-09-13T13:00:43.025Z`）に限定して`summary`フィールドのみを再生成した。一時スクリプト（`scripts/scratch/resummarize-5articles.js`、作業後削除）でStraits Times RSSから該当記事の説明文を再取得（5件全て取得成功、`filter-events.js`の`fetchArticleContent()`と同等のOGPスクレイピングのフォールバックは今回未発動）し、設計書199と同一プロンプトでSonnetに再要約させ、`data/sg/life-info.json`への書き込みは`.tmp`＋`fs.renameSync`の原子的差し替えで実施。`title`等の他フィールド・他53件は無変更（diff確認済み）。恒久スクリプト（`fetch-life-info.js`/`filter-events.js`）自体は無変更
+- **`summary_ja`の文字数目安を100〜150文字程度に再変更（設計書201、2026-09-14、builder→checker→closer）**: 設計書199で180〜220文字程度に増やした直後、ユーザーから「ちょっと長くなった感じがする」とのフィードバックがあり、文字数目安のみ100〜150文字程度に戻した（「在住日本人にとって〜」を書かない禁止指示は維持）。あわせて設計書200で長め基準に作り直した対象5件（`li_1789304443025_khnvx`/`4ccm2`/`lgrgz`/`ob531`/`a9jsv`）を新しい短め基準で再々生成（一時スクリプト`scripts/scratch/resummarize-5articles-v2.js`、作業後削除。5件ともStraits Times RSSから再取得成功、OGPフォールバック・スキップは0件）。実測は79〜100字（設計書200時点の150〜172字より明確に短縮）で、目安下限100字をやや下回るものもあったが、RSS取得元の英語説明文自体が65〜99字と短いことが原因であり、内容の正確性・禁止表現の不在は確認済みのため許容と判断した
+- **`summary_ja`の文字数目安を150〜180文字程度に再変更（設計書202、2026-09-14、builder→checker→closer）**: 設計書201で79〜100字とやや短くなりすぎたため、ユーザーから「もうちょい長い方がいい」とのフィードバックがあり、目安を150〜180文字程度に引き上げた（`何が起きたか・背景`に「経緯」を追加、「在住日本人にとって〜」禁止指示は維持）。対象5件は今回はRSS単体を採用せず、RSS再取得に加え`filter-events.js`の`fetchArticleContent()`と同等のOGPスクレイピングロジック（一時スクリプト`scripts/scratch/resummarize-5articles-v3.js`内に複製、`filter-events.js`自体は無変更）を併用し、材料量を底上げした上でSonnetに要約させた。5件全て「RSS+OGP併用」で取得成功（スキップ0件）。実測は126〜153字（設計書201時点の79〜100字より明確に改善）で、目安上限180字にはやや届かなかったが、これはRSS・OGPともに元記事の英語説明文自体が短く（65〜99字/226〜253字、かつ内容が重複）材料に上限があったためであり、捏造は行っていない。Sonnet呼び出しは目安への到達度と内容の自然さを比較するため4回試行（119〜152字→106〜136字→122〜142字→126〜153字の順）し、最終的に4回目の結果を採用
+- **スポーツニュースの扱い（設計書182、2026-09-08）**: `filterBatch()`のHaiku分類プロンプトは元々「スポーツ・芸能・エンタメ関連のニュース」を一律不採用としていたが、日本人選手の移籍・日本代表戦の開催など在住日本人の関心が高いスポーツニュースは除外対象から外し、既存の`community`カテゴリに分類するよう調整済み（新カテゴリ`sports`は新設していない、6カテゴリのまま）。プロンプト上は「知っておくべき話題のニュース」（移籍・大会結果・開催決定の速報等）を対象とし、「チケット販売中の参加イベント告知」は対象外と明記して、おでかけ側の独立イベント取り込みパイプライン（`fetch-events.js`/`filter-events.js`）との話題重複をプロンプト文言レベルで緩和している。**ただし両パイプライン間の技術的な重複排除ロジックは存在せず、完全な重複防止は未対応**（同じ話題が両タブに出る可能性は残る）
+- **1日3回取得・ユーザー向けプッシュ通知は7:00 SGT固定（設計書183で19:30 SGT固定に整理→2026-09-09にユーザー要望で6:30 SGT固定へ変更→同日中に「6:30は少し早い」とのユーザー要望で7:00 SGT固定へ再調整。なお`run-fetch-extra.sh`側の追加実行の時刻も同日中に12:30/19:30から12:00/17:00へ変更、さらに同日中に3回目を17:00から21:00へ再変更）**: フィード単位の頻度分けは行わず、`CITY_CONFIG.sg.feeds`全5本を一律1日3回（7:00/12:00/21:00 SGT、`run-fetch-all.sh`＋`run-fetch-extra.sh`）取得するように変更（ハイウォーターマーク方式のため同一記事の重複処理は発生しない）。`notifyContentUpdated()`（`server.js`の`POST /api/notify-events-updated`→`sendPushToAll()`経由のエンドユーザー向けWebプッシュ通知/APNs通知。開発者向けLINE通知とは別物）は`--no-notify` CLIフラグで呼び出し側から制御する。当初（設計書183）は朝は身支度等で忙しく通知が埋もれやすい・19:30はその日3回分の新着が出揃い内容が最も充実しているという理由で19:30 SGTの回にのみ送るよう集約していたが、2026-09-09にユーザーから「朝が一番通知を見る、通勤中にアプリを開くのがルーティーンだから」との要望を受け、朝の回（`run-fetch-all.sh`）にのみ送るよう戻した（12:00・21:00の回は`--no-notify`付き）。当初は6:30 SGTとしたが、同日中に「6:30は少し早い」とのユーザー要望を受け7:00 SGTに調整した
+- **開発者向けLINE通知（`notify-fetch-summary.js`）も1日3回化（設計書187、2026-09-09）**: `fetch-life-info.js`の`saveFetchSummary()`が毎回上書きする`logs/fetch-life-info-summary.json`（最新1回分。コード内コメントは「後方互換で残置・現在未使用」から「現役で使用」に訂正済み）を`notify-fetch-summary.js`がそのまま読み、その回だけの件数を通知する。上記のユーザー向けプッシュ通知の`--no-notify`制御（7:00のみ送信）とは完全に独立した仕組みで、開発者向けLINE通知は7:00/12:00/21:00の3回とも送られる
+- **cron**: 独立エントリではなく、`run-fetch-all.sh`（7:00 SGT、`fetch-events.js`の直後・`notify-fetch-summary.js`の直前、`--no-notify`なし＝ユーザー向けプッシュ通知あり）と`run-fetch-extra.sh`（12:00/21:00 SGT、設計書183で追加。2026-09-09にユーザー要望で12:30/19:30から時刻変更、さらに同日中に3回目を17:00から21:00へ再変更。2026-09-09以降は両方とも`--no-notify`付き。設計書187で末尾に`notify-fetch-summary.js`呼び出しも追加）の両方に組み込まれている。当初（設計書172時点）は独立cronエントリ（毎日7:15 SGT）だったが、その後`run-fetch-all.sh`に統合されイベントと同じLINE通知にまとめられ、さらに設計書183で1日3回化された
+- **API**: `GET /api/life-info?city=sg&category=...`（`server.js`、`GET /api/events`の直後）
+- **フロントエンド**: ボトムナビ「くらし」画面（`#screen-news`）＋ホーム（「おでかけ」画面）のプレビューセクション（`#life-info-preview-section`、直近3件）。未ログインでも閲覧可能（探訪・予定表で使われていたアカウント連携ゲートは適用外）
+- **新着リストのソート順（`public/app.js`、2026-09-09にユーザー要望で優先順位を変更）**: くらし画面・おでかけ画面（`renderEventCards()`）とも、1次キー=`fetched_at`（取り込み時間、降順・新しい順）、2次キー=カテゴリー順（くらしは`NEWS_CATEGORY_ORDER`、おでかけは`CATEGORY_ORDER`。いずれもカテゴリチップ`#news-filter-row`/`#filter-row-category`の並び順と一致する固定順）でソートされる。従来は「カテゴリー→時間」の優先順位だったが、「まず取り込んだ時間、次にカテゴリー」の順に入れ替えた。くらし画面は2次キーの参照フィールドもこの変更に合わせて`publishedAt`（元記事の公開日時）から`fetched_at`（自システムへの取り込み日時）に変更済み（おでかけ画面は元々`fetched_at`を使用済みだったため変更不要だった）
+- 詳細なi18nキー・UI構造等はコード直接参照
+
+## 環境構成と注意事項（2026-07-07）
+
+### Web版 = テスト環境 / iOS App Store版 = 本番環境
+
+| 環境 | URL/配布 | 役割 |
+|------|----------|------|
+| Web版 | dosuru.app | 開発・確認用（テスト環境） |
+| iOS App Store版 | App Store `id6787159354` | 本番（エンドユーザーが使う） |
+
+⚠️ **重要: データ層は両環境で共有**
+
+- `data/sg/events.json`・`data/sg/life-info.json`等のデータファイル
+- `/api/*` エンドポイント全般
+
+これらはサーバー上で1つだけ存在し、**Web版とApp Store版の両方が同じデータを参照している。**
+
+**Web版でテスト中に絶対やってはいけないこと:**
+- イベントデータを大量削除・破壊的に更新する（本番App利用者に影響する）
+- APIレスポンスの構造を非互換に変更する（旧App Store版が壊れる）
+
+**対応方針:**
+- データ構造の破壊的変更は、App Store版のリリースと同時に行う
+- テスト用の一時データ変更は必ず元に戻してからコミットする
+- APIを変更する場合は後方互換性を保つ（旧バージョンのアプリが動き続けるか確認）
+
+## iOS / Capacitor 開発ノウハウ（2026-07-08）
+
+### Web版とiOS版の関係
+- **同一コード**: Capacitorは `public/` をバンドル。Web版とiOS版は完全に同じHTML/CSS/JS
+- **`_isCapacitorApp`フラグ**で分岐: GA4スキップ / 外部リンク処理 / overscroll防止 / SW登録スキップ / インストールバナースキップ / Push通知UI非表示
+- データは共有（events.json / API）。Web版でデータ破壊 = 本番App利用者への影響
+
+### ❌ 絶対にやってはいけないこと
+
+**`html, body { overflow: hidden; height: 100% }` を使わない**
+→ WKWebView で bottom-nav が常に「上に上がった状態」で固定されてしまう副作用がある。overscrollをJSで制御する（下記参照）。
+
+**スクリーンコンテナに `position: fixed` を使わない**
+→ stacking context が生成され、その上に重なるはずの bottom-nav のクリックが効かなくなる。スクリーンは `height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px))` で通常フローに置く。
+
+**モーダル表示中も bottom-nav を表示し続ける設計**: 全モーダル・オーバーレイは bottom-nav (9999) 未満の3000番台z-indexに統一する。
+
+| 要素 | z-index |
+|---|---|
+| `#event-filter-sheet` | 3100 |
+| `.pin-detail-overlay` | 3300 |
+| `.pin-detail-modal` | 3301 |
+
+⚠️ 上記以外（`.plan-modal*`/`title-edit*`/`.cal-popup*`/`share-modal`/`cal-sync-modal`/`cal-join-modal`/`install-modal`/`date-picker*`/`schedule-plan-action*`）は探訪・コース・予定表・共有カレンダー機能の削除に伴いDOM上に存在しない（2026-09-03コード確認）。シート/オーバーレイのペアは「シート本体 ≥ 自身のoverlay」の相対関係を維持し、新規モーダル追加時も3000番台の方針（bottom-nav未満）に合わせること。
+
+**例外: パスフレーズ入力シート（`#backup-passphrase-sheet`/`#cal-passphrase-sheet`）はテキスト入力中に限りbottom-navを一時的に隠す**
+→ モバイルSafariは`position:fixed;bottom:0`要素のキーボード表示時可視領域追従がbottom-navとシートとで同期せず、ボタン行が重なる問題があったための例外措置。`document`レベルの`focusin`/`focusout`リスナーで、対象2シート内のINPUT/TEXTAREAにフォーカスがある間だけ`.bottom-nav`を`visibility:hidden`にする（Web版・iOS版共通）
+
+**PTR（プルトゥリフレッシュ）**: `_initPtr(container, indicatorId, onRefresh, watchSwipeIntent)`共通ヘルパーでiOS版・Web版両方で有効化（設計書198、2026-09-13。設計書19実装時点ではiOS版のみだったが、ユーザー依頼によりWeb版も有効化）。現在ホーム画面（`#home-scroll-content`）・くらし画面（`#news-scroll-content`）に適用。スクロールコンテナ内の`.ptr-indicator`要素の`height`/`opacity`のみを操作し、ヘッダー・`html`/`body`には一切触れない設計。リフレッシュ確定閾値60px
+→ **iOS overscroll防止JS（下記）・StatusBar Info.plist設定の2箇所を変更しないことが、PTRが正常動作する前提条件**（過去にこの2箇所の不備でPTRのヘッダーずれ・白いステータスバー問題が起きたため）。変更する場合はPTR・ヘッダー位置・ステータスバー色を実機で回帰確認すること
+
+### ⚠️ `position:fixed`要素は、キーボード表示・非表示の過渡期間中にタッチイベントの配送先が親要素にずれることがある（2026-07-11）
+
+実機ログ解析（設計書9）により判明した既知の食い違い: iOS WKWebViewでは、キーボードが閉じた後`window.innerHeight`/`visualViewport.height`が実際の値に戻るまでの過渡期間（数秒〜数十秒、`resize:'none'`設定下でも発生）、`position:fixed`要素（ボトムナビ等）の**子孫**へのネイティブタッチイベント配送が、子要素ではなく親のfixed要素自体をターゲットにしてしまうことがある。
+
+- この間、`document.elementFromPoint()`によるプログラム的ヒットテストは常に正確に子要素を返し続ける（CSSレイアウト・座標系自体は破壊されていない）
+- つまり「JS/CSSOM上は正常なのに、実際のタップだけが効かない」という食い違いが生じる。見た目やDOMを見ても異常が発見できないため原因特定が難しい
+- 同様の「見た目・DOM構造は正常なのにタップが効かない」系の調査では、まずこの食い違い（`elementFromPoint()`の理論値 vs 実際のイベントターゲット）を疑い、両方を並べて記録する診断ログをまず仕込むこと
+- 対応例（方針C、設計書9で採用）: 親のfixed要素自体に「保険」の`touchend`ハンドラを追加し、`e.target`が個別の子要素（ボタン）でない場合のみ`document.elementFromPoint()`でタップ座標から実際の対象を特定して手動でディスパッチする。既存の子要素個別ハンドラとの二重発火防止（`e.target.closest('.子要素セレクタ')`で判定）が必須
+
+### ✅ 正しいスクロール・レイアウトパターン
+
+```css
+/* 固定ヘッダー + スクロールコンテンツ の正解パターン */
+.screen-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 60px - env(safe-area-inset-bottom, 0px));
+}
+.screen-header  { flex-shrink: 0; }
+.screen-content { flex: 1; min-height: 0; overflow-y: auto; }
+/* flex: 1; min-height: 0; の両方が必要。min-height: 0 がないとオーバーフローしない */
+```
+
+### ✅ iOS overscroll（ゴムバンドスクロール）防止
+
+```javascript
+// touchmove を passive:false で登録し、必要な場合のみ preventDefault
+document.addEventListener('touchmove', e => {
+  const dy = e.touches[0].clientY - startY;
+  let el = e.target;
+  while (el && el !== document.documentElement) {
+    const ov = window.getComputedStyle(el).overflowY;
+    if (ov === 'auto' || ov === 'scroll') {
+      if (el.scrollHeight > el.clientHeight) {  // ← 縦スクロール可能な要素のみ対象
+        const atTop    = el.scrollTop <= 0;
+        const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+        if (dy > 0 && atTop)    { e.preventDefault(); return; }
+        if (dy < 0 && atBottom) { e.preventDefault(); return; }
+        return;
+      }
+      // ← scrollHeight <= clientHeight の要素はスキップ（overflow-x:auto の副作用でoverflow-y:autoになる水平カルーセルを除外）
+    }
+    el = el.parentElement;
+  }
+  e.preventDefault();
+}, { passive: false });
+```
+
+**注意**: `overflow-x: auto` を設定すると CSS仕様で `overflow-y` も暗黙的に `auto` になる。そのため `scrollHeight > clientHeight` の条件チェックが必須。これがないと水平カルーセルで縦スクロールが効かなくなる。
+
+### ✅ Capacitor キーボード設定
+
+`capacitor.config.js` に設定するだけでなく、**`@capacitor/keyboard` パッケージのインストールも必須**。パッケージがないと設定は iOS ネイティブに反映されない（サイレントに無視される）。
+
+```javascript
+// capacitor.config.js
+plugins: {
+  Keyboard: {
+    resize: 'none',  // キーボードがWebViewを縮小しない → ナビがキーボード裏に隠れる自然な挙動
+  },
+},
+```
+
+```json
+// package.json
+"@capacitor/keyboard": "^6.0.0"  // これがないと上記設定が効かない
+```
+
+**プラグイン取得は `registerPlugin()` を優先する（2026-07-09追記）**: `window.Capacitor?.Plugins?.Keyboard` だけに頼ると、Capacitor 6環境で `addListener` が動かないケースがある。`window.Capacitor.registerPlugin('Keyboard')` を先に試み、失敗時のみ従来方式にフォールバックする防御的実装にする。
+
+```javascript
+let _CapKB = null;
+try {
+  if (window.Capacitor?.registerPlugin) {
+    _CapKB = window.Capacitor.registerPlugin('Keyboard');
+  }
+} catch (_) {}
+if (!_CapKB) _CapKB = window.Capacitor?.Plugins?.Keyboard;
+```
+
+### ✅ 「トップへ戻る」FABのスクロール監視は内部スクロールコンテナを見る（2026-07-09修正）
+
+画面本体が `overflow-y:auto` の内部コンテナ（例: `#home-scroll-content`）でスクロールする構成の場合、`window.addEventListener('scroll', ...)` は発火しない。`window.scrollY` も常に0のままで、FABの表示切り替え・`scrollTo`はその内部コンテナに対して行う。
+
+```javascript
+document.getElementById('home-scroll-content').addEventListener('scroll', () => {
+  fab.classList.toggle('visible', document.getElementById('home-scroll-content').scrollTop > 300);
+}, { passive: true });
+```
+
+### ✅ キーボード被り対策（2026-07-09実装 → 2026-07-11に大幅簡素化、現行実装）
+当初「シートを縮小しながら移動する」複雑なJS一式（`_adjustSheetForKb`/`_liftVisibleSheetForKeyboard`等）を実装したが、ビューポート固着バグの真因は無関係な`capacitor.config.js`の`contentInset:'always'`設定（→`'never'`に変更）と判明（設計書15）し、複雑なJS一式は**無害な被害者として全撤去済み**（コード上に現存しないことを確認済み、`app.js:138`にその経緯コメントあり）。`.plan-modal`/`.plan-sheet`系のシートは内部スクロール（`.plan-modal-body{overflow-y:auto}`）とネイティブ挙動に委ねる。
+
+**現行実装は`_scrollFocusedIntoViewOnKb(kbHeight)`という軽量関数1つのみ**（`public/app.js`、設定画面直下の`#feedback-text`/`#nickname-input`等`.plan-modal`/`.plan-sheet`の外側にある入力欄が対象）。実装上の教訓2点:
+- **判定は「スクロール可能かどうか」ではなく「フォーカス要素が実際に画面のどこにあるか」**（`getBoundingClientRect()`で判定）。`Keyboard:{resize:'none'}`下では`clientHeight`が変化しないため、旧来の「`scrollHeight > clientHeight`」判定はコンテンツ量が少ない画面で常にfalseになり誤判定していた
+- 祖先の`overflow-y:auto`コンテナが見つかっても、既存`padding-bottom`では実際に必要なスクロール量に届かないことがある（`scrollTop`は`scrollHeight-clientHeight`で頭打ち）。キーボード表示中のみ`padding-bottom`を動的に拡張してから`scrollTop`を加算する。祖先が見つからない場合は何もしない（`scrollIntoView`フォールバックはWKWebViewでレイアウトズレを誘発する副作用があり撤去済み、設計書59）
+
+### ⚠️ z-index是正時は「companion要素」だけでなく「子シート」も辿って確認する（一般則、2026-07-09教訓）
+`.plan-modal-overlay`/`.plan-modal`のようなoverlay+本体のペアだけでなく、同じ構造を持つ別クラス（`.plan-sheet`等）にも是正漏れが起きやすい。あるz-index値を変更したら: (1)同じCSSクラスを使う他の要素、(2)その要素の内側から開かれる子シート（親だけ上げて子を据え置くと子が親の背後に隠れる）、(3)最終的なz-index順序を一覧化して意図した重なり順になっているか、の3点を横展開で確認すること。
+
+### ✅ CSSキャッシュバスティング手順（セットで変更必須）
+
+```html
+<!-- index.html -->
+<link rel="stylesheet" href="/app.css?v=YYYYMMDDX">
+```
+```javascript
+// sw.js
+const CACHE_NAME = 'sg-weekend-vXXX';  // 数字を上げる
+```
+**両方同時に変更しないと古いCSSがServiceWorkerにキャッシュされたまま残る。**
+
+### ✅ iOS ステータスバー
+
+GitHub Actions の workflow で Info.plist を直接書き換えて設定:
+```yaml
+- name: Set status bar style in Info.plist
+  run: |
+    /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool false" ios/App/App/Info.plist || \
+    /usr/libexec/PlistBuddy -c "Set :UIViewControllerBasedStatusBarAppearance false" ios/App/App/Info.plist
+    /usr/libexec/PlistBuddy -c "Add :UIStatusBarStyle string UIStatusBarStyleDarkContent" ios/App/App/Info.plist || \
+    /usr/libexec/PlistBuddy -c "Set :UIStatusBarStyle UIStatusBarStyleDarkContent" ios/App/App/Info.plist
+```
+
+### ✅ iOS カメラ許可（NSCameraUsageDescription）
+
+`Info.plist`はリポジトリに含まれず`npx cap add ios`実行時に毎回生成されるため、`getUserMedia()`等でカメラを使う機能がある場合、CIワークフロー内でのPlistBuddy追記が必須（パターンとして記録）。
+
+2026-09-03時点、現在この機能を使う箇所はコード上に存在しないため、`.github/workflows/ios-deploy.yml`の「Set camera usage description in Info.plist」ステップは削除済み（共有カレンダー機能削除に伴う後始末）。将来カメラを使う機能（QRスキャナー等）を追加する際は、このステップを同パターンで復活させること。
+
+### ✅ TestFlight デバッグのコツ
+
+- Web版で直らない場合でもiOSで直ることがある（WKWebView固有の挙動）
+- CSSの変更はSW経由でキャッシュされるため、バージョンを上げないと反映されない
+- `pm2 restart sg-weekend` は Web版のみ。iOS版は TestFlight ビルドが必要
+- ビルド時間: GitHub Actions → TestFlight 反映まで約15〜20分
+
+### ✅ モーダルを閉じる際は必ずフォーカスを外す（blur）
+フォーカスが残ったまま非表示化された`<input>`/`<textarea>`が、iOS WKWebView側のタッチイベント配送（`position:fixed`要素であるボトムナビへのヒットテスト）を阻害し、ボトムナビが一時的にタップ無反応になる不具合の原因になる。
+- モーダル/シートを閉じる関数の先頭で、「閉じようとしている要素の内部に`document.activeElement`が含まれる場合のみ`blur()`する」ガード付きヘルパー（`public/app.js`の`_blurIfFocusInside(...containers)`）を呼ぶ
+- `switchNav()`の冒頭でも、画面遷移直前にフォーカスが残っていれば無条件で`blur()`する
+- 新しいモーダル・シートを追加する際、内部にinput/textareaを持つ場合は、close関数に同様のblur処理を入れること
+
+### ✅ onclick属性＋touchendハンドラの二重登録とゴースト遅延クリック
+ボトムナビ・FAB等は応答性向上のため`touchend`にJSハンドラ（`e.preventDefault()`で後続clickを抑制）を登録しつつ、HTML側にも`onclick`属性を残す二重登録になっている。iOS WKWebViewでは`touchend`の`preventDefault()`によるネイティブclick抑制が確実に効かないケースがあり、遅延・ゴースト状態のclickイベントが`onclick`属性を直接トリガーしてしまうことがある。
+
+**やってはいけない対処**: タッチ操作検出後に全てのclickイベントを無条件にグローバルブロックする方式（`touchend`ハンドラを持たずonclick属性のみに依存するボタンも道連れで無反応になる）。`onclick`属性の全削除も不可（マウス操作のWeb版で`touchstart`/`touchend`が発火せずボタンが反応しなくなる）。
+
+**正しい対処**: ゴーストクリックが実証されている要素（ボトムナビ・FAB・シェア/フィードバック/言語切替ボタン・各種オーバーレイのclose等）の`onclick`属性**個別**に、`if(!_touchCapableDetected) 関数呼び出し(...)`のガードを埋め込む。グローバルなclickリスナーは追加しない。
+
+```html
+<button id="nav-home" onclick="if(!_touchCapableDetected) switchNav('home')">
+```
+```js
+let _touchCapableDetected = false;
+document.addEventListener('touchstart', () => { _touchCapableDetected = true; }, { passive: true, capture: true });
+```
+
+タッチ操作が一度でも発生した端末では、ガード対象の`onclick`のみ無効化される（`touchend`ハンドラが既に処理済みのため実害なし）。ガード対象外のボタンは通常のclickイベントで動作する。PCブラウザ（マウス操作）では`_touchCapableDetected`が常に`false`のため全onclickが従来通り機能する。
+
+**⚠️ 落とし穴（2026-09-06実際に発生）**: 上記の二重登録により、タッチ端末ではガード付き`onclick`が常にスキップされ、`touchend`側の委譲ハンドラが**唯一の実行経路**になる。ボトムナビのタブ構成変更（ピン留め→カレンダー）の際、`switchNav()`内の画面配列は更新したが、`app.js`内の別の場所にある`touchend`委譲用ハードコード配列（`['home','news',...].forEach(...)`、ボトムナビ即時タップ対応ブロック）の更新を忘れ、新タブがタッチ端末で完全に無反応になるバグを作り込んだ（PCブラウザでのマウスクリックは正常に動くため気づきにくい）。**教訓**: ボトムナビ/フィルターチップのタブ・カテゴリ構成を変更する際は、(1) `switchNav()`の画面配列、(2) 同名のtouchend委譲用配列またはリスナー登録、(3) HTML側`onclick`属性、の3箇所すべてを揃って更新すること。動作確認はマウスクリックだけでなく実機タッチ（またはPlaywrightの`hasTouch`+`tap()`等のタッチイベントエミュレーション）で行うこと。
+
+オーバーレイ背景タップで閉じる系（`install-overlay`/`pin-detail-overlay`/`pin-picker-overlay`/`emoji-picker-overlay`/`schedule-action-overlay`/`cal-popup-overlay`）は、`onclick`の個別ガードに加えて`app.js`側の配列一括登録`touchend`リスナーも併用している。新規に同種オーバーレイを追加する際は同じパターンに揃えること。
+
+## server.js編集時の注意（2026-07-09追記、2026-09-10更新）
+- ⚠️ **2026-09-10設計書192で削除済み**: かつて`server.js`冒頭付近に無効化中のStripe決済コード一式（`/api/webhook`・`/api/create-checkout-session`・旧`/privacy`ルートの重複定義・`/api/subscription-status`）とイベント自動収集cronブロックが`/* ... */`で丸ごとコメントアウトされて残っており、この範囲に新しいルートを追加すると**サイレントに一切発火しない**（エラーも出ない）という罠があったが、コードクリーンアップ（設計書192）でこれらのコメントアウトブロック自体を完全削除したため、この罠は現在は存在しない
+- ルート追加時は念のため`grep -n "^/\*\|^\*/"`等でコメントブロックが無いか確認する習慣は今後も維持すること（将来また無効化コードが増える可能性があるため）
+- 新規ルート追加後は`curl -H "Host: xxx"`等で実際にレスポンスを検証してから完了報告すること（行番号だけを頼りに配置場所を判断しない）
+- **新しいHTTPメソッド（PUT/PATCH等）を使うエンドポイントを追加する際は、`/api`向けCORSミドルウェアの`Access-Control-Allow-Methods`にそのメソッドが含まれているか必ず確認する**: 漏れるとWeb版はSame-Originのため気づかず、Capacitor環境（`capacitor://localhost`オリジン）のiOS実機でのみOPTIONSプリフライトが拒否され`fetch()`が失敗する。`curl -i -X OPTIONS -H "Origin: capacitor://localhost" -H "Access-Control-Request-Method: <メソッド>" <URL>`で確認してから完了報告すること
+
+## 実機デバッグ用ログ収集機能（2026-07-10追加）
+ユーザーはMacを保有しておらずSafari Web Inspectorでのリアルタイムデバッグができないため、**サーバーにログを送信し、ファイルとして記録する方式**を標準デバッグ手段として恒久的に用意している。
+
+- クライアント側: `public/app.js`冒頭（`API_BASE`定義の直後）に`_sendDebugLog(event, data)`関数を定義済み。**コード中の任意箇所から呼び出し可能**（fire-and-forget、送信結果は待たない・エラーも無視する）
+  ```js
+  _sendDebugLog('some_event_name', { anyKey: anyValue });
+  ```
+- サーバー側: `server.js`の`POST /api/debug-log`エンドポイントで受信し、`logs/debug-nav.log`に1行1JSONで追記する（認証なし）
+- 確認方法: サーバーにSSHで入り`logs/debug-nav.log`を直接読む（`cat`/`tail -f`。Claudeが代理で読むことも可能）
+- **この基盤機能自体（`_sendDebugLog`関数・`/api/debug-log`エンドポイント）は削除しない。** 今後も難しい不具合の実機調査に使い回す前提の恒久ユーティリティ
+- 個々の調査のために追加した**計装ポイント（呼び出し箇所）は使い捨て**であり、原因特定後に削除してよい（現在進行中の計装ポイントは`.claude/next.md`を参照）
+- ⚠️ 注意: `logs/debug-nav.log`にはサイズ上限・ローテーションを設けていない。認証もないため誰でもPOST可能。長期間放置するとディスクを圧迫する可能性がある点に注意（定期的に内容を確認し、不要になったら手動で削除する）
+
+## やってはいけないこと
+- cronはシステムcrontabを使う（PM2 cronはスケジュール制御に不向きなため使わない）
+- APIキー・秘密情報をログに出力しない
+- DBを勝手に導入しない
+- force pushしない
+
+## 鉄則
+どんな小さな修正でも必ずplanner→orchestratorの順で回す。
+
+## エージェントの使い方
+@planner → 設計書作成 → ユーザー承認
+「承認します。@orchestrator 実行して」
+→ builder→checker→closerが自動で動く
+
+## `.claude/plan.md`の扱い（2026-07-12ルール化）
+`.claude/`ディレクトリは基本的にgitignore対象だが、**`plan.md`だけは例外的にgit管理下に置く**（`.gitignore`に`.claude/*` + `!.claude/plan.md`で明示）。理由: 過去に「設計だけして実装未着手」のまま別タスクの設計に押されて`plan.md`が上書きされ、2026-07-11のGoogle/Apple IDログイン設計書が実物ごと失われる事故が発生したため。
+
+- **`plan.md`は必ず末尾に追記する。既存の設計書（実装済み・未実装問わず）を削除・上書きしない。** 新しい設計書は「設計書N」という連番見出しで追記していく
+- 実装未着手のまま長期間放置される設計書があっても構わない（`.claude/next.md`に要約とステータスを記録しておけば十分）。`plan.md`自体は削除しない
+- ファイルが肥大化してきたら、削除ではなく「古い設計書を`.claude/plan-archive.md`のような別ファイルに移す」形で対応する（移す場合も内容は保持したままにする）

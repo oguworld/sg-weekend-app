@@ -20530,3 +20530,159 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 - Web版は`public/`配下のみの変更で`pm2 restart`不要（server.js無変更のため）
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
 - API変更を伴わないため緊急TestFlightビルドは不要。次回のiOSビルド（TestFlight/App Store提出）に自然に含める形でよい
+
+## 設計書209: LINE通知「採用件数」とアプリ「新着」表示件数の差異調査（調査のみ、コード未編集）
+
+### 症状
+2026-09-23 21:03 SGTの取り込みバッチについて、開発者向けLINE通知(`scripts/notify-fetch-summary.js`)は「シンガポール10件採用（イベント6/グルメ・フェア2/新規オープン2）」と報告したが、同じタイミングでユーザーがアプリの「おでかけ」タブ「新着」フィルターを見たところ「8件」しか表示されていなかった。
+
+### 調査で判明した事実（推測ではなく実データで確認済み）
+
+**1. 「新着」フィルターは時間窓ベースの定義であり、「直近バッチの採用件数」とは別物（仕様、バグではない）**
+
+`public/app.js` 1508行目付近（イベントカード一覧のフィルタリング処理）:
+```js
+// 新着（取り込みから24時間以内、2026-09-02に日付単位判定から厳密な経過時間判定へ変更）
+const newMatch = !filterNew || (() => {
+  if (!e.fetched_at) return false;
+  const fetched = new Date(e.fetched_at);
+  if (isNaN(fetched.getTime())) return false;
+  return (Date.now() - fetched.getTime()) <= 24 * 3600000;
+})();
+```
+「新着」チップは「`fetched_at`が現在時刻から過去24時間以内の全イベント」を都度リアルタイムに再計算して表示する。LINE通知の「10件採用」は「その回の取り込みバッチだけの件数」であり、両者は定義が異なる。これ自体はバグではなく元々の仕様（CLAUDE.md「新着リストのソート順」節と同系統の設計）。
+
+**2. 今回の差異の主因: `events.json`への保存後に重複除外ロジックが2件を削除しているが、LINE通知の集計にはこの削除が反映されていない（バグ、根拠あり）**
+
+`scripts/fetch-events.js`のパイプライン順序（375〜405行目付近）:
+1. `filterAndSave()`（`scripts/filter-events.js`）がHaikuで採否判定し、採用10件を`events.json`に書き込む。この時点の`totalAccepted=10`を`result.accepted`として返す（`filter-events.js` 575行目 `return { accepted: totalAccepted, ... }`）
+2. その直後に`deduplicateSaved(conf.eventsPath)`（`fetch-events.js` 314〜349行目）が呼ばれ、`events.json`**全体**（既存データ＋今回追加分）に対し、タイトルの単語一致率75%以上を「類似」とみなして重複行を削除する
+3. `saveFetchSummary()`（LINE通知の元データ）には手順1の`result.accepted`（＝重複削除前の10件）がそのまま渡される。**手順2で実際に何件削除されたかはLINE通知の集計ロジックに一切フィードバックされない**
+
+実データ（`data/sg/events.json`、`logs/fetch-summary-sg.json`）で検証した結果、LINE通知に記載された10件のうち以下2件が`events.json`に実在しないことを確認:
+- 「Singapore Tennis Open 2026」(Timeout Singapore経由) → 同バッチ内の「Singapore Tennis Open」(Little Day Out経由)とタイトル語一致率100%(3/3語)のため`isSimilar()`判定で削除
+- 「Marina Bay Sands」(Timeout Singapore経由) → 9/9に取り込み済みの既存イベント「Polène Marina Bay Sands」とタイトル語一致率100%(1/1語、"marina bay sands"部分一致)のため`isSimilar()`判定で削除
+
+削除ロジックの該当箇所（`scripts/fetch-events.js` 318〜339行目）:
+```js
+function normalizeTitle(t) {
+  return (t || '').toLowerCase().replace(/[^a-z0-9　-鿿]/g, ' ').trim().split(/\s+/).filter(Boolean);
+}
+function isSimilar(a, b) {
+  const wa = new Set(normalizeTitle(a));
+  const wb = new Set(normalizeTitle(b));
+  if (wa.size === 0 || wb.size === 0) return false;
+  const common = [...wa].filter(w => wb.has(w)).length;
+  return common / Math.min(wa.size, wb.size) >= 0.75;
+}
+```
+この結果、10件採用→2件が重複削除→実際に`events.json`に残るのは8件。この8件はすべて`fetched_at`が取り込みバッチ時刻(2026-09-23T13:02:17Z前後)であり、ユーザー確認時点で「新着」24時間以内条件にも該当するため、フィルター結果と一致する（フィルター自体の計算は正しく動作している）。
+
+**3. 前日分の1件が「新着」に混入する可能性（仕様上の想定内挙動、補足）**
+
+「新着」フィルターは日付境界ではなく厳密な経過時間(24h)判定のため、ユーザーの確認タイミング次第では前回バッチ以前に取り込まれた別カテゴリのイベント（今回の例では9/22 23:00取り込みの`travel`カテゴリ「China - Multiple Destinations」）も「新着」に含まれ得る。ただしこの1件は今回のユーザー報告時点（LINE通知直後、9/23 21:02 SGT時点）ではまだ24時間ウィンドウに入っておらず、実際には影響していない（通知送信時刻基準での再計算でも該当件数は9件で、うち1件がこのtravelイベント、残り8件が今回バッチ）。ユーザーが見た「8件」はこのtravelイベントも含まれていない値であり、上記2の重複削除2件が主因であることと矛盾しない。
+
+### 原因のまとめ（一言で）
+LINE通知の「10件採用」は、取り込み直後・重複チェック前の速報値をそのまま使っている。その直後に走る重複除外処理（タイトルが酷似する既存/同時取り込みイベントの自動削除）で実際には2件が消えたため、アプリの実データは8件になっていた。「新着」フィルター自体（24時間以内表示）は正しく動作しており、バグはLINE通知の集計タイミング側にある。
+
+### これはバグか仕様か
+**バグ**（集計対象の齟齬）。「新着」フィルターの時間窓仕様自体は意図した設計だが、「LINE通知の採用件数」が「実際にevents.jsonへ最終的に残った件数」と食い違う点は、通知の正確性という観点で不具合と言える。今回はたまたま重複削除2件と「新着」フィルターの表示件数8件が一致したため実害は小さいが、以下のケースでは通知件数とアプリの実件数がさらに乖離しうる:
+- 24時間ウィンドウの境界をまたいだ場合（新着フィルターの母数自体が変わる）
+- 重複削除された件数が0件でない限り、常にLINE通知の「採用件数」は過大表示になる
+
+### 修正方針（コードは書かない、方針のみ）
+- `scripts/fetch-events.js`の`deduplicateSaved()`が返す削除件数（`removed`、341行目で算出済み）を`main()`内でLINE通知用サマリーに反映する。具体的には`saveFetchSummary()`呼び出し時に渡す`accepted`を「Haiku採用件数(10) − 重複削除件数(2)」に補正するか、通知本文に「うち重複除外N件」の内訳行を追加する
+- 補正は`fetch-events.js`内、388行目`deduplicateSaved(conf.eventsPath)`の戻り値（現状`removed`を呼び出し元で受け取っていない）を受け取り、396行目付近の`saveFetchSummary()`呼び出しに渡す形が自然（`filter-events.js`側は改修不要）
+- 「新着」フィルター（`public/app.js`側）自体は変更不要（時間窓ベースの設計は妥当、ユーザーへの説明としても「取り込みバッチ件数」と「新着表示件数」は元々別概念であることを伝えれば足りる）
+
+### 変更するファイル一覧（修正を実施する場合）
+- `scripts/fetch-events.js`（`deduplicateSaved()`の戻り値活用、`saveFetchSummary()`への引数調整）
+
+### 受け入れ基準（修正後にこうなればOK）
+- 重複削除が発生したバッチでは、LINE通知の「採用件数」が`events.json`に実際に残った件数と一致する（またはその内訳が通知文に明記される）
+- 重複削除が発生しなかったバッチでは、通知文言・件数とも従来通り変化しない（後方互換）
+
+### 再発防止策
+- 「採否カウント」を扱う処理を新規追加・変更する際は、カウントの起点（Haiku採否時点 / 保存後の重複除外後 / 表示側フィルター後）がそれぞれ異なるタイミングのデータを参照していないか、パイプライン全体を通しで確認する
+- 通知・集計系のサマリー値は、実データ（`events.json`の実件数）との突合を定期的に（またはコード変更時に）行う運用が望ましい
+
+### 調査時の補足情報
+- サーバー時刻はEurope/Berlin（UTC+2、CEST）、SGTとの時差は+6時間（SGT − 6h = サーバーローカル時刻の考慮が必要、UTC基準では SGT − 8h）
+- 通知データ: `logs/fetch-summary-sg.json`の`updatedAt: "2026-09-23T13:02:20.412Z"`（UTC）= SGT 21:02
+- 本調査はコード変更を一切行っていない（読み取り専用の原因調査のみ）
+
+---
+
+# 設計書210: 「くらし」「おでかけ」カードへの公開いいね機能の新規追加（2026-09-24、builder→checker→closer）
+
+**ユーザー承認済み事項（明示的に確認済みの2論点）**:
+1. 取り消し（アンいいね）機能は作らない。一度押したら押しっぱなし（Instagram的な片道仕様）
+2. 連打・水増し防止は端末の`localStorage`のみ（ピン留めと同じ方式）。サーバー側はIPレート制限等を入れず、「1リクエストにつき+1固定」でパラメータ改ざん（負の値・大量加算）のみ防ぐ。悪意ある連打は許容する
+
+## 背景・目的
+「くらし」タブ（生活情報カード）と「おでかけ」タブ（イベントカード）の各カードに、全ユーザーに見える公開の「いいね数」表示機能を追加する。個人用のお気に入りマークではなく、人気度の可視化が目的。
+
+## 確定仕様
+1. 公開のいいね数を表示（例: `❤️ 12`）。個人のブックマークではない
+2. ログイン不要（Google/Apple Sign-Inと無関係、未ログインユーザーも押せる）
+3. サーバー側で件数を集計
+4. 取り消し（アンいいね）機能は作らない。一度押したら押しっぱなし
+5. 連打・水増し防止は端末の`localStorage`のみ。サーバー側は「1リクエストにつき+1固定」でパラメータ改ざんのみ防ぐ
+
+## データモデル（新規）
+`data/sg/likes.json`（gitignore対象、`data/`配下は`.gitignore`の8行目`data/`で一括対象）:
+```json
+{ "event:evt_abc123": { "count": 12 }, "news:9f2a1c...": { "count": 3 } }
+```
+キー形式は`{itemType}:{itemId}`（`itemType`は`event`|`news`）。既存の`events.json`/`life-info.json`自体は変更しない。
+
+## API設計（`server.js`に新規追加、`/api/config`直前に配置）
+**`GET /api/likes?itemType=event|news`**: 認証不要。該当`itemType`の全いいね件数を一括取得。レスポンス例`{ "evt_abc123": 12 }`（キーはitemIdのみ）。`likes.json`が存在しない場合は空オブジェクト`{}`。`itemType`不正時は400
+
+**`POST /api/likes`**: 認証不要。リクエストボディ`{ itemType, itemId }`。サーバー側は常に+1固定（クライアントからのcount値は無視）。`itemType`不正・`itemId`空/未指定は400。存在しない`itemId`でも新規キーとして`count:1`で作成可。`withFileLock`でアトミックに読み書き。レスポンス`{ count: <加算後の最新値> }`
+
+## クリーンアップ（データ肥大化対策）
+- `scripts/fetch-events.js`の`purgeExpiredData()`実行直後、`purgeOrphanedLikes('event', freshIds, likesPath)`を呼び、現存イベントID集合に含まれない`likes.json`内`event:{id}`キーを削除
+- `scripts/fetch-life-info.js`のリテンション処理（7日経過削除）実行直後、同様に`purgeOrphanedLikes('news', keptIds, likesPath)`を呼び`news:{id}`キーを削除
+- 両スクリプトは完全に独立しているため、同名関数`purgeOrphanedLikes()`をそれぞれのファイルに重複定義（単純な差集合処理）
+
+## フロントエンドの変更（`public/app.js`）
+- **状態管理**: `likedKey()`（`${getCity()}_liked_items`）/`getLikedItems()`/`saveLikedItems()`をピン留めパターン踏襲で新規追加。キーは`{itemType}:{itemId}`形式
+- **件数のメモリキャッシュ**: `LIKE_COUNTS = { event: {}, news: {} }`。`loadLikeCounts(itemType)`が`GET /api/likes`を呼び格納。`loadEventData()`/`loadLifeInfoNewsScreen()`のデータ取得直後に呼び出し
+- **`likeItem(itemType, itemId)`**: 既にいいね済みなら何もしない（連打防止）。楽観的UI（POST失敗時もローカル状態・表示件数は維持、ロールバックしない）
+- **`_likeButtonHtml(itemType, itemId)`**: ハートボタンのHTML文字列を生成する共通関数。`renderEventCard()`の`.card-sub-row`（ピン留めリンクの前）と`_lifeInfoCardHtml()`の`.card-sub-row`（同様）から呼び出す
+- **`_updateLikeButtonDom(itemType, itemId)`**: `likeItem()`実行直後、`document.querySelectorAll('.like-btn[data-like-type=][data-like-id=]')`で該当カード（複数箇所にあれば全て）のハート塗りつぶし・件数を同期
+- **`_cardElCache`キャッシュヒット時の同期（最重要ポイント）**: `renderEventCards()`のforEachループ内、`_getOrCreateCardEl()`呼び出し直後（`isNew`の真偽に関わらず）に、該当カードDOM内の`.like-btn`をキャッシュヒット/新規生成いずれの場合も`LIKE_COUNTS.event[e.id]`・`getLikedItems()`の最新値で同期する処理を追加。これによりキャッシュヒット時に古い件数のまま表示され続ける問題を回避
+- **くらしカード（`_lifeInfoCardHtml()`）**: `innerHTML`一括再代入方式のため、件数をテンプレート文字列に直接埋め込むのみで差分更新の特別対応は不要
+- **ピン留め画面への波及**: `renderPinList()`/`renderNewsPinList()`は`renderEventCard()`/`_lifeInfoCardHtml()`をそのまま再利用しているため、いいねボタン・件数は自動的に反映される（追加対応不要、コードレビューで確認済み）
+
+## CSSの変更（`public/app.css`）
+`.like-btn`/`.like-emoji`/`.like-count`/`.like-btn.liked`を新規追加。色は`var(--terracotta)`のみ使用（inline生色値なし）。`.card-detail-link`を継承しサイズ・タップ領域を既存の📌/🔗アイコンボタンと統一
+
+## キャッシュバスティング
+- `public/index.html`: `app.css?v=20260915d` → `?v=20260924a`
+- `public/sw.js`: `CACHE_NAME`を`sg-weekend-v927` → `sg-weekend-v928`
+
+## 検証（builder→checker）
+- `curl`で`GET /api/likes`・`POST /api/likes`を実検証: 正常系（空オブジェクト初期状態、+1加算、複数回POSTでの累積）・異常系（`itemType`不正で400、`itemId`空/未指定で400）とも設計通り
+- パラメータ改ざん防止: `{"count":9999}`や`{"count":-500}`を送っても無視され常に+1のみ加算されることを確認
+- `withFileLock`のアトミック性: 同一itemIdへ20並列POSTを実行し、最終カウントが正確に20（取りこぼしなし）であることを実証
+- CORSプリフライト: `curl -i -X OPTIONS -H "Origin: capacitor://localhost" -H "Access-Control-Request-Method: POST"`で204・`Access-Control-Allow-Methods`にPOST含む既存設定のままで問題ないことを確認（変更不要、設計書記載通り）
+- `_cardElCache`キャッシュヒット時の同期処理は`renderEventCards()`のforEachループ内に実装されていることをコードレビューで確認
+- `scripts/fetch-events.js`/`scripts/fetch-life-info.js`双方に`purgeOrphanedLikes()`実装済み（片方のみの漏れなし）をgrepで確認
+- `data/sg/likes.json`が`.gitignore`の`data/`（8行目）で確実に対象になっていることを`git check-ignore -v`で確認
+- `node --check`で4ファイル（`server.js`/`public/app.js`/`scripts/fetch-events.js`/`scripts/fetch-life-info.js`）とも構文エラーなし
+- `pm2 restart sg-weekend`実施、online確認。`GET /api/events`・`GET /api/life-info`とも200で正常応答することを確認
+- 🔴Critical: なし
+- **実機確認の申し送り**: `.card-sub-row`は3項目（❤️件数/📌ピン留め/🔗元記事リンク）になったが`flex-wrap`なし構成のまま。文字幅の概算では既存のiPhone SE幅でも収まる想定だが、iOS実機タップでの折り返し崩れ有無の確認はTestFlightビルド後にユーザー側で確認を推奨
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+
+## スコープ外（今回作らない）
+- いいねの取り消し（アンいいね）機能
+- いいねしたユーザー一覧
+- サーバー側のIPレート制限等の厳密な多重投稿防止
+- ランキング機能（いいね数順ソート等）
+- 生活情報のホームプレビュー（`_lifeInfoPreviewCardHtml()`、横スクロール軽量カード）へのいいね表示
+- BKK/SYD（停止中都市）への対応
+
+**注記**: 起票時点では「設計書209」として指示されていたが、同時並行の別調査タスクが「設計書209」（LINE通知/新着表示件数の差異調査）として`plan.md`に先に追記されたため、コーディネーターの指示により本機能は「設計書210」として番号を繰り下げて記録する。コード内コメントも`sed`で一括置換し「設計書210」に統一済み。

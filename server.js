@@ -489,6 +489,68 @@ app.get('/api/config', (req, res) => {
   res.json({});
 });
 
+// ─────────────────────────────────────────────
+// 公開いいね機能（設計書210）
+// 認証不要・取り消し不可（片道）。連打・水増し防止は端末側localStorageのみで、
+// サーバー側は「1リクエストにつき+1固定」でパラメータ改ざん（負の値・大量加算）のみ防ぐ。
+// data/sg/likes.json（gitignore対象）: { "event:evt_abc123": { "count": 12 }, "news:9f2a1c...": { "count": 3 } }
+// ─────────────────────────────────────────────
+const LIKES_PATH = path.join(__dirname, 'data', 'sg', 'likes.json');
+const LIKE_ITEM_TYPES = ['event', 'news'];
+function loadLikes() {
+  try { return JSON.parse(fs.readFileSync(LIKES_PATH, 'utf8')); } catch { return {}; }
+}
+function saveLikes(likes) {
+  fs.mkdirSync(path.dirname(LIKES_PATH), { recursive: true });
+  fs.writeFileSync(LIKES_PATH, JSON.stringify(likes, null, 2), 'utf8');
+}
+
+// GET /api/likes?itemType=event|news — 該当itemTypeの全いいね件数を一括取得。認証不要
+app.get('/api/likes', (req, res) => {
+  try {
+    const itemType = (req.query.itemType || '').toLowerCase();
+    if (!LIKE_ITEM_TYPES.includes(itemType)) {
+      return res.status(400).json({ error: 'itemType must be one of: event, news' });
+    }
+    const likes = loadLikes();
+    const prefix = `${itemType}:`;
+    const result = {};
+    for (const key of Object.keys(likes)) {
+      if (key.startsWith(prefix)) {
+        const itemId = key.slice(prefix.length);
+        result[itemId] = likes[key]?.count || 0;
+      }
+    }
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/likes — { itemType, itemId } を受け取り、該当キーのcountを常に+1固定で加算。認証不要
+// クライアントからcount値は受け取らない（パラメータ改ざん防止）。取り消し（アンいいね）は無し
+app.post('/api/likes', async (req, res) => {
+  try {
+    const itemType = (req.body?.itemType || '').toLowerCase();
+    const itemId = req.body?.itemId;
+    if (!LIKE_ITEM_TYPES.includes(itemType) || typeof itemId !== 'string' || itemId.trim() === '') {
+      return res.status(400).json({ error: 'itemType must be event/news and itemId must be a non-empty string' });
+    }
+    const key = `${itemType}:${itemId}`;
+    let newCount;
+    await withFileLock(LIKES_PATH, () => {
+      const likes = loadLikes();
+      const current = likes[key]?.count || 0;
+      newCount = current + 1;
+      likes[key] = { count: newCount };
+      saveLikes(likes);
+    });
+    res.json({ count: newCount });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/sales — セール情報一覧（events.json の type==='sale' のみ返す）
 app.get('/api/sales', (req, res) => {
   try {

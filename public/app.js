@@ -711,6 +711,7 @@
       } catch (e) {
         SPONSORED_CARDS = [];
       }
+      await loadLikeCounts('event'); // 設計書210: 公開いいね件数をLIKE_COUNTSへ格納してからカード描画する
       EVENT_DATA.forEach(e => { EVENT_REGISTRY[e.id] = e; });
       if (EVENT_DATA.length > 0) {
         const pins = getPins();
@@ -895,6 +896,7 @@
           })()}
             ${displayContent ? `<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${displayContent}</p>` : ''}
             <div class="card-sub-row">
+              ${_likeButtonHtml('event', e.id)}
               ${pinLinkHtml}
               ${e.url ? `<a href="${e.url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
             </div>
@@ -1003,6 +1005,7 @@
         <div style="font-size:16px;font-weight:700;color:var(--midnight);margin-bottom:10px;line-height:1.35;">${title}</div>
         <div style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${summary}</div>
         <div class="card-sub-row">
+          ${_likeButtonHtml('news', item.id)}
           <span class="card-detail-link card-pin-link${getNewsPins()[item.id] ? ' pinned' : ''}" style="cursor:pointer;" onclick="toggleNewsPinById('${item.id}')">📌 ${getNewsPins()[item.id] ? t('pinnedBtn') : t('pinBtn')}</span>
           ${url ? `<a href="${url}" target="_blank" rel="noopener" class="card-detail-link">🔗 ${t('articleLink')}</a>` : ''}
         </div>
@@ -1118,6 +1121,7 @@
       } catch (e) {
         LIFE_INFO_DATA = [];
       }
+      await loadLikeCounts('news'); // 設計書210: 公開いいね件数をLIKE_COUNTSへ格納してからカード描画する
       _newsDataLoaded = true;
       _newsDataVersion++;
       renderNewsList();
@@ -1603,6 +1607,21 @@
         el.dataset.lang = lang;
         usedKeys.add(cacheKey);
         el.style.display = '';
+        // 設計書210: _cardElCacheのキャッシュヒット時（isNew===false）はrenderEventCard()自体を
+        // 呼ばないため、いいね件数・いいね済み状態（ハートの塗りつぶし）をここで都度最新値に同期する。
+        // 新規生成時（isNew===true）もrenderEventCard()生成時点の値で固定化されないよう同様に同期する。
+        (() => {
+          const liked = !!getLikedItems()[`event:${e.id}`];
+          const count = LIKE_COUNTS.event?.[e.id] || 0;
+          const likeBtn = el.querySelector('.like-btn');
+          if (likeBtn) {
+            likeBtn.classList.toggle('liked', liked);
+            const emojiEl = likeBtn.querySelector('.like-emoji');
+            if (emojiEl) emojiEl.textContent = liked ? '❤️' : '🤍';
+            const countEl = likeBtn.querySelector('.like-count');
+            if (countEl) countEl.textContent = count;
+          }
+        })();
         if (isNew) {
           hasNewCard = true;
           el.classList.remove('spot-card--reused');
@@ -2099,6 +2118,66 @@
         : document.getElementById('nav-news')?.classList.contains('active')
           ? 'news-scroll-content' : 'home-scroll-content';
       document.getElementById(targetId)?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ─── LIKE LOGIC（設計書210、公開いいね機能）───
+    // 個人のブックマーク（ピン留め）とは別の、全ユーザーに見える公開の人気度表示。
+    // ログイン不要・取り消し不可（片道）。連打・水増し防止は端末のlocalStorageのみ（ピン留めと同方式）。
+    let LIKE_COUNTS = { event: {}, news: {} }; // { event: { evt_abc: 12 }, news: { li_xxx: 3 } }
+
+    function likedKey() { return `${getCity()}_liked_items`; }
+    function getLikedItems() {
+      try { return JSON.parse(localStorage.getItem(likedKey()) || '{}'); } catch { return {}; }
+    }
+    function saveLikedItems(liked) {
+      localStorage.setItem(likedKey(), JSON.stringify(liked));
+    }
+
+    // itemType（'event'|'news'）別のいいね件数をまとめて取得し LIKE_COUNTS に格納する
+    async function loadLikeCounts(itemType) {
+      try {
+        const res = await fetch(API_BASE + `/api/likes?itemType=${itemType}`);
+        LIKE_COUNTS[itemType] = res.ok ? await res.json() : {};
+      } catch (e) {
+        LIKE_COUNTS[itemType] = {};
+      }
+    }
+
+    function likeItem(itemType, itemId) {
+      const liked = getLikedItems();
+      const key = `${itemType}:${itemId}`;
+      if (liked[key]) return; // 連打防止: 既にいいね済みなら何もしない（取り消し機能なし）
+      liked[key] = true;
+      saveLikedItems(liked);
+      LIKE_COUNTS[itemType][itemId] = (LIKE_COUNTS[itemType][itemId] || 0) + 1;
+      _updateLikeButtonDom(itemType, itemId);
+      fetch(API_BASE + '/api/likes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemType, itemId }),
+      }).catch(() => {}); // 失敗時もローカル状態は維持（楽観的UI、ピン留めと同じ思想）
+    }
+
+    // 該当カードのハートボタンDOM（塗りつぶし状態＋件数）を最新状態に同期する。
+    // renderEventCards()の_cardElCacheキャッシュヒット時、および_lifeInfoCardHtml()の
+    // innerHTML再代入後どちらから呼んでも安全なよう、DOM要素を都度querySelectorで探す。
+    function _updateLikeButtonDom(itemType, itemId) {
+      const liked = !!getLikedItems()[`${itemType}:${itemId}`];
+      const count = LIKE_COUNTS[itemType]?.[itemId] || 0;
+      document.querySelectorAll(`.like-btn[data-like-type="${itemType}"][data-like-id="${CSS.escape(itemId)}"]`).forEach(btn => {
+        btn.classList.toggle('liked', liked);
+        const emojiEl = btn.querySelector('.like-emoji');
+        if (emojiEl) emojiEl.textContent = liked ? '❤️' : '🤍';
+        const countEl = btn.querySelector('.like-count');
+        if (countEl) countEl.textContent = count;
+      });
+    }
+
+    function _likeButtonHtml(itemType, itemId) {
+      const liked = !!getLikedItems()[`${itemType}:${itemId}`];
+      const count = LIKE_COUNTS[itemType]?.[itemId] || 0;
+      const safeId = itemId.replace(/'/g, "\\'");
+      return `<span class="card-detail-link like-btn${liked ? ' liked' : ''}" data-like-type="${itemType}" data-like-id="${itemId}" style="cursor:pointer;" onclick="likeItem('${itemType}', '${safeId}')"><span class="like-emoji">${liked ? '❤️' : '🤍'}</span> <span class="like-count">${count}</span></span>`;
     }
 
     // ─── PIN LOGIC ───

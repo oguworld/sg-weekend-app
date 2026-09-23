@@ -501,6 +501,12 @@
 
     /* ひとことメモ⇔元記事を見るの間に表示するピン留めテキストリンク */
     .card-pin-link.pinned { color: var(--terracotta); font-weight: 700; }
+
+    /* 公開いいねボタン（設計書209）。タップ領域・サイズは既存の📌/🔗アイコンボタンと揃える */
+    .like-btn { display: inline-flex; align-items: center; gap: 3px; }
+    .like-btn .like-emoji { font-size: 13px; line-height: 1; }
+    .like-btn .like-count { font-variant-numeric: tabular-nums; }
+    .like-btn.liked { color: var(--terracotta); font-weight: 700; }
     .card-image-area {
       height: 170px;
       position: relative;

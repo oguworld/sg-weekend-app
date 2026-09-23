@@ -126,6 +126,33 @@ function saveFetchState(state) {
   fs.writeFileSync(LIFE_INFO_FETCH_STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
 }
 
+// 公開いいね機能（設計書210）: likes.jsonから、現存するID集合(existingIds)に含まれない
+// 指定itemTypeのキーを削除する単純な差集合処理。likes.jsonが存在しない場合は何もしない
+// （scripts/fetch-events.js内の同名関数と同一ロジック、独立スクリプトのため重複定義）
+function purgeOrphanedLikes(itemType, existingIds, likesPath) {
+  if (!fs.existsSync(likesPath)) return;
+  try {
+    const likes = JSON.parse(fs.readFileSync(likesPath, 'utf8'));
+    const existingIdSet = new Set(existingIds);
+    const prefix = `${itemType}:`;
+    let removed = 0;
+    for (const key of Object.keys(likes)) {
+      if (!key.startsWith(prefix)) continue;
+      const id = key.slice(prefix.length);
+      if (!existingIdSet.has(id)) {
+        delete likes[key];
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      fs.writeFileSync(likesPath, JSON.stringify(likes, null, 2), 'utf8');
+      console.log(`🗑  likes.json: 期限切れ${itemType}の いいね ${removed}件を削除`);
+    }
+  } catch (e) {
+    console.error(`  ⚠️  likes.json クリーンアップ失敗: ${e.message}`);
+  }
+}
+
 // ─── ステップ1: RSS取得（ハイウォーターマーク方式で新着のみ） ──
 const DAYS_BACK = 7;
 const MAX_PER_FEED = 30;
@@ -533,6 +560,10 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
       fs.writeFileSync(lifeInfoPath, JSON.stringify(kept, null, 2), 'utf8');
       console.log(`\n  💾 ${lifeInfoPath} に${newItems.length}件追記 / ${RETENTION_DAYS}日超過${removedCount}件削除（現在${kept.length}件）`);
     }
+
+    // 公開いいね機能（設計書210）のクリーンアップ: 現存する記事ID集合に含まれない
+    // likes.json内の news:{id} キーを削除する（データ肥大化対策）。SG固定パス（data/sg/likes.json）。
+    purgeOrphanedLikes('news', kept.map(item => item.id), path.join(path.dirname(lifeInfoPath), 'likes.json'));
   }
 
   console.log(`\n  📊 Claude API結果: ${totalAccepted + totalRejected}件送信 → 採用${totalAccepted}件 / 不採用${totalRejected}件`);

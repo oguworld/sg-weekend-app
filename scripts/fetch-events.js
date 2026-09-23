@@ -83,6 +83,7 @@ function purgeExpiredData(eventsPath) {
   today.setHours(0, 0, 0, 0);
 
   let deleted = 0;
+  let freshIds = null;
 
   if (fs.existsSync(eventsPath)) {
     const all    = JSON.parse(fs.readFileSync(eventsPath, 'utf8'));
@@ -90,12 +91,44 @@ function purgeExpiredData(eventsPath) {
     const fresh  = all.filter(e => e.end_date && new Date(e.end_date) >= today);
     deleted = before - fresh.length;
     fs.writeFileSync(eventsPath, JSON.stringify(fresh, null, 2), 'utf8');
+    freshIds = fresh.map(e => e.id);
   } else {
     fs.mkdirSync(path.dirname(eventsPath), { recursive: true });
     fs.writeFileSync(eventsPath, '[]', 'utf8');
+    freshIds = [];
   }
 
   console.log(`🗑  古いデータを削除: ${deleted}件`);
+
+  // 公開いいね機能（設計書210）のクリーンアップ: 現存するイベントID集合に含まれない
+  // likes.json内の event:{id} キーを削除する（データ肥大化対策）。SG固定パス（data/sg/likes.json）。
+  purgeOrphanedLikes('event', freshIds, path.join(path.dirname(eventsPath), 'likes.json'));
+}
+
+// likes.json（設計書210）から、現存するID集合(existingIds)に含まれない指定itemTypeのキーを削除する
+// 単純な差集合処理。likes.jsonが存在しない場合は何もしない
+function purgeOrphanedLikes(itemType, existingIds, likesPath) {
+  if (!fs.existsSync(likesPath)) return;
+  try {
+    const likes = JSON.parse(fs.readFileSync(likesPath, 'utf8'));
+    const existingIdSet = new Set(existingIds);
+    const prefix = `${itemType}:`;
+    let removed = 0;
+    for (const key of Object.keys(likes)) {
+      if (!key.startsWith(prefix)) continue;
+      const id = key.slice(prefix.length);
+      if (!existingIdSet.has(id)) {
+        delete likes[key];
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      fs.writeFileSync(likesPath, JSON.stringify(likes, null, 2), 'utf8');
+      console.log(`🗑  likes.json: 期限切れ${itemType}の いいね ${removed}件を削除`);
+    }
+  } catch (e) {
+    console.error(`  ⚠️  likes.json クリーンアップ失敗: ${e.message}`);
+  }
 }
 
 // ─── ハイウォーターマーク方式（ソースごとの既知GUID管理） ──────
