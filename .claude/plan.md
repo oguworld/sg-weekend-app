@@ -20714,3 +20714,58 @@ LINE通知の「10件採用」は、取り込み直後・重複チェック前�
 ### 申し送り
 - `data/`配下は無変更（`.gitignore`対象、テストもscratchpad上のコピーで実施し本番へ影響なし）
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+
+---
+
+## 設計書211: 公開いいね機能にトグル（取り消し）機能を追加
+
+### 背景
+設計書210で「取り消し不可・片道」として実装・コミット済み（ローカルmainブランチ、リモート未push、TestFlightビルド未実施=App Store本番には未反映）だった公開いいね機能について、ユーザーが方針転換。「何度でもON/OFF切り替え可能なシンプルな双方向トグル方式」に変更する。
+
+### 確定仕様
+- ハートボタンをタップするたびにON→OFF→ON…とトグルする（片道ではない）
+- 連打による件数の人為的な上下は許容する（サーバー側レート制限は導入しない、設計書210の方針を継続）
+- 「1リクエストにつき+1/-1固定」でパラメータ改ざん（任意の値の直接指定）を防ぐ方針は維持する
+
+### 実装内容
+
+#### `server.js`の`POST /api/likes`変更
+- リクエストボディに`action`フィールドを追加: `{ itemType, itemId, action }`（`action`は`'like'`|`'unlike'`の2値のみ許可）
+- `action`未指定時は`'like'`として扱う（後方互換性のためのフォールバック）
+- `action === 'unlike'`の場合: `withFileLock`内で`current = likes[key]?.count || 0; newCount = Math.max(0, current - 1);`（0未満にはならない）
+- `action === 'like'`の場合: 既存通り`newCount = current + 1`
+- クライアントから`count`の直接指定は引き続き無視（改ざん防止方針を維持）
+- `action`が`'like'`/`'unlike'`以外の値の場合は400を返す
+- `GET /api/likes`は無変更
+
+#### `public/app.js`の変更
+- `likeItem(itemType, itemId)`関数を`toggleLike(itemType, itemId)`にリネーム・ロジック変更（`liked[key]`の真偽で分岐、未いいね→いいね済みは`+1`+`action:'like'`、いいね済み→未いいねは`delete liked[key]`+`Math.max(0,...)`で`-1`+`action:'unlike'`）
+- `_likeButtonHtml()`内の`onclick="likeItem(...)"`を`onclick="toggleLike(...)"`に変更（HTML構造・CSSクラス構成は無変更）
+- `_updateLikeButtonDom()`・`_cardElCache`同期処理（`renderEventCards()`内）は無変更（既に双方向トグルに対応済みのロジックのため）
+- 失敗時の挙動: 設計書210の楽観的UI方針を継続（ローカル状態は維持、ロールバックしない）
+
+#### `public/app.css`
+無変更（`.like-btn.liked`は既に双方向トグルに対応した書き方）
+
+#### クリーンアップ処理（`scripts/fetch-events.js`・`scripts/fetch-life-info.js`）
+無変更（`purgeOrphanedLikes()`は`count`の値を見ない差集合処理のため、トグルでcountが0になっても影響なし）
+
+#### キャッシュバスティング
+- `public/index.html`: `app.css?v=20260924a`→`?v=20260924b`
+- `public/sw.js`: `CACHE_NAME`の`sg-weekend-v928`→`sg-weekend-v929`
+
+### 検証（builder→checker）
+- `curl`で`POST /api/likes`の`action:'like'`/`action:'unlike'`/`action`未指定（後方互換）/`action`不正値（400）の4パターンを実検証、すべて設計通り
+- countが0の状態から`unlike`を送っても0未満にならないことを確認
+- `grep -rn "likeItem"`で全ファイル検索、リネーム漏れなし（`toggleLike`のみ残存、旧名の参照ゼロ）
+- パラメータ改ざん防止: `{"count":9999}`・`{"count":-999}`を送っても無視され、action基準の+1/-1のみ反映されることを確認
+- `_updateLikeButtonDom()`・`_cardElCache`同期処理はコードレビューで無変更・双方向トグルに正しく対応していることを確認（`getLikedItems()`/`LIKE_COUNTS`を都度読み直す設計のため）
+- `node --check`で`server.js`・`public/app.js`とも構文エラーなし
+- キャッシュバスティング（`index.html`のクエリ・`sw.js`の`CACHE_NAME`）が両方更新されていることを確認
+- `pm2 restart sg-weekend`実施、online確認。`GET`/`POST /api/likes`・`GET /api/events`・`GET /api/life-info`とも正常応答（200）することを確認
+- テスト時に`data/sg/likes.json`へ追加したダミーキー（`__test_toggle_211`/`__checker_verify`/`__checker_tamper`）はすべて検証後に削除し、本番データを元の状態に復元済み
+- 🔴Critical: なし
+
+### 申し送り
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+- iOS側は今回のスコープ外で未対応のまま（設計書210自体が未リリースのため、iOS版への反映は設計書210・211を合わせて次回`release`ブランチpush時にまとめて行う形になる想定）

@@ -2120,9 +2120,9 @@
       document.getElementById(targetId)?.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // ─── LIKE LOGIC（設計書210、公開いいね機能）───
+    // ─── LIKE LOGIC（設計書210で新規追加、設計書211で双方向トグルに変更）───
     // 個人のブックマーク（ピン留め）とは別の、全ユーザーに見える公開の人気度表示。
-    // ログイン不要・取り消し不可（片道）。連打・水増し防止は端末のlocalStorageのみ（ピン留めと同方式）。
+    // ログイン不要・ON/OFF双方向トグル（何度でも切り替え可能）。連打・水増し防止は端末のlocalStorageのみ（ピン留めと同方式）。
     let LIKE_COUNTS = { event: {}, news: {} }; // { event: { evt_abc: 12 }, news: { li_xxx: 3 } }
 
     function likedKey() { return `${getCity()}_liked_items`; }
@@ -2143,19 +2143,25 @@
       }
     }
 
-    function likeItem(itemType, itemId) {
+    function toggleLike(itemType, itemId) {
       const liked = getLikedItems();
       const key = `${itemType}:${itemId}`;
-      if (liked[key]) return; // 連打防止: 既にいいね済みなら何もしない（取り消し機能なし）
-      liked[key] = true;
+      const isLiked = !!liked[key];
+      const action = isLiked ? 'unlike' : 'like';
+      if (isLiked) {
+        delete liked[key];
+        LIKE_COUNTS[itemType][itemId] = Math.max(0, (LIKE_COUNTS[itemType][itemId] || 0) - 1);
+      } else {
+        liked[key] = true;
+        LIKE_COUNTS[itemType][itemId] = (LIKE_COUNTS[itemType][itemId] || 0) + 1;
+      }
       saveLikedItems(liked);
-      LIKE_COUNTS[itemType][itemId] = (LIKE_COUNTS[itemType][itemId] || 0) + 1;
       _updateLikeButtonDom(itemType, itemId);
       fetch(API_BASE + '/api/likes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemType, itemId }),
-      }).catch(() => {}); // 失敗時もローカル状態は維持（楽観的UI、ピン留めと同じ思想）
+        body: JSON.stringify({ itemType, itemId, action }),
+      }).catch(() => {}); // 失敗時もローカル状態は維持（楽観的UI、ロールバックしない）
     }
 
     // 該当カードのハートボタンDOM（塗りつぶし状態＋件数）を最新状態に同期する。
@@ -2177,7 +2183,7 @@
       const liked = !!getLikedItems()[`${itemType}:${itemId}`];
       const count = LIKE_COUNTS[itemType]?.[itemId] || 0;
       const safeId = itemId.replace(/'/g, "\\'");
-      return `<span class="card-detail-link like-btn${liked ? ' liked' : ''}" data-like-type="${itemType}" data-like-id="${itemId}" style="cursor:pointer;" onclick="likeItem('${itemType}', '${safeId}')"><span class="like-emoji">${liked ? '❤️' : '🤍'}</span> <span class="like-count">${count}</span></span>`;
+      return `<span class="card-detail-link like-btn${liked ? ' liked' : ''}" data-like-type="${itemType}" data-like-id="${itemId}" style="cursor:pointer;" onclick="toggleLike('${itemType}', '${safeId}')"><span class="like-emoji">${liked ? '❤️' : '🤍'}</span> <span class="like-count">${count}</span></span>`;
     }
 
     // ─── PIN LOGIC ───

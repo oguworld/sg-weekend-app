@@ -490,9 +490,9 @@ app.get('/api/config', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// 公開いいね機能（設計書210）
-// 認証不要・取り消し不可（片道）。連打・水増し防止は端末側localStorageのみで、
-// サーバー側は「1リクエストにつき+1固定」でパラメータ改ざん（負の値・大量加算）のみ防ぐ。
+// 公開いいね機能（設計書210→設計書211で双方向トグルに変更）
+// 認証不要・ON/OFF双方向トグル（何度でも切り替え可能）。連打・水増し防止は端末側localStorageのみで、
+// サーバー側は「1リクエストにつき+1/-1固定」でパラメータ改ざん（任意値の直接指定）のみ防ぐ。
 // data/sg/likes.json（gitignore対象）: { "event:evt_abc123": { "count": 12 }, "news:9f2a1c...": { "count": 3 } }
 // ─────────────────────────────────────────────
 const LIKES_PATH = path.join(__dirname, 'data', 'sg', 'likes.json');
@@ -527,21 +527,26 @@ app.get('/api/likes', (req, res) => {
   }
 });
 
-// POST /api/likes — { itemType, itemId } を受け取り、該当キーのcountを常に+1固定で加算。認証不要
-// クライアントからcount値は受け取らない（パラメータ改ざん防止）。取り消し（アンいいね）は無し
+// POST /api/likes — { itemType, itemId, action } を受け取り、該当キーのcountを+1/-1固定で増減。認証不要
+// action は 'like'（+1、未指定時のデフォルト＝後方互換） / 'unlike'（-1、0未満にはならない）の2値のみ許可
+// クライアントからcount値は受け取らない（パラメータ改ざん防止）。双方向トグル（設計書211）
 app.post('/api/likes', async (req, res) => {
   try {
     const itemType = (req.body?.itemType || '').toLowerCase();
     const itemId = req.body?.itemId;
+    const action = req.body?.action === undefined ? 'like' : req.body.action;
     if (!LIKE_ITEM_TYPES.includes(itemType) || typeof itemId !== 'string' || itemId.trim() === '') {
       return res.status(400).json({ error: 'itemType must be event/news and itemId must be a non-empty string' });
+    }
+    if (action !== 'like' && action !== 'unlike') {
+      return res.status(400).json({ error: 'action must be one of: like, unlike' });
     }
     const key = `${itemType}:${itemId}`;
     let newCount;
     await withFileLock(LIKES_PATH, () => {
       const likes = loadLikes();
       const current = likes[key]?.count || 0;
-      newCount = current + 1;
+      newCount = action === 'unlike' ? Math.max(0, current - 1) : current + 1;
       likes[key] = { count: newCount };
       saveLikes(likes);
     });

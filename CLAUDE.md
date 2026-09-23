@@ -135,18 +135,18 @@ Web版(VAPID/Web Push)とは完全独立の仕組みとしてiOSネイティブP
 - 画像読み込み失敗時は`handleImgError()`が1.2秒後に1回だけ自動リトライしてから絵文字フォールバック
 - **同様のパターンを他画面に導入する際の注意**: `grid.innerHTML`丸ごと再代入が別分岐に残っていると、そこでキャッシュ済みノード(iframe含む)がdocumentから切り離され破棄される
 
-## 公開いいね機能（設計書210）
+## 公開いいね機能（設計書210→設計書211で双方向トグルに変更）
 「くらし」「おでかけ」各カードに、全ユーザーに見える公開の「いいね数」表示（例: `❤️ 12`）。個人用のお気に入り（ピン留め）とは別物、人気度の可視化が目的。
 
-- **確定仕様**: ログイン不要・取り消し（アンいいね）機能なし（一度押したら押しっぱなし、Instagram的な片道仕様）。連打・水増し防止は端末の`localStorage`のみ（ピン留めと同方式）、**サーバー側はIPレート制限等を入れず「1リクエストにつき+1固定」でパラメータ改ざん（負の値・大量加算）のみ防ぐ**方針（ユーザー明示承認済み）
+- **確定仕様**: ログイン不要・ON/OFF双方向トグル（ハートを何度でも押し直せる、取り消し可能）。連打・水増し防止は端末の`localStorage`のみ（ピン留めと同方式）、**サーバー側はIPレート制限等を入れず「1リクエストにつき+1/-1固定」でパラメータ改ざん（任意値の直接指定）のみ防ぐ**方針（ユーザー明示承認済み）
 - **データ**: `data/sg/likes.json`（`data/`配下のためgitignore対象）。キー形式`{itemType}:{itemId}`（`itemType`は`event`|`news`）、値`{count}`
-- **API**（`server.js`）: `GET /api/likes?itemType=event|news`（全件一括取得、`likes.json`未存在なら`{}`）／`POST /api/likes`（`{itemType,itemId}`、常に+1固定、`withFileLock`でアトミック処理）。いずれも認証不要
+- **API**（`server.js`）: `GET /api/likes?itemType=event|news`（全件一括取得、`likes.json`未存在なら`{}`）／`POST /api/likes`（`{itemType,itemId,action}`、`action`は`'like'`(+1)/`'unlike'`(-1、0未満にはならない)、未指定時は`'like'`扱い（後方互換）、`withFileLock`でアトミック処理）。いずれも認証不要
 - **クリーンアップ**: `scripts/fetch-events.js`の`purgeExpiredData()`直後・`scripts/fetch-life-info.js`のリテンション削除直後、それぞれ`purgeOrphanedLikes()`（各ファイルに重複定義）が現存ID集合に含まれない`likes.json`内キーを削除
-- **フロント状態管理**: `likedKey()`/`getLikedItems()`/`saveLikedItems()`（`localStorage`、ピン留めパターン踏襲）、`LIKE_COUNTS = {event:{}, news:{}}`（メモリキャッシュ、`loadLikeCounts()`で`loadEventData()`/`loadLifeInfoNewsScreen()`時に取得）、`likeItem()`（楽観的UI、POST失敗時もローカル状態は維持しロールバックしない）
+- **フロント状態管理**: `likedKey()`/`getLikedItems()`/`saveLikedItems()`（`localStorage`、ピン留めパターン踏襲）、`LIKE_COUNTS = {event:{}, news:{}}`（メモリキャッシュ、`loadLikeCounts()`で`loadEventData()`/`loadLifeInfoNewsScreen()`時に取得）、`toggleLike()`（`liked[key]`の真偽で+1/-1・`action`を分岐、楽観的UI、POST失敗時もローカル状態は維持しロールバックしない）
 - **`_cardElCache`との整合（重要）**: `renderEventCards()`のforEachループ内で、キャッシュヒット/新規生成いずれの場合も`.like-btn`の件数・いいね済み状態（ハート塗りつぶし）を`LIKE_COUNTS`/`getLikedItems()`の最新値で都度同期する処理が必須（上記「イベントカードのDOM差分更新」の注意点と同じ理由）
 - **くらしカード**（`_lifeInfoCardHtml()`）は`innerHTML`一括再代入方式のため、件数をテンプレート文字列に直接埋め込むのみでよい（差分更新の特別対応不要）
 - ピン留め画面（`renderPinList()`/`renderNewsPinList()`）は`renderEventCard()`/`_lifeInfoCardHtml()`を再利用しているため、いいねボタン・件数は自動的に反映される
-- **スコープ外**: いいね取り消し、いいねユーザー一覧、サーバー側IPレート制限、ランキング機能、ホームプレビュー（`_lifeInfoPreviewCardHtml()`）へのいいね表示
+- **スコープ外**: いいねユーザー一覧、サーバー側IPレート制限、ランキング機能、ホームプレビュー（`_lifeInfoPreviewCardHtml()`）へのいいね表示
 
 ## i18n対応（廃止済み、日本語固定の内部実装として存続）
 英語対応(多言語切替)は「実際には使われておらず紛らわしい」との判断で廃止。**`t(key)`関数・`data-i18n`属性・`applyI18n()`自体は削除せず残っている**(常に日本語を表示する内部実装として存続)。
