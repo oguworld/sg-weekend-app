@@ -110,37 +110,13 @@
       });
     });
 
-    // ─── パスフレーズ入力シート（バックアップ）フォーカス中はbottom-navを一時的に隠す（設計書60。
-    // 設計書178フェーズ3で共有カレンダー機能削除に伴い#cal-passphrase-sheetを対象から除外）───
-    // Web版Safari・iOS版共通（Capacitor限定にしない）。モバイルSafariのキーボード表示時、独立したposition:fixed;bottom:0
-    // 要素同士（.bottom-nav と #backup-passphrase-sheet）の可視領域追従がズレ、
-    // ボタン行がボトムナビと重なる不具合の対策。対象をシート内のinput/textareaに厳密に限定する。
-    document.addEventListener('focusin', (e) => {
-      try {
-        const t = e.target;
-        if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
-        if (!t.closest('#backup-passphrase-sheet')) return;
-        const nav = document.querySelector('.bottom-nav');
-        if (nav) nav.style.visibility = 'hidden';
-      } catch (_) {}
-    });
-    document.addEventListener('focusout', (e) => {
-      try {
-        const t = e.target;
-        if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
-        if (!t.closest('#backup-passphrase-sheet')) return;
-        const nav = document.querySelector('.bottom-nav');
-        if (nav) nav.style.visibility = '';
-      } catch (_) {}
-    });
-
     // ─── 設定画面のキーボード被り対策（軽量フォールバックのみ。2026-07-11設計書15で刷新）───
     // かつての .plan-modal / .plan-sheet を縮小・移動する複雑なJS一式（_adjustSheetForKb等）は撤去した。
     // ビューポート固着バグの真因は capacitor.config.js の contentInset:'always' 側にあり、
     // これらのシート操作JSは無害な被害者だったと判明したため（設計書15）。
     // シート系のキーボード回避は .plan-modal-body{overflow-y:auto} の内部スクロールとネイティブに委ねる。
     //
-    // ただし「設定画面直下の入力欄（#feedback-text / #nickname-input など、.plan-modal/.plan-sheetの外側）」は
+    // ただし「設定画面直下の入力欄（#feedback-text など、.plan-modal/.plan-sheetの外側）」は
     // 内部スクロールコンテナを持たずキーボードに隠れやすいため、この軽量関数だけ温存する（回帰防止）。
     // フォーカス要素が .plan-modal / .plan-sheet の外にあるときだけスクロールで逃がす。
     function _scrollFocusedIntoViewOnKb(kbHeight) {
@@ -375,9 +351,6 @@
         secFeedback: 'フィードバック',
         feedbackPlaceholder: '改善要望・バグ報告・スポット追加リクエストなど、なんでもどうぞ！',
         feedbackSend: '📨 送信する',
-        supportDesc: 'このアプリは無料で運営しています。気に入っていただけたら、コーヒー1杯分で応援していただけると嬉しいです',
-        supportLabel: 'アプリを応援する',
-        supportBtn: 'SGD 5 を贈る',
         secAbout: 'アプリ情報',
         aboutAppName: 'アプリ名',
         aboutVersion: 'バージョン',
@@ -452,11 +425,8 @@
         newsEmptyDesc: '現在表示できる情報がありません。<br>また後で確認してください。',
         lifeInfoPreviewTitle: '📰 シンガポールくらし情報',
         lifeInfoPreviewMoreLink: 'もっと見る ›',
-        authGateMessage: 'この機能を使うにはアカウント連携が必要です',
-        authGateBtn: '設定で連携する',
         prBadgeLabel: 'PR',
         titleEditCancel: 'キャンセル',
-        labelNickname: 'ニックネーム',
         labelDarkMode: 'ダークモード',
         statTemp: '気温',
         statRain: '降水確率',
@@ -464,7 +434,6 @@
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
         statDengue: 'デング熱',
-        nicknamePlaceholder: '匿名',
         labelWhoWith: '一緒に行く人',
         labelWhoSolo: '🚶 ひとりで',
         labelWhoCouple: '💑 夫婦・カップル',
@@ -484,43 +453,8 @@
         labelOfficialSite: '公式サイト',
         labelAboutSns: '公式サイト・SNS',
         labelSisterApp: '姉妹アプリ SGBusNavi',
-        secAccount: 'アカウント',
-        loginWithGoogle: 'Googleでログイン',
-        loginWithApple: 'Appleでサインイン',
-        loginStatusGoogle: 'Google連携中',
-        loginStatusApple: 'Apple連携中',
-        logoutBtn: '連携解除',
-        toastLoginSuccess: '連携しました',
-        toastLoginError: '連携に失敗しました。もう一度お試しください',
-        toastLogoutSuccess: '連携を解除しました',
-        deleteAccountBtn: 'アカウントを削除',
-        confirmDeleteAccount: 'アカウントを削除しますか？\nこの操作は取り消せません。予定表のバックアップデータもすべて削除されます。',
-        toastDeleteAccountSuccess: 'アカウントを削除しました',
-        toastDeleteAccountError: 'アカウントの削除に失敗しました。時間をおいて再度お試しください',
-        // データバックアップ（端末移行用。設計書54 → 設計書58で全データ対応に拡張）
-        backupLoginRequired: 'バックアップを利用するにはアカウント連携が必要です',
-        backupDisabledDesc: 'パスフレーズを設定すると、予定表・マイコースなどのデータをサーバーに暗号化してバックアップできます。パスフレーズを知っている本人以外は内容を読めません。',
-        backupEnabledDesc: 'バックアップは有効です。予定表・マイコースなどのデータの変更は自動的に暗号化して同期されます。',
-        backupFoundExistingDesc: '別の端末で作成済みのバックアップが見つかりました。パスフレーズを入力して復元するか、新しくバックアップを作成できます。',
-        backupEnable: 'バックアップを有効にする',
-        backupDisable: 'バックアップを無効にする',
-        backupChangePassphrase: 'パスフレーズを変更',
-        backupSetupTitle: 'バックアップ用パスフレーズを設定',
-        backupRestoreTitle: 'パスフレーズを入力',
-        backupPassphraseWarning: '⚠️ パスフレーズを忘れるとバックアップは復元できません。安全な場所に控えてください。',
-        backupPassphrasePlaceholder: 'パスフレーズ',
-        backupPassphraseConfirmPlaceholder: 'パスフレーズ（確認）',
-        backupPassphraseSubmit: '確定',
-        backupPassphraseEmpty: 'パスフレーズを入力してください',
-        backupPassphraseMismatch: 'パスフレーズが一致しません',
-        confirmBackupDisable: 'バックアップを無効にしますか？サーバー上のデータはこの端末からは同期されなくなります。',
-        backupForgotPassphraseLink: 'パスフレーズを忘れた場合はこちら',
-        confirmBackupReset: '既存のバックアップデータは復元できなくなり、新しいパスフレーズで作り直されます。よろしいですか？',
-        toastBackupEnabled: '🔒 バックアップを有効にしました',
-        toastBackupDisabled: 'バックアップを無効にしました',
-        toastBackupRestored: '✅ バックアップから復元しました',
-        toastBackupError: '⚠️ 処理に失敗しました。もう一度お試しください',
-        toastBackupPassphraseWrong: 'パスフレーズが正しくありません',
+        secWilloa: 'Willoa',
+        labelAboutWilloa: 'About Willoa',
       }
     };
 
@@ -2059,37 +1993,7 @@
         if (e.target.closest('#do-share-btn'))      { e.preventDefault(); openQrShareSheet(); return; }
         if (e.target.closest('#feedback-send-btn')) { e.preventDefault(); sendFeedback(); return; }
         if (e.target.closest('#push-toggle-btn'))   { e.preventDefault(); togglePush(); return; }
-        if (e.target.closest('#google-login-btn'))  { e.preventDefault(); handleGoogleLoginClick(); return; }
-        if (e.target.closest('#apple-login-btn'))    { e.preventDefault(); handleAppleLoginClick();  return; }
-        if (e.target.closest('#logout-btn'))        { e.preventDefault(); handleLogoutClick();      return; }
-        if (e.target.closest('#delete-account-btn')) { e.preventDefault(); handleDeleteAccountClick(); return; }
-        if (e.target.closest('#backup-section-content button')) {
-          const btn = e.target.closest('button');
-          e.preventDefault();
-          _runBackupAction(btn && btn.dataset.backupAction);
-          return;
-        }
       }, { passive: false });
-    }
-
-    // ─── データバックアップセクション ボタン共通処理（設計書58）───
-    // タッチ環境はtouchendデリゲーション（上記）から、PC/マウス環境は下記clickリスナーから呼ばれる。
-    function _runBackupAction(action) {
-      if (action === 'setup') openBackupPassphraseSheet('setup');
-      else if (action === 'change') openBackupPassphraseSheet('change');
-      else if (action === 'restore') openBackupPassphraseSheet('restore');
-      else if (action === 'disable') disableBackup();
-    }
-    {
-      const backupSectionEl = document.getElementById('backup-section-content');
-      if (backupSectionEl) {
-        backupSectionEl.addEventListener('click', e => {
-          if (_touchCapableDetected) return; // タッチ環境ではtouchend側で処理済み（二重発火防止）
-          const btn = e.target.closest('button');
-          if (!btn) return;
-          _runBackupAction(btn.dataset.backupAction);
-        });
-      }
     }
 
     // ─── 閉じる✕ボタン 即時タップ対応（data-close 属性で一括登録） ───
@@ -2103,8 +2007,6 @@
     // ─── オーバーレイ・モーダル閉じる 即時タップ対応 ───
     [
       ['pin-detail-overlay', () => closePinDetail()],
-      ['backup-passphrase-overlay', () => closeBackupPassphraseSheet()],
-      ['backup-passphrase-submit-btn', () => submitBackupPassphrase()],
       ['qr-share-overlay', () => closeQrShareSheet()],
       ['qr-share-link-btn', () => doShare()],
       ['promo-modal-overlay', () => closePromoModal()],
@@ -2118,24 +2020,9 @@
     // app-headerはscreen-home内のstickyヘッダーになったためsyncHeaderHeightは不要
     function syncHeaderHeight() {}
 
-    // ─── AUTH（Google/Apple Sign-In。iOS版・Web版共通。設計書20/35/36/44/49） ───
-    // 【重要】この変数宣言ブロックは、下記 _initAuthToken IIFE（起動時に即実行される）が
-    // これらの let/const を参照するため、必ず初期化フロー（loadEventData()）より前に置くこと。
-    // 元は関数定義群の直前（getAuthToken() の上）にあったが、宣言より前に参照される
-    // TDZ（Temporal Dead Zone）実行時 ReferenceError が発生したため、ここへ移動した（設計書49・TDZ修正）。
-    const AUTH_TOKEN_KEY = 'app_auth_token';
-    let _googleWebClientId = null; // GET /api/config で起動時に取得（Web版GISの初期化用）
-    let _googleAuthInited = false; // Web/iOS共通、各プラットフォームの初期化を一度だけ行うためのフラグ
-    let _appleServiceId = null; // GET /api/config で起動時に取得（Web版Sign in with Apple JSの初期化用）
-    let _appleRedirectUri = null; // GET /api/config で起動時に取得（Web版のredirectURI）
-    let _appleAuthInited = false; // Web版のみ、AppleID.auth.init()を一度だけ行うためのフラグ
-
-    // JWT保存: iOS版はlocalStorage単独だとWKWebView再起動で消えることがあるため、
-    // @capacitor/preferences（ネイティブ永続領域）をソースオブトゥルースにするハイブリッド方式（設計書49）。
-    // localStorage はミラー、_authTokenCache は getAuthToken() を同期のまま維持するための同期読み取り元。
-    let _authTokenCache = null;        // getAuthToken() が同期で返す唯一の読み取り元
-    let _prefsReady = false;           // 起動時 Preferences 読み出しが完了したか（診断用）
-    let _CapPrefs = null;              // @capacitor/preferences プラグイン（iOS版のみ非null想定）
+    // @capacitor/preferences プラグイン参照。プッシュ通知の状態永続化に使用（旧: 認証トークン保存にも使用していたが、
+    // アカウント連携機能の全削除に伴いプッシュ通知専用となった）
+    let _CapPrefs = null;              // iOS版のみ非null想定
     if (_isCapacitorApp) {
       try {
         if (window.Capacitor?.registerPlugin) _CapPrefs = window.Capacitor.registerPlugin('Preferences');
@@ -2161,72 +2048,6 @@
     initPushState().then(() => _maybePromptPushOnboarding());
     initSettingsProfile();
     initSettingsGenres();
-    // JWTトークンの初期化（設計書49）。iOS版は @capacitor/preferences から読み出し、
-    // 読み出し完了「後」に refreshLoginUI() を呼ぶ（同期 localStorage が空でも連携中を維持するため）。
-    (async function _initAuthToken() {
-      try {
-        if (_CapPrefs) {
-          let prefsToken = null;
-          try {
-            const r = await _CapPrefs.get({ key: AUTH_TOKEN_KEY });
-            prefsToken = (r && typeof r.value === 'string') ? r.value : null;
-          } catch (_) {}
-          if (prefsToken) {
-            _authTokenCache = prefsToken;
-            try { localStorage.setItem(AUTH_TOKEN_KEY, prefsToken); } catch (_) {} // localStorageミラー
-          } else {
-            // Preferencesに無くlocalStorageにある場合（旧バージョンからの移行）はPreferencesへ書き込む
-            const lsToken = localStorage.getItem(AUTH_TOKEN_KEY);
-            _authTokenCache = lsToken;
-            if (lsToken) _CapPrefs.set({ key: AUTH_TOKEN_KEY, value: lsToken }).catch(() => {});
-          }
-        } else {
-          // Web版 or プラグイン取得失敗: 従来通り localStorage をキャッシュへ
-          _authTokenCache = localStorage.getItem(AUTH_TOKEN_KEY);
-        }
-      } catch (_) {
-        _authTokenCache = localStorage.getItem(AUTH_TOKEN_KEY);
-      }
-      _prefsReady = true;
-      _sendDebugLog('auth_prefs_init', { hasPrefs: !!_CapPrefs, hasToken: !!_authTokenCache }); // 一時計装（原因確定後に削除）
-      refreshLoginUI();
-    })();
-    // Web版: Google/Apple公式ログインボタンを描画。各SDKは<script async>読み込みのため
-    // 未ロードの場合に備えて一定回数リトライする（iOS版はネイティブフローのため対象外、下記else分岐で自前ボタンを挿入する）。
-    if (!_isCapacitorApp) {
-      let _googleBtnRetries = 0;
-      const _tryInitGoogleBtn = () => {
-        if (window.google?.accounts?.id) { _initGoogleButtonWeb(); return; }
-        if (_googleBtnRetries++ < 20) setTimeout(_tryInitGoogleBtn, 300);
-      };
-      _tryInitGoogleBtn();
-
-      let _appleBtnRetries = 0;
-      const _tryInitAppleBtn = () => {
-        if (window.AppleID?.auth) { _initAppleButtonWeb(); return; }
-        if (_appleBtnRetries++ < 20) setTimeout(_tryInitAppleBtn, 300);
-      };
-      _tryInitAppleBtn();
-    } else {
-      // iOS版: #google-login-btn-container / #apple-login-btn-container はWeb版のみが使う
-      // 公式SDK描画用の空コンテナのため、iOS版では自前ボタンを動的に挿入する（設計書44、Googleボタン非表示バグの修正）
-      const gc = document.getElementById('google-login-btn-container');
-      if (gc) {
-        // 公式4色「G」ロゴ（Google Branding Guidelines準拠、viewBox 0 0 48 48の4パス）をインライン埋め込み
-        gc.innerHTML = `<button id="google-login-btn" onclick="if(!_touchCapableDetected) handleGoogleLoginClick()" class="oauth-btn oauth-btn--google">
-          <svg class="oauth-btn__logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
-          <span data-i18n="loginWithGoogle">${t('loginWithGoogle')}</span>
-        </button>`;
-      }
-      const ac = document.getElementById('apple-login-btn-container');
-      if (ac) {
-        // 公式Appleロゴ（Sign in with Apple HIG準拠、fill白）をインライン埋め込み
-        ac.innerHTML = `<button id="apple-login-btn" onclick="if(!_touchCapableDetected) handleAppleLoginClick()" class="oauth-btn oauth-btn--apple">
-          <svg class="oauth-btn__logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#fff" d="M17.05 12.54c-.03-2.9 2.37-4.29 2.48-4.36-1.35-1.98-3.46-2.25-4.21-2.28-1.79-.18-3.5 1.05-4.41 1.05-.91 0-2.31-1.03-3.8-1-1.96.03-3.77 1.14-4.78 2.9-2.04 3.53-.52 8.76 1.46 11.62.97 1.4 2.12 2.97 3.63 2.91 1.46-.06 2.01-.94 3.77-.94 1.76 0 2.26.94 3.8.91 1.57-.03 2.56-1.42 3.52-2.83 1.11-1.62 1.57-3.19 1.59-3.27-.03-.02-3.05-1.17-3.08-4.64zM14.13 4.03c.81-.98 1.35-2.34 1.2-3.7-1.16.05-2.57.77-3.4 1.75-.75.86-1.4 2.25-1.23 3.58 1.29.1 2.62-.66 3.43-1.63z"/></svg>
-          <span data-i18n="loginWithApple">${t('loginWithApple')}</span>
-        </button>`;
-      }
-    }
 
     // Pull to Refresh（設計書19、イベント画面。iOS版・Web版両方で有効化（設計書198）。既存の横スワイプ機構と共存させるためwatchSwipeIntent=true）
     _initPtr(document.getElementById('home-scroll-content'), 'ptr-indicator-home', async () => {
@@ -2516,7 +2337,6 @@
         localStorage.setItem('app_age_list', JSON.stringify([]));
       }
       initSettingsProfile();
-      _syncBackupToServer();
     }
 
     function getAgeList() {
@@ -2532,7 +2352,6 @@
         localStorage.setItem('app_age_list', JSON.stringify([val]));
       }
       initSettingsProfile();
-      _syncBackupToServer();
     }
 
     // ─── GENRE SETTINGS ───
@@ -2542,7 +2361,6 @@
 
     function saveGenreList(ids) {
       localStorage.setItem('app_genres', JSON.stringify(ids));
-      _syncBackupToServer();
     }
 
     function toggleGenre(id) {
@@ -2554,309 +2372,6 @@
       });
       _syncRecommendChip();
     }
-
-    function getAuthToken() {
-      if (_authTokenCache !== null) return _authTokenCache;
-      return localStorage.getItem(AUTH_TOKEN_KEY);
-    }
-    function setAuthToken(token) {
-      _authTokenCache = token;
-      try { localStorage.setItem(AUTH_TOKEN_KEY, token); } catch (_) {}
-      if (_CapPrefs) {
-        _CapPrefs.set({ key: AUTH_TOKEN_KEY, value: token }).catch(() => {});
-      }
-    }
-    function clearAuthToken() {
-      _authTokenCache = null;
-      try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (_) {}
-      if (_CapPrefs) {
-        _CapPrefs.remove({ key: AUTH_TOKEN_KEY }).catch(() => {});
-      }
-    }
-
-    // Authorizationヘッダーを自動付与するfetchヘルパー（未ログイン時は通常のfetchと同じ挙動）
-    async function authedFetch(url, options = {}) {
-      const token = getAuthToken();
-      const headers = Object.assign({}, options.headers || {});
-      if (token) headers['Authorization'] = 'Bearer ' + token;
-      return fetch(url, Object.assign({}, options, { headers }));
-    }
-
-    // サーバーに idToken を送信し、自前JWTを保存する共通処理（iOS/Web共通）
-    async function _submitGoogleIdToken(idToken) {
-      try {
-        const res = await fetch(API_BASE + '/api/auth/google', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
-        });
-        if (!res.ok) throw new Error('auth failed');
-        const data = await res.json();
-        if (!data.token) throw new Error('no token');
-        setAuthToken(data.token);
-        showToast(t('toastLoginSuccess'));
-        await refreshLoginUI();
-      } catch (e) {
-        showToast(t('toastLoginError'));
-      }
-    }
-
-    // サーバーに identityToken を送信し、自前JWTを保存する共通処理（iOS版のみ。Web版はform_postリダイレクト経由のため別経路）
-    async function _submitAppleIdentityToken(identityToken) {
-      try {
-        const res = await fetch(API_BASE + '/api/auth/apple', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identityToken }),
-        });
-        if (!res.ok) throw new Error('auth failed');
-        const data = await res.json();
-        if (!data.token) throw new Error('no token');
-        setAuthToken(data.token);
-        showToast(t('toastLoginSuccess'));
-        await refreshLoginUI();
-      } catch (e) {
-        showToast(t('toastLoginError'));
-      }
-    }
-
-    // トークンがある前提で「連携中」表示に切り替える楽観的ヘルパー（設計書48・課題2）
-    // providerが確定できない状況（通信エラー・500系）で呼ぶため、ラベルは既存の汎用キーを流用する。
-    // provider が分かる正常時（refreshLoginUI 内 res.ok 経路）のみ正確なラベルへ更新される。
-    function _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl) {
-      if (labelEl && !labelEl.getAttribute('data-i18n')) {
-        labelEl.setAttribute('data-i18n', 'loginStatusGoogle');
-        labelEl.textContent = t('loginStatusGoogle');
-      }
-      loggedOutEl.style.display = 'none';
-      loggedInEl.style.display = '';
-      const deleteSectionEl = document.getElementById('delete-account-section');
-      if (deleteSectionEl) deleteSectionEl.style.display = '';
-    }
-
-    // 設定画面のログインセクション表示をログイン状態に合わせて更新する
-    async function refreshLoginUI() {
-      const loggedOutEl = document.getElementById('login-section-logged-out');
-      const loggedInEl = document.getElementById('login-section-logged-in');
-      const labelEl = document.getElementById('login-status-label');
-      const deleteSectionEl = document.getElementById('delete-account-section');
-      if (!loggedOutEl || !loggedInEl) return;
-      const token = getAuthToken();
-      if (!token) {
-        loggedOutEl.style.display = '';
-        loggedInEl.style.display = 'none';
-        if (deleteSectionEl) deleteSectionEl.style.display = 'none';
-        return;
-      }
-      try {
-        const res = await authedFetch(API_BASE + '/api/auth/me');
-        // 明確に失効を示す 401 のときだけトークンを破棄して匿名表示に戻す（設計書48・課題2）
-        if (res.status === 401) {
-          clearAuthToken();
-          loggedOutEl.style.display = '';
-          loggedInEl.style.display = 'none';
-          if (deleteSectionEl) deleteSectionEl.style.display = 'none';
-          return;
-        }
-        // 401 以外の失敗（500系など）はトークンを消さず、楽観的に「連携中」を維持する。
-        // iOS版は起動直後にネットワーク未確立・サーバー一時エラーが起きやすく、
-        // 有効なトークンを誤って破棄すると再起動のたびに連携が切れて見えるため。
-        if (!res.ok) {
-          _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
-          return;
-        }
-        const data = await res.json();
-        // メールアドレス・氏名は一切表示しない（認証情報最小化方針）。プロバイダのみ表示
-        if (labelEl) {
-          const key = data.provider === 'apple' ? 'loginStatusApple' : 'loginStatusGoogle';
-          labelEl.setAttribute('data-i18n', key);
-          labelEl.textContent = t(key);
-        }
-        loggedOutEl.style.display = 'none';
-        loggedInEl.style.display = '';
-        if (deleteSectionEl) deleteSectionEl.style.display = '';
-        // アカウント連携だけで完結させる方針に変更。バックアップパスフレーズの必須化は廃止
-        // （_checkMandatoryBackupSetup()本体は削除せず残置、設定画面から任意に設定可能なまま）
-      } catch (e) {
-        // 通信エラー・fetch自体の失敗ではトークンを消さず、楽観的に「連携中」を維持する（設計書48・課題2）
-        _showLoggedInOptimistic(loggedInEl, loggedOutEl, labelEl);
-      }
-      if (typeof renderBackupSection === 'function') renderBackupSection();
-    }
-
-    function handleLogoutClick() {
-      if (!confirm(t('confirmLogout'))) return;
-      window.google?.accounts?.id?.disableAutoSelect?.();
-      clearAuthToken();
-      showToast(t('toastLogoutSuccess'));
-      refreshLoginUI();
-      // ログアウト時、バックアップの鍵material自体はローカルに残す（設計書54 §8-5、未解決事項として明示。
-      // 再ログイン時に同じ端末なら鍵を保持したまま同期を再開できるようにするための保守的な選択）。
-      // 表示のみ「未ログイン」向けの案内に更新する。
-      renderBackupSection();
-    }
-
-    // アカウント削除（設計書65）: JWT・バックアップ鍵material・saltを全てクリアする共通ヘルパー
-    function _clearAllAccountLocalState() {
-      clearAuthToken();
-      _clearBackupKeyMaterial();
-      try { localStorage.removeItem('app_backup_salt'); } catch (_) {}
-    }
-
-    async function handleDeleteAccountClick() {
-      if (!confirm(t('confirmDeleteAccount'))) return;
-      try {
-        const token = getAuthToken();
-        if (!token) { showToast(t('toastLoginError')); return; }
-        const res = await authedFetch(API_BASE + '/api/auth/me', { method: 'DELETE' });
-        if (res.status === 401) {
-          // 既に失効している場合はローカル状態のみクリアして終える
-          _clearAllAccountLocalState();
-          refreshLoginUI();
-          if (typeof renderBackupSection === 'function') renderBackupSection();
-          showToast(t('toastDeleteAccountSuccess'));
-          return;
-        }
-        if (!res.ok) { showToast(t('toastDeleteAccountError')); return; }
-        // サーバー側削除確認後にローカル状態をクリア（中途半端な状態を残さない）
-        window.google?.accounts?.id?.disableAutoSelect?.();
-        _clearAllAccountLocalState();
-        showToast(t('toastDeleteAccountSuccess'));
-        refreshLoginUI();
-        if (typeof renderBackupSection === 'function') renderBackupSection();
-      } catch (e) {
-        showToast(t('toastDeleteAccountError'));
-      }
-    }
-
-    // iOS版: Capacitorネイティブプラグイン経由でGoogleサインインを起動
-    async function _handleGoogleLoginIOS() {
-      try {
-        let GoogleAuthPlugin = null;
-        try {
-          if (window.Capacitor?.registerPlugin) GoogleAuthPlugin = window.Capacitor.registerPlugin('GoogleAuth');
-        } catch (_) {}
-        if (!GoogleAuthPlugin) GoogleAuthPlugin = window.Capacitor?.Plugins?.GoogleAuth;
-        if (!GoogleAuthPlugin) { showToast(t('toastLoginError')); return; }
-        if (!_googleAuthInited) {
-          try { await GoogleAuthPlugin.initialize?.(); } catch (_) {}
-          _googleAuthInited = true;
-        }
-        const result = await GoogleAuthPlugin.signIn();
-        const idToken = result?.authentication?.idToken || result?.idToken;
-        if (!idToken) { showToast(t('toastLoginError')); return; }
-        await _submitGoogleIdToken(idToken);
-      } catch (e) {
-        showToast(t('toastLoginError'));
-      }
-    }
-
-    // Web版: Google公式ボタン（renderButton）をコンテナ内に描画する。
-    // One Tap（prompt()）は一度サインインに成功するとページリロードまで内部的に抑制され、
-    // 再度呼んでも表示されなくなる仕様のため、確実にクリックのたびに起動するrenderButton方式に統一する（設計書40）。
-    async function _initGoogleButtonWeb() {
-      try {
-        if (!_googleWebClientId) {
-          const res = await fetch(API_BASE + '/api/config');
-          const conf = await res.json();
-          _googleWebClientId = conf.googleWebClientId;
-        }
-        if (!_googleWebClientId || !window.google?.accounts?.id) return;
-        if (!_googleAuthInited) {
-          window.google.accounts.id.initialize({
-            client_id: _googleWebClientId,
-            callback: (response) => { _submitGoogleIdToken(response.credential); },
-          });
-          _googleAuthInited = true;
-        }
-        const container = document.getElementById('google-login-btn-container');
-        if (container && !container.dataset.rendered) {
-          window.google.accounts.id.renderButton(container, {
-            type: 'standard',
-            theme: 'outline',
-            size: 'large',
-            text: 'signin_with',
-            shape: 'pill',
-            logo_alignment: 'left',
-            width: 280,
-          });
-          container.dataset.rendered = 'true';
-        }
-      } catch (e) {
-        // GIS SDK未ロード等の失敗時はコンテナが空のまま残るだけで実害なし
-      }
-    }
-
-    function handleGoogleLoginClick() {
-      if (_isCapacitorApp) _handleGoogleLoginIOS();
-      // Web版はrenderButton()が描画したGoogle公式ボタンがクリックを直接処理するため、ここでは何もしない
-    }
-
-    // iOS版: Capacitorネイティブプラグイン経由でSign in with Appleを起動。スコープは要求しない（同意画面を出さずsub相当のみ取得、設計書44）
-    async function _handleAppleLoginIOS() {
-      try {
-        let AppleAuthPlugin = null;
-        try {
-          if (window.Capacitor?.registerPlugin) AppleAuthPlugin = window.Capacitor.registerPlugin('SignInWithApple');
-        } catch (_) {}
-        if (!AppleAuthPlugin) AppleAuthPlugin = window.Capacitor?.Plugins?.SignInWithApple;
-        if (!AppleAuthPlugin) { showToast(t('toastLoginError')); return; }
-        const result = await AppleAuthPlugin.authorize({
-          clientId: 'app.dosuru',
-          redirectURI: 'https://dosuru.app/api/auth/apple/callback',
-          scopes: '',
-        });
-        const identityToken = result?.response?.identityToken;
-        if (!identityToken) { showToast(t('toastLoginError')); return; }
-        await _submitAppleIdentityToken(identityToken);
-      } catch (e) {
-        showToast(t('toastLoginError'));
-      }
-    }
-
-    // Web版: Sign in with Apple JS SDKを初期化し、公式ボタン（appleid-signin-button）をコンテナ内に描画する。
-    // response_mode:'form_post'によるフルページリダイレクト方式（設計書44）。scopeは要求しない。
-    async function _initAppleButtonWeb() {
-      try {
-        if (!_appleServiceId) {
-          const res = await fetch(API_BASE + '/api/config');
-          const conf = await res.json();
-          _appleServiceId = conf.appleServiceId;
-          if (conf.appleRedirectUri) _appleRedirectUri = conf.appleRedirectUri;
-        }
-        if (!_appleServiceId || !window.AppleID?.auth) return;
-        const stateRes = await fetch(API_BASE + '/api/auth/apple/state');
-        const stateData = await stateRes.json();
-        if (!stateData.state) return;
-        window.AppleID.auth.init({
-          clientId: _appleServiceId,
-          scope: '',
-          redirectURI: _appleRedirectUri || (API_BASE + '/api/auth/apple/callback'),
-          state: stateData.state,
-          usePopup: false,
-        });
-        _appleAuthInited = true;
-      } catch (e) {
-        // Sign in with Apple JS SDK未ロード等の失敗時はコンテナが空のまま残るだけで実害なし
-      }
-    }
-
-    function handleAppleLoginClick() {
-      if (_isCapacitorApp) { _handleAppleLoginIOS(); return; }
-      // Web版はAppleID公式ボタン（<div id="apple-login-btn-container">に描画されたappleid-signin-button）が
-      // クリックを検知しAppleID.auth.init()済みの設定でリダイレクトを開始するため、初期化未完了時のみ再試行する
-      if (!_appleAuthInited) _initAppleButtonWeb();
-    }
-
-    // Web版起動時、URLフラグメントに auth_token が含まれる場合（Apple form_post callbackからの中継後）保存して除去する
-    (function _consumeAppleAuthTokenFromHash() {
-      if (_isCapacitorApp) return;
-      const hash = window.location.hash || '';
-      const m = hash.match(/auth_token=([^&]+)/);
-      if (!m) return;
-      setAuthToken(decodeURIComponent(m[1]));
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-    })();
 
     function initSettingsGenres() {
       const container = document.getElementById('genre-chips-container');
@@ -2949,37 +2464,6 @@
     }
 
 
-    function toggleAvatarPicker() {
-      const picker = document.getElementById('avatar-picker');
-      picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function selectAvatar(emoji) {
-      localStorage.setItem('user_avatar', emoji);
-      document.getElementById('avatar-preview').textContent = emoji;
-      document.querySelectorAll('.avatar-chip').forEach(b => {
-        b.classList.toggle('selected', b.dataset.emoji === emoji);
-      });
-      document.getElementById('avatar-picker').style.display = 'none';
-      _syncBackupToServer();
-    }
-
-    function getUserAvatar() {
-      return localStorage.getItem('user_avatar') || '🙂';
-    }
-
-    function initProfileChips() {
-      const savedName = localStorage.getItem('user_name');
-      const input = document.getElementById('nickname-input');
-      if (input && savedName) input.value = savedName;
-      const savedAvatar = getUserAvatar();
-      const preview = document.getElementById('avatar-preview');
-      if (preview) preview.textContent = savedAvatar;
-      document.querySelectorAll('.avatar-chip').forEach(b => {
-        b.classList.toggle('selected', b.dataset.emoji === savedAvatar);
-      });
-    }
-
     // プロフィールに基づいてカードをソート
     function applyProfileSort() {
       const { who, age } = getProfile();
@@ -3017,7 +2501,6 @@
     // ─── AREA SETTING ───
     const AREAS = ['Central', 'East', 'West', 'North', 'North-East'];
 
-    initProfileChips();
     applyProfileSort();
     applyI18n();
     updateCityUI();
@@ -3366,13 +2849,6 @@
 
     let _loadedCity = getCity();
 
-    function goToAccountLinking() {
-      switchNav('settings');
-      setTimeout(() => {
-        document.getElementById('login-section-logged-out')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 100);
-    }
-
     // ─── 診断: News画面のbodyスクロール調査（使い捨て、原因特定後に削除すること。2026-08-28） ───
     function _debugLogScreenMetrics(screen) {
       try {
@@ -3471,8 +2947,6 @@
         if (screen === 'settings') {
           initSettingsProfile();
           initSettingsGenres();
-          renderBackupSection();
-          checkExistingBackupOnOpen();
         }
         if (screen === 'news') {
           // ボトムナビからニュースタブを開くたびにカテゴリ絞り込みを先頭チップ（新着）にリセットする
@@ -3890,444 +3364,6 @@
 
     // ─── PULL-TO-REFRESH ───
 
-
-
-    // ─── パスフレーズ由来の鍵導出（共通ヘルパー、設計書54/55）───
-    // 個人予定表バックアップ（設計書54）・共有カレンダー（設計書55）の両方から呼ばれる。
-    // 「鍵導出アルゴリズムの関数のみ共通化し、パスフレーズ自体・保存先キー・保存値は完全に分離する」方針（設計書55 §4）。
-    function _b64urlEncode(bytes) {
-      return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    }
-    function _b64urlDecode(b64) {
-      return Uint8Array.from(atob(b64.replace(/-/g,'+').replace(/_/g,'/')), c => c.charCodeAt(0));
-    }
-    function _genSaltB64() {
-      return _b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
-    }
-    // パスフレーズ文字列 + salt(Base64url) から AES-256-GCM の CryptoKey を導出する（PBKDF2, iterations:100000, SHA-256）
-    async function _deriveKeyFromPassphrase(passphrase, saltB64) {
-      const saltBytes = _b64urlDecode(saltB64);
-      const baseKey = await crypto.subtle.importKey(
-        'raw', new TextEncoder().encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
-      );
-      return crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt: saltBytes, iterations: 100000, hash: 'SHA-256' },
-        baseKey,
-        { name: 'AES-GCM', length: 256 },
-        true,
-        ['encrypt', 'decrypt']
-      );
-    }
-    // CryptoKeyをraw exportしてBase64url化する（案X-B: 端末保存・自動復元用。導出済み鍵materialのみ保存し、平文パスフレーズ自体は保存しない）
-    async function _exportKeyMaterial(cryptoKey) {
-      const raw = await crypto.subtle.exportKey('raw', cryptoKey);
-      return _b64urlEncode(raw);
-    }
-    async function _importKeyMaterial(b64) {
-      return crypto.subtle.importKey('raw', _b64urlDecode(b64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-    }
-    // CryptoKeyオブジェクトを直接受け取る汎用の暗号化・復号（IV12バイト先頭付与、Base64url形式）
-    async function _encryptWithKey(cryptoKey, data) {
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, new TextEncoder().encode(JSON.stringify(data)));
-      const buf = new Uint8Array(12 + ct.byteLength);
-      buf.set(iv); buf.set(new Uint8Array(ct), 12);
-      return _b64urlEncode(buf);
-    }
-    async function _decryptWithKey(cryptoKey, encB64) {
-      const buf = _b64urlDecode(encB64);
-      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, cryptoKey, buf.slice(12));
-      return JSON.parse(new TextDecoder().decode(plain));
-    }
-
-    // ─── 個人予定表バックアップ（設計書54）───
-    // ログイン認証（誰のデータか）とバックアップ用パスフレーズ（暗号化鍵の元）は完全に別レイヤー。
-    // オプトイン機能のため起動時同期フロー（loadEventData()等）からは一切呼ばれない。
-    // そのため下記モジュールスコープ変数はTDZ対象外（起動時フローの間接参照経路に無い、設計書54 §2-8）。
-    const BACKUP_KEY_MATERIAL_KEY = 'app_backup_key_material'; // 導出済み鍵material（raw export→Base64url）の保存キー。パスフレーズ自体は保存しない
-    let _backupKeyCache = null; // 導出済みCryptoKey（メモリキャッシュ、同期読み取り用）
-    let _backupSyncInFlight = false; // 多重PUT防止用の簡易フラグ
-
-    function _getBackupKeyMaterial() {
-      try { return localStorage.getItem(BACKUP_KEY_MATERIAL_KEY); } catch (_) { return null; }
-    }
-    function _setBackupKeyMaterial(material) {
-      try { localStorage.setItem(BACKUP_KEY_MATERIAL_KEY, material); } catch (_) {}
-      if (_CapPrefs) _CapPrefs.set({ key: BACKUP_KEY_MATERIAL_KEY, value: material }).catch(() => {});
-    }
-    function _clearBackupKeyMaterial() {
-      _backupKeyCache = null;
-      try { localStorage.removeItem(BACKUP_KEY_MATERIAL_KEY); } catch (_) {}
-      if (_CapPrefs) _CapPrefs.remove({ key: BACKUP_KEY_MATERIAL_KEY }).catch(() => {});
-    }
-    // iOS版はPreferencesをソースオブトゥルースとして復元（設計書49/50と同じハイブリッド方式）。
-    // オプトイン機能のため起動時には呼ばない。バックアップセクションを開いたタイミングで一度だけ呼ぶ。
-    async function _restoreBackupKeyFromPrefsIfNeeded() {
-      if (_backupKeyCache) return true;
-      let material = null;
-      if (_CapPrefs) {
-        try {
-          const r = await _CapPrefs.get({ key: BACKUP_KEY_MATERIAL_KEY });
-          material = (r && typeof r.value === 'string') ? r.value : null;
-          if (material) { try { localStorage.setItem(BACKUP_KEY_MATERIAL_KEY, material); } catch (_) {} }
-        } catch (_) {}
-      }
-      if (!material) material = _getBackupKeyMaterial();
-      if (!material) return false;
-      try {
-        _backupKeyCache = await _importKeyMaterial(material);
-        return true;
-      } catch (_) { return false; }
-    }
-
-    function isBackupEnabled() {
-      return !!_getBackupKeyMaterial();
-    }
-
-    // 現在のlocalStorageからバックアップ対象データ一式を集める（設計書58 §3-4 新構造。
-    // 設計書178フェーズ1でコース機能削除に伴い myCoursesByCity/likedCourses フィールドを削除。
-    // 設計書178フェーズ2で探訪（スタンプラリー）機能削除に伴い stampMemos/arrivalDate/departureDate フィールドを削除。
-    // 設計書178フェーズ3で予定表機能削除に伴い customPlans/eventPlansByCity フィールドを削除）
-    function _collectBackupPayload() {
-      let genres = [], ageList = [];
-      try { genres = JSON.parse(localStorage.getItem('app_genres') || '[]'); } catch (_) {}
-      try { ageList = JSON.parse(localStorage.getItem('app_age_list') || '[]'); } catch (_) {}
-      return {
-        version: 2,
-        genres,
-        who: localStorage.getItem('app_who') || '[]',
-        ageList,
-        avatar: localStorage.getItem('user_avatar') || '',
-      };
-    }
-
-    // 復号したバックアップデータをlocalStorageへローカルとマージして書き込む（設計書58 §3-5。
-    // 設計書178フェーズ2で旧構造〈versionフィールドなし〉の後方互換分岐を削除、常にversion:2形式として扱う。
-    // 設計書178フェーズ3で予定表機能削除に伴い customPlans/eventPlansByCity のマージ処理を削除）
-    async function _applyRestoredBackup(dec) {
-      if (Array.isArray(dec.genres) && dec.genres.length && getGenreList().length === 0) {
-        saveGenreList(dec.genres);
-      }
-      if (dec.who && getWhoList().length === 0) {
-        try { localStorage.setItem('app_who', typeof dec.who === 'string' ? dec.who : JSON.stringify(dec.who)); } catch (_) {}
-      }
-      if (Array.isArray(dec.ageList) && dec.ageList.length && getAgeList().length === 0) {
-        localStorage.setItem('app_age_list', JSON.stringify(dec.ageList));
-      }
-      if (dec.avatar && !localStorage.getItem('user_avatar')) {
-        localStorage.setItem('user_avatar', dec.avatar);
-      }
-    }
-
-    // マイコース保存・ジャンル/プロフィール/いいね変更から呼ばれる。
-    // バックアップ未設定・未ログインなら即return（実害なし）。
-    async function _syncBackupToServer() {
-      if (!getAuthToken()) return;
-      if (!isBackupEnabled()) return;
-      if (_backupSyncInFlight) return;
-      _backupSyncInFlight = true;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 設計書22パターン踏襲：ハングさせない
-      try {
-        if (!_backupKeyCache) {
-          const ok = await _restoreBackupKeyFromPrefsIfNeeded();
-          if (!ok) return;
-        }
-        const salt = localStorage.getItem('app_backup_salt');
-        if (!salt) return;
-        const encryptedData = await _encryptWithKey(_backupKeyCache, _collectBackupPayload());
-        await authedFetch(API_BASE + '/api/user-plans/me', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ salt, encryptedData }),
-          signal: controller.signal,
-        });
-      } catch (e) {
-        // ネットワークエラー・タイムアウトとも静かに諦める（ローカル保存は既に完了済み、UIをブロックしない）
-      } finally {
-        clearTimeout(timeoutId);
-        _backupSyncInFlight = false;
-      }
-    }
-
-    function openBackupSection() {
-      renderBackupSection();
-    }
-
-    function renderBackupSection() {
-      const el = document.getElementById('backup-section-content');
-      if (!el) return;
-      const loggedIn = !!getAuthToken();
-      if (!loggedIn) {
-        el.innerHTML = `<p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0;" data-i18n="backupLoginRequired">${t('backupLoginRequired')}</p>`;
-        return;
-      }
-      if (isBackupEnabled()) {
-        el.innerHTML = `
-          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupEnabledDesc">${t('backupEnabledDesc')}</p>
-          <button class="cal-sync-action secondary" data-backup-action="change" style="margin-bottom:8px;">🔑 <span data-i18n="backupChangePassphrase">${t('backupChangePassphrase')}</span></button>
-          <button class="cal-sync-action secondary" data-backup-action="disable">🚫 <span data-i18n="backupDisable">${t('backupDisable')}</span></button>`;
-      } else {
-        el.innerHTML = `
-          <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupDisabledDesc">${t('backupDisabledDesc')}</p>
-          <button class="cal-sync-action primary" data-backup-action="setup">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
-      }
-    }
-
-    // ─── バックアップ用パスフレーズ入力シート ───
-    let _backupSheetMode = null; // 'setup' | 'restore' | 'change'
-    let _backupSheetMandatory = false; // true時はオーバーレイタップ・✕・キャンセルで閉じられない（設計書118）
-
-    // アカウント連携が確認できた（refreshLoginUI success分岐）たびに呼ばれる。この端末にまだ
-    // バックアップ鍵materialが無ければ、サーバーの既存バックアップ有無を見てsetup/restoreいずれかの
-    // モードで必須パスフレーズシートを開く（設計書118）。
-    async function _checkMandatoryBackupSetup() {
-      if (!getAuthToken()) return;
-      if (isBackupEnabled()) return; // 既にこの端末で鍵material保持済みなら何もしない
-      const sheetEl = document.getElementById('backup-passphrase-sheet');
-      if (sheetEl && sheetEl.classList.contains('visible')) return; // 既に開いている（二重表示防止）
-      try {
-        const res = await authedFetch(API_BASE + '/api/user-plans/me');
-        if (!res.ok) return;
-        const d = await res.json();
-        const mode = (d.salt && d.encryptedData) ? 'restore' : 'setup';
-        openBackupPassphraseSheet(mode, true); // 第2引数 mandatory=true
-      } catch (e) {}
-    }
-
-    async function openBackupPassphraseSheet(mode, mandatory = false) {
-      if (!getAuthToken()) { showToast(t('backupLoginRequired')); return; }
-      _sendDebugLog('backup_passphrase_sheet_open', { mode, mandatory, isCapacitor: _isCapacitorApp, ua: navigator.userAgent });
-      _backupSheetMode = mode;
-      _backupSheetMandatory = mandatory;
-      const titleEl = document.getElementById('backup-passphrase-title');
-      const warnEl = document.getElementById('backup-passphrase-warn');
-      const confirmRow = document.getElementById('backup-passphrase-confirm-row');
-      document.getElementById('backup-passphrase-input').value = '';
-      document.getElementById('backup-passphrase-confirm-input').value = '';
-      if (warnEl) warnEl.style.display = '';
-      if (mode === 'setup') {
-        if (titleEl) titleEl.textContent = t('backupSetupTitle');
-        if (confirmRow) confirmRow.style.display = '';
-      } else if (mode === 'change') {
-        if (titleEl) titleEl.textContent = t('backupChangePassphrase');
-        if (confirmRow) confirmRow.style.display = '';
-      } else {
-        // restore: サーバーに既存バックアップがある場合（別端末で設定済み）
-        if (titleEl) titleEl.textContent = t('backupRestoreTitle');
-        if (confirmRow) confirmRow.style.display = 'none';
-      }
-      const closeBtn = document.getElementById('backup-passphrase-close-btn');
-      const cancelBtn = document.getElementById('backup-passphrase-cancel-btn');
-      const resetLink = document.getElementById('backup-passphrase-reset-link');
-      if (closeBtn) closeBtn.style.display = mandatory ? 'none' : '';
-      if (cancelBtn) cancelBtn.style.display = mandatory ? 'none' : '';
-      if (resetLink) resetLink.style.display = (mandatory && mode === 'restore') ? '' : 'none';
-      lockScroll();
-      document.getElementById('backup-passphrase-overlay').classList.add('visible');
-      document.getElementById('backup-passphrase-sheet').classList.add('visible');
-    }
-
-    function closeBackupPassphraseSheet() {
-      if (_backupSheetMandatory) return; // 必須モードは閉じさせない（オーバーレイタップ・✕・キャンセル全経路がこの1関数を通るため一括で防げる）
-      _blurIfFocusInside('backup-passphrase-sheet');
-      unlockScroll();
-      document.getElementById('backup-passphrase-overlay').classList.remove('visible');
-      document.getElementById('backup-passphrase-sheet').classList.remove('visible');
-    }
-
-    (function _initBackupPassphraseInputDiag() {
-      const input = document.getElementById('backup-passphrase-input');
-      if (!input) return;
-      ['touchstart', 'touchend', 'focus', 'blur', 'input'].forEach(evtName => {
-        input.addEventListener(evtName, () => {
-          _sendDebugLog('backup_passphrase_input_event', {
-            evt: evtName,
-            valueLength: input.value.length,
-            activeElementIsInput: document.activeElement === input,
-            isCapacitor: _isCapacitorApp,
-          });
-        }, { passive: true });
-      });
-    })();
-
-    async function submitBackupPassphrase() {
-      const passphrase = (document.getElementById('backup-passphrase-input').value || '').trim();
-      if (!passphrase) { showToast(t('backupPassphraseEmpty')); return; }
-      const mode = _backupSheetMode;
-      if (mode === 'setup' || mode === 'change') {
-        const confirmVal = (document.getElementById('backup-passphrase-confirm-input').value || '').trim();
-        if (passphrase !== confirmVal) { showToast(t('backupPassphraseMismatch')); return; }
-      }
-      const btn = document.getElementById('backup-passphrase-submit-btn');
-      if (btn) { btn.disabled = true; }
-      try {
-        if (mode === 'setup') {
-          await _doBackupSetup(passphrase);
-        } else if (mode === 'change') {
-          await _doBackupChange(passphrase);
-        } else {
-          await _doBackupRestore(passphrase);
-        }
-      } finally {
-        if (btn) { btn.disabled = false; }
-      }
-    }
-
-    // 必須restoreモードで「パスフレーズを忘れた場合」リンクをタップした際、シートを閉じずに
-    // その場でsetupモードへ切り替える（設計書118）。サーバー上の暗号化データは_doBackupSetupが
-    // 新しいsalt+暗号文で無条件PUT上書きするため、この関数自体はUI切り替えのみでよい。
-    function _resetBackupAndSetupFresh() {
-      if (!confirm(t('confirmBackupReset'))) return;
-      _backupSheetMode = 'setup';
-      document.getElementById('backup-passphrase-title').textContent = t('backupSetupTitle');
-      document.getElementById('backup-passphrase-confirm-row').style.display = '';
-      document.getElementById('backup-passphrase-input').value = '';
-      document.getElementById('backup-passphrase-reset-link').style.display = 'none';
-    }
-
-    async function _doBackupSetup(passphrase) {
-      _sendDebugLog('backup_start', { mode: 'setup', hasAuthToken: !!getAuthToken() });
-      try {
-        const salt = _genSaltB64();
-        const key = await _deriveKeyFromPassphrase(passphrase, salt);
-        const encryptedData = await _encryptWithKey(key, _collectBackupPayload());
-        const res = await authedFetch(API_BASE + '/api/user-plans/me', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ salt, encryptedData }),
-        });
-        _sendDebugLog('backup_put_response', { mode: 'setup', status: res.status, ok: res.ok });
-        if (!res.ok) throw new Error('backup setup failed');
-        _backupKeyCache = key;
-        const material = await _exportKeyMaterial(key);
-        _setBackupKeyMaterial(material);
-        localStorage.setItem('app_backup_salt', salt);
-        _backupSheetMandatory = false; // 成功時は必須モードでも閉じられるようにする（設計書118）
-        closeBackupPassphraseSheet();
-        renderBackupSection();
-        showToast(t('toastBackupEnabled'));
-      } catch (e) {
-        _sendDebugLog('backup_error', {
-          mode: 'setup',
-          errorName: e?.name || null,
-          errorMessage: e?.message || String(e),
-          hasAuthToken: !!getAuthToken(),
-        });
-        showToast(t('toastBackupError'));
-      }
-    }
-
-    async function _doBackupChange(passphrase) {
-      _sendDebugLog('backup_start', { mode: 'change', hasAuthToken: !!getAuthToken() });
-      try {
-        // 既存の鍵で復号できることを確認してから新パスフレーズで再暗号化（設計書54 §6-10のフロー）
-        if (!_backupKeyCache) {
-          const ok = await _restoreBackupKeyFromPrefsIfNeeded();
-          if (!ok) {
-            _sendDebugLog('backup_error', { mode: 'change', errorName: 'RestoreKeyFailed', errorMessage: 'no existing backup key material', hasAuthToken: !!getAuthToken() });
-            showToast(t('toastBackupError'));
-            return;
-          }
-        }
-        const newSalt = _genSaltB64();
-        const newKey = await _deriveKeyFromPassphrase(passphrase, newSalt);
-        const encryptedData = await _encryptWithKey(newKey, _collectBackupPayload());
-        const res = await authedFetch(API_BASE + '/api/user-plans/me', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ salt: newSalt, encryptedData }),
-        });
-        _sendDebugLog('backup_put_response', { mode: 'change', status: res.status, ok: res.ok });
-        if (!res.ok) throw new Error('backup change failed');
-        _backupKeyCache = newKey;
-        const material = await _exportKeyMaterial(newKey);
-        _setBackupKeyMaterial(material);
-        localStorage.setItem('app_backup_salt', newSalt);
-        _backupSheetMandatory = false; // 成功時は必須モードでも閉じられるようにする（設計書118）
-        closeBackupPassphraseSheet();
-        renderBackupSection();
-        showToast(t('toastBackupEnabled'));
-      } catch (e) {
-        _sendDebugLog('backup_error', {
-          mode: 'change',
-          errorName: e?.name || null,
-          errorMessage: e?.message || String(e),
-          hasAuthToken: !!getAuthToken(),
-        });
-        showToast(t('toastBackupError'));
-      }
-    }
-
-    async function _doBackupRestore(passphrase) {
-      _sendDebugLog('backup_start', { mode: 'restore', hasAuthToken: !!getAuthToken() });
-      try {
-        const res = await authedFetch(API_BASE + '/api/user-plans/me');
-        _sendDebugLog('backup_get_response', { mode: 'restore', status: res.status, ok: res.ok });
-        if (!res.ok) throw new Error('fetch failed');
-        const d = await res.json();
-        if (!d.salt || !d.encryptedData) {
-          _sendDebugLog('backup_error', { mode: 'restore', errorName: 'MissingSaltOrData', errorMessage: 'no salt/encryptedData in response', hasAuthToken: !!getAuthToken() });
-          showToast(t('toastBackupError'));
-          return;
-        }
-        const key = await _deriveKeyFromPassphrase(passphrase, d.salt);
-        let dec;
-        try {
-          dec = await _decryptWithKey(key, d.encryptedData);
-        } catch (e) {
-          _sendDebugLog('backup_error', { mode: 'restore', errorName: e?.name || null, errorMessage: 'decrypt failed: ' + (e?.message || String(e)), hasAuthToken: !!getAuthToken() });
-          showToast(t('toastBackupPassphraseWrong'));
-          return;
-        }
-        _backupKeyCache = key;
-        const material = await _exportKeyMaterial(key);
-        _setBackupKeyMaterial(material);
-        localStorage.setItem('app_backup_salt', d.salt);
-        await _applyRestoredBackup(dec);
-        _backupSheetMandatory = false; // 成功時は必須モードでも閉じられるようにする（設計書118）
-        closeBackupPassphraseSheet();
-        renderBackupSection();
-        showToast(t('toastBackupRestored'));
-      } catch (e) {
-        _sendDebugLog('backup_error', {
-          mode: 'restore',
-          errorName: e?.name || null,
-          errorMessage: e?.message || String(e),
-          hasAuthToken: !!getAuthToken(),
-        });
-        showToast(t('toastBackupError'));
-      }
-    }
-
-    function disableBackup() {
-      if (!confirm(t('confirmBackupDisable'))) return;
-      _clearBackupKeyMaterial();
-      localStorage.removeItem('app_backup_salt');
-      renderBackupSection();
-      showToast(t('toastBackupDisabled'));
-    }
-
-    // 設定画面「予定表のバックアップ」セクションを開いたタイミングで、
-    // 別端末での既存バックアップ有無をチェックし、あればrestoreモードの案内を出す。
-    async function checkExistingBackupOnOpen() {
-      if (!getAuthToken()) return;
-      if (isBackupEnabled()) return; // 既にこの端末で有効化済みなら何もしない
-      try {
-        const res = await authedFetch(API_BASE + '/api/user-plans/me');
-        if (!res.ok) return;
-        const d = await res.json();
-        if (d.salt && d.encryptedData) {
-          const el = document.getElementById('backup-section-content');
-          if (el) {
-            el.innerHTML = `
-              <p style="font-size:13px;color:var(--warm-gray);line-height:1.7;margin:0 0 10px;" data-i18n="backupFoundExistingDesc">${t('backupFoundExistingDesc')}</p>
-              <button class="cal-sync-action primary" data-backup-action="restore">🔓 <span data-i18n="backupRestoreTitle">${t('backupRestoreTitle')}</span></button>
-              <button class="cal-sync-action secondary" data-backup-action="setup">🔒 <span data-i18n="backupEnable">${t('backupEnable')}</span></button>`;
-          }
-        }
-      } catch (e) {}
-    }
 
     // Web版でのプッシュ通知タップ遷移（?nav=news → 生活情報タブ）。sw.jsのnotificationclickが
     // client.navigate()で付与するクエリを起動時に読み取る

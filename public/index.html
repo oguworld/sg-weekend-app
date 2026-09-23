@@ -19,11 +19,6 @@
   <meta name="description" content="シンガポール在住日本人ファミリーのための週末おでかけ提案アプリ" />
   <link rel="manifest" href="manifest.json" />
   <script async src="https://www.instagram.com/embed.js"></script>
-  <!-- Google Identity Services（Web版Google Sign-In用。iOS版はCapacitorネイティブプラグインを使うため未使用だが読み込み自体は無害） -->
-  <script async src="https://accounts.google.com/gsi/client"></script>
-  <!-- Sign in with Apple JS（Web版Apple Sign-In用。設計書44。iOS版はCapacitorネイティブプラグインを使うため未使用だが読み込み自体は無害） -->
-  <script type="text/javascript" async src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
-  <script type="text/javascript" async src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid-button/1/en_US/appleid-button.js"></script>
   <!-- Safari / iOS ホーム画面アイコン（manifest.jsonは参照されないため必須） -->
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
   <!-- ブラウザタブ用 favicon -->
@@ -247,45 +242,6 @@
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secProfile">プロフィール</div>
 
-      <!-- ニックネーム＋アバター（コメント機能で表示名として使用。設計書174で再表示） -->
-      <div class="settings-item" style="gap:10px;">
-        <span class="settings-item-label" style="white-space:nowrap;" data-i18n="labelNickname">ニックネーム</span>
-        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-          <input id="nickname-input" type="text" maxlength="20" data-i18n-ph="nicknamePlaceholder" placeholder="匿名"
-            style="width:90px;text-align:right;border:none;background:transparent;font-size:16px;
-                   color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
-            oninput="localStorage.setItem('user_name', this.value.trim() || t('nicknamePlaceholder'))"
-            onblur="if(!this.value.trim()) this.value=''">
-          <button id="avatar-preview" onclick="toggleAvatarPicker()"
-            style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--sand-dark);
-                   background:var(--sand);font-size:16px;cursor:pointer;flex-shrink:0;
-                   display:flex;align-items:center;justify-content:center;padding:0;">🙂</button>
-        </div>
-      </div>
-      <!-- アバター選択パネル（タップで表示） -->
-      <div id="avatar-picker" style="display:none;padding:10px 18px 14px;border-top:1px solid var(--sand);">
-        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-          <button class="avatar-chip" data-emoji="🙂" onclick="selectAvatar('🙂')">🙂</button>
-          <button class="avatar-chip" data-emoji="😎" onclick="selectAvatar('😎')">😎</button>
-          <button class="avatar-chip" data-emoji="🤩" onclick="selectAvatar('🤩')">🤩</button>
-          <button class="avatar-chip" data-emoji="🥳" onclick="selectAvatar('🥳')">🥳</button>
-          <button class="avatar-chip" data-emoji="🐼" onclick="selectAvatar('🐼')">🐼</button>
-          <button class="avatar-chip" data-emoji="🦊" onclick="selectAvatar('🦊')">🦊</button>
-          <button class="avatar-chip" data-emoji="🐨" onclick="selectAvatar('🐨')">🐨</button>
-          <button class="avatar-chip" data-emoji="🐸" onclick="selectAvatar('🐸')">🐸</button>
-          <button class="avatar-chip" data-emoji="🐶" onclick="selectAvatar('🐶')">🐶</button>
-          <button class="avatar-chip" data-emoji="🐱" onclick="selectAvatar('🐱')">🐱</button>
-          <button class="avatar-chip" data-emoji="🦄" onclick="selectAvatar('🦄')">🦄</button>
-          <button class="avatar-chip" data-emoji="🐧" onclick="selectAvatar('🐧')">🐧</button>
-          <button class="avatar-chip" data-emoji="🌸" onclick="selectAvatar('🌸')">🌸</button>
-          <button class="avatar-chip" data-emoji="🌴" onclick="selectAvatar('🌴')">🌴</button>
-          <button class="avatar-chip" data-emoji="⭐" onclick="selectAvatar('⭐')">⭐</button>
-          <button class="avatar-chip" data-emoji="🍜" onclick="selectAvatar('🍜')">🍜</button>
-          <button class="avatar-chip" data-emoji="🍣" onclick="selectAvatar('🍣')">🍣</button>
-          <button class="avatar-chip" data-emoji="✈️" onclick="selectAvatar('✈️')">✈️</button>
-        </div>
-      </div>
-
       <div class="settings-item" style="padding:12px 18px;display:none;">
         <span class="settings-item-label" data-i18n="labelCity">都市</span>
         <div class="city-select-wrapper">
@@ -363,31 +319,7 @@
 
     </div>
 
-    <!-- 2. アカウント（Google/Apple Sign-In＋予定表のバックアップ。設計書20/35/36/44、バックアップは設計書54。統合は設計書64） -->
-    <div class="settings-section">
-      <div class="settings-section-title" data-i18n="secAccount">アカウント</div>
-
-      <div id="login-section-logged-out" class="settings-item" style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
-        <div id="google-login-btn-container" style="display:flex;justify-content:center;width:100%;"></div>
-        <div id="apple-login-btn-container" style="display:flex;justify-content:center;width:100%;">
-          <div id="appleid-signin" data-color="black" data-border="true" data-type="sign in" data-width="280" data-height="40"></div>
-        </div>
-      </div>
-
-      <div id="login-section-logged-in" class="settings-item" style="padding:12px 18px;display:none;">
-        <span class="settings-item-label" id="login-status-label" data-i18n="loginStatusGoogle">Googleでログイン中</span>
-        <button id="logout-btn" onclick="if(!_touchCapableDetected) handleLogoutClick()"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;">
-          <span data-i18n="logoutBtn">連携解除</span>
-        </button>
-      </div>
-
-      <div class="settings-item" style="padding:14px 18px;flex-direction:column;align-items:flex-start;gap:2px;display:none;">
-        <div id="backup-section-content" style="width:100%;"></div>
-      </div>
-    </div>
-
-    <!-- 3. アプリ設定 -->
+    <!-- 2. アプリ設定 -->
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secAppSettings">アプリ設定</div>
 
@@ -410,7 +342,7 @@
 
     </div>
 
-    <!-- 4. サポート・情報（旧「その他」、設計書64でフィードバックを分離） -->
+    <!-- 3. サポート・情報（旧「その他」、設計書64でフィードバックを分離） -->
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secSupport">サポート・情報</div>
 
@@ -429,6 +361,25 @@
         </div>
       </div>
 
+      <div class="settings-item" style="padding:12px 18px;">
+        <span class="settings-item-label" data-i18n="labelVersion">バージョン</span>
+        <span id="app-version-label" style="font-size:14px;color:var(--warm-gray);">-</span>
+      </div>
+
+    </div>
+
+    <!-- 4. Willoa（About Willoa・姉妹アプリSGBusNavi・シェア機能） -->
+    <div class="settings-section">
+      <div class="settings-section-title" data-i18n="secWilloa">Willoa</div>
+
+      <div class="settings-item" style="padding:12px 18px;">
+        <span class="settings-item-label" data-i18n="labelAboutWilloa">About Willoa</span>
+        <a href="https://willoa.net" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;justify-content:center;color:var(--midnight);text-decoration:none;font-size:20px;">
+          🌐
+        </a>
+      </div>
+
       <!-- 姉妹アプリSGBusNaviへの相互リンク（2026-09-17、SGBusNavi側のSettingsに
            SG在住Naviへのリンクを追加したのに合わせて追加） -->
       <div class="settings-item" style="padding:12px 18px;">
@@ -440,26 +391,12 @@
       </div>
 
       <div class="settings-item" style="padding:12px 18px;">
-        <span class="settings-item-label" data-i18n="labelVersion">バージョン</span>
-        <span id="app-version-label" style="font-size:14px;color:var(--warm-gray);">-</span>
-      </div>
-
-      <div class="settings-item" style="padding:12px 18px;">
         <span class="settings-item-label" data-i18n="shareSettingsBtn">友達にシェアする</span>
         <button id="do-share-btn" onclick="if(!_touchCapableDetected) openQrShareSheet()"
           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;"
           onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
           <span data-i18n="shareLabel">シェア</span>
         </button>
-      </div>
-
-      <div class="settings-item" style="padding:12px 18px;">
-        <span class="settings-item-label" data-i18n="supportLabel">アプリを応援する</span>
-        <a href="https://buy.stripe.com/28EfZ9eN56aZaEEbmY4c800" target="_blank" rel="noopener"
-          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--warm-white);cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:14px;font-weight:600;color:var(--midnight);transition:all 0.18s;flex-shrink:0;text-decoration:none;"
-          onmousedown="this.style.opacity=0.7" onmouseup="this.style.opacity=1">
-          <span data-i18n="supportBtn">$5 を贈る</span>
-        </a>
       </div>
 
     </div>
@@ -481,16 +418,6 @@
 
     </div>
 
-    <!-- 6. アカウント削除（設計書66で「アカウント」セクションから分離・最下部へ移動、設計書67で見出しなし・中央寄せテキストのみに変更） -->
-    <div class="settings-section">
-      <div id="delete-account-section" style="padding:4px 18px 14px;display:none;">
-        <button id="delete-account-btn" class="settings-item--danger"
-          onclick="if(!_touchCapableDetected) handleDeleteAccountClick()"
-          style="display:flex;justify-content:center;align-items:center;width:100%;padding:12px 18px;border:none;background:transparent;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:600;transition:all 0.18s;">
-          <span data-i18n="deleteAccountBtn">アカウントを削除</span>
-        </button>
-      </div>
-    </div>
     </div><!-- /screen-scroll-content -->
   </div><!-- /screen-settings -->
 
@@ -542,49 +469,6 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V7a4 4 0 0 1 8 0v9a2.5 2.5 0 0 1-5 0V9"/></svg>
   </button>
 
-
-  <!-- 個人予定表バックアップ用パスフレーズ入力シート（設計書54） -->
-  <div class="chat-overlay" id="backup-passphrase-overlay" onclick="if(!_touchCapableDetected) closeBackupPassphraseSheet()" style="z-index:3601;"></div>
-  <div id="backup-passphrase-sheet" class="plan-modal" style="z-index:3602;
-    background:var(--warm-white);border-radius:20px 20px 0 0;padding:20px 20px 0;
-    box-shadow:0 -4px 20px rgba(0,0,0,0.12);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
-      <div id="backup-passphrase-title" style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="backupSetupTitle">バックアップ用パスフレーズを設定</div>
-      <button id="backup-passphrase-close-btn" data-close onclick="closeBackupPassphraseSheet()" style="background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;">✕</button>
-    </div>
-    <div class="plan-modal-body" style="padding:0 0 calc(84px + env(safe-area-inset-bottom,0px));">
-      <div id="backup-passphrase-warn" style="font-size:12px;color:var(--terracotta);line-height:1.6;background:var(--caramel-pale);border-radius:10px;padding:8px 10px;margin-bottom:12px;" data-i18n="backupPassphraseWarning">⚠️ パスフレーズを忘れるとバックアップは復元できません。安全な場所に控えてください。</div>
-      <input id="backup-passphrase-input" type="password" maxlength="100" autocomplete="off"
-        data-i18n-ph="backupPassphrasePlaceholder" placeholder="パスフレーズ"
-        style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
-               border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-               color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:10px;"
-        onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-      <div id="backup-passphrase-confirm-row">
-        <input id="backup-passphrase-confirm-input" type="password" maxlength="100" autocomplete="off"
-          data-i18n-ph="backupPassphraseConfirmPlaceholder" placeholder="パスフレーズ（確認）"
-          style="width:100%;box-sizing:border-box;font-size:16px;padding:12px 14px;
-                 border:1.5px solid var(--sand-dark);border-radius:12px;background:var(--warm-white);
-                 color:var(--text);font-family:'Noto Sans JP',sans-serif;outline:none;"
-          onfocus="this.style.borderColor='var(--caramel)'" onblur="this.style.borderColor='var(--sand-dark)'">
-      </div>
-      <div style="display:flex;gap:10px;margin-top:12px;margin-bottom:8px;">
-        <button id="backup-passphrase-cancel-btn" onclick="closeBackupPassphraseSheet()"
-          style="flex:1;padding:12px;background:var(--sand);border:none;border-radius:12px;
-                 font-size:15px;font-family:inherit;cursor:pointer;color:var(--warm-gray);"
-          data-i18n="titleEditCancel">キャンセル</button>
-        <button id="backup-passphrase-submit-btn" onclick="if(!_touchCapableDetected) submitBackupPassphrase()"
-          style="flex:2;padding:12px;background:var(--caramel);border:none;border-radius:12px;
-                 font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;color:white;"
-          data-i18n="backupPassphraseSubmit">確定</button>
-      </div>
-      <div id="backup-passphrase-reset-link" style="display:none;text-align:center;margin-bottom:12px;">
-        <span style="font-size:12px;color:var(--warm-gray);text-decoration:underline;cursor:pointer;"
-          onclick="if(!_touchCapableDetected) _resetBackupAndSetupFresh()"
-          data-i18n="backupForgotPassphraseLink">パスフレーズを忘れた場合はこちら</span>
-      </div>
-    </div>
-  </div>
 
   <!-- アプリ共有用QRコードシート -->
   <div class="chat-overlay" id="qr-share-overlay" onclick="if(!_touchCapableDetected) closeQrShareSheet()" style="z-index:3601;"></div>

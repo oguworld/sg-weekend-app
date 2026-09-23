@@ -228,14 +228,6 @@ function verifyAppJwtOptional(req) {
   }
 }
 
-// GET /api/auth/me 等、認証必須エンドポイント用ミドルウェア
-function requireAppAuth(req, res, next) {
-  const userId = verifyAppJwtOptional(req);
-  if (!userId) return res.status(401).json({ error: 'unauthorized' });
-  req.authUserId = userId;
-  next();
-}
-
 // ─────────────────────────────────────────────
 // MIDDLEWARE
 // ─────────────────────────────────────────────
@@ -491,13 +483,10 @@ app.get('/api/sponsored-cards', (req, res) => {
   }
 });
 
-// GET /api/config — 認証不要、公開情報のみを返す軽量エンドポイント（Web版のGoogle Identity Services / Sign in with Apple JS初期化用）
+// GET /api/config — 認証不要、公開情報のみを返す軽量エンドポイント
+// （アカウント連携機能削除に伴い、Google/Apple Sign-In関連フィールドは削除済み。現状フロントからの参照なし）
 app.get('/api/config', (req, res) => {
-  res.json({
-    googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID || null,
-    appleServiceId: process.env.APPLE_SERVICE_ID || null,
-    appleRedirectUri: 'https://dosuru.app/api/auth/apple/callback',
-  });
+  res.json({});
 });
 
 // GET /api/sales — セール情報一覧（events.json の type==='sale' のみ返す）
@@ -1407,147 +1396,6 @@ app.post('/api/line-webhook', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// AUTH ROUTES（Google Sign-In。設計書20/35/36、今回はGoogle Sign-Inのみ実装。Apple・予定表紐づけは次回）
-// ─────────────────────────────────────────────
-
-// POST /api/auth/google — Google idToken を検証し、自前JWTを発行する
-// iOS版（GOOGLE_IOS_CLIENT_ID）・Web版（GOOGLE_WEB_CLIENT_ID）どちらのクライアントIDが発行したトークンでも検証を通す
-app.post('/api/auth/google', async (req, res) => {
-  try {
-    const { idToken } = req.body || {};
-    if (!idToken) return res.status(400).json({ error: 'idToken required' });
-
-    const audience = [GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID].filter(Boolean);
-    if (audience.length === 0) {
-      console.error('auth/google: GOOGLE_WEB_CLIENT_ID / GOOGLE_IOS_CLIENT_ID が未設定です');
-      return res.status(500).json({ error: 'server not configured' });
-    }
-
-    const ticket = await googleOAuthClient.verifyIdToken({ idToken, audience });
-    const payload = ticket.getPayload();
-    const sub = payload?.sub;
-    if (!sub) return res.status(401).json({ error: 'invalid token' });
-
-    // 認証情報最小化方針: email/name/picture等は一切保存・利用しない。sub のみ使用
-    const user = await upsertUser('google', sub);
-    const token = issueAppJwt(user.userId);
-    res.json({ token, userId: user.userId });
-  } catch (e) {
-    console.error('auth/google error:', e.message);
-    res.status(401).json({ error: 'verification failed' });
-  }
-});
-
-// GET /api/auth/me — 自前JWTを検証し、ユーザー情報（userId/provider/createdAt のみ）を返す
-app.get('/api/auth/me', requireAppAuth, (req, res) => {
-  const users = loadUsers();
-  const user = users.find(u => u.userId === req.authUserId);
-  if (!user) return res.status(401).json({ error: 'user not found' });
-  res.json({ userId: user.userId, provider: user.provider, createdAt: user.createdAt });
-});
-
-// DELETE /api/auth/me — アカウント削除（設計書65）。ユーザーレコード・予定表バックアップを削除し、
-// 公開コースの authorId は匿名化（null）する。冪等: 対象レコードが既に無くても200を返す
-app.delete('/api/auth/me', requireAppAuth, async (req, res) => {
-  const userId = req.authUserId;
-  try {
-    // 1. data/users.json からレコードを削除（冪等: 既に無くても成功扱い）
-    await withFileLock(USERS_PATH, () => {
-      const users = loadUsers();
-      const next = users.filter(u => u.userId !== userId);
-      saveUsers(next);
-    });
-
-    // 2. data/user-plans/{userId}.json を削除（存在すれば）
-    const fp = getUserPlansFilePath(userId);
-    if (fp && fs.existsSync(fp)) {
-      await withFileLock(fp, () => {
-        try { fs.unlinkSync(fp); } catch (_) {}
-      });
-    }
-
-    // 3. 全都市のコミュニティコースの authorId を匿名化（null化）
-    for (const city of ['sg', 'bkk', 'syd']) {
-      const cPath = path.join(__dirname, 'data', city, 'community-courses.json');
-      if (!fs.existsSync(cPath)) continue;
-      await withFileLock(cPath, () => {
-        const courses = JSON.parse(fs.readFileSync(cPath, 'utf8'));
-        let changed = false;
-        for (const c of courses) {
-          if (c.authorId === userId) { c.authorId = null; changed = true; }
-        }
-        if (changed) fs.writeFileSync(cPath, JSON.stringify(courses, null, 2));
-      });
-    }
-
-    res.json({ ok: true });
-  } catch (e) {
-    console.error('DELETE /api/auth/me error:', e.message);
-    res.status(500).json({ error: 'delete failed' });
-  }
-});
-
-// ─────────────────────────────────────────────
-// Sign in with Apple（設計書44。iOS版はidentityTokenを直接POST、Web版はresponse_mode:'form_post'経由のcallback）
-// ─────────────────────────────────────────────
-
-// Apple idToken を検証し upsertUser する共通コアロジック（iOS/Web両経路から呼ぶ）
-async function verifyAppleTokenAndUpsert(identityToken) {
-  const audience = [APPLE_APP_ID, APPLE_SERVICE_ID].filter(Boolean);
-  const payload = await appleSignin.verifyIdToken(identityToken, { audience, ignoreExpiration: false });
-  const sub = payload?.sub;
-  if (!sub) throw new Error('invalid apple token: no sub');
-  // 認証情報最小化方針: email等は一切保存・利用しない。sub のみ使用
-  const user = await upsertUser('apple', sub);
-  return user;
-}
-
-// POST /api/auth/apple — iOS版ネイティブSign in with AppleのidentityTokenを検証し、自前JWTを発行する
-app.post('/api/auth/apple', async (req, res) => {
-  try {
-    const { identityToken } = req.body || {};
-    if (!identityToken) return res.status(400).json({ error: 'identityToken required' });
-    if (!APPLE_AUTH_ENABLED) {
-      console.error('auth/apple: APPLE_SERVICE_ID / APPLE_APP_ID が未設定です');
-      return res.status(500).json({ error: 'server not configured' });
-    }
-    const user = await verifyAppleTokenAndUpsert(identityToken);
-    const token = issueAppJwt(user.userId);
-    res.json({ token, userId: user.userId });
-  } catch (e) {
-    console.error('auth/apple error:', e.message);
-    res.status(401).json({ error: 'verification failed' });
-  }
-});
-
-// GET /api/auth/apple/state — Web版CSRF対策用のワンタイムstateを発行する
-app.get('/api/auth/apple/state', (req, res) => {
-  res.json({ state: issueAppleAuthState() });
-});
-
-// POST /api/auth/apple/callback — Web版 response_mode:'form_post' のリダイレクト先。
-// AppleサーバーがブラウザのフルページPOSTでここに戻ってくる。JSON応答ではなくHTML中継でJWTをURLフラグメント経由で渡す
-app.post('/api/auth/apple/callback', express.urlencoded({ extended: false }), async (req, res) => {
-  try {
-    const { id_token, state } = req.body || {};
-    if (!state || !verifyAndConsumeAppleAuthState(state)) {
-      return res.redirect('https://dosuru.app/?auth_error=state_mismatch');
-    }
-    if (!id_token) return res.redirect('https://dosuru.app/?auth_error=no_token');
-    if (!APPLE_AUTH_ENABLED) {
-      console.error('auth/apple/callback: APPLE_SERVICE_ID / APPLE_APP_ID が未設定です');
-      return res.redirect('https://dosuru.app/?auth_error=server_not_configured');
-    }
-    const user = await verifyAppleTokenAndUpsert(id_token);
-    const token = issueAppJwt(user.userId);
-    res.send(`<script>location.replace('https://dosuru.app/#auth_token=${token}');</script>`);
-  } catch (e) {
-    console.error('auth/apple/callback error:', e.message);
-    res.redirect('https://dosuru.app/?auth_error=verification_failed');
-  }
-});
-
-// ─────────────────────────────────────────────
 // PUSH NOTIFICATIONS
 // ─────────────────────────────────────────────
 app.get('/api/vapid-public-key', (req, res) => {
@@ -1631,54 +1479,6 @@ app.get('/api/ig-embed', async (req, res) => {
 */
 
 // ─────────────────────────────────────────────
-// USER PLANS BACKUP（個人予定表のログインユーザー同期＋ゼロ知識暗号化バックアップ、設計書54）
-// サーバーは salt（非秘密のPBKDF2ソルト）と encryptedData（暗号文）のみを保持し、
-// customPlans/eventPlansの平文は一切扱わない・検証もしない（暗号文のためパースも不可能）。
-// ─────────────────────────────────────────────
-const USER_PLANS_DIR = path.join(__dirname, 'data', 'user-plans');
-if (!fs.existsSync(USER_PLANS_DIR)) fs.mkdirSync(USER_PLANS_DIR, { recursive: true });
-
-function getUserPlansFilePath(userId) {
-  // userId は upsertUser() が 'usr_' + hex24 で発行する既知フォーマットのみ許可（パストラバーサル対策）
-  if (!/^usr_[a-f0-9]{24}$/.test(userId)) return null;
-  return path.join(USER_PLANS_DIR, `${userId}.json`);
-}
-
-app.get('/api/user-plans/me', requireAppAuth, (req, res) => {
-  const fp = getUserPlansFilePath(req.authUserId);
-  if (!fp) return res.status(400).json({ error: 'invalid user' });
-  if (!fs.existsSync(fp)) {
-    return res.json({ userId: req.authUserId, salt: null, encryptedData: null, updatedAt: null });
-  }
-  try {
-    res.json(JSON.parse(fs.readFileSync(fp, 'utf8')));
-  } catch (e) {
-    res.status(500).json({ error: 'read failed' });
-  }
-});
-
-app.put('/api/user-plans/me', requireAppAuth, async (req, res) => {
-  const fp = getUserPlansFilePath(req.authUserId);
-  if (!fp) return res.status(400).json({ error: 'invalid user' });
-  const { salt, encryptedData } = req.body;
-  if (!salt || !encryptedData) return res.status(400).json({ error: 'salt and encryptedData are required' });
-  try {
-    await withFileLock(fp, () => {
-      const data = {
-        userId: req.authUserId,
-        salt,
-        encryptedData,
-        updatedAt: new Date().toISOString(),
-      };
-      fs.writeFileSync(fp, JSON.stringify(data, null, 2));
-    });
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ error: 'write failed' });
-  }
-});
-
-// ─────────────────────────────────────────────
 // Static HTML pages (about subdomain)
 // ─────────────────────────────────────────────
 app.get('/api/version', (req, res) => {
@@ -1688,9 +1488,6 @@ app.get('/api/version', (req, res) => {
 
 app.get('/about', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'about.html'));
-});
-app.get('/privacy', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'privacy.html'));
 });
 app.get('/contact', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'contact.html'));
