@@ -20494,3 +20494,39 @@ const metaRowHtml = (catLabel || e.source || e.period || e.hours || inlineBadgeH
 - 🔴Criticalなし
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
+
+
+---
+
+# 設計書200 — 設定画面「プロフィール」セクションが見出しのみの空白表示になる不具合の修正（2026-09-23、builder→checker→closer）
+
+## 背景
+設定画面(`public/index.html`)の「設定」タブで、「プロフィール」セクション見出しの中身(都市選択・おでかけスタイル・ジャンル/興味パネル)が全て既存の`display:none`済みのため、見出し文字列だけが空白セクションとして画面に残っていた。ユーザーがiOSアプリのスクリーンショットでこれを報告し、「プロフィールは設定から消したのでこのラベルいらない」と指摘。
+
+## 受け入れ基準
+- 正常系: 設定画面を開いたとき、「プロフィール」の見出し文字列が表示されない。「アプリ設定」セクションが自然な余白で表示される
+- 失敗系/エッジケース: 都市選択・おでかけスタイル・ジャンル/興味の各機能を再開する際、既存の`display:none`解除だけで機能を戻せること（見出しdiv削除が復活の妨げにならないこと）
+
+## 変更内容（実施済み）
+- `public/index.html`から以下2行を削除（実施時点の実際の行番号は241〜243行目、設計書起票時の記載行番号242〜243行目とは1行のズレがあったが対象箇所は同一）:
+  ```html
+    <!-- 1. プロフィール -->
+    <div class="settings-section-title" data-i18n="secProfile">プロフィール</div>
+  ```
+- `<div class="settings-section">`開始タグおよびその中身（都市選択`#city-select`/おでかけスタイル折りたたみパネル/ジャンル・興味パネル、いずれも既存の`display:none`のまま）・閉じタグは一切変更せず維持
+- `public/app.js`内の`secProfile: 'プロフィール',`(STRINGS.ja定義)は削除せず残置（他から参照される可能性を排除しないため）
+- API/データ/CSS(`app.css`)/`server.js`には一切触れず。`pm2 restart`不要
+
+## スコープ外（今回対応せず）
+- 都市選択・おでかけスタイル・ジャンル/興味の各機能自体の再開
+- 後続セクションの番号コメント（`<!-- 2. アプリ設定 -->`等）の振り直し
+
+## 検証（builder→checker）
+- `git diff`で変更が`public/index.html`の2行削除のみであることを確認（`.settings-section`開始タグ・244〜320行目相当の中身・322行目以降の「アプリ設定」セクションは無変更）
+- `secProfile`という`data-i18n`キーが`index.html`内の他箇所・`app.js`内のロジックから参照されていないことを`grep`で確認（`app.js`のSTRINGS.ja定義1箇所のみ残存、実害なし）
+- HTML構造: 削除した2行は同一行内で開始・終了タグが完結する自己完結型divのコメント+要素であり、`.settings-section`の開閉ペアには影響しないことを確認。ファイル全体のdiv開始/終了タグ数の差分(-1)が変更前後で保たれていることを確認
+- `public/app.js`・`public/app.css`・`server.js`はdiffに一切現れず無変更
+- 🔴Critical: なし
+- Web版は`public/`配下のみの変更で`pm2 restart`不要（server.js無変更のため）
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
+- API変更を伴わないため緊急TestFlightビルドは不要。次回のiOSビルド（TestFlight/App Store提出）に自然に含める形でよい
