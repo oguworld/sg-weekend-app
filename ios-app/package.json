@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.8.6",
+  "version": "1.8.7",
   "description": "SG在住Navi iOS App (Capacitor)",
   "private": true,
   "scripts": {
@@ -24,5 +24,5 @@
     "@capacitor/cli": "^6.0.0",
     "@capacitor/ios": "^6.0.0"
   },
-  "releaseNotes": "・「くらし」「おでかけ」カードに、みんなの反応がわかる「いいね」ボタンを追加しました\n・設定画面の使っていない項目を整理しました"
+  "releaseNotes": "・「くらし」「おでかけ」カードに、みんなの反応がわかる「いいね」ボタンを追加しました(何度でもON/OFFを切り替えられます)\n・設定画面の使っていない項目を整理しました\n・カレンダーのF1シンガポールGPアイコンの表示月を修正しました"
 }
