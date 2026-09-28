@@ -195,13 +195,14 @@ Web版(VAPID/Web Push)とは完全独立の仕組みとしてiOSネイティブP
 - ボトムナビアイコンはSVG(`currentColor`)で`.nav-icon-svg{color:var(--light-gray)}`／`.nav-item.active .nav-icon-svg{color:var(--caramel)}`によりダークモード切替に画像差し替えなしで自動追従
 
 ## 指標ウィジェット
-おでかけ画面・くらし画面それぞれの最上部に3項目ずつ、外部データの実況値を表示。`GET /api/widget-stats?city=sg`1本のAPIで全項目をまとめて返す(`loadWidgetStats()`、init時に1回呼び出し)。
+おでかけ画面・くらし画面それぞれの最上部に3項目ずつ、外部データの実況値を表示。`GET /api/widget-stats?city=sg`1本のAPIで全項目をまとめて返す(`loadWidgetStats()`)。
 
 - **おでかけ画面**: 気温・降水確率(`#stat-temp`/`#stat-rain`、OpenWeatherMap)・2時間予報(`#stat-nowcast`、NEAナウキャスト、47エリア中最も深刻な区分を採用)
 - **くらし画面**: 為替SGD→JPY(`#stat-fx`、Frankfurter API)・PSI(`#stat-psi`、data.gov.sg)・デング熱クラスター警戒(`#stat-dengue`、data.gov.sg新API方式。**表示件数は日次新規感染者数ではなく活動中クラスター数のスナップショット**)
 - **PSI表示に顔絵文字**: 判定レベルに応じ絵文字を数値前に表示(良好😊/普通😐/要注意😷/健康に悪い😫/危険☠️)。マッピングは`STAT_LEVEL_EMOJI`。**`server.js`の`psiLevel()`/`dengueLevel()`としきい値・ラベル文言を必ず一致させること**(文字列マッチングで強調表示を行っているため)
 - **PSI・デング熱タップでクライテリア表示**: `#stat-criteria-popover`に指標説明+レベル一覧チップ、該当レベルを強調。判定基準は`STAT_CRITERIA`(PSI: 良好0-50/普通51-100/要注意101-200/健康に悪い201-300/危険301+、デング熱: 警報なし0/注意1-5/警戒6-15/厳重警戒16+)
-- **キャッシュ**: `widgetStatsCache`はフィールド単位(為替/天気/PSI/nowcast/dengue)で30分キャッシュ。1項目失敗でも他項目に影響しない(フォールバックで古い値保持)
+- **キャッシュ**: `widgetStatsCache`はフィールド単位(為替/天気/PSI/nowcast/dengue)でキャッシュ、TTLはフィールドごとに個別設定(設計書213で一律30分から変更): 為替30分(元データが平日1日1回更新)/天気20分(OpenWeatherMap無料プランが3時間おき予報のため)/PSI・nowcast各10分(体感の鮮度要求からタイムラグを短縮)/デング熱60分(元データが日次更新、2段階APIリクエストでコストもやや高いため延長)。1項目失敗でも他項目に影響しない(フォールバックで古い値保持)
+- **フロント側の再取得(設計書213)**: `loadWidgetStats()`はアプリ起動時に加え、`switchNav()`でhome(おでかけ)・news(くらし)画面へ遷移するたびに、前回取得(`_widgetStatsLastLoadedAt`、成功時のみ更新)から5分以上経過していれば自動的に再実行される。定期ポーリングではなく画面遷移トリガー方式（案A）
 
 ## カレンダー機能（ボトムナビ4タブ目）
 `#screen-calendar`でその年(1〜12月)の祝日・主要行事・記念日・学校休暇を月カード(`.cal-month-card`)+日付グループ化リストで**1年分まとめてリスト表示**(グリッドではなく縦スクロールのみ、月送りボタンなし)。日本語固定(i18n不要)。

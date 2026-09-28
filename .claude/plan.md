@@ -20817,3 +20817,73 @@ LINE通知の「10件採用」は、取り込み直後・重複チェック前�
 ### 申し送り
 - iOS版への反映には次回TestFlightビルドが必要（`release`ブランチへのpushはユーザーの明示指示があるまで待機）
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
+
+---
+
+## 設計書213: 指標ウィジェットのデータ鮮度改善(TTL見直し・フィールド別最適化)
+
+### 背景
+「おでかけ」「くらし」画面上部の指標ウィジェット(気温・降水確率・2時間予報・為替・PSI・デング熱)について、ユーザーから「PSIのタイムラグが気になる、できるだけリアルタイムにしたい」との依頼。
+
+調査の結果、2つの問題が判明:
+1. `server.js`の`GET /api/widget-stats`(608行目〜)で、為替・天気・PSI・ナウキャスト・デング熱の**5項目すべてが一律30分キャッシュ**(`WIDGET_STATS_TTL_MS = 30 * 60 * 1000`、613行目、`isFresh(field)`関数で判定、674行目)
+2. フロント側`loadWidgetStats()`(`public/app.js` 596行目)が**アプリ起動時のinit処理内で1回だけ**呼び出されており(2593行目付近)、画面遷移時の再取得や定期ポーリングが一切ない。サーバー側TTLをいくら短縮しても、ユーザーがアプリを開きっぱなしのままでは表示は更新されない
+
+### 実装内容(builderが実施すること)
+
+#### 1. `server.js`: フィールドごとのTTL個別化
+現状の単一定数`WIDGET_STATS_TTL_MS`(613行目)を、フィールドごとのTTLマップに変更する:
+```js
+const WIDGET_STATS_TTL_MS = {
+  exchangeRate: 30 * 60 * 1000,  // 30分(元データが平日1日1回更新のため現状維持)
+  weather:      20 * 60 * 1000,  // 20分(OpenWeatherMap無料プランは3時間おき予報のため大幅短縮は無意味)
+  psi:          10 * 60 * 1000,  // 10分(NEA側は概ね1時間更新と推測、待たせすぎない範囲で短縮)
+  nowcast:      10 * 60 * 1000,  // 10分(NEA側は概ね30分更新と推測、スコール検知の機能目的から短縮の意義大)
+  dengue:       60 * 60 * 1000,  // 60分(元データが日次更新のため延長。新API方式で2段階リクエストのためコストもやや高い)
+};
+```
+`isFresh(field)`(674行目)の比較先を、単一の`WIDGET_STATS_TTL_MS`から`WIDGET_STATS_TTL_MS[field]`を参照する形に変更する。フィールド名は既存の`cityCache`のキー(`exchangeRate`/`weather`/`psi`/`nowcast`/`dengue`)と一致させること。
+`GET /api/widget-stats`のレスポンス構造(JSON形状)は変更しない。1項目の取得失敗が他項目に影響しない既存の挙動(`Promise.allSettled`ベース)も維持する。
+
+#### 2. `public/app.js`: 画面遷移時の再取得ロジック追加
+`switchNav()`(2976行目付近)内、home/news(くらし)画面への遷移時に、前回`loadWidgetStats()`実行からの経過時間を判定し、一定時間(**5分**)経過していれば自動的に再実行する。
+
+- 前回実行時刻を保持するグローバル変数を新設(例: `let _widgetStatsLastLoadedAt = 0;`)
+- `loadWidgetStats()`の呼び出し箇所(既存の起動時1回、2593行目付近)で、成功時に`_widgetStatsLastLoadedAt = Date.now();`を設定するよう変更
+- `switchNav()`内、home/news遷移時の分岐に、`if (Date.now() - _widgetStatsLastLoadedAt > 5 * 60 * 1000) { loadWidgetStats(); }`のようなガードを追加(既存の`homeAlreadyDefault`等の「画面遷移のたびに毎回全部やり直さない」ガードパターンを踏襲すること)
+- `loadWidgetStats()`内部でも実行完了時(成功時のみ)に`_widgetStatsLastLoadedAt`を更新するのを忘れないこと(再取得のたびに更新しないと5分ごとに毎回叩かれ続けてしまう)
+- くらし画面・おでかけ画面どちらも対象とすること(CLAUDE.mdの「指標ウィジェット」節に「おでかけ画面」「くらし画面」両方に表示される旨の記載あり、両方の遷移で判定させる)
+- UIの見た目・レイアウトへの変更は無し、既存の`#stat-*`要素への反映ロジックはそのまま流用
+
+### 受け入れ基準
+**正常系**:
+- くらし画面・おでかけ画面を表示した状態で、前回`loadWidgetStats()`実行から5分以上経過した後に画面を切り替える(あるいは再訪する)と、PSI等の値が再取得される
+- PSI・ナウキャストは10分、天気は20分、デング熱は60分、為替は30分のTTLでサーバー側キャッシュが機能し、各フィールド独立して動作する
+
+**失敗系**:
+- 外部API(PSI/ナウキャスト等)が一時的に失敗しても、既存同様に古いキャッシュ値をフォールバック表示する
+- フロント側の再取得リクエストが失敗しても、直前の表示を維持する(「--」表示にならない)
+
+### 設計書213 実装記録(builder→checker→closer)
+
+#### builder実施内容
+- `server.js`: `WIDGET_STATS_TTL_MS`(613行目付近)を単一定数からフィールド別TTLマップに変更(設計書通りの値: exchangeRate 30分/weather 20分/psi 10分/nowcast 10分/dengue 60分)。`isFresh(field)`の比較先を`WIDGET_STATS_TTL_MS[field]`に変更
+- `public/app.js`: `loadWidgetStats()`直前にグローバル変数`let _widgetStatsLastLoadedAt = 0;`を新設。`loadWidgetStats()`内、成功パスの末尾(catchに入らない箇所)で`_widgetStatsLastLoadedAt = Date.now();`を設定。`switchNav()`内、home画面遷移分岐の先頭とnews画面遷移分岐の先頭それぞれに`if (Date.now() - _widgetStatsLastLoadedAt > 5 * 60 * 1000) loadWidgetStats();`ガードを追加
+- `pm2 restart sg-weekend`実施、online復帰を確認
+
+#### checker確認結果
+- `curl GET /api/widget-stats?city=sg`のレスポンスJSON形状(`exchangeRate`/`weather`/`psi`/`nowcast`/`dengue`の5キー、各内部フィールドも従来通り)が変更前後で同一であることを確認
+- `node --check server.js`・`node --check public/app.js`とも構文エラーなし
+- `grep`で`WIDGET_STATS_TTL_MS`の参照箇所を確認、`isFresh()`内が`WIDGET_STATS_TTL_MS[field]`のみで単一定数としての参照(`< WIDGET_STATS_TTL_MS;`のような形)が残っていないことを確認
+- `switchNav()`内、home分岐(3010行目付近)・news分岐(3044行目付近)の両方に再取得ガードが入っていることを確認
+- `_widgetStatsLastLoadedAt`は`loadWidgetStats()`のtryブロック末尾(成功時のみ実行される位置、catch節には含まれない)で更新されており、失敗時に更新されず次回遷移で再試行される設計になっていることを確認
+- `Promise.allSettled`ベースの構造・各フィールドの失敗時ハンドリング(`console.error`のみでcityCacheへの反映をスキップし古い値をフォールバック)は無変更であることを`git diff`で確認
+- `git diff --stat`で変更ファイルが`server.js`・`public/app.js`の2ファイルのみ、diffも意図した箇所のみであることを確認
+- 🔴Critical: なし。🟡🟢の指摘もなし
+
+#### pm2再起動の要否
+`server.js`を変更しているため`pm2 restart sg-weekend`を実施しWeb版に反映済み。`public/app.js`のみの変更はWeb版は静的配信のため本来`pm2 restart`不要だが、`server.js`変更と合わせてどのみち再起動したため問題なし。
+
+### 申し送り
+- iOS版への反映には次回TestFlightビルドが必要(`release`ブランチへのpushはユーザーの明示指示があるまで待機)
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施

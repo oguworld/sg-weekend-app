@@ -593,6 +593,8 @@
       document.getElementById('stat-criteria-popover')?.classList.remove('visible');
     }, { passive: true });
 
+    // 指標ウィジェットの前回取得時刻（設計書213: 画面遷移時の再取得判定に使用。成功時のみ更新）
+    let _widgetStatsLastLoadedAt = 0;
     async function loadWidgetStats() {
       try {
         const res = await fetch(API_BASE + '/api/widget-stats?city=' + getCity());
@@ -611,6 +613,7 @@
           setText('stat-rain', data.weather.rainProbPercent + '%');
         }
         if (data.nowcast) setText('stat-nowcast', data.nowcast.text);
+        _widgetStatsLastLoadedAt = Date.now(); // 成功時のみ更新（失敗時は直前の表示を維持し、次回遷移時に再試行させる）
       } catch (e) { /* 取得失敗時は「--」のまま表示 */ }
     }
 
@@ -3002,6 +3005,9 @@
       if (screen === 'home') {
         document.getElementById('screen-home').style.display = 'flex';
         if (appHeader) appHeader.style.display = 'block';
+        // 指標ウィジェット（気温・降水確率・2時間予報等）は前回取得から5分以上経過していれば再取得する（設計書213）。
+        // アプリを開きっぱなしのまま長時間放置されても表示が古いままにならないようにするため。
+        if (Date.now() - _widgetStatsLastLoadedAt > 5 * 60 * 1000) loadWidgetStats();
         // 既に「すべて」表示済み（カテゴリ未選択・おすすめモードOFF）かつ都市も変わっていなければ、
         // タブを叩くだけで毎回チップ再同期・スクロール位置リセット・再描画をやり直す必要はない。
         // ニュース画面の同種の「変化がなければ何もしない」対策と挙動を揃える（生活情報のちかつき対策と同じ考え方）。
@@ -3034,6 +3040,8 @@
           initSettingsGenres();
         }
         if (screen === 'news') {
+          // 指標ウィジェット（為替・PSI・デング熱等）は前回取得から5分以上経過していれば再取得する（設計書213）
+          if (Date.now() - _widgetStatsLastLoadedAt > 5 * 60 * 1000) loadWidgetStats();
           // ボトムナビからニュースタブを開くたびにカテゴリ絞り込みを先頭チップ（新着）にリセットする
           _newsCategory = '';
           _newsFilterNew = true;

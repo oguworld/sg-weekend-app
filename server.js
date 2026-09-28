@@ -610,7 +610,14 @@ app.get('/api/weather', async (req, res) => {
 // フィールドごとに個別キャッシュ（1つが取得失敗しても他のフィールドの鮮度に影響しない。
 // 失敗時は古いキャッシュ値があればそれをフォールバックとして返す）
 const widgetStatsCache = new Map(); // city -> { exchangeRate: {value,cachedAt}, weather: {...}, psi: {...} }
-const WIDGET_STATS_TTL_MS = 30 * 60 * 1000; // 30分
+// フィールドごとにTTLを個別化（設計書213）。元データの更新頻度・体感上の鮮度要求に応じて調整。
+const WIDGET_STATS_TTL_MS = {
+  exchangeRate: 30 * 60 * 1000,  // 30分（元データが平日1日1回更新のため現状維持）
+  weather:      20 * 60 * 1000,  // 20分（OpenWeatherMap無料プランは3時間おき予報のため大幅短縮は無意味）
+  psi:          10 * 60 * 1000,  // 10分（NEA側は概ね1時間更新と推測、待たせすぎない範囲で短縮）
+  nowcast:      10 * 60 * 1000,  // 10分（NEA側は概ね30分更新と推測、スコール検知の機能目的から短縮の意義大）
+  dengue:       60 * 60 * 1000,  // 60分（元データが日次更新のため延長。新API方式で2段階リクエストのためコストもやや高い）
+};
 
 function psiLevel(value) {
   if (value <= 50) return '良好';
@@ -671,7 +678,7 @@ app.get('/api/widget-stats', async (req, res) => {
   const cityCache = widgetStatsCache.get(city) || {};
   const currency = CITIES[city].currency;
   const now = Date.now();
-  const isFresh = (field) => cityCache[field] && now - cityCache[field].cachedAt < WIDGET_STATS_TTL_MS;
+  const isFresh = (field) => cityCache[field] && now - cityCache[field].cachedAt < WIDGET_STATS_TTL_MS[field];
 
   const [fxSettled, weatherSettled, psiSettled, nowcastSettled, dengueSettled] = await Promise.allSettled([
     isFresh('exchangeRate') ? Promise.resolve(null) : axios.get(`https://api.frankfurter.dev/v1/latest?base=${currency}&symbols=JPY`, { timeout: 6000 }),
