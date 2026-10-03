@@ -138,6 +138,7 @@ VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラ
 - **アイコン・スプラッシュ**: `android-app/resources/icon.png`・`splash.png`・`splash-dark.png`から`npx capacitor-assets generate --android`で`android/app/src/main/res/mipmap-*`(アイコン)・`drawable-*`(スプラッシュ)を生成。**`generateSplash()`はsharpの`resize()`をfit/positionオプション無しで呼ぶためデフォルトcover+centreクロップとなり、正方形素材でロゴがテキストブロック込みで非中央配置だと横長/縦長変換時に大きくズレる**(設計書215で発覚)。ロゴがほぼ画像中央にある正方形素材（背景色込み）を使えば複雑な透過抽出(`logo.png`経由の`generateFromLogo()`)は不要、そのまま`splash.png`/`splash-dark.png`として差し替えれば通常のcover+centre経路で問題なく収まる。スプラッシュ再生成時は`mipmap-*/`配下のアイコンファイルがMD5ハッシュ的に不変であることを必ず確認する(生成コマンドがアイコンも巻き込む可能性があるため)
 - **APK配布(一時的な仕組み、恒久機能ではない)**: `releases/android/`(`.gitignore`対象)にビルド済みAPKを配置、`server.js`の`GET /dl/:token`(UUID v4トークンハードコード、`/api/*`向けCORSミドルウェアとは無関係の別パス)でAndroid実機のブラウザから直接ダウンロードさせる。ユーザーの実機動作確認が完了次第、このルートと`releases/`ディレクトリごと撤去する想定(次回別タスク)
 - `android-app/android/`(ビルド生成物、巨大)は`.gitignore`対象でコミットしない
+- **Play Store申請準備(設計書216、進行中)**: `android-app/store-assets/feature-graphic.png`(1024×500 PNG)に承認済みフィーチャーグラフィック(クリーム系デザイン)を配置済み。アプリ名「SG在住Navi」確定、プライバシーポリシーは`https://willoa.net/privacy-policy`を流用方針(最新性未確認)。残作業: スクリーンショット撮影・連絡先メール確定・Developer登録料$25支払い・Play Console申請操作(いずれもユーザー対応、詳細は`plan.md`設計書216参照)
 
 ## ジャンル・興味機能（UI非表示・実質不使用）
 設定画面「ジャンル・興味」セクションは`display:none`で非表示化済み。ロジック(`GENRE_LIST`等)は削除していないため、再開時はUI非表示解除のみで動く。

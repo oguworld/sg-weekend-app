@@ -21045,3 +21045,33 @@ dosuruアプリ(Capacitorベース、iOS版は`ios-app/`配下で稼働中)をAn
 - Android実機でのインストール確認・動作確認が完了したら、`/dl/:token`ルート（`server.js`）・`releases/android/`ディレクトリの撤去は引き続き今回のcloserの作業範囲外であり、別途ユーザーからの依頼を待って対応する（設計書214の申し送り事項を継続）
 - iOS版への影響は無し（`ios-app/`配下は完全に無変更、CORS修正の`https://localhost`追加もiOS版の既存オリジン`capacitor://localhost`とは別値のため無関係）
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+
+## 設計書216: Google Play Store申請準備の状況まとめ・フィーチャーグラフィック確定
+
+### 背景
+Google Play Store申請準備を別タスクで並行調査中。このタスクでは、メインエージェントがsharpで作成したフィーチャーグラフィック（1024×500、ストア掲載情報の必須素材）のA/B 2案をユーザーに提示し、「A（クリーム系）」案が承認された（「まぁこれでいいかな」）。承認済み案をリポジトリに正式配置し、申請準備の進捗をここに記録する。
+
+### これまでの経緯（Play Store申請準備・全体まとめ）
+- ストア掲載文（説明文・簡単な説明等）のドラフトは作成済み
+- アプリ名は「SG在住Navi」で確定
+- プライバシーポリシーは`https://willoa.net/privacy-policy`を流用する方針（内容が最新かどうかの確認はまだ未実施）
+- フィーチャーグラフィックはA案（クリーム系）が承認され、`android-app/store-assets/feature-graphic.png`（1024×500 PNG）として配置済み
+
+### 実装内容（builder）
+- 承認済みのA案画像（`feature-graphic-A-cream.png`）を`android-app/store-assets/feature-graphic.png`として新規配置（ディレクトリ`android-app/store-assets/`を新設）
+- サイズは1024×500 PNG（8-bit RGBA）で、Google Play Consoleのフィーチャーグラフィック要件を満たすことを確認
+
+### 検証（checker）
+- `file`コマンドで配置ファイルが1024×500 PNGであることを確認
+- `git diff --stat`でフィーチャーグラフィック追加とplan.md追記のみに変更が限定されていることを確認
+- 🔴Critical: なし
+
+### 残作業（Play Store申請準備・未完了分）
+- スクリーンショット撮影（Android版ビルドが安定してから実施）
+- 連絡先メールアドレスの確定
+- Play Developer登録料$25の支払い（ユーザー対応）
+- Play Console上での実際の申請操作（ユーザー対応）
+
+### 申し送り
+- コードロジックの変更は伴わない、アセット追加とドキュメント記録のみの変更
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
