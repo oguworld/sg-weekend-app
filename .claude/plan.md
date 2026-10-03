@@ -20998,3 +20998,50 @@ dosuruアプリ(Capacitorベース、iOS版は`ios-app/`配下で稼働中)をAn
 - Android実機でのインストール確認・動作確認が完了したら、`/dl/:token`ルート(`server.js`)・`releases/android/`ディレクトリの撤去は**今回のcloserの作業範囲外**であり、別途ユーザーからの依頼を待って対応する
 - iOS版への影響は無し(`ios-app/`配下は完全に無変更)
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施(ユーザーの明示指示があるまで待機)
+
+---
+
+## 2026-10-03 設計書215: Android版CORS不具合の修正＋スプラッシュ画像差し替え（builder→checker→closer）
+
+### 背景
+設計書214でAndroid版APK配布を開始した後、Android実機で動作確認したユーザーから「イベント・指標ウィジェット等のAPIデータが一切表示されない」との不具合報告。あわせて、スプラッシュ画面のロゴ位置が横長/縦長画面でクロップにより大きくズレている問題も判明。本セッションでは前段のplanner/debugger相当の調査により原因が断定済み、本セッションのbuilder→checker→closerで修正を実施した（調査・設計の経緯はタスク指示内に記述されたものをここに記録する）。
+
+### 原因1: CORS設定にAndroid版オリジンが含まれていなかった
+`server.js`の`ALLOWED_ORIGINS`配列（237〜242行目付近）に`https://localhost`が含まれていなかった。AndroidのCapacitor WebViewはデフォルトで`androidScheme: 'https'`・`hostname: 'localhost'`のためオリジンが`https://localhost`になる（iOS版の`capacitor://localhost`とは異なる）が、`android-app/capacitor.config.js`に`server`セクションでの上書きはない。CORSミドルウェアは完全一致判定のみのため、Android版からの全APIリクエストがブロックされていた（VPS上でcurl検証済み、修正前は`Origin: https://localhost`だと`Access-Control-Allow-Origin`ヘッダーが付与されないことを確認済み）。
+
+### 原因2: スプラッシュ画像のロゴ位置が横長/縦長変換でクロップにより大きくズレていた
+当初`android-app/resources/splash.png`・`splash-dark.png`はiOS版と同一の2732×2732正方形素材（ロゴ+「SG在住Navi」テキストブロック、縦42.5%位置）をそのまま流用していたが、`@capacitor/assets generate --android`の`generateSplash()`が`sharp`の`resize()`をfit/positionオプションなしで呼ぶため、デフォルトの`cover`+`centre`処理で正方形→横長/縦長変換時にクロップが発生し、ロゴ位置が大きくズレていた（横長変換で上下合計約20%クロップ、ロゴ相対位置が42.5%→約37.5%にズレる）。
+
+### 解決策（簡略化版、当初案からの変更点）
+当初はロゴ部分のみを透過抽出し`logo.png`経由で`generateFromLogo()`（背景色指定＋ロゴオーバーレイ方式）を使う複雑な対応を検討していたが、ユーザーがテキストなし・ロゴがほぼ中央配置（縦54.1%・横50.0%）の新しいスプラッシュ用画像を2枚提供してくれたため不要と判断、簡略化した。提供された2枚は既に正方形（2000×2000）かつ不透明な背景色込み（ライト版は背景クリーム色RGB(255,255,245)、ダーク版は背景ほぼ黒RGB(23,23,24))で、ロゴがほぼ画像中央にあるため、そのまま`splash.png`/`splash-dark.png`として差し替え、既存の`generateSplash()`（cover+centreクロップ）の通常経路で生成し直すだけで、横長/縦長いずれのクロップでも大きくズレない方針とした。`logo.png`等の新規ファイルは`android-app/resources/`に一切追加しない（アイコン生成を巻き込む事故を避けるため）。
+
+### 実装内容（builder）
+1. **CORS修正**: `server.js`の`ALLOWED_ORIGINS`配列に`'https://localhost'`を1行追加（コメント「Android版CapacitorのデフォルトWebViewオリジン」付き）
+2. **スプラッシュ画像差し替え**: ユーザー提供の2ファイル（`splash-light-source.png`・`splash-dark-source.png`、ともに2000×2000）を、既存の`android-app/resources/splash.png`（ライト版）・`splash-dark.png`（ダーク版）に上書きコピー。`icon.png`や`logo.png`等、他のファイルは一切追加・変更しなかった
+3. **アイコン保護の事前確認**: スプラッシュ生成前に`android-app/android/app/src/main/res/mipmap-*/`配下の全アイコンファイル（24ファイル）のMD5ハッシュを取得
+4. `npx capacitor-assets generate --android`を実行し、`drawable-*/splash.png`（land/port × ldpi〜xxxhdpi、通常+night、計100ファイル）を再生成
+5. **アイコン保護の事後確認**: 生成後に同じ24ファイルのMD5ハッシュを再取得し`diff`で完全一致（差分ゼロ）を確認、アイコンは意図せず変更されていないことを実証
+6. 生成された`drawable-land-xxxhdpi`・`drawable-port-xxxhdpi`・`drawable-night`のsplash.pngをReadツールで目視確認、ロゴがほぼ中央に収まりクロップによる大きな欠けがないことを確認
+7. `JAVA_HOME`/`ANDROID_HOME`等の環境変数を明示エクスポートした上で（非対話シェルのため`~/.bashrc`は読み込まれない既知の制約、設計書214の申し送り通り）`cd android-app/android && ./gradlew assembleDebug`を実行、`BUILD SUCCESSFUL`（19秒、238タスク、6実行/232 up-to-date）
+8. 新しくビルドされた`app-debug.apk`（25,817,009バイト、約25.8MB。新スプラッシュ画像が高解像度・複数解像度×ライト/ダークの分だけ旧ビルド9.5MBより大きい）を`releases/android/app-debug.apk`に上書きコピー（トークン・ファイル名は無変更）
+9. `pm2 restart sg-weekend`実施（CORS修正を反映するため必須。スプラッシュ/APKファイル差し替え自体はpm2再起動不要だが、どのみち同時に実施）
+
+### 検証（checker、builderとは独立に再実施）
+- **CORS**: `curl -H "Origin: https://localhost"`で`Access-Control-Allow-Origin: https://localhost`が返ることを確認。既存4オリジン（`capacitor://localhost`/`ionic://localhost`/`http://localhost`/`https://about.dosuru.app`）はいずれも挙動変化なし（各自分自身の値がそのまま返る）を個別に確認。未許可オリジン（`https://evil.example.com`）は引き続き`Access-Control-Allow-Origin`ヘッダーが付与されないことを確認。OPTIONSプリフライト（Android origin）も204+正しいCORSヘッダーで応答することを確認
+- **既存`/api/*`エンドポイント回帰確認**: `/api/events`・`/api/life-info`・`/api/widget-stats`・`/api/calendar`・`/api/likes`いずれも200応答、回帰なし
+- **アイコン非変更確認**: `mipmap-*/`配下24ファイルのMD5ハッシュをcheckerが独自に再取得し、builder記録のbefore分と`diff`で完全一致（差分ゼロ）を確認。`mipmap-anydpi-v26/`のXML参照ファイル（adaptive icon）も標準の2ファイルのみで変更なし
+- **スプラッシュ目視確認**: `drawable-land-xxxhdpi`・`drawable-port-xxxhdpi`・`drawable-night`・`drawable-port-hdpi`の計4解像度をReadツールで開き、いずれもロゴ（コンパス+ピン型アイコン）がほぼ中央に収まり、大きな欠けがないことを確認
+- **ビルド確認**: `./gradlew assembleDebug`が`BUILD SUCCESSFUL`、生成APKと`releases/android/app-debug.apk`のMD5が完全一致することを確認
+- **ダウンロードURL確認**: `GET /dl/95a82b43-f667-4010-b70e-ad3b52b5a361`をcurlで取得し、ダウンロードしたファイルのMD5・サイズ(25,817,009バイト)が新ビルドと完全一致、旧ビルド(9,546,580バイト)とは明確に区別できることを確認
+- **`ios-app/`配下無変更確認**: `git diff --stat -- ios-app/`で差分ゼロを確認
+- **`git diff --stat`全体確認**: 変更ファイルが`server.js`(1行追加)・`android-app/resources/splash.png`・`android-app/resources/splash-dark.png`の3ファイルのみに限定されていることを確認。`android-app/android/`（ビルド生成物）・`releases/`は`.gitignore`対象で追跡されないことを確認
+- 🔴Critical: なし。🟡🟢の指摘もなし
+
+### pm2再起動の要否
+`server.js`（CORS設定の1行追加）を変更しているため`pm2 restart sg-weekend`を実施しWeb版・Capacitor両環境からのAPIアクセスに反映済み（online復帰確認済み）。
+
+### 申し送り
+- **ユーザー対応が必要（最重要）**: ダウンロードURL`https://dosuru.app/dl/95a82b43-f667-4010-b70e-ad3b52b5a361`は変更なし（トークン自体は変更していない）。Android実機で既にインストール済みの場合は、同URLから新しいAPKを再ダウンロードし**上書きインストール**して、(1)CORS修正によりイベント・指標ウィジェット等のAPIデータが正しく表示されるようになったこと、(2)スプラッシュ画面のロゴが横長/縦長いずれの端末でも大きく欠けずほぼ中央に表示されることの2点を確認してもらう必要がある
+- Android実機でのインストール確認・動作確認が完了したら、`/dl/:token`ルート（`server.js`）・`releases/android/`ディレクトリの撤去は引き続き今回のcloserの作業範囲外であり、別途ユーザーからの依頼を待って対応する（設計書214の申し送り事項を継続）
+- iOS版への影響は無し（`ios-app/`配下は完全に無変更、CORS修正の`https://localhost`追加もiOS版の既存オリジン`capacitor://localhost`とは別値のため無関係）
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）

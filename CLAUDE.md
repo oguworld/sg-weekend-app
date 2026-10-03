@@ -127,13 +127,15 @@ Web版(VAPID/Web Push)とは完全独立の仕組みとしてiOSネイティブP
 - iOS/CI: `App.entitlements`に`aps-environment: production`。`scripts/ensure-apns-bridge.py`が`AppDelegate.swift`にAPNsブリッジメソッドを冪等注入(無ければCI失敗)
 - スコープ外: Android版、通知既読管理・一覧UI、パーソナライズ配信、FCM、サイレントプッシュ、通知文言多言語化
 
-## Androidアプリ化（Capacitor、設計書214）
+## Androidアプリ化（Capacitor、設計書214→215）
 VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラインツール(Gradle/Android SDK cmdline-tools)のみでAPKをビルドする運用。iOS版(`.github/workflows/ios-deploy.yml`経由のGitHub Actions CI)とは異なり、現状CI化はしておらずVPS上で手動ビルド。
 
 - `android-app/`(`ios-app/`と対になる構成)。appId: `app.dosuru` / appName: `SG在住Navi`(`android-app/capacitor.config.js`、iOS版と同一値、`ios`固有セクションは無し)
 - **iOS版との差分**: Google Sign-In・Sign in with Apple・APNsプッシュ通知はAndroid版に一切含めない(`android-app/package.json`に`@codetrix-studio/capacitor-google-auth`・`@capacitor-community/apple-sign-in`・`@capacitor/push-notifications`を含めない)。設定画面のプッシュ通知トグルUI(`#push-setting-item`)は`public/app.js`の`initPushState()`/`_shouldShowPushPrompt()`で`window.Capacitor?.getPlatform?.() === 'android'`判定により非表示化(既存のiOS版・Web版の`_isCapacitorApp`分岐には影響なし)
 - **VPS側ビルド環境**: `JAVA_HOME=/home/masahiko/jdk17`(Eclipse Temurin OpenJDK 17、VPSにパスワード無しsudoが無く`apt install`不可だったためtarball配置で代替)・`ANDROID_HOME=/home/masahiko/android-sdk`(`platform-tools`・`platforms;android-34`・`build-tools;34.0.0`)。いずれも`~/.bashrc`に追記済み(対話シェルでのみ有効、非対話スクリプトから使う場合は別途sourceが必要)
-- **ビルド**: `cd android-app/android && ./gradlew assembleDebug`で署名無しデバッグAPK(`app-debug.apk`)を生成。アイコン・スプラッシュは`ios-app/resources/`と同一素材を`android-app/resources/`にコピーし`npx capacitor-assets generate --android`で生成
+- **ビルド**: `cd android-app/android && ./gradlew assembleDebug`で署名無しデバッグAPK(`app-debug.apk`)を生成
+- **CORS注意(設計書215で修正済み)**: AndroidのCapacitor WebViewはデフォルトで`androidScheme:'https'`・`hostname:'localhost'`のためオリジンが`https://localhost`になる(iOS版の`capacitor://localhost`とは別値)。`server.js`の`ALLOWED_ORIGINS`に`'https://localhost'`を含めないと全APIリクエストがCORSでブロックされ画面が真っ白/データ欠落になる(実際に発生した不具合、要注意)
+- **アイコン・スプラッシュ**: `android-app/resources/icon.png`・`splash.png`・`splash-dark.png`から`npx capacitor-assets generate --android`で`android/app/src/main/res/mipmap-*`(アイコン)・`drawable-*`(スプラッシュ)を生成。**`generateSplash()`はsharpの`resize()`をfit/positionオプション無しで呼ぶためデフォルトcover+centreクロップとなり、正方形素材でロゴがテキストブロック込みで非中央配置だと横長/縦長変換時に大きくズレる**(設計書215で発覚)。ロゴがほぼ画像中央にある正方形素材（背景色込み）を使えば複雑な透過抽出(`logo.png`経由の`generateFromLogo()`)は不要、そのまま`splash.png`/`splash-dark.png`として差し替えれば通常のcover+centre経路で問題なく収まる。スプラッシュ再生成時は`mipmap-*/`配下のアイコンファイルがMD5ハッシュ的に不変であることを必ず確認する(生成コマンドがアイコンも巻き込む可能性があるため)
 - **APK配布(一時的な仕組み、恒久機能ではない)**: `releases/android/`(`.gitignore`対象)にビルド済みAPKを配置、`server.js`の`GET /dl/:token`(UUID v4トークンハードコード、`/api/*`向けCORSミドルウェアとは無関係の別パス)でAndroid実機のブラウザから直接ダウンロードさせる。ユーザーの実機動作確認が完了次第、このルートと`releases/`ディレクトリごと撤去する想定(次回別タスク)
 - `android-app/android/`(ビルド生成物、巨大)は`.gitignore`対象でコミットしない
 

@@ -239,6 +239,7 @@ const ALLOWED_ORIGINS = [
   'capacitor://localhost',
   'ionic://localhost',
   'http://localhost',
+  'https://localhost',   // Android版CapacitorのデフォルトWebViewオリジン
 ];
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
