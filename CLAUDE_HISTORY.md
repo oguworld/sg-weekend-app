@@ -661,3 +661,59 @@ document.addEventListener('touchstart', () => { _touchCapableDetected = true; },
 - **`plan.md`は必ず末尾に追記する。既存の設計書（実装済み・未実装問わず）を削除・上書きしない。** 新しい設計書は「設計書N」という連番見出しで追記していく
 - 実装未着手のまま長期間放置される設計書があっても構わない（`.claude/next.md`に要約とステータスを記録しておけば十分）。`plan.md`自体は削除しない
 - ファイルが肥大化してきたら、削除ではなく「古い設計書を`.claude/plan-archive.md`のような別ファイルに移す」形で対応する（移す場合も内容は保持したままにする）
+
+---
+
+# 2026-10退避: CLAUDE.mdから移した停止・廃止済み機能の記述
+以下は2026-10にCLAUDE.mdの軽量化のため退避した記述(内容は退避時点のまま、**現行コードとは乖離している節がある**)。特にSign-In/バックアップ/プライバシーポリシーの節は、UI・APIとも削除済みで`privacy.html`も存在しない。
+
+## 広告表示機能（実装済み・2026-07以降停止中）
+コード自体は削除せず残置、停止中。
+- **PRカード**: `data/{city}/sponsored-cards.json`が空配列のため非表示。再開は同ファイルへのデータ追記のみ(`_pickSponsoredCardForToday()`は無変更)
+- **Klookアフィリエイトウィジェット**: `renderEventCards()`内のマーカー挿入`splice`をコメントアウトして停止中。再開はコメントアウト解除のみ
+
+## Google/Apple Sign-In認証基盤
+Google Sign-In・Sign in with Appleに対応。予定表データ/共有カレンダーとのユーザー紐づけは未実装。
+
+- **認証情報最小化**: サーバーが保存・利用するのは`idToken`の`sub`クレームのみ。`data/users.json`スキーマは`userId`/`provider`/`providerSub`/`createdAt`/`lastLoginAt`/`subscriptions`のみ(email・氏名・画像は含まない)
+- **サーバー(`server.js`)**: `POST /api/auth/google`(`google-auth-library`)／`POST /api/auth/apple`・`GET /api/auth/apple/state`・`POST /api/auth/apple/callback`(`apple-signin-auth`、Web版はCSRF対策の`state`+`response_mode:'form_post'`)／`GET /api/auth/me`／`DELETE /api/auth/me`(アカウント削除: `data/users.json`削除+`data/user-plans/{userId}.json`削除+全都市`community-courses.json`の該当`authorId`をnullに匿名化、コース自体は削除しない)／`GET /api/config`。`verifyAppJwtOptional()`は後方互換認証用
+- **iOS版**: `@codetrix-studio/capacitor-google-auth`・`@capacitor-community/apple-sign-in`。Google用URL SchemeはCIで`Info.plist`に自動注入(`plistlib`使用)。`App.entitlements`に`applesignin` capability
+- **Web版**: Google Identity Services `renderButton()`方式(One Tap `prompt()`は不使用)／Apple公式JSボタン(`scope:''`で同意画面を出さない)
+- **トークン保存**: `authedFetch()`が`localStorage`の`app_auth_token`を自動付与。iOS版は`@capacitor/preferences`をソースオブトゥルースとする3層ハイブリッド(`_authTokenCache`同期変数／`localStorage`ミラー／`Preferences`永続化)。`refreshLoginUI()`は401以外のサーバーエラー時トークンを破棄しない
+- **設定画面UI**: 「アカウント」セクション(ログイン+バックアップ統合)。ログアウトは確認ダイアログあり
+- **アカウント削除**(App Store Review Guideline 5.1.1(v)対応): 設定画面最下部に見出しなし・中央寄せ(`--terracotta`色)で独立配置、未ログイン時は非表示。`confirm()`後にサーバー側削除→ローカルのJWT・バックアップ鍵material・saltを一括クリア(500系エラー時はローカル状態を保持)
+
+## プライバシーポリシー
+`public/privacy.html`にGoogle/Appleアカウント識別子(subのみ保存)・バックアップデータ(ゼロ知識暗号化)・共有カレンダーデータ・アカウント削除の記載あり。文言はCLAUDE.mdに記録された技術的事実の範囲でのみ記述(誇大な安全性主張はしない方針)。
+
+## データバックアップ（端末移行用、ゼロ知識暗号化）
+設定画面から任意でパスフレーズを設定すると、端末移行用に一部データをサーバーへゼロ知識暗号化(PBKDF2+AES-256-GCM、サーバーはパスフレーズ自体を保存しない)バックアップできるオプトイン機能。
+
+- **現状バックアップ対象は`{version, genres, who, ageList, avatar}`のみ**(ジャンル設定・家族構成・年齢リスト・アバター絵文字。コース/探訪/予定表削除に伴い縮小済み)。「アカウント連携時にバックアップ必須」方針も撤回済み、完全にオプトイン
+- **API**: `GET/PUT /api/user-plans/me`(`requireAppAuth`必須、`data/user-plans/{userId}.json`に`{userId, salt, encryptedData, updatedAt}`のみ保存)
+- **UI**: 設定画面「アカウント」セクション内、`renderBackupSection()`＋パスフレーズ入力シート(`#backup-passphrase-sheet`)
+- **設定画面構成**: プロフィール→アカウント(ログイン+バックアップ統合)→アプリ設定→サポート・情報→フィードバック→アカウント削除の6セクション
+- **App Store審査対応(プライバシーマニフェスト)**: `@codetrix-studio/capacitor-google-auth`が古いSDKに依存し審査で`ITMS-91061`エラーになるため、CIで`GoogleSignIn`/`GTMAppAuth`/`GTMSessionFetcher`用の`PrivacyInfo.xcprivacy`(`ios-app/PrivacyManifests/`)をビルド時に注入(`scripts/ensure-privacy-manifests.py`、`Podfile`の`post_install`フックに冪等挿入)
+
+## ジャンル・興味機能（UI非表示・実質不使用）
+設定画面「ジャンル・興味」セクションは`display:none`で非表示化済み。ロジック(`GENRE_LIST`等)は削除していないため、再開時はUI非表示解除のみで動く。
+
+## i18n対応（廃止済み、日本語固定の内部実装として存続）
+英語対応(多言語切替)は「実際には使われておらず紛らわしい」との判断で廃止。**`t(key)`関数・`data-i18n`属性・`applyI18n()`自体は削除せず残っている**(常に日本語を表示する内部実装として存続)。
+
+- `STRINGS.en`は削除済み(`STRINGS.ja`のみ)。`getLang()`は常に`'ja'`を返す(`localStorage`は参照しない)。`t(key)`は`STRINGS.ja`のみ参照
+- 言語切替ボタン(`#lang-toggle-btn`)・`setLang()`は削除済み。`isEn`系の到達不能分岐は全削除済み
+- 既存データの英語フィールド(`content_en`等)は生成・保存されなくなった。`data/bkk/`/`data/syd/`(停止中都市)には旧`content_en`が残存するが対象外
+- **新しいUI文字列を追加する場合、`data-i18n`属性＋`STRINGS.ja`へのキー追加のみでよい(英語キーは不要)**
+
+## X自動投稿（scripts/post-to-x.js）
+- ペルソナ: 日本・SG両方フラットに見る30-40代男性(`PERSONA`定数)。投稿タイプ: event/news/life を自動選択
+- **文字数・文体はタイプごとに異なる**: event/news = 日本語80文字程度、客観的紹介文(`TONE_GUIDE`定数、個人の感想・一人称は含めない)／life = 40文字以内、個人のつぶやきスタイル(`PERSONA`使用)
+- **イベント選定(`pickEvent()`)**: 過去24時間以内に`fetched_at`された候補プールから`score`(Haiku採点0-10)最高の1件。プール内全件score欠落時のみ`fetched_at`降順フォールバック。候補が無ければ`null`(スキップ)
+- **ニュース選定(`pickNewsArticle()`)**: 暦日(当日`fetched_at`)優先→フォールバックで`fetched_at`降順15件→ランダム1件
+- 実行: `node scripts/post-to-x.js [--type=event|news|life] [--city=sg|bkk|syd|all] [--dry-run]`
+- **現在はX API自動投稿ではなく「投稿下書きのLINE通知」運用**(X APIクレジット枯渇のため停止)。`--to-line`フラグで生成文をLINE送信、手動でXに貼る。1日2回、crontab `0 2,12 * * *`(サーバー時刻Europe/Berlin基準、SGT換算8:00/18:00)。X API送信経路自体は無変更で残置(`--to-line`を外せば復活可能)
+
+### ✅ iOS カメラ許可（NSCameraUsageDescription）
+`Info.plist`はリポジトリに含まれず`npx cap add ios`実行時に毎回生成されるため、カメラを使う機能がある場合はCIワークフロー内でのPlistBuddy追記が必須。**現在この機能を使う箇所はコード上に存在しないためCIステップは削除済み**。将来QRスキャナー等でカメラを使う際は同パターンで復活させること。
+

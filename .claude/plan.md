@@ -21075,3 +21075,31 @@ Google Play Store申請準備を別タスクで並行調査中。このタスク
 ### 申し送り
 - コードロジックの変更は伴わない、アセット追加とドキュメント記録のみの変更
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+
+---
+
+## 設計書217: Android 12+の起動画面をiOS版に近づける（2026-10-03、メインエージェント直接実装）
+
+### 背景・原因
+設計書215でsplash.png/splash-dark.pngを差し替えて再ビルドしても、Android 12以降の実機で起動画面が変わらないとユーザーが報告。配布APKは新ビルドであることをMD5で確認済み。`android-app/node_modules/@capacitor/splash-screen/README.md`(v6.0.4)に、Android 12+ではOSのSplash Screen APIを無効化できず、`androidSplashResourceName`(splash.png)・`backgroundColor`・`androidScaleType`・`useDialog`等は「launch時は効かない」と明記されている。現状の`AppTheme.NoActionBarLaunch`は`android:background`のみで`windowSplashScreen*`が無く、「ランチャーアイコン+既定背景」の表示になっていた。`splash.png`が効くのはAndroid 11以前のみ。
+
+### できること／できないこと
+- できる: 背景色(ライト=クリーム、ダーク=ほぼ黒)と中央ロゴ(ピン+コンパス)をiOS版の絵柄に近づける
+- できない: 全画面画像、「SG在住Navi」テキスト入りの起動画面(OS仕様)
+
+### 実装
+- `android-app/scripts/make-splash-icon.js`(新規): `resources/splash.png`・`splash-dark.png`から1152x1152のアイコンを生成。OSの円マスク(直径=キャンバスの2/3)にピン全体が収まる倍率(0.48)で配置。背景は透過抽出せず(ドロップシャドウ消失を避ける)、素材の背景色(ライト#FEFCF9 / ダーク#191818、実測のばらつき±2)と`windowSplashScreenBackground`を同色にして境界を消す
+- `android-app/native-overrides/`(新規、コミット対象): `drawable-nodpi/splash_icon.png`・`drawable-night-nodpi/splash_icon.png`・`values/splash_colors.xml`・`values-night/splash_colors.xml`
+- `android-app/scripts/apply-native-overrides.sh`(新規、冪等): 上記を`android/app/src/main/res/`へコピーし、`styles.xml`の`AppTheme.NoActionBarLaunch`に`windowSplashScreenBackground`・`windowSplashScreenAnimatedIcon`を追記。`android-app/android/`は生成物でgitignore対象のため、再生成時はこのスクリプトを再実行する
+- 既存の`android:background`行・splash.png系(Android 11以前用)・`ios-app/`・`public/`・`server.js`は無変更
+
+### 検証(メインエージェントが実施。orchestratorがAPIエラー(thinking設定の400)で2回起動に失敗したため直接実装、独立checkerは無し)
+- 円マスクを重ねたプレビューを目視確認: ピン全体が円内に収まり、背景との境目なし(ライト・ダークとも)。スカイライン端のみ円で切れる
+- スクリプトを2回実行して冪等を確認(2回目は「適用済み」)
+- `./gradlew assembleDebug`成功。APK内に`res/drawable-nodpi-v4/splash_icon.png`・`res/drawable-night-nodpi-v8/splash_icon.png`が含まれることを確認
+- `mipmap-*`26ファイルのMD5が変更前後で一致
+- `releases/android/app-debug.apk`を更新(27.6MB)、`GET /dl/95a82b43-...`が新APKと同一MD5(980f141b...)を返すことを確認
+- `ios-app/`・`public/`・`server.js`の差分なし
+
+### 未確認(実機確認待ち)
+Android 12+実機での実際の見え方。ホーム画面アイコンから起動して確認すること(Android 12/12Lはサードパーティランチャー等からの起動でスプラッシュが出ないOS側の既知問題あり)。
