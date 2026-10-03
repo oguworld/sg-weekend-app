@@ -46,6 +46,7 @@ sg-weekend-app/
 │   ├── index.html                  ← ボトムナビ4タブ: くらし/おでかけ/カレンダー/設定
 │   └── sw.js
 ├── ios-app/                        ← iOSアプリ化（Capacitor）
+├── android-app/                    ← Androidアプリ化（Capacitor、VPS上でCLIビルド）
 ├── .github/workflows/ios-deploy.yml
 └── .claude/{plan.md, next.md, session-log.md}
 ```
@@ -125,6 +126,16 @@ Web版(VAPID/Web Push)とは完全独立の仕組みとしてiOSネイティブP
 - **ユーザーのON/OFF意思とOS許可状態は別軸で管理**: `app_push_enabled`フラグを永続化し、OS許可(granted)とユーザー意思の両方が揃ったときのみ`register()`
 - iOS/CI: `App.entitlements`に`aps-environment: production`。`scripts/ensure-apns-bridge.py`が`AppDelegate.swift`にAPNsブリッジメソッドを冪等注入(無ければCI失敗)
 - スコープ外: Android版、通知既読管理・一覧UI、パーソナライズ配信、FCM、サイレントプッシュ、通知文言多言語化
+
+## Androidアプリ化（Capacitor、設計書214）
+VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラインツール(Gradle/Android SDK cmdline-tools)のみでAPKをビルドする運用。iOS版(`.github/workflows/ios-deploy.yml`経由のGitHub Actions CI)とは異なり、現状CI化はしておらずVPS上で手動ビルド。
+
+- `android-app/`(`ios-app/`と対になる構成)。appId: `app.dosuru` / appName: `SG在住Navi`(`android-app/capacitor.config.js`、iOS版と同一値、`ios`固有セクションは無し)
+- **iOS版との差分**: Google Sign-In・Sign in with Apple・APNsプッシュ通知はAndroid版に一切含めない(`android-app/package.json`に`@codetrix-studio/capacitor-google-auth`・`@capacitor-community/apple-sign-in`・`@capacitor/push-notifications`を含めない)。設定画面のプッシュ通知トグルUI(`#push-setting-item`)は`public/app.js`の`initPushState()`/`_shouldShowPushPrompt()`で`window.Capacitor?.getPlatform?.() === 'android'`判定により非表示化(既存のiOS版・Web版の`_isCapacitorApp`分岐には影響なし)
+- **VPS側ビルド環境**: `JAVA_HOME=/home/masahiko/jdk17`(Eclipse Temurin OpenJDK 17、VPSにパスワード無しsudoが無く`apt install`不可だったためtarball配置で代替)・`ANDROID_HOME=/home/masahiko/android-sdk`(`platform-tools`・`platforms;android-34`・`build-tools;34.0.0`)。いずれも`~/.bashrc`に追記済み(対話シェルでのみ有効、非対話スクリプトから使う場合は別途sourceが必要)
+- **ビルド**: `cd android-app/android && ./gradlew assembleDebug`で署名無しデバッグAPK(`app-debug.apk`)を生成。アイコン・スプラッシュは`ios-app/resources/`と同一素材を`android-app/resources/`にコピーし`npx capacitor-assets generate --android`で生成
+- **APK配布(一時的な仕組み、恒久機能ではない)**: `releases/android/`(`.gitignore`対象)にビルド済みAPKを配置、`server.js`の`GET /dl/:token`(UUID v4トークンハードコード、`/api/*`向けCORSミドルウェアとは無関係の別パス)でAndroid実機のブラウザから直接ダウンロードさせる。ユーザーの実機動作確認が完了次第、このルートと`releases/`ディレクトリごと撤去する想定(次回別タスク)
+- `android-app/android/`(ビルド生成物、巨大)は`.gitignore`対象でコミットしない
 
 ## ジャンル・興味機能（UI非表示・実質不使用）
 設定画面「ジャンル・興味」セクションは`display:none`で非表示化済み。ロジック(`GENRE_LIST`等)は削除していないため、再開時はUI非表示解除のみで動く。

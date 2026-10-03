@@ -1568,6 +1568,25 @@ app.get('/contact', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// Android APK 一時配布ルート（設計書214）
+// 動作確認用の暫定措置。実機確認が完了次第、このルートと
+// releases/android/ ディレクトリごと撤去する想定（恒久機能ではない）
+// ─────────────────────────────────────────────
+const ANDROID_APK_DL_TOKEN = '95a82b43-f667-4010-b70e-ad3b52b5a361';
+app.get('/dl/:token', (req, res) => {
+  if (req.params.token !== ANDROID_APK_DL_TOKEN) {
+    return res.sendStatus(404);
+  }
+  const apkPath = path.join(__dirname, 'releases', 'android', 'app-debug.apk');
+  if (!fs.existsSync(apkPath)) {
+    return res.sendStatus(404);
+  }
+  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+  res.setHeader('Content-Disposition', 'attachment; filename="dosuru-debug.apk"');
+  fs.createReadStream(apkPath).pipe(res);
+});
+
+// ─────────────────────────────────────────────
 // SPA fallback
 // ─────────────────────────────────────────────
 app.get('*', (req, res) => {

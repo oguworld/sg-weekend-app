@@ -2674,6 +2674,8 @@
     // Web版・iOS版共通: 「通知をオンにしましょう」プロンプトを表示すべきか
     // （iOS版は `Notification`（Web API）がWKWebView上で信頼できないため、ネイティブプラグインの許可状態を使う）
     function _shouldShowPushPrompt() {
+      // Android版（設計書214）: FCM未導入のためプッシュ通知オンボーディング自体を出さない
+      if (_isCapacitorApp && window.Capacitor?.getPlatform?.() === 'android') return false;
       if (_isCapacitorApp) return !_nativeDeviceToken && !!_getCapPushPlugin() && !_nativePushDenied;
       return !_pushSubscription && 'PushManager' in window && Notification.permission !== 'denied';
     }
@@ -2701,6 +2703,12 @@
     async function initPushState() {
       const item = document.getElementById('push-setting-item');
       if (!item) return;
+      // Android版（設計書214）: FCM未導入のためプッシュ通知トグルUI自体を非表示にする。
+      // iOS版・Web版の既存分岐（_isCapacitorApp判定）には影響を与えない。
+      if (_isCapacitorApp && window.Capacitor?.getPlatform?.() === 'android') {
+        item.style.display = 'none';
+        return;
+      }
       if (_isCapacitorApp) { await _initNativePush(); return; }
       if (!('PushManager' in window) || !('serviceWorker' in navigator)) {
         item.style.display = 'none';

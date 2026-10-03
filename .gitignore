@@ -17,3 +17,9 @@ data/
 
 # local Obsidian vault symlink (see ~/obsidian-vault)
 /notes
+
+# Android build生成物（巨大なため、設計書214）
+android-app/android/
+
+# APK一時配布ルート（設計書214、動作確認後に削除予定）
+releases/

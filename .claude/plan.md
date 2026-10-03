@@ -20887,3 +20887,114 @@ const WIDGET_STATS_TTL_MS = {
 ### 申し送り
 - iOS版への反映には次回TestFlightビルドが必要(`release`ブランチへのpushはユーザーの明示指示があるまで待機)
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施
+
+---
+
+## 設計書214: Android版をVPS上でCLIのみで完結させるビルド環境構築
+
+### 背景
+dosuruアプリ(Capacitorベース、iOS版は`ios-app/`配下で稼働中)をAndroid対応させる。ユーザー希望は「Android Studio等のGUIは使わず、このVPS(Linux、Ubuntu 22.04 LTS)上でAndroid SDK/Gradleのコマンドラインツールのみを使ってAPKをビルドし、できたAPKをユーザーのAndroid実機にブラウザ経由で直接ダウンロードさせてインストールする」(USB・PC作業・adb不要)。
+
+### 確定事項(ユーザー承認済み)
+- VPSのOS: Ubuntu 22.04.5 LTS(確認済み)
+- APK配布用の一時ダウンロードルートは、動作確認後に削除・撤去する(恒久的に残さない)
+- プッシュ通知トグルUIはAndroid Capacitor環境では非表示にする(FCM未導入のため)
+- Google/Apple Sign-In認証機能はWeb/iOS版で既に実質デッドコード化しているため、Android版でも一切対応不要(`@codetrix-studio/capacitor-google-auth`・`@capacitor-community/apple-sign-in`はAndroid版`package.json`に含めない)
+
+### 実装内容(builderが実施すること)
+
+#### 1. VPS環境セットアップ
+- JDK 17のインストール: `sudo apt install -y openjdk-17-jdk-headless`(Ubuntu 22.04の標準リポジトリに存在することを確認済み)
+- Android SDK Command-line Toolsのダウンロード・配置:
+  - 公式配布の`commandlinetools-linux-*.zip`をダウンロード
+  - `$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager`という階層になるよう配置(zipの中身を`cmdline-tools/latest`にリネームして配置する必要がある点に注意)
+  - 配置先は`/home/masahiko/android-sdk`等、プロジェクト外の適切な場所を選ぶこと
+- `sdkmanager --licenses`を`yes | sdkmanager --licenses`で非対話的に承諾
+- `sdkmanager`で`platform-tools`・`platforms;android-34`・`build-tools;34.0.0`をインストール(ただし`npx cap add android`生成物の`variables.gradle`で実際に要求されるSDKバージョンを確認し、異なればそちらに合わせること)
+- `ANDROID_HOME`・`ANDROID_SDK_ROOT`環境変数とPATHを`~/.bashrc`に追記して永続化
+
+#### 2. Androidプロジェクト新設
+- `android-app/`ディレクトリを新設(`ios-app/`と対になる命名)
+- `android-app/package.json`を新規作成:
+  - 含める: `@capacitor/core`・`@capacitor/app`・`@capacitor/browser`・`@capacitor/keyboard`・`@capacitor/preferences`・`@capacitor/splash-screen`・`@capacitor/status-bar`
+  - 含めない: `@codetrix-studio/capacitor-google-auth`・`@capacitor-community/apple-sign-in`・`@capacitor/push-notifications`(いずれも今回不要と確定済み)
+  - devDependencies: `@capacitor/cli`・`@capacitor/android`・`@capacitor/assets`
+- `android-app/capacitor.config.js`を新規作成: `appId: 'app.dosuru'`・`appName: 'SG在住Navi'`・`webDir: '../public'`(iOS版と同一値)。`ios`固有セクションは含めない
+- コマンド実行: `cd android-app && npm install && npx cap add android && npx cap sync android`
+
+#### 3. アイコン・スプラッシュ画像の生成
+- `android-app/resources/`に`ios-app/resources/icon.png`・`splash.png`・`splash-dark.png`をコピー
+- `npx capacitor-assets generate --android`を実行
+- **生成後、実際にAPKをインストールしてホーム画面アイコンが正しく表示されるか確認する工程を省略しないこと**(iOS版で過去に自動生成結果が実際のビルドに正しく反映されなかった不具合があったため)
+
+#### 4. APKビルド
+- `cd android-app/android && ./gradlew assembleDebug`(署名不要のデバッグビルド、`app-debug.apk`が`android/app/build/outputs/apk/debug/`配下に生成される想定)
+- ビルドエラーが出た場合、Gradle/AGP/JDKバージョンの組み合わせを調整すること
+
+#### 5. APK配布用の一時ダウンロードルート
+- `releases/android/`ディレクトリを新設(`.gitignore`対象)、ビルドしたAPKをここに配置
+- `server.js`に`GET /dl/:token`相当の一時ルートを追加。`token`は推測困難なランダム文字列(UUID v4等)で、ハードコードまたは起動時生成でよい。該当トークンへのリクエストのみ`releases/android/`配下のAPKファイルをstreamで返す。既存の`/api/*`向けCORSミドルウェアには影響しないよう別パスにすること
+- `.gitignore`に`android-app/android/`(ビルド生成物、巨大なため)・`releases/`を追加
+
+#### 6. プッシュ通知トグルUIの非表示化
+- `public/app.js`・`public/index.html`内の該当箇所(CLAUDE.mdの「iOSアプリのAPNsプッシュ通知対応」節、`_initNativePush()`等)を確認し、Capacitor環境かつAndroidプラットフォーム(`window.Capacitor?.getPlatform?.() === 'android'`で判定)の場合に、プッシュ通知トグルUI(`#push-setting-item`相当)を非表示にする条件分岐を追加する
+- 既存のiOS版・Web版の動作(`_isCapacitorApp`等の既存分岐)には影響を与えないこと
+
+#### 7. 動作確認
+- `pm2 restart sg-weekend`で`server.js`の変更(ダウンロードルート追加)を反映
+- builder自身で`curl`等を使い、追加した`GET /dl/:token`ルートが正しくAPKを返すか確認
+- 実際にユーザーの実機でインストール確認してもらう必要があるため、**builderはダウンロード用URLをユーザーに伝えられる形で完了報告に明記すること**(完全なURL、`https://dosuru.app/dl/<トークン>`の形)
+
+### 受け入れ基準
+- VPS上で`java -version`がOpenJDK 17系を返す
+- `android-app/android`で`./gradlew assembleDebug`が成功し、`app-debug.apk`が生成される
+- `GET /dl/<トークン>`にアクセスするとAPKファイルがダウンロードされる(curlで`Content-Type`・ファイルサイズ等を確認)
+- 既存の`ios-app/`配下・`.github/workflows/ios-deploy.yml`・既存の`/api/*`エンドポイント・既存データファイルに一切変更がないこと
+
+### checkerが確認すること
+- `git diff --stat`で変更ファイルが設計書通り(新規`android-app/`・`releases/`・`server.js`の1ルート追加・`public/app.js`/`public/index.html`のプッシュ通知UI分岐・`.gitignore`)に限定されていることを確認
+- `ios-app/`配下に一切変更がないことを確認
+- `node --check server.js`で構文エラーがないことを確認
+- `GET /dl/<トークン>`が実際にAPKファイルを返すことをcurlで実検証
+- 不正なトークンでアクセスした場合404等の適切なレスポンスになることを確認
+- 既存の`/api/*`エンドポイントが引き続き正常応答することを確認(回帰がないか)
+- プッシュ通知UI非表示分岐が、既存のiOS版・Web版の`_isCapacitorApp`判定を壊していないことをコードレビューで確認
+
+### closerが実施すること
+- `.claude/plan.md`の末尾に「設計書214」としてplannerが作成した設計内容全文+実装記録を追記する
+- `.claude/next.md`・`.claude/session-log.md`を通常運用に従って更新
+- ダウンロード用URLをユーザーに明確に伝える形で完了報告に含める(最重要、ユーザーがこのURLをAndroid実機のブラウザで開いて動作確認するため)
+- Android実機でのインストール確認・動作確認後にダウンロードルートを撤去する作業は、今回のcloserの作業範囲外(ユーザーが実機確認を終えてから別途依頼される想定)である旨を申し送り事項に明記する
+- 変更内容をローカル`main`ブランチにコミットする(ただし`android-app/android/`等の巨大なビルド生成物は`.gitignore`対象のためコミットされないことを確認。pushは行わない)
+
+### 設計書214 実装記録(builder→checker→closer)
+
+#### builder実施内容
+- **VPS環境セットアップ**: 当初計画の`sudo apt install -y openjdk-17-jdk-headless`は、VPSにパスワード無しsudoが設定されておらず対話式パスワード入力が必須だったため実行不可。代替として公式Eclipse Temurin OpenJDK 17のtarball(`https://api.adoptium.net/`配布)をダウンロードし、ユーザー権限で`/home/masahiko/jdk17`に展開(機能的にopenjdk-17-jdk-headlessと同等)。同様に`unzip`コマンドも未インストールだったため、Android cmdline-tools(`commandlinetools-linux-11076708_latest.zip`)の展開はPythonの`zipfile`モジュールで代替。`chmod +x`でsdkmanager等に実行権限を付与し、`$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager`の階層になるよう配置。`yes | sdkmanager --licenses`で非対話承諾。`sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"`でインストール(`npx cap add android`生成物の`variables.gradle`で`compileSdkVersion=34`/`targetSdkVersion=34`を確認し一致させた)。`JAVA_HOME`/`ANDROID_HOME`/`ANDROID_SDK_ROOT`と`PATH`を`~/.bashrc`に追記
+- **Androidプロジェクト新設**: `android-app/package.json`(設計書通りの依存関係、Google/Apple Sign-In・Push Notifications除外)・`android-app/capacitor.config.js`(`appId: 'app.dosuru'`・`appName: 'SG在住Navi'`・`webDir: '../public'`、`ios`セクション無し)を新規作成。`npm install && npx cap add android && npx cap sync android`を実施、6プラグイン(app/browser/keyboard/preferences/splash-screen/status-bar)が正しく認識されたことを確認
+- **アイコン・スプラッシュ画像**: `ios-app/resources/`の3ファイルを`android-app/resources/`にコピーし`npx capacitor-assets generate --android`実行、adaptive icon含む100ファイル生成(アイコン・スプラッシュとも昼/夜・各解像度)
+- **APKビルド**: `cd android-app/android && ./gradlew assembleDebug`実行、Gradle 8.2.1/JDK 17/AGPの組み合わせ調整不要で初回ビルドが成功(3分5秒、238タスク実行)。`app-debug.apk`(9,546,580バイト、約9.5MB)が`android/app/build/outputs/apk/debug/`に生成されたことを確認
+- **APK配布用ルート**: `releases/android/`を新設しAPKを配置。`server.js`の`app.get('/contact', ...)`の直後・SPAフォールバック(`app.get('*', ...)`)の直前に`GET /dl/:token`ルートを追加(UUID v4`95a82b43-f667-4010-b70e-ad3b52b5a361`をハードコード)。トークン不一致・ファイル不在時は404、一致時は`Content-Type: application/vnd.android.package-archive`・`Content-Disposition: attachment`ヘッダーを設定しstreamで返す。`.gitignore`に`android-app/android/`・`releases/`を追加
+- **プッシュ通知UI非表示化**: `public/app.js`の`initPushState()`冒頭(`_initNativePush()`呼び出しの直前)と`_shouldShowPushPrompt()`冒頭に、それぞれ`if (_isCapacitorApp && window.Capacitor?.getPlatform?.() === 'android')`判定を追加。前者は`#push-setting-item`を`display:none`にして即return、後者はfalseを返しオンボーディング自動プロンプト自体を抑止。いずれも既存の`_isCapacitorApp`単独条件の手前に追加したネスト分岐のため、Web版(`_isCapacitorApp`が常にfalse)・iOS版(`getPlatform()`が`'ios'`を返す)の分岐には到達しない
+- `pm2 restart sg-weekend`実施、online復帰を確認
+- builder自身で`curl`により`GET /dl/<正しいトークン>`がAPKを200で返すこと、ダウンロードしたファイルが元のAPKとMD5完全一致することを確認
+
+#### checker確認結果
+- `git diff --stat`で変更ファイルが`.gitignore`・`public/app.js`・`server.js`の3ファイルに限定、新規`android-app/`(package.json・capacitor.config.js・resources/のみコミット対象、`android/`はgitignore対象)を確認。設計書通りの範囲
+- `ios-app/`・`.github/`配下は`git diff --stat`で差分ゼロであることを確認
+- `node --check server.js`・`node --check public/app.js`とも構文エラーなし
+- `curl`で`GET /dl/<正しいトークン>`がHTTP 200・`Content-Type: application/vnd.android.package-archive`・MD5チェックサム完全一致(9,546,580バイト)でAPKを返すことを実証
+- `GET /dl/<不正なトークン>`がHTTP 404を返すことを確認
+- 既存`/api/*`エンドポイント(events/life-info/widget-stats/calendar/likes)がいずれもHTTP 200で応答、回帰なしを確認。`/api`向けCORS OPTIONSプリフライト(`Origin: capacitor://localhost`)も従来通り正常応答することを確認、新ルート追加による影響なし
+- プッシュ通知UI非表示分岐をコードレビューし、`_isCapacitorApp`判定自体は無変更、Android判定はその内側にネストした追加条件のみでWeb版・iOS版の既存経路を変更していないことを確認
+- `android-app/package.json`にGoogle/Apple Sign-In・Push Notificationsのいずれも含まれていないこと、生成された`AndroidManifest.xml`が`INTERNET`権限のみ(Google Sign-In等の権限なし)であることを確認
+- 🔴Critical: なし。🟡軽微: `~/.bashrc`は非対話シェルでは早期returnする標準Ubuntu仕様のため、対話的なsshログインでは問題なく有効化されるが、非対話スクリプトから利用する場合は別途sourceが必要な点を申し送り事項に記録(設計書通りの実装であり、仕様自体の不備ではない)
+
+#### pm2再起動の要否
+`server.js`(新規`/dl/:token`ルート追加)を変更しているため`pm2 restart sg-weekend`を実施しWeb版・Capacitor両環境からのAPIアクセスに反映済み。
+
+### 申し送り
+- **ユーザー対応が必要(最重要)**: ダウンロードURL `https://dosuru.app/dl/95a82b43-f667-4010-b70e-ad3b52b5a361` をAndroid実機のブラウザで開き、APK(`dosuru-debug.apk`、署名なしデバッグビルド)をダウンロード・インストールして動作確認すること。「提供元不明のアプリ」警告は想定内(Google Play経由ではないデバッグビルドのため)。ホーム画面アイコンが正しく表示されるかも必ず確認すること(iOS版で過去に自動生成結果が実機ビルドに正しく反映されなかった不具合があったため)
+- Android実機でのインストール確認・動作確認が完了したら、`/dl/:token`ルート(`server.js`)・`releases/android/`ディレクトリの撤去は**今回のcloserの作業範囲外**であり、別途ユーザーからの依頼を待って対応する
+- iOS版への影響は無し(`ios-app/`配下は完全に無変更)
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施(ユーザーの明示指示があるまで待機)
