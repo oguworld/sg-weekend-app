@@ -1587,6 +1587,21 @@ app.get('/dl/:token', (req, res) => {
   fs.createReadStream(apkPath).pipe(res);
 });
 
+// 署名付きAAB(Play Console提出用)の一時ダウンロード。Play提出が済んだら、このルートとreleases/を撤去する。
+const ANDROID_AAB_DL_TOKEN = 'fc6e2000-f5e4-466f-aefa-c3070d158777';
+app.get('/dl-aab/:token', (req, res) => {
+  if (req.params.token !== ANDROID_AAB_DL_TOKEN) {
+    return res.sendStatus(404);
+  }
+  const aabPath = path.join(__dirname, 'releases', 'android', 'app-release.aab');
+  if (!fs.existsSync(aabPath)) {
+    return res.sendStatus(404);
+  }
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'attachment; filename="dosuru-release.aab"');
+  fs.createReadStream(aabPath).pipe(res);
+});
+
 // ─────────────────────────────────────────────
 // SPA fallback
 // ─────────────────────────────────────────────

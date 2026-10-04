@@ -21160,3 +21160,10 @@ Google公式(support.google.com/googleplay/android-developer/answer/9866151)の�
 
 ### 設計書217 追記5(2026-10-04): 起動画面のロゴと文字を1.2倍に拡大
 ユーザー指示(「小さすぎる、1.2倍くらい」)。絵の幅440→528px、文字84→101px、間隔22→26px。文字幅(約5.71em)が円の下側で入りきらなくなるため、文字を円からはみ出さない最下位置に置き、その上に絵を重ねる配置に変更(円の輪郭プレビューで、ライト・ダークとも絵・文字が円内に収まることを確認。ピンの上端は円の上端に近い)。APK/AABを更新。
+
+---
+
+## 設計書220: Play Consoleの組織登録とAAB提出の準備（2026-10-04、メインエージェント直接実装）
+- WILLOA PTE. LTD.(DUNS 599620815)の組織アカウント「Willoa」を作成、$25の支払い完了。決済プロファイルの書類確認が先に必要だった(エラーOR_PMCR_47)。カードは、Trust Bankの不正検知で一度止まり、「自分の支払い」と回答して5分後に通った(OR_FGVEM_07)
+- ウェブサイトの所有権確認: Search ConsoleにURLプレフィックスで`https://willoa.net/`を登録し、HTMLファイル`google3195c757cd12a362.html`を`willoa-site/public/`に設置。`next start`は起動時に`public/`を読むため`pm2 restart willoa`が必要(ビルド不要)。所有権の確認は成功。このファイルは削除しない(`willoa-site/CLAUDE.md`にも記載)
+- 署名付きAABの一時ダウンロード用ルート`GET /dl-aab/:token`を`server.js`に追加(APK用`/dl/:token`と同形式)。`pm2 restart sg-weekend`済み。AABのMD5が、サーバー上のファイルと一致することを確認。不正なトークンは404。Play提出後に撤去する
