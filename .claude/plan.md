@@ -21106,3 +21106,29 @@ Android 12+実機での実際の見え方。ホーム画面アイコンから起
 
 ### 設計書217 追記(2026-10-04): ロゴの縮小
 実機確認で「円の外側でスカイライン(ビル)が切れる」との指摘。円(直径=キャンバスの2/3)にピン+スカイライン全体が収まるよう、`make-splash-icon.js`の中心を(1000,1300)・半径を1170に変更(倍率0.48→0.328、ロゴは約7割の大きさ)。元画像の縁が薄く四角く見えたため、縁を背景色へぼかして合成。円の輪郭を重ねたプレビューで全体が円内に収まることを目視確認、mipmap不変、APK更新(MD5 71b6ca2c...)。
+
+---
+
+## 設計書218: Android版をPlay Storeの要件(targetSdk 36)に対応し、署名付きAABを作る（2026-10-04、メインエージェント直接実装）
+
+### 背景
+Google公式(support.google.com/googleplay/android-developer/answer/11926878)で確認: 2026-08-31以降、新規アプリ・更新はtargetSdk 36以上が必須(2026-11-01まで延長申請可)。Android版はCapacitor 6(compileSdk/targetSdk 34)で、このままでは申請できなかった。
+
+### 対応
+- Capacitor 6→8.5.2(`@capacitor/core/android/cli`と、app/browser/keyboard/preferences/splash-screen/status-barを^8.0.0)。Capacitor 8はtargetSdk 36・minSdk 24・AGP 8.13・Gradle 8.14.3・Java 21・Node 22以上が前提。`android-app/`内のみの変更で、`ios-app/`(Capacitor 6のまま)・`public/`・`server.js`は無変更
+- VPSへ別置きで追加(システムのNode 20・JDK 17は無変更): `~/toolchains/node22`(22.23.3)・`~/toolchains/jdk21`(21.0.12)・Android SDK 36とbuild-tools 36.0.0
+- `android/`を作り直し(旧版は`~/backups/android-app-cap6-2026-10-04.tar.gz`)、`capacitor-assets generate --android`と`apply-native-overrides.sh`で起動画面を再適用
+- `apply-native-overrides.sh`に署名設定とversionName/versionCodeの注入を追加(`package.json`の`version`/`androidVersionCode`、現在1.0.0 / 1)。アップロード鍵は`~/android-keystore/`(リポジトリ外)に新規作成
+- `store-assets/listing-ja.md`にストア掲載文(アプリ名8字/30、簡単な説明41字/80、詳しい説明757字/4000)を保存
+
+### 検証
+- `assembleDebug`・`bundleRelease`とも成功(初回は約5分、以降1〜1.5分)
+- `aapt2 dump badging`: targetSdkVersion=36 / compileSdkVersion=36
+- AABの署名者がアップロード鍵と一致(SHA256 3B:14:D6:71:...:E5:57:97)
+- 配布APKを更新(`/dl/`、MD5 d1fb3d8f...)、AABは`releases/android/app-release.aab`(gitignore対象)
+- スクリプトの冪等性を2回実行で確認
+
+### 未確認(実機確認待ち)
+- API 35以上はエッジ・ツー・エッジが強制される。アプリは元から`viewport-fit=cover`と`env(safe-area-inset-*)`に対応しCapacitor 8の`SystemBars`既定(css)も効く見込みだが、ステータスバー・下のジェスチャーバーとヘッダー/ボトムナビが重ならないかは実機で要確認
+- CORS・起動画面・データ表示がCapacitor 8でも従来どおり動くか(実機)
+- Capacitor 6→8でアイコン(mipmap)は再生成されたため設計書215時点とはバイト単位で一致しない。見た目は実機で確認

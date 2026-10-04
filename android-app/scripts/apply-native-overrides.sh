@@ -29,3 +29,39 @@ if add:
 else:
     print('styles.xml は適用済み')
 PY
+
+# --- リリース署名とバージョン(app/build.gradle) ---
+# 鍵は ~/android-keystore/ に置く(リポジトリ外、コミットしない)。無ければ署名設定は無効のままでデバッグビルドは通る。
+python3 - android/app/build.gradle package.json <<'PY'
+import json, re, sys
+gp, pj = sys.argv[1], sys.argv[2]
+s = open(gp, encoding='utf-8').read()
+pkg = json.load(open(pj, encoding='utf-8'))
+name = pkg['version']
+code = int(pkg.get('androidVersionCode', 1))
+
+s = re.sub(r'versionCode\s+\d+', f'versionCode {code}', s, count=1)
+s = re.sub(r'versionName\s+"[^"]*"', f'versionName "{name}"', s, count=1)
+
+if 'keystoreProps' not in s:
+    head = '''def keystorePropsFile = file(System.getProperty("user.home") + "/android-keystore/keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) { keystorePropsFile.withInputStream { keystoreProps.load(it) } }
+
+'''
+    s = head + s
+    s = s.replace('    buildTypes {', '''    signingConfigs {
+        release {
+            if (keystoreProps['storeFile']) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {''', 1)
+    s = s.replace("        release {\n            minifyEnabled false", "        release {\n            signingConfig keystoreProps['storeFile'] ? signingConfigs.release : null\n            minifyEnabled false", 1)
+open(gp, 'w', encoding='utf-8').write(s)
+print(f'build.gradle: versionName={name} versionCode={code}、署名設定を適用')
+PY
