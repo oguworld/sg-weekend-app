@@ -1602,6 +1602,21 @@ app.get('/dl-aab/:token', (req, res) => {
   fs.createReadStream(aabPath).pipe(res);
 });
 
+// Play Console掲載用の画像一式(zip)の一時ダウンロード。Play提出が済んだら撤去する。
+const ANDROID_ASSETS_DL_TOKEN = '105d0359-b629-414e-8e29-a65354843739';
+app.get('/dl-assets/:token', (req, res) => {
+  if (req.params.token !== ANDROID_ASSETS_DL_TOKEN) {
+    return res.sendStatus(404);
+  }
+  const zipPath = path.join(__dirname, 'releases', 'android', 'store-assets.zip');
+  if (!fs.existsSync(zipPath)) {
+    return res.sendStatus(404);
+  }
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="dosuru-store-assets.zip"');
+  fs.createReadStream(zipPath).pipe(res);
+});
+
 // ─────────────────────────────────────────────
 // SPA fallback
 // ─────────────────────────────────────────────
