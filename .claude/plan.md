@@ -21132,3 +21132,6 @@ Google公式(support.google.com/googleplay/android-developer/answer/11926878)で
 - API 35以上はエッジ・ツー・エッジが強制される。アプリは元から`viewport-fit=cover`と`env(safe-area-inset-*)`に対応しCapacitor 8の`SystemBars`既定(css)も効く見込みだが、ステータスバー・下のジェスチャーバーとヘッダー/ボトムナビが重ならないかは実機で要確認
 - CORS・起動画面・データ表示がCapacitor 8でも従来どおり動くか(実機)
 - Capacitor 6→8でアイコン(mipmap)は再生成されたため設計書215時点とはバイト単位で一致しない。見た目は実機で確認
+
+### 設計書217 追記2(2026-10-04): 起動画面を常にライト版に統一
+ダークモードの端末でOSが夜用リソース(`drawable-night-nodpi`・`values-night`)を選び、黒背景の起動画面になっていた。ユーザー指示でライト版に統一: `native-overrides`の夜用ファイルを削除し、`make-splash-icon.js`はライト版のみ生成、`apply-native-overrides.sh`は既存の夜用`splash_icon`を削除してから適用する。再ビルド後のAPKに`splash_icon`が1つ(ライト)だけ含まれることを確認。他の動作(データ表示・CORS・画面)は実機で問題なしとの確認を受領。

@@ -7,6 +7,7 @@ RES=android/app/src/main/res
 [ -d "$RES" ] || { echo "android/ が無い。先に npx cap add android を実行すること" >&2; exit 1; }
 
 node scripts/make-splash-icon.js
+rm -rf "$RES/drawable-night-nodpi" "$RES/values-night/splash_colors.xml"
 cp -R native-overrides/. "$RES/"
 
 python3 - "$RES/values/styles.xml" <<'PY'
