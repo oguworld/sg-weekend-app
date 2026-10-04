@@ -5,6 +5,7 @@ const path = require('path');
 const sharp = require('sharp');
 const ROOT = path.join(__dirname, '..');
 const SRC = process.argv[2];
+const STATUS_BAR_ROWS = 130;
 const SHOTS = [
   ['a14c0ac4-30.png', '01-kurashi.png'],
   ['ca32336d-31.png', '02-odekake.png'],
@@ -18,6 +19,11 @@ const SHOTS = [
       .extend({ left: pad, right: pad, extendWith: 'copy' }).raw().toBuffer({ resolveWithObject: true });
     // 見切れているチップ等の端の画素を複製すると横すじになるため、端が「背景色/白」でない行は背景色で塗る
     const BG = [250, 250, 248], WHITE = [255, 255, 255];
+    // ステータスバー(時刻・電池など)を消す。実機の画面で、アイコンはy=33〜76、画面のタイトルはy=189以降のため、
+    // 0〜130を背景色で塗っても中身に影響しない(画像の大きさ・レイアウトは変わらない)
+    for (let y = 0; y < STATUS_BAR_ROWS; y++) {
+      for (let x = 0; x < info.width; x++) { const i = (y * info.width + x) * 3; data[i] = BG[0]; data[i + 1] = BG[1]; data[i + 2] = BG[2]; }
+    }
     const near = (i, c) => Math.hypot(data[i] - c[0], data[i + 1] - c[1], data[i + 2] - c[2]) < 6;
     for (let y = 0; y < info.height; y++) {
       for (const [edgeX, from_, to_] of [[pad, 0, pad], [pad + m.width - 1, pad + m.width, info.width]]) {
