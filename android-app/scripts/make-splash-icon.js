@@ -11,9 +11,9 @@ const LOGO_CENTER = { x: 1000, y: 1300 };  // 絵全体(ピン+スカイライ�
 const LOGO_RADIUS = 1170;                  // 中心から最も遠い絵の画素までの距離(左右端・上端)
 const SCALE = (CIRCLE / 2) / LOGO_RADIUS;
 
-// 端末がダークモードでもライト版を使う(夜用リソースは作らない)
 const VARIANTS = [
   { src: 'resources/splash.png',      out: 'native-overrides/drawable-nodpi/splash_icon.png',       bg: { r: 254, g: 252, b: 249 } },
+  { src: 'resources/splash-dark.png', out: 'native-overrides/drawable-night-nodpi/splash_icon.png', bg: { r: 25,  g: 24,  b: 24  } },
 ];
 
 (async () => {
