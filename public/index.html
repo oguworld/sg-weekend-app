@@ -1,13 +1,27 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-JDCJPD1P9X"></script>
+  <!-- Google tag (gtag.js) / Instagram embed.js
+       Web版(dosuru.app)でのみ読み込む。Capacitorアプリ(iOS/Android)ではホスト名がlocalhostになるため読み込まない。
+       以前は静的な<script>とgtag('config')がここで先に実行され、アプリでもapp.js側の無効化が間に合わず
+       アクセスデータがGoogleに送られていた(Play Storeのデータ安全性の申告に影響するため設計書221で修正)。 -->
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-JDCJPD1P9X');
+    (function () {
+      var onWeb = /(^|\.)dosuru\.app$/.test(location.hostname);
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = onWeb ? function () { dataLayer.push(arguments); } : function () {};
+      if (!onWeb) { window['ga-disable-G-JDCJPD1P9X'] = true; return; }
+      gtag('js', new Date());
+      gtag('config', 'G-JDCJPD1P9X');
+      var g = document.createElement('script');
+      g.async = true;
+      g.src = 'https://www.googletagmanager.com/gtag/js?id=G-JDCJPD1P9X';
+      document.head.appendChild(g);
+      var ig = document.createElement('script');
+      ig.async = true;
+      ig.src = 'https://www.instagram.com/embed.js';
+      document.head.appendChild(ig);
+    })();
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -18,7 +32,6 @@
   <meta name="apple-mobile-web-app-title" content="SG在住Navi" />
   <meta name="description" content="シンガポール在住日本人ファミリーのための週末おでかけ提案アプリ" />
   <link rel="manifest" href="manifest.json" />
-  <script async src="https://www.instagram.com/embed.js"></script>
   <!-- Safari / iOS ホーム画面アイコン（manifest.jsonは参照されないため必須） -->
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
   <!-- ブラウザタブ用 favicon -->

@@ -93,7 +93,7 @@ sg-weekend-app/
 - appId: `app.dosuru`（`ios-app/capacitor.config.js`で確認） / appName: `SG在住Navi`
 - `_isCapacitorApp`: `window.Capacitor?.isNativePlatform?.()`で検出(`app.js`先頭)
 - `API_BASE`: Capacitor環境では`https://dosuru.app`、Web環境では空文字列。**全fetchに必須付与**
-- GA4は`_isCapacitorApp`時に`window.gtag = function(){}`でnoop化。外部リンクは`a[target="_blank"]`クリックを`Capacitor.Plugins.Browser.open()`へ。SW登録・インストールバナーはCapacitor環境でスキップ/非表示
+- GA4・Instagram embed.jsは`public/index.html`の`<head>`先頭のスクリプトが、ホスト名が`dosuru.app`(Web版)のときだけ読み込む(Capacitorではホスト名が`localhost`)。**以前は静的な`<script>`と`gtag('config')`が先に実行され、app.js側の`window.gtag = function(){}`(今も残置)では間に合わず、iOS/Androidアプリでもアクセスデータが送られていた(設計書221で修正、Play Storeのデータ安全性の申告のため)。iOS版に反映するには次回ビルドが必要**。外部リンクは`a[target="_blank"]`クリックを`Capacitor.Plugins.Browser.open()`へ。SW登録・インストールバナーはCapacitor環境でスキップ/非表示
 - CI/CD: `release`ブランチpush→GitHub Actions(macOS runner)→Fastlane deploy→TestFlight配信(社内テストのみ、`distribute_external: false`)。Fastlaneレーンは`deploy`のみ(`upload_to_testflight`、本番申請は含まない・別途手動対応要)
 - GitHub Secrets: `ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`/`MATCH_PASSWORD`/`MATCH_GIT_BASIC_AUTH`
 - 詳細手順: `ios-app/README.md`参照

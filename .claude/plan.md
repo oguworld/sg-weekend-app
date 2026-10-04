@@ -21167,3 +21167,19 @@ Google公式(support.google.com/googleplay/android-developer/answer/9866151)の�
 - WILLOA PTE. LTD.(DUNS 599620815)の組織アカウント「Willoa」を作成、$25の支払い完了。決済プロファイルの書類確認が先に必要だった(エラーOR_PMCR_47)。カードは、Trust Bankの不正検知で一度止まり、「自分の支払い」と回答して5分後に通った(OR_FGVEM_07)
 - ウェブサイトの所有権確認: Search ConsoleにURLプレフィックスで`https://willoa.net/`を登録し、HTMLファイル`google3195c757cd12a362.html`を`willoa-site/public/`に設置。`next start`は起動時に`public/`を読むため`pm2 restart willoa`が必要(ビルド不要)。所有権の確認は成功。このファイルは削除しない(`willoa-site/CLAUDE.md`にも記載)
 - 署名付きAABの一時ダウンロード用ルート`GET /dl-aab/:token`を`server.js`に追加(APK用`/dl/:token`と同形式)。`pm2 restart sg-weekend`済み。AABのMD5が、サーバー上のファイルと一致することを確認。不正なトークンは404。Play提出後に撤去する
+
+---
+
+## 設計書221: アプリでGA4とInstagram embed.jsを読み込まないようにする（2026-10-04、メインエージェント直接実装、ユーザー承認済み）
+
+### 背景
+Play Consoleのデータの安全性の回答のため、アプリが外部へ送るデータを調べたところ、`public/index.html`の`<head>`先頭でGA4の`gtag('config')`が静的な`<script>`として先に実行され、googletagmanager.comのgtag.jsが読み込まれていた。`app.js`の`window.gtag = function(){}`(Capacitor時)は後から実行されるため間に合わず、`dataLayer`に積まれた`config`が処理されて、iOS/Androidアプリでもアクセスデータが送られていた可能性が高い(CLAUDE.mdの「アプリではGA4スキップ」という記述は、実際には効いていなかった)。Googleの公式説明(support.google.com/googleplay/android-developer/answer/10787469)では、ライブラリやSDKが端末外へ送るデータ、アプリが管理するWebViewのデータは、すべて申告の対象。
+
+### 対応(ユーザーが「アプリでGA4を止めてAABを作り直す」を選択)
+- `public/index.html`: GA4(`gtag.js`と`config`)と、Instagramの`embed.js`の読み込みを、ホスト名が`dosuru.app`(または`*.dosuru.app`)のときだけ行うスクリプトに置き換え。アプリでは`window.gtag`を空関数にし、`ga-disable-G-JDCJPD1P9X`を立てる
+- 検証: ホスト名を変えて実際に実行(`dosuru.app`・`www`・`about`はGA4とInstagramを読み込む、`localhost`と偽装ドメインは何も読み込まない)。アプリに同梱された`index.html`に新スクリプトが入り、静的なGA4の`<script>`が無いことを確認。Web版本番の`index.html`も更新済み。Instagram投稿URLのイベントは現状0件で、表示への影響なし
+- `android-app/package.json`の`androidVersionCode`を2に。AAB・APKを再ビルド(targetSdk 36、versionCode 2)し、`releases/android/`を更新
+
+### 未対応・申し送り
+- iOS版: 同じ`public/`を同梱しているため、次回ビルドまで、GA4の問題は残る。次のiOSビルドで反映される
+- Google Fontsの読み込み(fonts.googleapis.com)は残しており、フォント取得時に端末のIPがGoogleに渡る。Googleの説明ではIPは使い方(位置の推定や識別子)で申告が決まるため、データの安全性では「利用していない」と整理する
