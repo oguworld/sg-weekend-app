@@ -8,9 +8,9 @@ const sharp = require('sharp');
 const ROOT = path.join(__dirname, '..');
 const CANVAS = 1152;                 // 288dp @ xxxhdpi
 const ART_CROP = { left: 0, top: 180, width: 2000, height: 1790 }; // 素材内の絵(ピン+スカイライン)の範囲
-const ART_W = 440;                   // 絵の幅(円直径768に対し、名前を入れても円に収まる大きさ)
-const GAP = 22;                      // 絵と文字の間
-const FONT_SIZE = 84;
+const ART_W = 528;                   // 絵の幅(2026-10-04に1.2倍へ拡大。440→528)
+const GAP = 26;                      // 絵と文字の間
+const FONT_SIZE = 101;                // 84→101(1.2倍)
 const FONT = 'Noto Sans CJK JP';
 
 const VARIANTS = [
@@ -21,10 +21,14 @@ const VARIANTS = [
 (async () => {
   const artH = Math.round(ART_W * ART_CROP.height / ART_CROP.width);
   const textBox = Math.round(FONT_SIZE * 1.25);
-  const stackH = artH + GAP + textBox;
-  const artTop = Math.round((CANVAS - stackH) / 2);
   const artLeft = Math.round((CANVAS - ART_W) / 2);
-  const textTop = artTop + artH + GAP;
+  // 文字は円の下側ほど入る幅が狭くなる。文字の幅(約5.71em)が円からはみ出さない一番下の位置に文字を置き、
+  // その上に絵を重ねる(上下の中央揃えにはしない)。
+  const textHalf = FONT_SIZE * 2.86;
+  const maxOffset = Math.sqrt((CANVAS / 3) ** 2 - textHalf ** 2);
+  const inkBottom = CANVAS / 2 + maxOffset - 10;
+  const textTop = Math.round(inkBottom - FONT_SIZE * 1.06);
+  const artTop = textTop - GAP - artH;
 
   for (const v of VARIANTS) {
     // 元画像の背景に微妙な濃淡があり、縁がうっすら四角く見えるため、縁を背景色へぼかして馴染ませる
