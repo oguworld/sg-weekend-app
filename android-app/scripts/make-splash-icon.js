@@ -7,8 +7,8 @@ const sharp = require('sharp');
 const ROOT = path.join(__dirname, '..');
 const CANVAS = 1152;                       // 288dp @ xxxhdpi
 const CIRCLE = CANVAS * 2 / 3;             // OSが見せる円の直径
-const LOGO_CENTER = { x: 1000, y: 965 };   // 2000x2000素材内のピン中心
-const LOGO_RADIUS = 800;                   // ピン全体を囲む半径
+const LOGO_CENTER = { x: 1000, y: 1300 };  // 絵全体(ピン+スカイライン)を円に収める中心
+const LOGO_RADIUS = 1170;                  // 中心から最も遠い絵の画素までの距離(左右端・上端)
 const SCALE = (CIRCLE / 2) / LOGO_RADIUS;
 
 const VARIANTS = [
@@ -19,7 +19,13 @@ const VARIANTS = [
 (async () => {
   for (const v of VARIANTS) {
     const size = Math.round(2000 * SCALE);
-    const resized = await sharp(path.join(ROOT, v.src)).removeAlpha().resize(size, size).toBuffer();
+    // 元画像の背景に微妙な濃淡があり、縁がうっすら四角く見えるため、縁を背景色へぼかして馴染ませる
+    const feather = Math.round(size * 0.04);
+    const alphaMask = await sharp({ create: { width: size, height: size, channels: 3, background: '#000' } })
+      .composite([{ input: { create: { width: size - feather * 2, height: size - feather * 2, channels: 3, background: '#fff' } }, left: feather, top: feather }])
+      .blur(feather / 2).greyscale().raw().toBuffer();
+    const resized = await sharp(path.join(ROOT, v.src)).removeAlpha().resize(size, size)
+      .joinChannel(alphaMask, { raw: { width: size, height: size, channels: 1 } }).png().toBuffer();
     const left = Math.round(CANVAS / 2 - LOGO_CENTER.x * SCALE);
     const top = Math.round(CANVAS / 2 - LOGO_CENTER.y * SCALE);
     await sharp({ create: { width: CANVAS, height: CANVAS, channels: 3, background: v.bg } })
