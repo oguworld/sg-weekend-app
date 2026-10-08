@@ -201,6 +201,19 @@ VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラ
 - **カテゴリフィルターのスワイプ切り替え**: `_switchCalCatBySwipe()`(他画面と同パターン)。`#calendar-filter-row`上で始まったタッチは除外
 - **スクロールトップFAB(`#fab-top`)**: `calendar-scroll-content`も監視対象。新しい`.screen-scroll-content`画面追加時はスクロールリスナー・`fabScrollTop()`のtargetId分岐の2箇所を必ず更新
 
+### 航空券シーズン表（設計書222）
+カレンダー画面ヘッダー右側の「✈ 航空券」ボタン(`#fare-seasons-entry-btn`)から開く、SG発の航空券が高い/安い月を行き先別の5段階ヒートマップで示す**静的な目安表**(実運賃は扱わない)。初版15都市: 東京・大阪・札幌・クアラルンプール・ペナン・バンコク・プーケット・バリ・ホーチミン・ダナン・セブ・モルディブ・シドニー・パース・台北。
+
+- **データ**: `content/fare-seasons.json`(**`data/`配下ではなくgit管理対象**。手書きで磨くコンテンツのため`data/`のgitignoreから意図的に外している)。都市ごとに`levels`[12か月、1〜5]・`climate`[12か月]・`haul`(near/mid/far)・`direct`・`flightHours`・`cheapestMonths`・`notes`を保持。編集時は`node scripts/validate-fare-seasons.js`で形式検証(levels/climateが12要素、レベル1〜5の整数、cheapestMonthsに挙げた月のレベルが実際に最安値と一致、等)してからコミットする
+- **API**: `GET /api/fare-seasons?city=sg`。`content/fare-seasons.json`をそのまま返しつつ、`schoolHolidays: {moe, sijs}`(SGの学校休暇が及ぶ月番号の配列)をサーバーが動的計算して付加する。**月を手書きで二重管理しない**: `calendar-events.json`内の名前が`現地校(MOE):`で始まる`school-vacation`項目からMOE、`school-calendar.json`の`vacations`からSIJSを算出(`computeSchoolHolidayMonths()`)。認証不要、`Cache-Control: public, max-age=3600`
+- **通信失敗時のフォールバック**: `sw.js`は`/api/`をネットワーク専用にしているためService Workerキャッシュは使わず、フロントが最後の成功応答を`localStorage`(`sg_fare_seasons_cache`)に保存し、次回通信失敗時はそれを表示する
+- **画面構成**: `#fare-seasons-sheet`(`<body>`直下、`#screen-calendar`の外に配置。理由: カレンダー画面には横スワイプでカテゴリを切り替える処理があり、シート内側の横スクロール表と干渉するため)。上部固定(タイトル・凡例・詳細パネル)+下部はヒートマップ専用の縦横スクロール領域(`#fare-table-scroll`)。z-index 3700(bottom-nav未満、モーダル表示中もbottom-navを隠さない設計のため)
+- **月タップで並べ替え**: 月見出し(`<th data-fare-month>`)タップでその月の安い順に行を並べ替え、同じ月を再タップで解除(選択状態は維持)。セルタップで詳細パネルに行き先名・レベル・所要時間・気候・予約の目安・最安月注記・学校休暇との重なりを表示
+- **`_preventBgScroll`対策(重要)**: `lockScroll()`は縦スクロール可能な祖先が無い要素の横スクロールまで`preventDefault`してしまうため、`#fare-table`の`tbody`末尾に高さ420pxの非表示スペーサー行(`.fare-table-spacer`)を常に追加し、画面サイズに関わらずテーブルが縦にもスクロール領域をあふれるようにしている(横スクロールを機能させるための前提条件)
+- **ボトムナビとの重なり対策**: `.fare-table-scroll`に`padding-bottom: calc(80px + safe-area-inset-bottom)`を確保(`#event-filter-sheet`と同パターン)。シート自体はbottom-nav(9999)より低いz-indexのため、開いている間もbottom-navは常に操作可能
+- **配色**: `--fare-lv1`〜`--fare-lv5`(固定変数、ライト/ダーク双方で別値を定義。色だけに頼らずセルに1〜5の数字も表示)
+- **スコープ外**: 実運賃の取得・表示、価格アラート、アフィリエイト、日本以外の出発地、`verified`フィールドの画面表示、更新スクリプト
+
 ### ピン留めのFAB化
 ピン留めはくらし・おでかけ画面のみに表示されるクリップ型FAB(`#fab-pin`、`#fab-top`と反対の左下)から開くボトムシート。中身(`#pins-sectioned-content`等)は旧`#screen-pins`から無変更で移設。
 - **FABの表示条件**: ピン留め0件時は非表示(`updatePinFabVisibility(screen)`)

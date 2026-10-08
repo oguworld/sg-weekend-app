@@ -815,6 +815,61 @@ app.get('/api/calendar', (req, res) => {
   }
 });
 
+// FARE_SEASONS_PATH: 手書きで磨くコンテンツのため data/ 外（git管理対象）に配置（設計書222）
+const FARE_SEASONS_PATH = path.join(__dirname, 'content', 'fare-seasons.json');
+
+// 開始日〜終了日(YYYY-MM-DD)が重なる月番号(1〜12)の集合を返す。年をまたぐ休暇にも対応。
+function monthsInRange(startStr, endStr) {
+  const months = new Set();
+  const start = new Date(startStr + 'T00:00:00');
+  const end = new Date((endStr || startStr) + 'T00:00:00');
+  if (isNaN(start) || isNaN(end) || start > end) return months;
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const endCursor = new Date(end.getFullYear(), end.getMonth(), 1);
+  // 安全弁: 最大36か月分まで（通常の休暇期間なら数か月以内で収まる）
+  let guard = 0;
+  while (cursor <= endCursor && guard < 36) {
+    months.add(cursor.getMonth() + 1);
+    cursor.setMonth(cursor.getMonth() + 1);
+    guard++;
+  }
+  return months;
+}
+
+// シンガポールの学校休暇（MOE＝現地校、SIJS＝日本人学校）が及ぶ月番号をcalendar-events.json/school-calendar.jsonから計算
+// （手書きの月配列を二重管理しないため、既存カレンダーデータから都度算出する。設計書222）
+function computeSchoolHolidayMonths(city) {
+  const moe = new Set();
+  const sijs = new Set();
+  try {
+    const curated = JSON.parse(fs.readFileSync(calendarEventsPath(city), 'utf8'));
+    for (const item of curated.items || []) {
+      if (item.category === 'school-vacation' && typeof item.name === 'string' && item.name.startsWith('現地校(MOE):')) {
+        for (const m of monthsInRange(item.date, item.endDate || item.date)) moe.add(m);
+      }
+    }
+  } catch (e) { /* ファイル未作成の場合は無視 */ }
+  try {
+    const school = JSON.parse(fs.readFileSync(calendarPath(city), 'utf8'));
+    for (const v of school.vacations || []) {
+      for (const m of monthsInRange(v.start, v.end)) sijs.add(m);
+    }
+  } catch (e) { /* ファイル未作成の場合は無視 */ }
+  return { moe: [...moe].sort((a, b) => a - b), sijs: [...sijs].sort((a, b) => a - b) };
+}
+
+// GET /api/fare-seasons?city=sg — 航空券シーズン表（SG発、5段階ヒートマップの目安データ。実運賃は扱わない。設計書222）
+app.get('/api/fare-seasons', (req, res) => {
+  try {
+    const city = resolveCity(req);
+    const data = JSON.parse(fs.readFileSync(FARE_SEASONS_PATH, 'utf8'));
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ ...data, schoolHolidays: computeSchoolHolidayMonths(city) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/debug-log — 実機デバッグ用ログ収集（原因特定後に削除すること）
 app.post('/api/debug-log', (req, res) => {
   const line = JSON.stringify({ receivedAt: new Date().toISOString(), ...req.body }) + '\n';

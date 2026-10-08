@@ -317,6 +317,9 @@
       ja: {
         headerSubtitle: 'シンガポール在住者の週末おでかけガイド', // city-specific: overridden by updateCityUI()
         labelCity: '都市',
+        fareEntryBtn: '✈ 航空券',
+        fareSheetTitle: '✈ 航空券シーズン表',
+        fareSheetSub: 'SG発の航空券が高い/安いおおよその目安です。実際の価格は予約前に確認してください。',
         shareLabel: 'シェア',
         tabsLabel: 'いつ行く？',
         tabWeekend: '今週',
@@ -1761,6 +1764,35 @@
       toggleCalNote(btn);
     }, { passive: false });
 
+    // ─── 航空券シーズン表 月見出し・セルの即時タップ対応（横スクロールと誤反応しないよう移動量チェック、動的に再描画されるため#fare-tableへのイベント委譲）───
+    {
+      let _fareTouchX = 0, _fareTouchY = 0;
+      const fareTableEl = document.getElementById('fare-table');
+      fareTableEl?.addEventListener('touchstart', e => {
+        _fareTouchX = e.touches[0].clientX;
+        _fareTouchY = e.touches[0].clientY;
+      }, { passive: true });
+      fareTableEl?.addEventListener('touchend', e => {
+        const dx = Math.abs(e.changedTouches[0].clientX - _fareTouchX);
+        const dy = Math.abs(e.changedTouches[0].clientY - _fareTouchY);
+        if (dx > 10 || dy > 10) return;
+        const th = e.target.closest('th[data-fare-month]');
+        if (th) { e.preventDefault(); toggleFareMonthSort(Number(th.dataset.fareMonth)); return; }
+        const td = e.target.closest('td[data-fare-city]');
+        if (td) { e.preventDefault(); selectFareCell(td.dataset.fareCity, Number(td.dataset.fareMonth)); return; }
+      }, { passive: false });
+    }
+
+    document.getElementById('fare-detail-panel')?.addEventListener('touchend', e => {
+      const btn = e.target.closest('.fare-detail-close');
+      if (!btn) return;
+      e.preventDefault();
+      _fareSelectedCityId = null;
+      _fareSelectedMonth = null;
+      renderFareTable();
+      renderFareDetailPanel();
+    }, { passive: false });
+
     // ─── PSI・デング熱指標タップでクライテリア表示 即時タップ対応 ───
     document.getElementById('stat-widget-info')?.addEventListener('touchend', e => {
       const col = e.target.closest('[data-stat-crit]');
@@ -2033,6 +2065,8 @@
       ['qr-share-link-btn', () => doShare()],
       ['promo-modal-overlay', () => closePromoModal()],
       ['promo-modal-dismiss-link', () => closePromoModal()],
+      ['fare-seasons-overlay', () => closeFareSeasonsSheet()],
+      ['fare-seasons-entry-btn', () => openFareSeasonsSheet()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -2939,6 +2973,7 @@
     function closeAllPopups() {
       closePinDetail();
       closeEventFilterSheet();
+      closeFareSeasonsSheet();
     }
 
     const FAB_HIDDEN_SCREENS = new Set(['settings']);
@@ -3347,6 +3382,162 @@
         const need = lastCard ? Math.max(0, scrollEl.clientHeight - lastCard.getBoundingClientRect().height) : 0;
         listEl.style.paddingBottom = `${need}px`;
       }
+    }
+
+    // ─── 航空券シーズン表（設計書222。SG発の航空券が高い/安い月を行き先別の5段階ヒートマップで示す静的な目安表、実運賃は扱わない） ───
+    const FARE_SEASONS_CACHE_KEY = 'sg_fare_seasons_cache';
+    let FARE_SEASONS_DATA = null;      // { legend, bookingLeadTime, cities, schoolHolidays } をそのまま保持
+    let _fareSortMonth = null;         // 選択中の月(1〜12)。nullは並べ替えなし
+    let _fareSelectedCityId = null;    // 詳細パネル表示中の都市id（並べ替えで行の位置が変わっても追従させるため）
+    let _fareSelectedMonth = null;     // 詳細パネル表示中の月(1〜12)
+
+    async function loadFareSeasonsData() {
+      try {
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}`);
+        if (!res.ok) throw new Error('fare-seasons fetch failed');
+        FARE_SEASONS_DATA = await res.json();
+        try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
+      } catch (e) {
+        // 通信失敗時は前回成功時のキャッシュがあればそれを使う（設計書222）
+        if (!FARE_SEASONS_DATA) {
+          try {
+            const cached = localStorage.getItem(FARE_SEASONS_CACHE_KEY);
+            if (cached) FARE_SEASONS_DATA = JSON.parse(cached);
+          } catch (_) {}
+        }
+      }
+    }
+
+    function openFareSeasonsSheet() {
+      lockScroll();
+      document.getElementById('fare-seasons-overlay').classList.add('visible');
+      document.getElementById('fare-seasons-sheet').classList.add('visible');
+      (async () => {
+        if (!FARE_SEASONS_DATA) await loadFareSeasonsData();
+        renderFareSeasonsSheet();
+      })();
+    }
+
+    function closeFareSeasonsSheet() {
+      _blurIfFocusInside('fare-seasons-sheet');
+      unlockScroll();
+      document.getElementById('fare-seasons-overlay').classList.remove('visible');
+      document.getElementById('fare-seasons-sheet').classList.remove('visible');
+    }
+
+    function renderFareSeasonsSheet() {
+      const legendEl = document.getElementById('fare-legend-row');
+      const schoolLegendEl = document.getElementById('fare-school-legend');
+      const tableEl = document.getElementById('fare-table');
+      if (!FARE_SEASONS_DATA) {
+        if (tableEl) tableEl.innerHTML = '<caption style="padding:20px;color:var(--warm-gray);font-size:13px;">データを取得できませんでした。しばらくしてから開き直してください。</caption>';
+        return;
+      }
+      const { legend, cities } = FARE_SEASONS_DATA;
+
+      if (legendEl) {
+        legendEl.innerHTML = Object.keys(legend).sort().map(lv =>
+          `<span class="fare-legend-chip"><span class="fare-legend-swatch fare-lv-${lv}">${lv}</span>${escapeHtml(legend[lv])}</span>`
+        ).join('');
+      }
+      if (schoolLegendEl) {
+        schoolLegendEl.innerHTML = `<span>🏫現地校(MOE)休暇</span><span>🎒日本人学校(SIJS)休暇</span>`;
+      }
+
+      renderFareTable();
+      renderFareDetailPanel();
+    }
+
+    function renderFareTable() {
+      const tableEl = document.getElementById('fare-table');
+      if (!tableEl || !FARE_SEASONS_DATA) return;
+      const { cities, schoolHolidays } = FARE_SEASONS_DATA;
+      const moeSet = new Set((schoolHolidays && schoolHolidays.moe) || []);
+      const sijsSet = new Set((schoolHolidays && schoolHolidays.sijs) || []);
+
+      let orderedCities = cities;
+      if (_fareSortMonth) {
+        const idx = _fareSortMonth - 1;
+        orderedCities = [...cities].sort((a, b) => a.levels[idx] - b.levels[idx]);
+      }
+
+      let thead = '<thead><tr><th>行き先</th>';
+      for (let m = 1; m <= 12; m++) {
+        thead += `<th class="${m === _fareSortMonth ? 'fare-month-selected' : ''}" onclick="if(!_touchCapableDetected) toggleFareMonthSort(${m})" data-fare-month="${m}">${m}月</th>`;
+      }
+      thead += '</tr></thead>';
+
+      let tbody = '<tbody>';
+      orderedCities.forEach(city => {
+        tbody += `<tr><th>${escapeHtml(city.name)}</th>`;
+        for (let m = 1; m <= 12; m++) {
+          const lv = city.levels[m - 1];
+          const isSelected = _fareSelectedCityId === city.id && _fareSelectedMonth === m;
+          const mark = moeSet.has(m) && sijsSet.has(m) ? '🏫🎒' : moeSet.has(m) ? '🏫' : sijsSet.has(m) ? '🎒' : '';
+          tbody += `<td class="fare-cell fare-cell-bg${isSelected ? ' fare-cell-selected' : ''}" onclick="if(!_touchCapableDetected) selectFareCell('${city.id}',${m})" data-fare-city="${city.id}" data-fare-month="${m}">
+            <div class="fare-cell-inner fare-lv-${lv}">${lv}${mark ? `<span class="fare-school-mark">${mark}</span>` : ''}</div>
+          </td>`;
+        }
+        tbody += '</tr>';
+      });
+      // _preventBgScrollが横スクロールを機能させるには表が縦にもスクロール領域を超える必要があるため、
+      // 画面が大きい場合でも確実にあふれるよう余白行を1行追加する（実害は無い、見た目にも表示されない高さのみの行）
+      tbody += '<tr class="fare-table-spacer"><td colspan="13"></td></tr>';
+      tbody += '</tbody>';
+
+      tableEl.innerHTML = thead + tbody;
+    }
+
+    function toggleFareMonthSort(month) {
+      _fareSortMonth = (_fareSortMonth === month) ? null : month;
+      renderFareTable();
+    }
+
+    function selectFareCell(cityId, month) {
+      if (_fareSelectedCityId === cityId && _fareSelectedMonth === month) {
+        _fareSelectedCityId = null;
+        _fareSelectedMonth = null;
+      } else {
+        _fareSelectedCityId = cityId;
+        _fareSelectedMonth = month;
+      }
+      renderFareTable();
+      renderFareDetailPanel();
+    }
+
+    function renderFareDetailPanel() {
+      const panel = document.getElementById('fare-detail-panel');
+      if (!panel) return;
+      if (!_fareSelectedCityId || !_fareSelectedMonth || !FARE_SEASONS_DATA) {
+        panel.style.display = 'none';
+        panel.innerHTML = '';
+        return;
+      }
+      const { legend, bookingLeadTime, cities, schoolHolidays, sgFactors } = FARE_SEASONS_DATA;
+      const city = cities.find(c => c.id === _fareSelectedCityId);
+      if (!city) { panel.style.display = 'none'; return; }
+      const m = _fareSelectedMonth;
+      const lv = city.levels[m - 1];
+      const climate = city.climate[m - 1];
+      const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)] || '-';
+      const isCheapest = (city.cheapestMonths || []).includes(m);
+      const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(m);
+      const sijsHit = ((schoolHolidays && schoolHolidays.sijs) || []).includes(m);
+      const schoolNote = (moeHit || sijsHit)
+        ? `<div class="fare-detail-row">🏫🎒 この月はシンガポールの学校休暇と重なります（${[moeHit ? '現地校(MOE)' : null, sijsHit ? '日本人学校(SIJS)' : null].filter(Boolean).join('・')}）。${sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : ''}</div>`
+        : '';
+
+      panel.style.display = 'block';
+      panel.innerHTML = `
+        <button class="fare-detail-close" onclick="if(!_touchCapableDetected) selectFareCell('${city.id}',${m})">✕</button>
+        <div class="fare-detail-title">${escapeHtml(city.name)} ${m}月 — <span class="fare-legend-swatch fare-lv-${lv}" style="display:inline-flex;vertical-align:middle;">${lv}</span> ${escapeHtml(legend[String(lv)] || '')}${isCheapest ? '（この行き先の中で最も安い月）' : ''}</div>
+        <div class="fare-detail-row">✈ 所要時間: ${escapeHtml(city.flightHours)}</div>
+        <div class="fare-detail-row">🌦 気候: ${escapeHtml(climate)}</div>
+        <div class="fare-detail-row">🗓 予約の目安: ${escapeHtml(leadTime)}前後が目安です</div>
+        <div class="fare-detail-row">${escapeHtml(city.notes)}</div>
+        ${schoolNote}
+        <div class="fare-detail-row" style="color:var(--warm-gray);font-size:12px;margin-top:6px;">※あくまで目安です。予約前に実際の価格を確認してください。</div>
+      `;
     }
 
     // ユーティリティ（getUserId()はコース機能専用のため設計書178フェーズ1で削除済み）

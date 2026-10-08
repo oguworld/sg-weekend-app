@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20260924b">
+  <link rel="stylesheet" href="/app.css?v=20261008a">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -227,6 +227,7 @@
   <div class="screen" id="screen-calendar">
     <div class="plan-title-header">
       <span class="screen-title">カレンダー</span>
+      <button id="fare-seasons-entry-btn" class="fare-entry-btn" onclick="if(!_touchCapableDetected) openFareSeasonsSheet()" data-i18n="fareEntryBtn">✈ 航空券</button>
     </div>
     <div id="calendar-filter-row">
       <button class="filter-chip active" data-cal-cat="" onclick="if(!_touchCapableDetected) setCalendarCategory('')">すべて</button>
@@ -542,7 +543,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20260915i"></script>
+  <script src="/app.js?v=20261008a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
@@ -598,6 +599,22 @@
     </div>
     <div style="padding:0 20px calc(80px + env(safe-area-inset-bottom,0px));">
       <button onclick="applyEventFilter()" style="width:100%;padding:15px;background:var(--caramel);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;">適用する</button>
+    </div>
+  </div>
+
+  <!-- ─── 航空券シーズン表（設計書222。#screen-calendarの横スワイプ処理と干渉しないよう<body>直下に配置） ─── -->
+  <div class="chat-overlay" id="fare-seasons-overlay" onclick="if(!_touchCapableDetected) closeFareSeasonsSheet()" style="z-index:3700;"></div>
+  <div id="fare-seasons-sheet" class="fare-sheet">
+    <div class="fare-sheet-header">
+      <button data-close onclick="closeFareSeasonsSheet()" class="fare-sheet-close">✕</button>
+      <div class="fare-sheet-title" data-i18n="fareSheetTitle">✈ 航空券シーズン表</div>
+      <div class="fare-sheet-sub" data-i18n="fareSheetSub">SG発の航空券が高い/安いおおよその目安です。実際の価格は予約前に確認してください。</div>
+      <div class="fare-legend-row" id="fare-legend-row"></div>
+      <div class="fare-school-legend" id="fare-school-legend"></div>
+    </div>
+    <div class="fare-detail-panel" id="fare-detail-panel" style="display:none;"></div>
+    <div class="fare-table-scroll" id="fare-table-scroll">
+      <table class="fare-table" id="fare-table"></table>
     </div>
   </div>
 
