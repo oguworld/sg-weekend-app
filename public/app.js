@@ -3593,6 +3593,10 @@
         if ((ov.includes('auto') || ov.includes('scroll')) && el.scrollHeight > el.clientHeight) {
           return;
         }
+        const ovX = style.overflow + style.overflowX;
+        if ((ovX.includes('auto') || ovX.includes('scroll')) && el.scrollWidth > el.clientWidth) {
+          return;
+        }
         el = el.parentElement;
       }
       e.preventDefault();

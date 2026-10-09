@@ -21246,3 +21246,13 @@ Play Consoleのデータの安全性の回答のため、アプリが外部へ�
 - **変更不要として維持**: `content/fare-seasons.json`、`scripts/validate-fare-seasons.js`、`server.js`の`GET /api/fare-seasons`、localStorageフォールバック、カレンダー画面ヘッダーの「✈ 航空券」入口ボタン自体
 - **実機確認未実施**: この環境ではPlaywright等が使えずiOS/Android実機でのタッチ動作確認は不可。横スクロール・sticky要素が無くなったため以前の設計(ヒートマップ表)よりリスクは下がっている見込みだが、次回実機確認が必要
 3. 行き先の性質が変わるため、`sgFactors`(SG側の理由)は旧正月・ディパバリ・ハリラヤ・学校休暇・年末が中心。日本方面はお盆・GW・年末年始、東南アジアは雨季・ソンクラーン等を`notes`に入れる
+
+### 設計書222 追記3(2026-10-09): 実機確認で発覚した2件の不具合を修正
+
+UI再設計(追記2)後、ユーザー実機確認で2件の不具合が発覚。原因特定済みのため修正。
+
+- **不具合1: 右上✕ボタンの見た目崩れ**: `.fare-sheet-close`にCLAUDE.md「UIスタイル規約」の標準✕ボタンスタイル(`background:var(--sand); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-size:16px; border:none; cursor:pointer;`)が入っていなかった。既存の`position:absolute;top:10px;right:16px;`は維持しつつ追加
+- **不具合2: 月選択チップ(`#fare-month-row`)がタップ無反応**: 共通スクロールロック関数`_preventBgScroll()`(`lockScroll()`/`unlockScroll()`が使う`touchmove`ハンドラ)が**縦スクロール可能な祖先のみ**を判定しており、`#fare-month-row`(`.fare-sheet-body`の兄弟要素、`overflow-x:auto`の横スクロール専用)はこの判定に引っかからずcatch-allの`e.preventDefault()`でタッチが握りつぶされていた。`_preventBgScroll()`に横スクロール可能祖先(`scrollWidth > clientWidth`)の判定を追加(既存の縦判定ロジックは変更せず加算のみ)
+- **影響範囲確認**: `lockScroll()`は他に4箇所(イベントフィルターシート・ピン詳細・QR共有シート・ピン留めシート)で使用。いずれのシート内にも`overflow-x`要素は存在せず、既存動作への悪影響なし(加算的変更のため後方互換)
+- `public/sw.js`の`CACHE_NAME`を`v932→v933`、`index.html`のCSSクエリを`20261009a→20261009b`、JSクエリを`20261008a→20261009a`にバンプ
+- データ・API・HTML構造は無変更。CSS/JSの差し替えのみ
