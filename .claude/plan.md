@@ -21256,3 +21256,20 @@ UI再設計(追記2)後、ユーザー実機確認で2件の不具合が発覚�
 - **影響範囲確認**: `lockScroll()`は他に4箇所(イベントフィルターシート・ピン詳細・QR共有シート・ピン留めシート)で使用。いずれのシート内にも`overflow-x`要素は存在せず、既存動作への悪影響なし(加算的変更のため後方互換)
 - `public/sw.js`の`CACHE_NAME`を`v932→v933`、`index.html`のCSSクエリを`20261009a→20261009b`、JSクエリを`20261008a→20261009a`にバンプ
 - データ・API・HTML構造は無変更。CSS/JSの差し替えのみ
+
+### 設計書222 追記4(2026-10-09): 月選択チップのタップ無反応が追記3の修正後も再現→静的解析で再調査、確定原因なし・実機ログ計装を追加
+
+追記3の修正後もユーザー実機で「月選択チップ(`#fare-month-row`)だけタップ無反応」が再現（ランキングリスト・詳細パネルは問題なし）。静的解析で以下の仮説を検討したが、いずれも決定的な証拠には至らなかった。
+
+- **検討した仮説と結論**:
+  1. `#fare-month-row`向けtouchstart/touchend委譲リスナーと`#calendar-filter-row`を1行単位で比較→ロジックは完全に同一。差分なし
+  2. `_preventBgScroll()`は`touchmove`専用のハンドラであり、動かない純粋なタップには本来無関係。**追記3の修正(横スクロール判定追加)はタップ無反応そのものの対策にはなっていなかった可能性が高い**(「チップ行を横ドラッグした際の背景ロック誤爆」への対策であり、別の懸念事項への対処だった)
+  3. `.fare-month-row`にのみ`touch-action: pan-x`が指定されている点を発見し有力仮説として一時採用したが、`#filter-row-category`・`#news-filter-row`にも同プロパティがあり正常動作している事実と矛盾するため、単独要因と確定できない。念のため削除したが「予防的変更」の位置づけ(害は無い)
+  4. z-index教訓(`.pin-sheet`はbottom:0到達のため9999超の10001/10000、`.fare-sheet`は3700)も検討したが、月チップ行はシート上部にあり画面最下部のボトムナビ帯とは重ならないはずで、「月チップだけ」反応しないという症状とは整合しないため確定要因から除外
+- **対応**: 確定修正ができないため、CLAUDE.md「実機デバッグ用ログ収集機能」を使い使い捨ての計装を3箇所に追加
+  - `#fare-month-row`の`touchstart`: `_sendDebugLog('fare_month_touchstart', { x, y })`
+  - `#fare-month-row`の`touchend`(chip特定前、returnより前に移動): `_sendDebugLog('fare_month_touchend', { hasChip, dx, dy, targetTag, targetClass })`
+  - `selectFareMonth(month)`先頭: `_sendDebugLog('fare_month_selected', { month })`
+- `.fare-month-row`から`touch-action: pan-x`を削除(予防的、確定修正ではない)
+- `public/sw.js`の`CACHE_NAME`を`v933→v934→v935`、`index.html`のCSSクエリを`20261009b→20261009c`、JSクエリを`20261009a→20261009b`にバンプ
+- **次のアクション**: ユーザーに実機で月ピルを2〜3回タップしてもらい、`logs/debug-nav.log`の`fare_month_touchstart`/`fare_month_touchend`/`fare_month_selected`を確認する必要がある。原因判明後、計装3箇所は削除すること

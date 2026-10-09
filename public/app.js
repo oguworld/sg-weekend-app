@@ -1771,12 +1771,16 @@
       fareMonthRowEl?.addEventListener('touchstart', e => {
         _fareMonthTouchX = e.touches[0].clientX;
         _fareMonthTouchY = e.touches[0].clientY;
+        // ─── DEBUG: 月チップタップ無反応調査用の一時計装(原因特定後に削除すること、設計書222) ───
+        _sendDebugLog('fare_month_touchstart', { x: _fareMonthTouchX, y: _fareMonthTouchY });
       }, { passive: true });
       fareMonthRowEl?.addEventListener('touchend', e => {
         const chip = e.target.closest('.fare-month-chip');
-        if (!chip) return;
         const dx = Math.abs(e.changedTouches[0].clientX - _fareMonthTouchX);
         const dy = Math.abs(e.changedTouches[0].clientY - _fareMonthTouchY);
+        // ─── DEBUG: 月チップタップ無反応調査用の一時計装(原因特定後に削除すること、設計書222) ───
+        _sendDebugLog('fare_month_touchend', { hasChip: !!chip, dx, dy, targetTag: e.target.tagName, targetClass: e.target.className });
+        if (!chip) return;
         if (dx > 8 || dy > 8) return;
         e.preventDefault();
         selectFareMonth(Number(chip.dataset.fareMonth));
@@ -3481,6 +3485,8 @@
     }
 
     function selectFareMonth(month) {
+      // ─── DEBUG: 月チップタップ無反応調査用の一時計装(原因特定後に削除すること、設計書222) ───
+      _sendDebugLog('fare_month_selected', { month });
       _fareSelectedMonth = month;
       // 月を切り替えたら前の月の詳細パネルは閉じる（都市は残っていても別の月の情報と混在しないように）
       _fareSelectedCityId = null;

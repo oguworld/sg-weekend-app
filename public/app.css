@@ -1520,10 +1520,15 @@
     }
     .fare-school-legend { display: flex; gap: 12px; margin-top: 8px; font-size: 11px; color: var(--warm-gray); }
 
-    /* 月選択チップ行（#calendar-filter-rowと同パターン、横スクロールのみ） */
+    /* 月選択チップ行（#calendar-filter-rowと同パターン、横スクロールのみ）
+       ⚠️ touch-action:pan-x は付けない: #calendar-filter-row等の既存の横スクロールチップ行には
+       元々指定が無く、ここだけ追加したことでWebKitがわずかな縦方向のブレを「許可されていない軸への
+       ジェスチャー」と判定しtouchendが発火しない（タップ無反応）回帰を起こしていた(設計書222)。
+       横スクロール自体はoverflow-x:autoのみで機能し、縦方向の誤反応は_preventBgScroll側の
+       スクロール可能判定で抑止されるため、touch-action指定は不要かつ有害。 */
     .fare-month-row {
       display: flex; gap: 8px; overflow-x: auto; padding: 12px 20px; flex-shrink: 0;
-      scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch;
       border-bottom: 1px solid var(--sand);
     }
     .fare-month-row::-webkit-scrollbar { display: none; }
