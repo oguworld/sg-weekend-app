@@ -1483,7 +1483,8 @@
     .plan-modal.visible { display: flex; transform: translateY(0); }
     .plan-modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 20px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; min-height: 0; }
 
-    /* ─── 航空券シーズン表（設計書222）: .plan-modalの背の高い版。上部固定(タイトル・凡例・詳細パネル)＋下部はヒートマップの縦横スクロール領域のみ ─── */
+    /* ─── 航空券シーズン表（設計書222→UI再設計）: .plan-modalの背の高い版。
+       月選択チップ行＋縦スクロールのみのランキングリスト方式（表・固定列・横スクロールは廃止） ─── */
     .fare-entry-btn {
       flex-shrink: 0; align-self: flex-start;
       background: var(--sand); color: var(--midnight);
@@ -1506,13 +1507,36 @@
     .fare-sheet-close { position: absolute; top: 10px; right: 16px; }
     .fare-sheet-title { font-family: var(--font-heading); font-size: 17px; font-weight: 700; color: var(--midnight); padding-right: 40px; }
     .fare-sheet-sub { font-size: 12px; color: var(--warm-gray); line-height: 1.5; margin-top: 4px; padding-right: 20px; }
-    .fare-legend-row { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .fare-legend-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     .fare-legend-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--midnight); }
-    .fare-legend-swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--fare-lv-text); }
+    .fare-legend-swatch {
+      width: 18px; height: 18px; border-radius: 50%; display: inline-flex;
+      align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--fare-lv-text);
+    }
     .fare-school-legend { display: flex; gap: 12px; margin-top: 8px; font-size: 11px; color: var(--warm-gray); }
 
+    /* 月選択チップ行（#calendar-filter-rowと同パターン、横スクロールのみ） */
+    .fare-month-row {
+      display: flex; gap: 8px; overflow-x: auto; padding: 12px 20px; flex-shrink: 0;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x;
+      border-bottom: 1px solid var(--sand);
+    }
+    .fare-month-row::-webkit-scrollbar { display: none; }
+    .fare-month-chip {
+      flex-shrink: 0; padding: 7px 14px; border: 1px solid var(--sand); border-radius: 50px;
+      background: var(--cream); color: var(--warm-gray); font-size: 14px; font-weight: 500;
+      font-family: 'Noto Sans JP', sans-serif; cursor: pointer; white-space: nowrap;
+    }
+    .fare-month-chip.active { background: var(--caramel); color: #fff; border-color: var(--caramel); font-weight: 700; }
+
+    /* 本体は縦スクロールのみ（横スクロール・sticky列は廃止） */
+    .fare-sheet-body {
+      flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+      padding: 14px 20px calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+
     .fare-detail-panel {
-      flex-shrink: 0; margin: 10px 20px 0; padding: 12px 14px;
+      margin: 0 0 12px; padding: 12px 14px;
       background: var(--sand); border-radius: 14px; font-size: 13px; color: var(--midnight); line-height: 1.6;
     }
     .fare-detail-panel .fare-detail-close {
@@ -1521,54 +1545,31 @@
     .fare-detail-title { font-weight: 700; margin-bottom: 4px; }
     .fare-detail-row { margin-top: 2px; }
 
-    .fare-table-scroll {
-      flex: 1; min-height: 0; margin-top: 10px;
-      overflow: auto; -webkit-overflow-scrolling: touch;
-      /* シート表示中もbottom-navを隠さない設計のため、表の最下部がbottom-navの裏に隠れないよう
-         ナビの高さ分を確保する（#event-filter-sheetの末尾ボタンと同パターン。設計書222） */
-      padding: 0 20px calc(80px + env(safe-area-inset-bottom, 0px));
+    /* ランキングリスト（.cal-itemのグリッドパターンを踏襲） */
+    .fare-rank-list { display: flex; flex-direction: column; }
+    .fare-rank-item {
+      display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 10px;
+      padding: 12px 4px; border-bottom: 1px solid var(--sand); cursor: pointer;
     }
-    /* 都市数が少ない/画面が大きい場合でもテーブルの高さが確実にスクロール領域を超えるようにする
-       （_preventBgScrollはscrollHeight > clientHeightの要素のみ縦スクロール扱いし、それ以外は横スクロールも
-       含めpreventDefaultしてしまうため、横スクロールを機能させるには縦にもあふれる形にする必要がある。設計書222） */
-    .fare-table-spacer td { height: 420px; padding: 0; }
-    .fare-table { border-collapse: separate; border-spacing: 0; font-size: 12px; }
-    .fare-table th, .fare-table td { padding: 0; text-align: center; }
-    .fare-table thead th {
-      position: sticky; top: 0; z-index: 2;
-      background: var(--warm-white);
-      font-size: 11px; font-weight: 700; color: var(--warm-gray);
-      padding: 6px 4px; min-width: 34px;
-      cursor: pointer;
-    }
-    .fare-table thead th.fare-month-selected { color: var(--caramel); text-decoration: underline; }
-    .fare-table thead th:first-child {
-      position: sticky; left: 0; top: 0; z-index: 3;
-      background: var(--warm-white); min-width: 92px; text-align: left; cursor: default;
-    }
-    .fare-table tbody th {
-      position: sticky; left: 0; z-index: 1;
-      background: var(--warm-white);
-      font-size: 12px; font-weight: 700; color: var(--midnight);
-      text-align: left; padding: 6px 10px 6px 4px; white-space: nowrap; min-width: 92px;
-    }
-    .fare-table tbody tr:nth-child(odd) th,
-    .fare-table tbody tr:nth-child(odd) td.fare-cell-bg { background: var(--cream); }
-    .fare-cell {
-      width: 34px; height: 34px; cursor: pointer; position: relative;
-    }
-    .fare-cell-inner {
-      width: 30px; height: 30px; margin: 2px auto; border-radius: 8px;
+    .fare-rank-item:last-child { border-bottom: none; }
+    .fare-rank-item.fare-rank-selected { background: var(--cream); border-radius: 12px; }
+    .fare-rank-badge {
+      justify-self: start; width: 34px; height: 34px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700; color: var(--fare-lv-text);
+      font-size: 15px; font-weight: 700; color: var(--fare-lv-text);
     }
-    .fare-cell-inner.fare-lv-1 { background: var(--fare-lv1); }
-    .fare-cell-inner.fare-lv-2 { background: var(--fare-lv2); }
-    .fare-cell-inner.fare-lv-3 { background: var(--fare-lv3); }
-    .fare-cell-inner.fare-lv-4 { background: var(--fare-lv4); }
-    .fare-cell-inner.fare-lv-5 { background: var(--fare-lv5); }
-    .fare-cell.fare-cell-selected .fare-cell-inner { box-shadow: 0 0 0 2px var(--midnight) inset; }
-    .fare-school-mark { position: absolute; bottom: 0; right: 2px; font-size: 7px; line-height: 1; }
+    .fare-rank-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .fare-rank-name-wrap { display: flex; align-items: center; gap: 6px; }
+    .fare-rank-name { font-size: 15px; font-weight: 700; color: var(--midnight); }
+    .fare-rank-label { font-size: 12px; color: var(--warm-gray); }
+    .fare-school-mark { font-size: 11px; line-height: 1; flex-shrink: 0; }
+    .fare-rank-chevron { color: var(--warm-gray); font-size: 13px; }
+
+    .fare-lv-1 { background: var(--fare-lv1); }
+    .fare-lv-2 { background: var(--fare-lv2); }
+    .fare-lv-3 { background: var(--fare-lv3); }
+    .fare-lv-4 { background: var(--fare-lv4); }
+    .fare-lv-5 { background: var(--fare-lv5); }
 
     /* ─── PROMO MODAL（Web版→iOSアプリ誘導、中央モーダル、設計書206） ─── */
     .promo-modal-overlay {
@@ -1685,10 +1686,9 @@
     html[data-theme="dark"] .pin-card,
     html[data-theme="dark"] .settings-item,
     html[data-theme="dark"] .plan-modal,
-    html[data-theme="dark"] .fare-sheet,
-    html[data-theme="dark"] .fare-table thead th,
-    html[data-theme="dark"] .fare-table thead th:first-child,
-    html[data-theme="dark"] .fare-table tbody th { background: #252019; }
+    html[data-theme="dark"] .fare-sheet { background: #252019; }
+    html[data-theme="dark"] .fare-month-chip:not(.active),
+    html[data-theme="dark"] .fare-rank-item.fare-rank-selected { background: #2E241C; }
     html[data-theme="dark"] .profile-chip:not(.selected),
     html[data-theme="dark"] .custom-select-pill,
     html[data-theme="dark"] .city-select,

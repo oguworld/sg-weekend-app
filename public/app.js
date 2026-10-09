@@ -1764,24 +1764,31 @@
       toggleCalNote(btn);
     }, { passive: false });
 
-    // ─── 航空券シーズン表 月見出し・セルの即時タップ対応（横スクロールと誤反応しないよう移動量チェック、動的に再描画されるため#fare-tableへのイベント委譲）───
+    // ─── 航空券シーズン表 月チップ・ランキング行の即時タップ対応（#calendar-filter-rowと同パターン、動的に再描画されるためイベント委譲）───
     {
-      let _fareTouchX = 0, _fareTouchY = 0;
-      const fareTableEl = document.getElementById('fare-table');
-      fareTableEl?.addEventListener('touchstart', e => {
-        _fareTouchX = e.touches[0].clientX;
-        _fareTouchY = e.touches[0].clientY;
+      let _fareMonthTouchX = 0, _fareMonthTouchY = 0;
+      const fareMonthRowEl = document.getElementById('fare-month-row');
+      fareMonthRowEl?.addEventListener('touchstart', e => {
+        _fareMonthTouchX = e.touches[0].clientX;
+        _fareMonthTouchY = e.touches[0].clientY;
       }, { passive: true });
-      fareTableEl?.addEventListener('touchend', e => {
-        const dx = Math.abs(e.changedTouches[0].clientX - _fareTouchX);
-        const dy = Math.abs(e.changedTouches[0].clientY - _fareTouchY);
-        if (dx > 10 || dy > 10) return;
-        const th = e.target.closest('th[data-fare-month]');
-        if (th) { e.preventDefault(); toggleFareMonthSort(Number(th.dataset.fareMonth)); return; }
-        const td = e.target.closest('td[data-fare-city]');
-        if (td) { e.preventDefault(); selectFareCell(td.dataset.fareCity, Number(td.dataset.fareMonth)); return; }
+      fareMonthRowEl?.addEventListener('touchend', e => {
+        const chip = e.target.closest('.fare-month-chip');
+        if (!chip) return;
+        const dx = Math.abs(e.changedTouches[0].clientX - _fareMonthTouchX);
+        const dy = Math.abs(e.changedTouches[0].clientY - _fareMonthTouchY);
+        if (dx > 8 || dy > 8) return;
+        e.preventDefault();
+        selectFareMonth(Number(chip.dataset.fareMonth));
       }, { passive: false });
     }
+
+    document.getElementById('fare-rank-list')?.addEventListener('touchend', e => {
+      const item = e.target.closest('.fare-rank-item');
+      if (!item) return;
+      e.preventDefault();
+      selectFareCell(item.dataset.fareCity, _fareSelectedMonth || _fareCurrentMonth);
+    }, { passive: false });
 
     document.getElementById('fare-detail-panel')?.addEventListener('touchend', e => {
       const btn = e.target.closest('.fare-detail-close');
@@ -1789,7 +1796,7 @@
       e.preventDefault();
       _fareSelectedCityId = null;
       _fareSelectedMonth = null;
-      renderFareTable();
+      renderFareRankList();
       renderFareDetailPanel();
     }, { passive: false });
 
@@ -3384,12 +3391,25 @@
       }
     }
 
-    // ─── 航空券シーズン表（設計書222。SG発の航空券が高い/安い月を行き先別の5段階ヒートマップで示す静的な目安表、実運賃は扱わない） ───
+    // ─── 航空券シーズン表（設計書222→UI再設計。SG発の航空券が高い/安い月を行き先別の5段階で示す静的な目安表、実運賃は扱わない）
+    // UIは当初の表（15都市×12か月ヒートマップ・横スクロール・sticky列）から「月選択＋ランキングリスト」方式に変更済み。
+    // 理由: 表はカレンダー画面の暖色カード・ピルバッジ基調の見た目から浮いており、小さいマスが見づらいとのフィードバックのため。
+    // データ・API・ロジックは無変更、フロントの見た目と構造のみ変更。 ───
     const FARE_SEASONS_CACHE_KEY = 'sg_fare_seasons_cache';
     let FARE_SEASONS_DATA = null;      // { legend, bookingLeadTime, cities, schoolHolidays } をそのまま保持
-    let _fareSortMonth = null;         // 選択中の月(1〜12)。nullは並べ替えなし
-    let _fareSelectedCityId = null;    // 詳細パネル表示中の都市id（並べ替えで行の位置が変わっても追従させるため）
-    let _fareSelectedMonth = null;     // 詳細パネル表示中の月(1〜12)
+    let _fareSelectedMonth = null;     // 月チップで選択中の月(1〜12)。初期値は今月
+    let _fareCurrentMonth = (new Date()).getMonth() + 1;
+    let _fareSelectedCityId = null;    // 詳細パネル表示中の都市id
+
+    // レベル(1〜5)ごとの短いラベル文言。legend(JSONの日本語、凡例表示用)とは別に
+    // ランキング行に添える一言用（アプリのトーンに合わせた表現、データ側の変更は不要）
+    const FARE_LEVEL_SHORT_LABEL = {
+      1: '最安・狙い目',
+      2: '安め',
+      3: '普通',
+      4: 'やや高め',
+      5: '高額',
+    };
 
     async function loadFareSeasonsData() {
       try {
@@ -3412,6 +3432,7 @@
       lockScroll();
       document.getElementById('fare-seasons-overlay').classList.add('visible');
       document.getElementById('fare-seasons-sheet').classList.add('visible');
+      if (_fareSelectedMonth === null) _fareSelectedMonth = _fareCurrentMonth;
       (async () => {
         if (!FARE_SEASONS_DATA) await loadFareSeasonsData();
         renderFareSeasonsSheet();
@@ -3428,80 +3449,83 @@
     function renderFareSeasonsSheet() {
       const legendEl = document.getElementById('fare-legend-row');
       const schoolLegendEl = document.getElementById('fare-school-legend');
-      const tableEl = document.getElementById('fare-table');
+      const rankListEl = document.getElementById('fare-rank-list');
       if (!FARE_SEASONS_DATA) {
-        if (tableEl) tableEl.innerHTML = '<caption style="padding:20px;color:var(--warm-gray);font-size:13px;">データを取得できませんでした。しばらくしてから開き直してください。</caption>';
+        if (rankListEl) rankListEl.innerHTML = '<div style="padding:20px;color:var(--warm-gray);font-size:13px;">データを取得できませんでした。しばらくしてから開き直してください。</div>';
         return;
       }
-      const { legend, cities } = FARE_SEASONS_DATA;
+      const { legend } = FARE_SEASONS_DATA;
 
       if (legendEl) {
         legendEl.innerHTML = Object.keys(legend).sort().map(lv =>
-          `<span class="fare-legend-chip"><span class="fare-legend-swatch fare-lv-${lv}">${lv}</span>${escapeHtml(legend[lv])}</span>`
+          `<span class="fare-legend-chip"><span class="fare-legend-swatch fare-lv-${lv}">${lv}</span>${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || legend[lv])}</span>`
         ).join('');
       }
       if (schoolLegendEl) {
         schoolLegendEl.innerHTML = `<span>🏫現地校(MOE)休暇</span><span>🎒日本人学校(SIJS)休暇</span>`;
       }
 
-      renderFareTable();
+      renderFareMonthRow();
+      renderFareRankList();
       renderFareDetailPanel();
     }
 
-    function renderFareTable() {
-      const tableEl = document.getElementById('fare-table');
-      if (!tableEl || !FARE_SEASONS_DATA) return;
-      const { cities, schoolHolidays } = FARE_SEASONS_DATA;
-      const moeSet = new Set((schoolHolidays && schoolHolidays.moe) || []);
-      const sijsSet = new Set((schoolHolidays && schoolHolidays.sijs) || []);
-
-      let orderedCities = cities;
-      if (_fareSortMonth) {
-        const idx = _fareSortMonth - 1;
-        orderedCities = [...cities].sort((a, b) => a.levels[idx] - b.levels[idx]);
-      }
-
-      let thead = '<thead><tr><th>行き先</th>';
+    function renderFareMonthRow() {
+      const rowEl = document.getElementById('fare-month-row');
+      if (!rowEl) return;
+      let html = '';
       for (let m = 1; m <= 12; m++) {
-        thead += `<th class="${m === _fareSortMonth ? 'fare-month-selected' : ''}" onclick="if(!_touchCapableDetected) toggleFareMonthSort(${m})" data-fare-month="${m}">${m}月</th>`;
+        html += `<button class="fare-month-chip${m === _fareSelectedMonth ? ' active' : ''}" data-fare-month="${m}" onclick="if(!_touchCapableDetected) selectFareMonth(${m})">${m}月</button>`;
       }
-      thead += '</tr></thead>';
-
-      let tbody = '<tbody>';
-      orderedCities.forEach(city => {
-        tbody += `<tr><th>${escapeHtml(city.name)}</th>`;
-        for (let m = 1; m <= 12; m++) {
-          const lv = city.levels[m - 1];
-          const isSelected = _fareSelectedCityId === city.id && _fareSelectedMonth === m;
-          const mark = moeSet.has(m) && sijsSet.has(m) ? '🏫🎒' : moeSet.has(m) ? '🏫' : sijsSet.has(m) ? '🎒' : '';
-          tbody += `<td class="fare-cell fare-cell-bg${isSelected ? ' fare-cell-selected' : ''}" onclick="if(!_touchCapableDetected) selectFareCell('${city.id}',${m})" data-fare-city="${city.id}" data-fare-month="${m}">
-            <div class="fare-cell-inner fare-lv-${lv}">${lv}${mark ? `<span class="fare-school-mark">${mark}</span>` : ''}</div>
-          </td>`;
-        }
-        tbody += '</tr>';
-      });
-      // _preventBgScrollが横スクロールを機能させるには表が縦にもスクロール領域を超える必要があるため、
-      // 画面が大きい場合でも確実にあふれるよう余白行を1行追加する（実害は無い、見た目にも表示されない高さのみの行）
-      tbody += '<tr class="fare-table-spacer"><td colspan="13"></td></tr>';
-      tbody += '</tbody>';
-
-      tableEl.innerHTML = thead + tbody;
+      rowEl.innerHTML = html;
     }
 
-    function toggleFareMonthSort(month) {
-      _fareSortMonth = (_fareSortMonth === month) ? null : month;
-      renderFareTable();
+    function selectFareMonth(month) {
+      _fareSelectedMonth = month;
+      // 月を切り替えたら前の月の詳細パネルは閉じる（都市は残っていても別の月の情報と混在しないように）
+      _fareSelectedCityId = null;
+      renderFareMonthRow();
+      renderFareRankList();
+      renderFareDetailPanel();
+    }
+
+    function renderFareRankList() {
+      const listEl = document.getElementById('fare-rank-list');
+      if (!listEl || !FARE_SEASONS_DATA) return;
+      const { cities, schoolHolidays } = FARE_SEASONS_DATA;
+      const month = _fareSelectedMonth || _fareCurrentMonth;
+      const idx = month - 1;
+      const moeSet = new Set((schoolHolidays && schoolHolidays.moe) || []);
+      const sijsSet = new Set((schoolHolidays && schoolHolidays.sijs) || []);
+      const mark = moeSet.has(month) && sijsSet.has(month) ? '🏫🎒' : moeSet.has(month) ? '🏫' : sijsSet.has(month) ? '🎒' : '';
+
+      const ordered = [...cities].sort((a, b) => a.levels[idx] - b.levels[idx]);
+
+      listEl.innerHTML = ordered.map(city => {
+        const lv = city.levels[idx];
+        const isSelected = _fareSelectedCityId === city.id;
+        return `<div class="fare-rank-item${isSelected ? ' fare-rank-selected' : ''}" data-fare-city="${city.id}" onclick="if(!_touchCapableDetected) selectFareCell('${city.id}',${month})">
+          <span class="fare-rank-badge fare-lv-${lv}">${lv}</span>
+          <span class="fare-rank-main">
+            <span class="fare-rank-name-wrap">
+              <span class="fare-rank-name">${escapeHtml(city.name)}</span>
+              ${mark ? `<span class="fare-school-mark">${mark}</span>` : ''}
+            </span>
+            <span class="fare-rank-label">${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || '')}</span>
+          </span>
+          <span class="fare-rank-chevron">${isSelected ? '︿' : '﹀'}</span>
+        </div>`;
+      }).join('');
     }
 
     function selectFareCell(cityId, month) {
-      if (_fareSelectedCityId === cityId && _fareSelectedMonth === month) {
+      if (_fareSelectedCityId === cityId) {
         _fareSelectedCityId = null;
-        _fareSelectedMonth = null;
       } else {
         _fareSelectedCityId = cityId;
         _fareSelectedMonth = month;
       }
-      renderFareTable();
+      renderFareRankList();
       renderFareDetailPanel();
     }
 
@@ -3530,7 +3554,7 @@
       panel.style.display = 'block';
       panel.innerHTML = `
         <button class="fare-detail-close" onclick="if(!_touchCapableDetected) selectFareCell('${city.id}',${m})">✕</button>
-        <div class="fare-detail-title">${escapeHtml(city.name)} ${m}月 — <span class="fare-legend-swatch fare-lv-${lv}" style="display:inline-flex;vertical-align:middle;">${lv}</span> ${escapeHtml(legend[String(lv)] || '')}${isCheapest ? '（この行き先の中で最も安い月）' : ''}</div>
+        <div class="fare-detail-title">${escapeHtml(city.name)} ${m}月 — <span class="fare-legend-swatch fare-lv-${lv}" style="display:inline-flex;vertical-align:middle;">${lv}</span> ${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || legend[String(lv)] || '')}${isCheapest ? '（この行き先の中で最も安い月）' : ''}</div>
         <div class="fare-detail-row">✈ 所要時間: ${escapeHtml(city.flightHours)}</div>
         <div class="fare-detail-row">🌦 気候: ${escapeHtml(climate)}</div>
         <div class="fare-detail-row">🗓 予約の目安: ${escapeHtml(leadTime)}前後が目安です</div>
