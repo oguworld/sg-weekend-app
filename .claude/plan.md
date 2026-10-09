@@ -21273,3 +21273,19 @@ UI再設計(追記2)後、ユーザー実機確認で2件の不具合が発覚�
 - `.fare-month-row`から`touch-action: pan-x`を削除(予防的、確定修正ではない)
 - `public/sw.js`の`CACHE_NAME`を`v933→v934→v935`、`index.html`のCSSクエリを`20261009b→20261009c`、JSクエリを`20261009a→20261009b`にバンプ
 - **次のアクション**: ユーザーに実機で月ピルを2〜3回タップしてもらい、`logs/debug-nav.log`の`fare_month_touchstart`/`fare_month_touchend`/`fare_month_selected`を確認する必要がある。原因判明後、計装3箇所は削除すること
+
+### 設計書222 追記5(2026-10-09): 最終UI(2回目の再設計、月カード統合+吹き出しポップオーバー方式に変更。旧シート方式は廃止)
+
+追記2〜4の「別シート(月選択チップ＋ランキングリスト)」方式は、ユーザーから「カレンダー機能とフィットしていない」と再度のフィードバックを受け、**完全に廃止**。既存の月カード(`.cal-month-card`)の見出し行に統合する「吹き出しポップオーバー方式」に作り直した(ユーザー承認済み)。データ・API(`content/fare-seasons.json`・`scripts/validate-fare-seasons.js`・`GET /api/fare-seasons`)は今回も無変更、フロントエンドのみの変更。
+
+- **入口の移動**: カレンダー画面ヘッダーの「✈ 航空券」ボタン(`#fare-seasons-entry-btn`)を削除。各月カードの見出し行(`.cal-month-head-outer`)に✈アイコンボタン(`.cal-fare-icon-btn`、既存の季節アイコン`.cal-season-icon-btn`と同じ丸ボタンの見た目)を追加。季節アイコンが無い月でも常に表示
+- **吹き出しポップオーバー**: ✈ボタンタップで`.cal-fare-bubble`が、既存の`.cal-month-season-bubble`と同じ位置計算ロジック(矢印追従・左端クランプ)で月カード内に表示。位置計算ロジックは`_positionCalBubbleUnderBtn(headRow, btn, bubble)`として関数化し、季節アイコンの吹き出し(`toggleMonthSeasonNote()`)・航空券の吹き出し(`toggleFareBubble()`)の両方から共有。横幅は季節アイコンの吹き出し(`max-width:220px`)より広い`min(300px, calc(100vw - 56px))`、`max-height:60vh`+`overflow-y:auto`で縦スクロール対応
+- **吹き出しの中身**: そのカードが指す月(ユーザーに月を選ばせない)の15都市を安い順(レベル昇順)に並べたランキング。`.fare-rank-item`/`.fare-rank-badge`/`.fare-rank-main`/`.fare-rank-name`/`.fare-rank-label`/`.fare-school-mark`は流用、吹き出しの横幅に合わせてpadding/フォントサイズを詰めた(バッジ34px→22px等)。凡例(`.fare-legend-row`)も吹き出し先頭に表示
+- **都市タップで簡易詳細**: 行タップで`.fare-rank-detail`をその行の直下に展開(予約目安+学校休暇との重なり、または行き先の一言メモを1〜2行、`_fareSimpleDetailHtml()`)。気候・最安月・所要時間は割愛(「パッと見れる」ことを優先、ユーザー指示)。再タップで閉じる
+- **相互排他**: `_closeAllCalBubbles()`に一本化(`.cal-note-bubble`/`.cal-month-season-bubble`/`.cal-fare-bubble`の3種を一括で閉じる共通関数)。document-level touchendリスナー・`toggleCalNote()`・`toggleMonthSeasonNote()`・`toggleFareBubble()`いずれもこれを呼ぶ
+- **データ読み込み**: `loadFareSeasonsData()`・`FARE_SEASONS_CACHE_KEY`・`FARE_LEVEL_SHORT_LABEL`は内容そのまま維持。初回✈タップ時に未取得なら`toggleFareBubble()`内で遅延ロード(非同期待機中に別の吹き出しへ切り替えられていた場合は描画をスキップするガード付き)
+- **3点セット**: `.cal-fare-icon-btn`の`onclick`に`if(!_touchCapableDetected)`ガード、`#calendar-list`の既存touchend委譲リスナーに`.cal-fare-icon-btn`(→`toggleFareBubble()`)・`.fare-rank-item`(→`selectFareRankItem()`、新規関数)の分岐を追加
+- **削除**: `public/index.html`の`#fare-seasons-overlay`/`#fare-seasons-sheet`一式とヘッダーの入口ボタン、`public/app.css`の`.fare-entry-btn`/`.fare-sheet*`/`.fare-month-row`/`.fare-month-chip*`(ランキング・レベル色系CSSは吹き出し用に残置・縮小調整)、`public/app.js`の`openFareSeasonsSheet`/`closeFareSeasonsSheet`/`renderFareSeasonsSheet`/`renderFareMonthRow`/`selectFareMonth`/`renderFareRankList`(→吹き出し用`renderFareBubble`に置き換え)/`selectFareCell`(→`selectFareRankItem`に置き換え)/`renderFareDetailPanel`(→`_fareSimpleDetailHtml`に簡略化)、`#fare-seasons-entry-btn`/`#fare-seasons-overlay`のtouchend委譲登録、**`fare_month_touchstart`/`fare_month_touchend`/`fare_month_selected`の使い捨てデバッグ計装3箇所**(原因不明のまま方式自体を廃止したため計装も不要に)。`closeAllPopups()`内の`closeFareSeasonsSheet()`呼び出しは`_closeAllCalBubbles()`に置き換え
+- `public/sw.js`の`CACHE_NAME`を`v935→v936`、`index.html`のCSSクエリを`20261009c→20261009d`、JSクエリを`20261009b→20261009c`にバンプ
+- **変更不要として維持**: `content/fare-seasons.json`、`scripts/validate-fare-seasons.js`、`server.js`の`GET /api/fare-seasons`(curlで無変更を確認済み)、localStorageフォールバック
+- **実機確認未実施**: この環境ではPlaywright等が使えずiOS/Android実機でのタッチ動作確認は不可。特に吹き出しの位置計算(画面右端に近い月・ボタンでの矢印ズレ)と吹き出し内スクロールの実機確認が必要。月選択チップ方式で発生していた「タップ無反応」問題(追記4で未解決)は、チップ行自体を廃止したことで構造的に解消されている可能性が高いが、新方式での別の不具合(吹き出し内のタップ等)が無いことは実機で要確認

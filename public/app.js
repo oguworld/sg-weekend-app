@@ -1750,7 +1750,8 @@
       }, { passive: false });
     }
 
-    // ─── カレンダー画面 予定のinfoボタン・月見出しの季節アイコン 即時タップ対応（動的に再描画されるため#calendar-listへのイベント委譲） ───
+    // ─── カレンダー画面 予定のinfoボタン・月見出しの季節アイコン・航空券アイコン・航空券ランキング行
+    //     即時タップ対応（いずれも動的に再描画されるため#calendar-listへのイベント委譲） ───
     document.getElementById('calendar-list')?.addEventListener('touchend', e => {
       const seasonBtn = e.target.closest('.cal-season-icon-btn');
       if (seasonBtn) {
@@ -1758,50 +1759,22 @@
         toggleMonthSeasonNote(seasonBtn);
         return;
       }
+      const fareBtn = e.target.closest('.cal-fare-icon-btn');
+      if (fareBtn) {
+        e.preventDefault();
+        toggleFareBubble(fareBtn);
+        return;
+      }
+      const fareRankItem = e.target.closest('.fare-rank-item');
+      if (fareRankItem) {
+        e.preventDefault();
+        selectFareRankItem(fareRankItem);
+        return;
+      }
       const btn = e.target.closest('.cal-info-btn');
       if (!btn) return;
       e.preventDefault();
       toggleCalNote(btn);
-    }, { passive: false });
-
-    // ─── 航空券シーズン表 月チップ・ランキング行の即時タップ対応（#calendar-filter-rowと同パターン、動的に再描画されるためイベント委譲）───
-    {
-      let _fareMonthTouchX = 0, _fareMonthTouchY = 0;
-      const fareMonthRowEl = document.getElementById('fare-month-row');
-      fareMonthRowEl?.addEventListener('touchstart', e => {
-        _fareMonthTouchX = e.touches[0].clientX;
-        _fareMonthTouchY = e.touches[0].clientY;
-        // ─── DEBUG: 月チップタップ無反応調査用の一時計装(原因特定後に削除すること、設計書222) ───
-        _sendDebugLog('fare_month_touchstart', { x: _fareMonthTouchX, y: _fareMonthTouchY });
-      }, { passive: true });
-      fareMonthRowEl?.addEventListener('touchend', e => {
-        const chip = e.target.closest('.fare-month-chip');
-        const dx = Math.abs(e.changedTouches[0].clientX - _fareMonthTouchX);
-        const dy = Math.abs(e.changedTouches[0].clientY - _fareMonthTouchY);
-        // ─── DEBUG: 月チップタップ無反応調査用の一時計装(原因特定後に削除すること、設計書222) ───
-        _sendDebugLog('fare_month_touchend', { hasChip: !!chip, dx, dy, targetTag: e.target.tagName, targetClass: e.target.className });
-        if (!chip) return;
-        if (dx > 8 || dy > 8) return;
-        e.preventDefault();
-        selectFareMonth(Number(chip.dataset.fareMonth));
-      }, { passive: false });
-    }
-
-    document.getElementById('fare-rank-list')?.addEventListener('touchend', e => {
-      const item = e.target.closest('.fare-rank-item');
-      if (!item) return;
-      e.preventDefault();
-      selectFareCell(item.dataset.fareCity, _fareSelectedMonth || _fareCurrentMonth);
-    }, { passive: false });
-
-    document.getElementById('fare-detail-panel')?.addEventListener('touchend', e => {
-      const btn = e.target.closest('.fare-detail-close');
-      if (!btn) return;
-      e.preventDefault();
-      _fareSelectedCityId = null;
-      _fareSelectedMonth = null;
-      renderFareRankList();
-      renderFareDetailPanel();
     }, { passive: false });
 
     // ─── PSI・デング熱指標タップでクライテリア表示 即時タップ対応 ───
@@ -2076,8 +2049,6 @@
       ['qr-share-link-btn', () => doShare()],
       ['promo-modal-overlay', () => closePromoModal()],
       ['promo-modal-dismiss-link', () => closePromoModal()],
-      ['fare-seasons-overlay', () => closeFareSeasonsSheet()],
-      ['fare-seasons-entry-btn', () => openFareSeasonsSheet()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -2984,7 +2955,7 @@
     function closeAllPopups() {
       closePinDetail();
       closeEventFilterSheet();
-      closeFareSeasonsSheet();
+      _closeAllCalBubbles();
     }
 
     const FAB_HIDDEN_SCREENS = new Set(['settings']);
@@ -3274,9 +3245,14 @@
     function toggleCalNote(btn) {
       const bubble = btn.nextElementSibling;
       const wasVisible = bubble?.classList.contains('visible');
+      _closeAllCalBubbles();
+      if (bubble && !wasVisible) bubble.classList.add('visible');
+    }
+    // 吹き出し系(予定note・季節アイコン・航空券)の相互排他を一括で閉じる共通処理
+    function _closeAllCalBubbles() {
       document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
       document.querySelectorAll('.cal-month-season-bubble.visible').forEach(b => b.classList.remove('visible'));
-      if (bubble && !wasVisible) bubble.classList.add('visible');
+      document.querySelectorAll('.cal-fare-bubble.visible').forEach(b => b.classList.remove('visible'));
     }
     // 月見出しの季節アイコン（気候・食べ物・GSS）タップで説明の吹き出しを表示（設計書194、
     // 2026-09-10に月見出し行へアイコンを統合する形へレイアウト変更）。
@@ -3289,12 +3265,16 @@
       if (!bubble) return;
       const note = btn.dataset.note || '';
       const isSameAndVisible = bubble.classList.contains('visible') && bubble.dataset.activeNote === note;
-      document.querySelectorAll('.cal-note-bubble.visible, .cal-month-season-bubble.visible')
-        .forEach(b => b.classList.remove('visible'));
+      _closeAllCalBubbles();
       if (isSameAndVisible) return;
       bubble.textContent = note;
       bubble.dataset.activeNote = note;
       bubble.classList.add('visible');
+      _positionCalBubbleUnderBtn(headRow, btn, bubble);
+    }
+    // 月見出し行内のボタン(季節アイコン/航空券アイコン)の直下に吹き出しの位置・矢印を合わせる共通処理
+    // （toggleMonthSeasonNoteの位置計算ロジックを航空券吹き出しでも再利用するため関数化）
+    function _positionCalBubbleUnderBtn(headRow, btn, bubble) {
       const rowRect = headRow.getBoundingClientRect();
       const btnRect = btn.getBoundingClientRect();
       const btnCenter = btnRect.left - rowRect.left + btnRect.width / 2;
@@ -3307,9 +3287,9 @@
     // 吹き出し表示中に他の場所をタップしたら閉じる
     document.addEventListener('touchend', e => {
       if (e.target.closest('.cal-info-btn') || e.target.closest('.cal-note-bubble')
-          || e.target.closest('.cal-season-icon-btn') || e.target.closest('.cal-month-season-bubble')) return;
-      document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
-      document.querySelectorAll('.cal-month-season-bubble.visible').forEach(b => b.classList.remove('visible'));
+          || e.target.closest('.cal-season-icon-btn') || e.target.closest('.cal-month-season-bubble')
+          || e.target.closest('.cal-fare-icon-btn') || e.target.closest('.cal-fare-bubble')) return;
+      _closeAllCalBubbles();
     }, { passive: true });
 
     function renderCalendarList() {
@@ -3354,8 +3334,12 @@
             : '';
           html += `<div class="cal-month-head-outer" data-month="${month}">
             <span class="cal-month-head-label">${monthNum}月</span>
-            ${seasonBadgeHtml}
+            <span class="cal-month-season-badge">
+              ${seasonBadgeHtml}
+              <button class="cal-fare-icon-btn" data-month-num="${monthNum}" aria-label="航空券シーズン表を見る" onclick="if(!_touchCapableDetected) toggleFareBubble(this)">✈</button>
+            </span>
             <div class="cal-month-season-bubble"></div>
+            <div class="cal-fare-bubble"></div>
           </div>
           <div class="cal-month-card" data-month="${month}">`;
         }
@@ -3395,15 +3379,14 @@
       }
     }
 
-    // ─── 航空券シーズン表（設計書222→UI再設計。SG発の航空券が高い/安い月を行き先別の5段階で示す静的な目安表、実運賃は扱わない）
-    // UIは当初の表（15都市×12か月ヒートマップ・横スクロール・sticky列）から「月選択＋ランキングリスト」方式に変更済み。
-    // 理由: 表はカレンダー画面の暖色カード・ピルバッジ基調の見た目から浮いており、小さいマスが見づらいとのフィードバックのため。
+    // ─── 航空券シーズン表（設計書222→UI再設計2回目。SG発の航空券が高い/安い月を行き先別の5段階で示す静的な目安表、実運賃は扱わない）
+    // UIは「別シート(月選択チップ+ランキングリスト)」方式から、各月カードの見出し行(.cal-month-head-outer)に
+    // 置いた✈アイコン→吹き出しポップオーバーで、その月カードが指す月のランキングをその場に表示する方式に変更。
+    // 月をユーザーに選ばせる必要がない（カードがその月を指しているため）。
     // データ・API・ロジックは無変更、フロントの見た目と構造のみ変更。 ───
     const FARE_SEASONS_CACHE_KEY = 'sg_fare_seasons_cache';
     let FARE_SEASONS_DATA = null;      // { legend, bookingLeadTime, cities, schoolHolidays } をそのまま保持
-    let _fareSelectedMonth = null;     // 月チップで選択中の月(1〜12)。初期値は今月
-    let _fareCurrentMonth = (new Date()).getMonth() + 1;
-    let _fareSelectedCityId = null;    // 詳細パネル表示中の都市id
+    let _fareSelectedCityId = null;    // 吹き出し内で簡易詳細を展開表示中の都市id
 
     // レベル(1〜5)ごとの短いラベル文言。legend(JSONの日本語、凡例表示用)とは別に
     // ランキング行に添える一言用（アプリのトーンに合わせた表現、データ側の変更は不要）
@@ -3432,85 +3415,51 @@
       }
     }
 
-    function openFareSeasonsSheet() {
-      lockScroll();
-      document.getElementById('fare-seasons-overlay').classList.add('visible');
-      document.getElementById('fare-seasons-sheet').classList.add('visible');
-      if (_fareSelectedMonth === null) _fareSelectedMonth = _fareCurrentMonth;
+    // 月カード見出し行の✈アイコンをタップ → その月カードの吹き出しに都市ランキングを表示（初回タップ時に未取得ならデータ遅延ロード）
+    function toggleFareBubble(btn) {
+      const headRow = btn.closest('.cal-month-head-outer');
+      const bubble = headRow?.querySelector('.cal-fare-bubble');
+      if (!bubble) return;
+      const month = Number(btn.dataset.monthNum);
+      const isSameAndVisible = bubble.classList.contains('visible') && Number(bubble.dataset.fareMonth) === month;
+      _closeAllCalBubbles();
+      if (isSameAndVisible) return;
+      bubble.dataset.fareMonth = String(month);
+      _fareSelectedCityId = null;
+      bubble.classList.add('visible');
       (async () => {
-        if (!FARE_SEASONS_DATA) await loadFareSeasonsData();
-        renderFareSeasonsSheet();
+        if (!FARE_SEASONS_DATA) {
+          bubble.innerHTML = '<div style="padding:12px;color:var(--warm-gray);font-size:12px;">読み込み中…</div>';
+          await loadFareSeasonsData();
+          // データ取得の待機中に他の吹き出しへ切り替えられていたら上書きしない
+          if (!bubble.classList.contains('visible') || Number(bubble.dataset.fareMonth) !== month) return;
+        }
+        renderFareBubble(bubble, month);
+        _positionCalBubbleUnderBtn(headRow, btn, bubble);
       })();
     }
 
-    function closeFareSeasonsSheet() {
-      _blurIfFocusInside('fare-seasons-sheet');
-      unlockScroll();
-      document.getElementById('fare-seasons-overlay').classList.remove('visible');
-      document.getElementById('fare-seasons-sheet').classList.remove('visible');
-    }
-
-    function renderFareSeasonsSheet() {
-      const legendEl = document.getElementById('fare-legend-row');
-      const schoolLegendEl = document.getElementById('fare-school-legend');
-      const rankListEl = document.getElementById('fare-rank-list');
+    // 吹き出し内に、指定月の都市ランキング(安い順)を描画する
+    function renderFareBubble(bubble, month) {
       if (!FARE_SEASONS_DATA) {
-        if (rankListEl) rankListEl.innerHTML = '<div style="padding:20px;color:var(--warm-gray);font-size:13px;">データを取得できませんでした。しばらくしてから開き直してください。</div>';
+        bubble.innerHTML = '<div style="padding:12px;color:var(--warm-gray);font-size:12px;">データを取得できませんでした。しばらくしてから開き直してください。</div>';
         return;
       }
-      const { legend } = FARE_SEASONS_DATA;
-
-      if (legendEl) {
-        legendEl.innerHTML = Object.keys(legend).sort().map(lv =>
-          `<span class="fare-legend-chip"><span class="fare-legend-swatch fare-lv-${lv}">${lv}</span>${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || legend[lv])}</span>`
-        ).join('');
-      }
-      if (schoolLegendEl) {
-        schoolLegendEl.innerHTML = `<span>🏫現地校(MOE)休暇</span><span>🎒日本人学校(SIJS)休暇</span>`;
-      }
-
-      renderFareMonthRow();
-      renderFareRankList();
-      renderFareDetailPanel();
-    }
-
-    function renderFareMonthRow() {
-      const rowEl = document.getElementById('fare-month-row');
-      if (!rowEl) return;
-      let html = '';
-      for (let m = 1; m <= 12; m++) {
-        html += `<button class="fare-month-chip${m === _fareSelectedMonth ? ' active' : ''}" data-fare-month="${m}" onclick="if(!_touchCapableDetected) selectFareMonth(${m})">${m}月</button>`;
-      }
-      rowEl.innerHTML = html;
-    }
-
-    function selectFareMonth(month) {
-      // ─── DEBUG: 月チップタップ無反応調査用の一時計装(原因特定後に削除すること、設計書222) ───
-      _sendDebugLog('fare_month_selected', { month });
-      _fareSelectedMonth = month;
-      // 月を切り替えたら前の月の詳細パネルは閉じる（都市は残っていても別の月の情報と混在しないように）
-      _fareSelectedCityId = null;
-      renderFareMonthRow();
-      renderFareRankList();
-      renderFareDetailPanel();
-    }
-
-    function renderFareRankList() {
-      const listEl = document.getElementById('fare-rank-list');
-      if (!listEl || !FARE_SEASONS_DATA) return;
-      const { cities, schoolHolidays } = FARE_SEASONS_DATA;
-      const month = _fareSelectedMonth || _fareCurrentMonth;
+      const { legend, cities, schoolHolidays } = FARE_SEASONS_DATA;
       const idx = month - 1;
       const moeSet = new Set((schoolHolidays && schoolHolidays.moe) || []);
       const sijsSet = new Set((schoolHolidays && schoolHolidays.sijs) || []);
       const mark = moeSet.has(month) && sijsSet.has(month) ? '🏫🎒' : moeSet.has(month) ? '🏫' : sijsSet.has(month) ? '🎒' : '';
-
       const ordered = [...cities].sort((a, b) => a.levels[idx] - b.levels[idx]);
 
-      listEl.innerHTML = ordered.map(city => {
+      const legendHtml = Object.keys(legend).sort().map(lv =>
+        `<span class="fare-legend-chip"><span class="fare-legend-swatch fare-lv-${lv}">${lv}</span>${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || legend[lv])}</span>`
+      ).join('');
+
+      const listHtml = ordered.map(city => {
         const lv = city.levels[idx];
         const isSelected = _fareSelectedCityId === city.id;
-        return `<div class="fare-rank-item${isSelected ? ' fare-rank-selected' : ''}" data-fare-city="${city.id}" onclick="if(!_touchCapableDetected) selectFareCell('${city.id}',${month})">
+        return `<div class="fare-rank-item${isSelected ? ' fare-rank-selected' : ''}" data-fare-city="${city.id}">
           <span class="fare-rank-badge fare-lv-${lv}">${lv}</span>
           <span class="fare-rank-main">
             <span class="fare-rank-name-wrap">
@@ -3520,54 +3469,42 @@
             <span class="fare-rank-label">${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || '')}</span>
           </span>
           <span class="fare-rank-chevron">${isSelected ? '︿' : '﹀'}</span>
-        </div>`;
+        </div>
+        ${isSelected ? _fareSimpleDetailHtml(city, month) : ''}`;
       }).join('');
-    }
 
-    function selectFareCell(cityId, month) {
-      if (_fareSelectedCityId === cityId) {
-        _fareSelectedCityId = null;
-      } else {
-        _fareSelectedCityId = cityId;
-        _fareSelectedMonth = month;
-      }
-      renderFareRankList();
-      renderFareDetailPanel();
-    }
-
-    function renderFareDetailPanel() {
-      const panel = document.getElementById('fare-detail-panel');
-      if (!panel) return;
-      if (!_fareSelectedCityId || !_fareSelectedMonth || !FARE_SEASONS_DATA) {
-        panel.style.display = 'none';
-        panel.innerHTML = '';
-        return;
-      }
-      const { legend, bookingLeadTime, cities, schoolHolidays, sgFactors } = FARE_SEASONS_DATA;
-      const city = cities.find(c => c.id === _fareSelectedCityId);
-      if (!city) { panel.style.display = 'none'; return; }
-      const m = _fareSelectedMonth;
-      const lv = city.levels[m - 1];
-      const climate = city.climate[m - 1];
-      const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)] || '-';
-      const isCheapest = (city.cheapestMonths || []).includes(m);
-      const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(m);
-      const sijsHit = ((schoolHolidays && schoolHolidays.sijs) || []).includes(m);
-      const schoolNote = (moeHit || sijsHit)
-        ? `<div class="fare-detail-row">🏫🎒 この月はシンガポールの学校休暇と重なります（${[moeHit ? '現地校(MOE)' : null, sijsHit ? '日本人学校(SIJS)' : null].filter(Boolean).join('・')}）。${sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : ''}</div>`
-        : '';
-
-      panel.style.display = 'block';
-      panel.innerHTML = `
-        <button class="fare-detail-close" onclick="if(!_touchCapableDetected) selectFareCell('${city.id}',${m})">✕</button>
-        <div class="fare-detail-title">${escapeHtml(city.name)} ${m}月 — <span class="fare-legend-swatch fare-lv-${lv}" style="display:inline-flex;vertical-align:middle;">${lv}</span> ${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || legend[String(lv)] || '')}${isCheapest ? '（この行き先の中で最も安い月）' : ''}</div>
-        <div class="fare-detail-row">✈ 所要時間: ${escapeHtml(city.flightHours)}</div>
-        <div class="fare-detail-row">🌦 気候: ${escapeHtml(climate)}</div>
-        <div class="fare-detail-row">🗓 予約の目安: ${escapeHtml(leadTime)}前後が目安です</div>
-        <div class="fare-detail-row">${escapeHtml(city.notes)}</div>
-        ${schoolNote}
-        <div class="fare-detail-row" style="color:var(--warm-gray);font-size:12px;margin-top:6px;">※あくまで目安です。予約前に実際の価格を確認してください。</div>
+      bubble.innerHTML = `
+        <div class="fare-bubble-title">✈ ${month}月の航空券シーズン目安</div>
+        <div class="fare-legend-row">${legendHtml}</div>
+        <div class="fare-bubble-list">${listHtml}</div>
+        <div class="fare-bubble-footnote">※あくまで目安です。予約前に実際の価格を確認してください。</div>
       `;
+    }
+
+    // 簡易詳細（吹き出しの横幅が限られるため、理由・予約目安を1〜2行で簡潔に。気候・最安月・所要時間は割愛）
+    function _fareSimpleDetailHtml(city, month) {
+      const { bookingLeadTime, schoolHolidays, sgFactors } = FARE_SEASONS_DATA;
+      const lv = city.levels[month - 1];
+      const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)] || '-';
+      const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
+      const sijsHit = ((schoolHolidays && schoolHolidays.sijs) || []).includes(month);
+      const schoolNote = (moeHit || sijsHit)
+        ? `学校休暇(${[moeHit ? 'MOE' : null, sijsHit ? 'SIJS' : null].filter(Boolean).join('・')})と重なる時期です。${sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : ''}`
+        : (city.notes || '');
+      return `<div class="fare-rank-detail">
+        <div>🗓 予約目安: ${escapeHtml(leadTime)}前後</div>
+        <div>${escapeHtml(schoolNote)}</div>
+      </div>`;
+    }
+
+    // ランキング行タップで簡易詳細を展開/折りたたみ（再タップで閉じる）
+    function selectFareRankItem(itemEl) {
+      const bubble = itemEl.closest('.cal-fare-bubble');
+      if (!bubble) return;
+      const cityId = itemEl.dataset.fareCity;
+      const month = Number(bubble.dataset.fareMonth);
+      _fareSelectedCityId = (_fareSelectedCityId === cityId) ? null : cityId;
+      renderFareBubble(bubble, month);
     }
 
     // ユーティリティ（getUserId()はコース機能専用のため設計書178フェーズ1で削除済み）
