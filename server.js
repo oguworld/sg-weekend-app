@@ -81,11 +81,8 @@ function savePushSubs(subs) {
 function subPlatform(sub) {
   return sub.platform || 'web';
 }
-async function sendPushToAll(cityKey) {
+async function sendPushToAll(cityKey, title = '最新情報を更新しました', body = 'おでかけ情報・生活情報の最新記事をチェックしてみましょう！', url = 'https://dosuru.app/?nav=news') {
   const cityConf = CITIES[cityKey] || CITIES.sg;
-  const title = '最新情報を更新しました';
-  const body = 'おでかけ情報・生活情報の最新記事をチェックしてみましょう！';
-  const url = 'https://dosuru.app/?nav=news';
   const payload = JSON.stringify({ title, body, data: { url } });
   const subs = loadPushSubs();
   if (subs.length === 0) return 0;
@@ -1576,10 +1573,42 @@ app.delete('/api/push-subscribe-ios', async (req, res) => {
   res.json({ ok: true });
 });
 
+// 「今日は何の日通知」用: その日のholiday-sg/festival該当項目を1件だけ返す（無ければnull）。
+// 対象はconfirmed!==falseのみ（日付未確定の項目を誤通知しないため）。holiday-sgをfestivalより優先、
+// 同カテゴリ内で複数該当する場合はcalendar-events.json内の記載順で先頭を採用する。
+function getTodayCalendarNotification(cityKey = 'sg') {
+  const cityConf = CITIES[cityKey] || CITIES.sg;
+  const today = new Date().toLocaleString('sv-SE', { timeZone: cityConf.timezone }).slice(0, 10);
+  let items;
+  try {
+    items = JSON.parse(fs.readFileSync(calendarEventsPath(cityKey), 'utf8')).items || [];
+  } catch (e) {
+    return null;
+  }
+  const candidates = items.filter(it => {
+    if (it.category !== 'holiday-sg' && it.category !== 'festival') return false;
+    if (it.confirmed === false) return false;
+    const start = it.date;
+    const end = it.endDate || it.date;
+    return start <= today && today <= end;
+  });
+  if (candidates.length === 0) return null;
+  const holidaySg = candidates.find(it => it.category === 'holiday-sg');
+  return holidaySg || candidates[0];
+}
+
 app.post('/api/notify-events-updated', requireAdminSecret, async (req, res) => {
   const city = req.query.city || 'sg';
   try {
-    const sent = await sendPushToAll(city);
+    const todayItem = getTodayCalendarNotification(city);
+    if (!todayItem) {
+      console.log(`[notify-events-updated] 本日該当する行事なしのためプッシュ通知スキップ (city=${city})`);
+      return res.json({ ok: true, sent: 0, skipped: true, reason: 'no-calendar-event-today' });
+    }
+    const title = `今日は${todayItem.name}です`;
+    const bodyMain = todayItem.note ? `今日は${todayItem.name}です。${todayItem.note}` : `今日は${todayItem.name}です`;
+    const body = `${bodyMain} おでかけ情報・生活情報の最新記事もチェックしてみましょう。`;
+    const sent = await sendPushToAll(city, title, body);
     res.json({ ok: true, sent });
   } catch (e) {
     res.status(500).json({ error: e.message });

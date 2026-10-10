@@ -21370,4 +21370,47 @@ UI再設計(追記2)後、ユーザー実機確認で2件の不具合が発覚�
 - **初回実行時は何かまず軽微な変更（文言修正等）をTestFlightにアップロードした上で、このワークフローを手動実行して動作確認することを推奨**（`automatic_release: true`のため審査通過後は即座に一般公開される点に注意）
 - 今回の静的な正しさの担保のみで、実際にワークフローを実行した動作確認はスコープ外（ユーザーが実際に手動実行して初めて検証可能）
 - 今回の作業中、作業ディレクトリに本タスクとは無関係な未コミット変更（`android-app/package.json`/`package-lock.json`/新規`android-app/scripts/publish-android.js`、Google Play公開自動化関連と見られる）が既に存在していたことを確認した。これは今回のbuilderが作成したものではなく、今回のコミット対象には含めていない（手を加えず、未コミットのまま残置）
+
+---
+
+## 2026-10-10 設計書225: 「今日は何の日通知」機能の追加（既存のくらし情報プッシュ通知にカレンダー連動の内容を統合、builder→checker→closer）
+
+### 背景
+plannerの事前調査（本orchestrator実行の直前に別セッションで実施）により、毎朝7:00 SGTにユーザー向けプッシュ通知で送られる文言（タイトル「最新情報を更新しました」・本文「おでかけ情報・生活情報の最新記事をチェックしてみましょう！」）が`server.js`の`sendPushToAll()`にハードコードされ、カレンダー・イベント内容と一切連動していないことが判明していた。トリガーは`scripts/fetch-life-info.js`の`notifyContentUpdated()`→`POST /api/notify-events-updated`（`requireAdminSecret`保護）→`sendPushToAll('sg')`。`data/sg/calendar-events.json`の各項目は`category`/`date`/`endDate`/`name`/`note`/`confirmed`を持ち、`holiday-sg`・`festival`カテゴリの一部に見どころ説明（`note`）が入っている一方、イスラム暦の祝日等`confirmed: false`（日付未確定）の項目も存在する。
+
+### 決定事項（ユーザー承認済み）
+1. 通知対象カテゴリは`holiday-sg`・`festival`のみ（`holiday-jp`・`school-vacation`は対象外）
+2. 該当行事が無い日は通知を送らない（スキップ。従来の「毎朝必ず1通届く」という挙動からの変更）
+3. 既存のくらし情報プッシュ通知とは完全に別物にせず**1通に統合**する（タイトル＝その日の行事名、本文末尾に新着記事を促す一文を残す）
+4. `confirmed: false`の項目は通知対象から除外（日付未確定のため誤通知を避ける、planner推奨をそのまま採用）
+5. 通知文はAI生成ではなく**固定テンプレート**で組み立てる（`note`あり: `今日は{name}です。{note}`、`note`なし: `今日は{name}です`。コスト・レイテンシ・失敗リスク回避のためのplanner推奨採用）
+6. 同日に複数該当がある場合は`holiday-sg`を`festival`より優先して1件のみ選ぶ。同カテゴリ内で複数該当する場合は`calendar-events.json`内の記載順で先頭の1件を使う
+
+### 実装内容
+1. `server.js`:
+   - `sendPushToAll(cityKey, title, body, url)`に引数化（デフォルト値は既存の固定文言のまま。呼び出し元は`/api/notify-events-updated`の1箇所のみで、デフォルト値への依存は無く既存動作は変化しない）
+   - 新規関数`getTodayCalendarNotification(cityKey = 'sg')`（`app.post('/api/notify-events-updated', ...)`の直前に配置）: `CITIES[cityKey].timezone`（SGなら`Asia/Singapore`）を使い`new Date().toLocaleString('sv-SE', {timeZone})`で`YYYY-MM-DD`形式の「今日」をSGT基準で取得。`calendar-events.json`の`items`から`category`が`holiday-sg`/`festival`かつ`confirmed !== false`かつ`date`〜(`endDate`||`date`)の範囲に今日が含まれる項目を抽出、`holiday-sg`優先・無ければ配列先頭の1件を返す（該当無しは`null`）
+   - `POST /api/notify-events-updated`ハンドラを変更: `getTodayCalendarNotification(city)`が`null`の場合は`sendPushToAll`を呼ばずに`{ok:true, sent:0, skipped:true, reason:'no-calendar-event-today'}`を返し、サーバーログに「本日該当する行事なしのためプッシュ通知スキップ」を出力。該当がある場合はタイトル`今日は{name}です`、本文`今日は{name}です。{note}`（noteが無ければnote部分省略）＋末尾に`おでかけ情報・生活情報の最新記事もチェックしてみましょう。`を付与して`sendPushToAll(city, title, body)`を呼ぶ
+2. `scripts/fetch-life-info.js`: `notifyContentUpdated()`の呼び出し方自体は変更なし（判定はサーバー側に委ねる設計のため）。レスポンスの`skipped`フラグを見てログ文言を「本日該当する行事なしのためスキップ」に分岐する処理を追加。冒頭コメントを新しい挙動（カレンダー連動・該当日のみ送信）に合わせて更新
+
+### checker結果
+- `node --check server.js` / `node --check scripts/fetch-life-info.js` 両方通過
+- `getTodayCalendarNotification()`相当のロジックを実データ（`data/sg/calendar-events.json`）に対してNode単体スクリプトで検証:
+  - 当日（2026-10-10、F1シンガポールグランプリ開催期間中=`festival`、`endDate`を含む範囲判定）で正しく検出
+  - 該当なしの日（2026-10-05）→`null`（スキップ）
+  - `confirmed: false`の項目（ハリラヤ・プアサ3/21、ハリラヤ・ハジ5/27）に当日が一致するケース→正しく除外され`null`
+  - `holiday-sg`該当日（クリスマス12/25、チャイニーズ・ニューイヤー2/17、`endDate`あり）→正しく検出
+- `sendPushToAll`の呼び出し元は`server.js`内1箇所のみであることを確認、デフォルト引数化により既存動作への影響が無いことを確認（後方互換性担保）
+- `pm2 restart sg-weekend`後のログにエラー無し（出力されていたエラーログはスキャナーボットによる不正URIデコードエラーで本変更と無関係）
+- **実際のプッシュ通知は一切送信していない**（ロジックはNode単体スクリプトで`calendar-events.json`を読み込んでの検証のみ、本番の`/api/notify-events-updated`エンドポイントを叩くテストは実施していない）
+- 🔴Critical無し。🟡`sendPushToAll`内の`cityConf`ローカル変数が元から未使用のまま残っている（今回のスコープ外の既存コードのため変更せず）
+
+### スコープ外（今回実施しないこと）
+- 実際のプッシュ通知配信によるエンドツーエンド確認（本番ユーザーへの誤配信リスクを避けるため、次回7:00 SGTの定時実行で自然に確認される）
+- `holiday-jp`・`school-vacation`への対象拡大
+- AI生成による通知文のバリエーション化
+
+### 申し送り
+- 次回7:00 SGT（`run-fetch-all.sh`経由）の自動実行で、実際に該当日かどうかに応じた送信/スキップの実挙動が確認できる。問題があれば`logs/`または`pm2 logs sg-weekend`で`[notify-events-updated]`ログを確認すること
+- `data/sg/calendar-events.json`は年1回更新が必要なデータ（CLAUDE.md既存記載）。更新時に`confirmed`フラグの精度が本機能の誤通知防止に直結するため、今後の年次更新時は`confirmed`の設定精度にも注意を払うこと
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）。新規ワークフローファイル自体はGitHub上にマージされるまで実行不可（`workflow_dispatch`はデフォルトブランチまたは対象ブランチにワークフローファイルが存在する必要があるため、マージ後に有効化される）

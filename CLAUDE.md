@@ -257,7 +257,7 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中。旧`refresh
 - **1日3回取得の理由**: Goody Feed/The Smart Local/Eatbook等、投稿頻度に対しRSSフィード保持件数が少なく1日1回では記事が流れ落ちるリスクがあるため。ハイウォーターマーク方式(`data/source-fetch-state.json`)により重複取得はされない
 - **開発者向けLINE通知は1日3回、その都度その回だけの件数を通知**(`notify-fetch-summary.js`が`logs/fetch-summary-${city}.json`/`logs/fetch-life-info-summary.json`の最新1回分をそのまま表示)。過去24h合算用の関数・履歴ファイル(48時間分)は残置だが現在未使用
 - **イベント側の「採用件数」は重複削除後の実件数**(設計書209で修正済み): `fetch-events.js`はHaiku採否直後の速報値から、直後の`deduplicateSaved()`(タイトル類似度75%以上の重複削除)で削除された件数を差し引いた値を`logs/fetch-summary-${city}.json`の`accepted`として記録する。削除が発生したバッチはLINE通知本文に「（うち重複除外N件）」も付記。**くらし情報側(`fetch-life-info.js`)には同型のバグが残存する可能性がある(`filterAndSaveLifeInfo()`の`totalAccepted`が事後の意味的重複除外・要約失敗除外を反映していない)**、未調査・未修正(`.claude/next.md`参照)
-- **ユーザー向けWebプッシュ通知はイベント側(`fetch-events.js`)は完全停止済み**(`notify-fetch-summary.js`は開発者向けのみ、`sendPushToAll()`自体は残置)。**生活情報側(`fetch-life-info.js`)のユーザー向けプッシュは現役稼働中**(1日1回、7:00 SGT固定)。両者を混同しないこと
+- **ユーザー向けWebプッシュ通知はイベント側(`fetch-events.js`)は完全停止済み**(`notify-fetch-summary.js`は開発者向けのみ、`sendPushToAll()`自体は残置)。**生活情報側(`fetch-life-info.js`)のユーザー向けプッシュは現役稼働中**(1日1回、7:00 SGT固定でトリガーのみ実行。実際に送信するかどうか・内容は「今日は何の日通知」(設計書225)によりカレンダー連動、詳細は後述の該当節参照)。両者を混同しないこと
 - **ハイウォーターマーク方式**(`fetch-events.js`): `data/source-fetch-state.json`にソースごとの`lastSeenGuids`/`lastFetchedAt`。初回は`daysBack=7`フォールバック
 - **Haiku採否・記事生成**(`filter-events.js`): `scoreThreshold=6`(薄いカテゴリはscore5以上に緩和)。採用イベントはSonnetで日本語記事生成(英語記事生成は廃止済み)
 - **`data/sources.json`のstatus**: `active`/`paused`/`rejected`の3値のみが取得可否を左右
@@ -272,7 +272,8 @@ BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中。旧`refresh
   - **Expat Living**は Cloudflare WAFがNode標準fetch(undici)からのリクエストのみ403でブロックする状態(curl/rss-parserでは200が返る、外部サイトのボット対策でありバグではない)。エラーハンドリングは正常機能し該当ソースのみスキップ。**くらし側には自動評価・除外の仕組みが無いため、採用ゼロが続いても自動検知されない。手動モニタリングが必要**
 - **`summary_ja`の文字数目安は現在150〜180文字程度**(「記事内容そのものを客観的に記述、読者への呼びかけ調は書かない」指示。文字数は複数回の調整を経て確定、経緯は`CLAUDE_HISTORY.md`参照)
 - **スポーツニュースの扱い**: 日本人選手の移籍・日本代表戦等、在住日本人の関心が高いものは`community`カテゴリに分類(「チケット販売中の参加イベント告知」はおでかけ側の対象、こちらでは対象外)。**両パイプライン間の技術的な重複排除ロジックは存在せず、同じ話題が両タブに出る可能性は残る**
-- **1日3回取得、ユーザー向けプッシュ通知は7:00 SGT固定**(`CITY_CONFIG.sg.feeds`全5本を一律1日3回取得、ハイウォーターマークのため重複処理なし。通知は朝の回のみ、12:00/21:00は`--no-notify`)
+- **1日3回取得、ユーザー向けプッシュ通知のトリガーは7:00 SGT固定**(`CITY_CONFIG.sg.feeds`全5本を一律1日3回取得、ハイウォーターマークのため重複処理なし。トリガーは朝の回のみ、12:00/21:00は`--no-notify`)
+- **「今日は何の日通知」(設計書225、2026-10-10)**: 上記トリガーで呼ばれる`POST /api/notify-events-updated`は、新着記事の固定文言ではなく**その日のカレンダー行事と連動した内容**を送る。`server.js`の`getTodayCalendarNotification(cityKey)`が`data/sg/calendar-events.json`からSGT基準の「今日」に一致し`category`が`holiday-sg`/`festival`(`holiday-jp`/`school-vacation`は対象外)かつ`confirmed !== false`の項目を抽出(複数該当時は`holiday-sg`優先、同カテゴリ内は記載順で先頭)。**該当する行事が無い日はプッシュ通知自体を送らない**(従来の「毎朝必ず1通届く」という挙動からの変更、`{skipped:true}`を返しログに記録)。該当がある日はタイトル`今日は{name}です`、本文`今日は{name}です。{note}`(`note`があれば)+末尾に新着記事を促す一文を付けて1通に統合送信する。通知文はAI生成ではなく固定テンプレート組み立て(コスト・レイテンシ・失敗リスク回避のため意図的な選択)。`sendPushToAll(cityKey, title, body, url)`は引数化済み(デフォルト値は旧来の固定文言のまま、呼び出し元が明示指定しない場合のみ適用される設計)
 - **API**: `GET /api/life-info?city=sg&category=...`。**フロント**: くらし画面(`#screen-news`)＋おでかけ画面のプレビューセクション(`#life-info-preview-section`、直近3件)。未ログインでも閲覧可能
 - **新着リストのソート順**: 1次キー=`fetched_at`(取り込み時間、降順)、2次キー=カテゴリ順(固定順)。くらし画面はfetched_at基準(旧publishedAt基準から変更済み)
 

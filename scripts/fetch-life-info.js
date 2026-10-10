@@ -55,7 +55,7 @@ function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems 
   }
 }
 
-// ─── 1日1回、朝の取り込み完了後にアプリへプッシュ通知を送る（設計書173→183→2026-09-09で朝の時刻に再調整） ───
+// ─── 1日1回、朝の取り込み完了後にアプリへプッシュ通知を送る（設計書173→183→2026-09-09→設計書「今日は何の日通知」で内容を刷新） ───
 // fetch-life-info.js自体は1日3回（7:00/12:30/19:30 SGT）実行されるようになったが（設計書183）、
 // ユーザー向けプッシュ通知は7:00 SGTの回にのみ送る（呼び出し側が--no-notifyを付与して制御する。
 // run-fetch-all.sh〈7:00〉・run-fetch-extra.sh の12:30/19:30側は両方とも--no-notify付き）。
@@ -63,6 +63,9 @@ function saveFetchSummary({ rawTotal, uniqueTotal, accepted, rejected, newItems 
 // （server.jsのPOST /api/notify-events-updated → sendPushToAll()経由）である。
 // 通知はオプトイン済みユーザーのみに届く（data/push-subscriptions.jsonに登録済み＝設定で
 // 「イベント通知」をONにした人のみ）。
+// 通知内容は「今日は何の日通知」に刷新済み（calendar-events.jsonのholiday-sg/festivalが当日に該当する場合のみ、
+// その行事名+noteを本文にして送信。該当が無い日は送信自体をスキップする。判定ロジックはserver.js側
+// getTodayCalendarNotification()が担い、このファイルは呼び出すだけで挙動を意識する必要はない）。
 async function notifyContentUpdated() {
   const secret = process.env.ADMIN_SECRET;
   if (!secret) { console.log('  ⚠️ ADMIN_SECRET未設定のためプッシュ通知をスキップ'); return; }
@@ -72,7 +75,11 @@ async function notifyContentUpdated() {
       headers: { 'x-admin-secret': secret },
     });
     const data = await res.json().catch(() => ({}));
-    console.log(`  🔔 プッシュ通知: ${res.ok ? `${data.sent || 0}件に送信` : `失敗(${res.status})`}`);
+    if (res.ok && data.skipped) {
+      console.log(`  🔔 プッシュ通知: 本日該当する行事なしのためスキップ`);
+    } else {
+      console.log(`  🔔 プッシュ通知: ${res.ok ? `${data.sent || 0}件に送信` : `失敗(${res.status})`}`);
+    }
   } catch (e) {
     console.log(`  ⚠️ プッシュ通知の送信に失敗: ${e.message}`);
   }
