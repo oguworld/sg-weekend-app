@@ -21413,4 +21413,38 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 ### 申し送り
 - 次回7:00 SGT（`run-fetch-all.sh`経由）の自動実行で、実際に該当日かどうかに応じた送信/スキップの実挙動が確認できる。問題があれば`logs/`または`pm2 logs sg-weekend`で`[notify-events-updated]`ログを確認すること
 - `data/sg/calendar-events.json`は年1回更新が必要なデータ（CLAUDE.md既存記載）。更新時に`confirmed`フラグの精度が本機能の誤通知防止に直結するため、今後の年次更新時は`confirmed`の設定精度にも注意を払うこと
+
+---
+
+## 設計書226: `publish-android.js`への`--non-interactive`フラグ・本番versionCode事前チェック追加(設計書223の追記、2026-10-10)
+
+### 背景・決定事項
+設計書223で実装した`android-app/scripts/publish-android.js`に、プロジェクトリポジトリ外で新規作成する本番リリース自動化エージェント「releaser」(ユーザーレベルカスタムエージェント、`~/.claude/agents/releaser.md`、今回のタスクでは触らない)から呼び出されることを想定した機能を追加した。
+
+### 実装内容
+1. **非対話モード(`--non-interactive`フラグ)**: 指定時は`confirmProduction()`の対話プロンプト(readlineでの`production`入力待ち)をスキップしてそのまま処理を続行する。ファイル先頭コメントとCLAUDE.mdに「このフラグは人間が直接ターミナルで実行する際には使わないこと。自動化エージェントからの呼び出し専用」と明記。デフォルト(フラグ無し)の対話確認必須という挙動は無変更(後方互換性維持)
+2. **本番公開中versionCodeとの事前比較チェック**: `getCurrentProductionVersionCode(androidpublisher)`関数を新設。認証後、AABアップロードや確認プロンプトより前の段階で`edits.insert`→`edits.tracks.get({packageName, editId, track:'production'})`→`edits.delete`(変更を加えずに破棄、`finally`ブロックで必ず実行)の順に呼び、本番トラックの`releases[].versionCodes[]`から最大値を取得する。これと、これからアップロードするversionCode(引数`--version-code`または`package.json`の`androidVersionCode`)を比較し、**指定versionCodeが本番公開中の最大versionCode以下の場合は、両方の値を表示したエラーメッセージを出してプロセスを中断する**(exit 1、確認プロンプトより前に停止)。この事前チェックは対話・非対話どちらのモードでも常に実行される
+   - 本番トラックに公開中のリリースが無い場合(初回公開等、`releases`が空または`versionCodes`が無い)は`maxVersionCode === null`となり、チェックをスキップして続行
+   - 事前チェック自体がAPI呼び出しエラー等で失敗した場合は、「事前チェックに失敗したため従来通り進めます」と警告ログを出した上で、通常の処理(対話確認プロンプト or `--non-interactive`ならそのまま続行)に進む(安全網の不具合で本来成功するはずの公開が止まらないようにするため)
+3. **CLAUDE.md「Androidアプリ化」節の「Play Developer API 本番公開自動化(設計書223)」項目に、上記2点(`--non-interactive`フラグの説明・versionCode事前チェックの挙動)を追記**
+
+### 検証内容(checker)
+- `node --check android-app/scripts/publish-android.js`で構文確認OK
+- `googleapis`モジュールをモック化したテストハーネス(`Module._load`差し替え、`edits.bundles.upload`/`edits.commit`呼び出し時に例外を投げるフェイルセーフ付き)で以下を確認、**実際のGoogle Play Developer APIは一度も呼んでいない**:
+  - 対話モード(フラグ無し)・指定versionCode=本番公開中versionCode: 確認プロンプトに到達する前にエラー(exit 1)で停止することを確認
+  - 対話モード・指定versionCode<本番公開中versionCode: 同様にプロンプト前にエラー停止することを確認
+  - 対話モード・指定versionCode>本番公開中versionCode: 事前チェックOKのログの後、確認プロンプトに正しく到達することを確認(その後は空入力(EOF)で`production`と一致せず「中断しました」exit 0、本番APIは呼ばれていない)
+  - `--non-interactive`・指定versionCode=本番公開中versionCode: 非対話モードでも事前チェックが機能し確認プロンプト前にエラー停止することを確認
+  - `--non-interactive`・指定versionCode>本番公開中versionCode: 確認プロンプトをスキップし、そのままアップロード処理(`edits.bundles.upload`相当)に進もうとすることを確認(テストのフェイルセーフが発火して停止、実アップロードは未実行)
+  - 事前チェック自体が例外を投げるシナリオ: 警告ログを出し、従来通り対話確認プロンプトへ進むことを確認(EOF入力で安全に中断、exit 0)
+  - 既存の後方互換性: AABファイル未存在時のエラーメッセージ・exit codeが無変更であることを確認
+- 🔴Critical無し
+
+### スコープ外(今回実施しないこと)
+- `~/.claude/agents/releaser.md`自体の作成(プロジェクトリポジトリ外のため対象外)
+- 実際のGoogle Playへの本番公開操作(AABアップロード・`edits.commit`の実行、サービスアカウント鍵が無い現状の検証環境では実施不可かつ実施禁止)
+
+### 申し送り
+- releaserエージェントがこのスクリプトを呼び出す際は、本番審査提出の都度`--version-code`を正しく上げた値で呼ぶこと(事前チェックが古い/同一値を検知して止めるが、呼び出し側でも`androidVersionCode`の更新を徹底する運用が望ましい)
+- サービスアカウント鍵が未配置の現状では、事前チェック・本体処理ともに鍵未存在エラーで停止する(設計書223時点の既存挙動のまま)。鍵配置後、初回は`--non-interactive`を使わず人間が対話モードで一度試すことを推奨(設計書223の申し送り内容を維持)
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）。新規ワークフローファイル自体はGitHub上にマージされるまで実行不可（`workflow_dispatch`はデフォルトブランチまたは対象ブランチにワークフローファイルが存在する必要があるため、マージ後に有効化される）

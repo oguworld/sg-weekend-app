@@ -11,6 +11,12 @@
 //   2. Play Console「設定 > API アクセス」でサービスアカウントをリンクし、
 //      app.dosuruに対して「製品版への公開」権限を付与
 //   3. JSON鍵を ~/android-keystore/play-publisher-service-account.json に配置(chmod 600推奨)
+//
+// --non-interactive フラグについて:
+//   ⚠️ このフラグは人間が直接ターミナルで実行する際には使わないこと。
+//   信頼されたリリース自動化エージェント(releaser)からの呼び出し専用。
+//   対話確認プロンプト(readlineでの"production"入力)をスキップしてそのまま本番公開を実行する。
+//   人間が直接実行する場合は、フラグを付けずデフォルトの対話確認フローを使うこと。
 'use strict';
 
 const path = require('path');
@@ -25,10 +31,11 @@ const APP_DISPLAY_NAME = 'SG在住Navi';
 const TRACK = 'production';
 
 function parseArgs(argv) {
-  const args = { aab: null, versionCode: null };
+  const args = { aab: null, versionCode: null, nonInteractive: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--aab') { args.aab = argv[++i]; }
     else if (argv[i] === '--version-code') { args.versionCode = parseInt(argv[++i], 10); }
+    else if (argv[i] === '--non-interactive') { args.nonInteractive = true; }
   }
   return args;
 }
@@ -48,6 +55,50 @@ function getDefaultVersionCode() {
   const pkgPath = path.join(ROOT, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   return pkg.androidVersionCode;
+}
+
+// 現在本番トラックで公開中の最大versionCodeを取得する(読み取りのみ、実際の変更は加えない)。
+// edits.insert → edits.tracks.get → edits.delete の順で呼び、最後に必ず編集セッションを破棄する。
+// 失敗した場合はnullを返す(呼び出し側で「事前チェックに失敗したため従来通り進めます」の扱いにする)。
+async function getCurrentProductionVersionCode(androidpublisher) {
+  let editId = null;
+  try {
+    const editInsertRes = await androidpublisher.edits.insert({
+      packageName: PACKAGE_NAME,
+    });
+    editId = editInsertRes.data.id;
+
+    const trackRes = await androidpublisher.edits.tracks.get({
+      packageName: PACKAGE_NAME,
+      editId,
+      track: TRACK,
+    });
+
+    const releases = (trackRes.data && trackRes.data.releases) || [];
+    let maxVersionCode = null;
+    for (const release of releases) {
+      const codes = release.versionCodes || [];
+      for (const code of codes) {
+        const num = parseInt(code, 10);
+        if (!Number.isNaN(num) && (maxVersionCode === null || num > maxVersionCode)) {
+          maxVersionCode = num;
+        }
+      }
+    }
+    return maxVersionCode;
+  } finally {
+    if (editId) {
+      try {
+        await androidpublisher.edits.delete({
+          packageName: PACKAGE_NAME,
+          editId,
+        });
+      } catch (e) {
+        // 破棄に失敗しても致命的ではない(Google側で編集セッションは一定時間後に自動失効する)。
+        console.warn(`警告: 事前チェック用の編集セッション(editId: ${editId})の破棄に失敗しました。`, e.message || e);
+      }
+    }
+  }
 }
 
 function confirmProduction(versionCode) {
@@ -104,12 +155,6 @@ async function main() {
     process.exit(1);
   }
 
-  const proceed = await confirmProduction(versionCode);
-  if (!proceed) {
-    console.log('中断しました。本番公開は実行されていません。');
-    process.exit(0);
-  }
-
   console.log('');
   console.log('認証中...');
   const auth = new google.auth.GoogleAuth({
@@ -117,6 +162,51 @@ async function main() {
     scopes: ['https://www.googleapis.com/auth/androidpublisher'],
   });
   const androidpublisher = google.androidpublisher({ version: 'v3', auth });
+
+  // 安全策: AABアップロードや確認プロンプトより前に、現在本番トラックで公開中の
+  // 最大versionCodeを取得し、これからアップロードするversionCode以上でないか確認する。
+  // (対話・非対話どちらのモードでも常に実行する)
+  console.log('現在本番公開中のversionCodeを確認します(事前チェック)...');
+  let currentProductionVersionCode = null;
+  let precheckFailed = false;
+  try {
+    currentProductionVersionCode = await getCurrentProductionVersionCode(androidpublisher);
+  } catch (e) {
+    precheckFailed = true;
+    console.warn('警告: 事前チェック(本番versionCode取得)に失敗しました。事前チェックに失敗したため従来通り進めます。');
+    if (e.response && e.response.data) {
+      console.warn(JSON.stringify(e.response.data, null, 2));
+    } else {
+      console.warn(e.message || e);
+    }
+  }
+
+  if (!precheckFailed) {
+    if (currentProductionVersionCode === null) {
+      console.log('本番トラックに公開中のリリースが見つかりませんでした(初回公開の可能性)。事前チェックをスキップして続行します。');
+    } else if (versionCode <= currentProductionVersionCode) {
+      console.error('');
+      console.error('エラー: 指定したversionCodeが現在本番公開中のversionCode以下です。');
+      console.error(`  現在本番公開中のversionCode: ${currentProductionVersionCode}`);
+      console.error(`  指定したversionCode: ${versionCode}`);
+      console.error('');
+      console.error('android-app/package.jsonのandroidVersionCodeを上げるか、--version-code で正しい値を指定してください。');
+      process.exit(1);
+    } else {
+      console.log(`事前チェックOK: 現在本番公開中のversionCode(${currentProductionVersionCode}) < 指定したversionCode(${versionCode})`);
+    }
+  }
+
+  if (args.nonInteractive) {
+    console.log('');
+    console.log('--non-interactive が指定されたため、対話確認プロンプトをスキップします。');
+  } else {
+    const proceed = await confirmProduction(versionCode);
+    if (!proceed) {
+      console.log('中断しました。本番公開は実行されていません。');
+      process.exit(0);
+    }
+  }
 
   try {
     console.log('編集セッションを開始します(edits.insert)...');
