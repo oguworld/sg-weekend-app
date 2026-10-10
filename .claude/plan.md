@@ -21632,3 +21632,22 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 🔴Critical無し
 
 **変更しなかったもの(スコープ外として維持)**: 都市リスト(18都市)・levels・climate・cheapestMonths・flightHours等の他フィールド、トグル行+パネルのUI構造・ロジック(追記10〜12で確定済み、無変更)。
+
+### 設計書222 追記14(2026-10-10): トグル行の文言変更+見た目をシンプルな罫線行に変更(builder→checker→closer)
+
+**背景**: トグル行の文言「〇月のおすすめ渡航先」を「〇月のおすすめ行き先」に変更。また見た目を、灰色の角丸ボックス（独立した箱に見える）から、予定一覧の延長線上に見えるシンプルな罫線区切り行に変更する。
+
+**実装内容**:
+- `public/app.js`: `cal-fare-toggle-label`を含む2箇所(月カードの通常終端用・最終月終端用、同一テンプレート文字列)の文言「${currentMonthNum}月のおすすめ渡航先」を「${currentMonthNum}月のおすすめ行き先」に変更(「渡航先」→「行き先」のみ)
+- `public/app.css`の`.cal-fare-toggle`: `background: var(--cream)`→`background: none`、`border-radius: 12px`→`border-radius: 0`、`border: none`に`border-top: 1px solid var(--sand)`を追加、`padding: 10px 12px`→`padding: 10px 0`(左右paddingを0にして`.cal-item`等の予定行と左右位置を揃える)。`:active { opacity: 0.7 }`は無変更で維持。ダークモード側に`.cal-fare-toggle`固有の塗りつぶし定義は存在しなかったため追加修正は不要(CSS変数`--cream`/`--sand`自体がダークモードで再定義される仕組みに乗るのみ)
+- 展開時のパネル(`.cal-fare-panel`)自体の見た目は無変更
+- キャッシュバスティング: `public/index.html`のCSS/JSクエリを`20261010g→20261010h`/`20261010i→20261010j`、`public/sw.js`の`CACHE_NAME`を`v949→v950`
+
+**checker結果**:
+- `node --check public/app.js`: OK
+- CSS波括弧バランス: 367/367でOK、`.cal-fare-toggle`の重複定義なし
+- 旧文言「おすすめ渡航先」0件、新文言「おすすめ行き先」2件を確認
+- `pm2 restart sg-weekend`後、curlで実配信(`https://dosuru.app`)の`/`のCSS/JSクエリが`20261010h`/`20261010j`、`/sw.js`の`CACHE_NAME`が`v950`、`/app.js`に新文言2件、`/app.css`に新しい`.cal-fare-toggle`定義(透明背景・border-radius 0・上罫線あり)が反映されていることを確認
+- 🔴Critical無し
+
+**変更しなかったもの(スコープ外として維持)**: トグルの開閉ロジック(`toggleFarePanel()`)・展開時のパネル(`.cal-fare-panel`)の見た目・ピル表示・色分け・データ取得はすべて無変更。この環境はブラウザ描画確認ができないため、最終的な見た目はユーザーの実機/ブラウザ確認待ち。
