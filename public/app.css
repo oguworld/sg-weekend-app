@@ -1517,7 +1517,7 @@
 
     .cal-fare-detail {
       margin-top: 10px; padding: 10px 12px; background: var(--sand); border-radius: 10px;
-      font-size: 12px; line-height: 1.7; color: var(--midnight);
+      font-size: 14px; line-height: 1.8; color: var(--midnight);
     }
     .cal-fare-detail-row { margin-bottom: 4px; }
     .cal-fare-detail-row:last-child { margin-bottom: 0; }

@@ -3433,6 +3433,23 @@
     // 気候tierに応じた小さいアイコン(good: ☀️ / bad: 🌧 / neutral: アイコンなし)
     const FARE_CLIMATE_TIER_ICON = { good: '☀️', bad: '🌧', neutral: '' };
 
+    // 国名(日本語)→国旗絵文字。content/fare-seasons.jsonのcityごとのcountryフィールドに対応。
+    const FARE_COUNTRY_FLAG = {
+      '日本': '🇯🇵',
+      'タイ': '🇹🇭',
+      'ベトナム': '🇻🇳',
+      'インドネシア': '🇮🇩',
+      'マレーシア': '🇲🇾',
+      'フィリピン': '🇵🇭',
+      'モルディブ': '🇲🇻',
+      'オーストラリア': '🇦🇺',
+      '台湾': '🇹🇼',
+      'カンボジア': '🇰🇭'
+    };
+    function _fareCountryFlag(country) {
+      return FARE_COUNTRY_FLAG[country] || '';
+    }
+
     // 気候補正込みの「おすすめ度スコア」(小さいほどおすすめ)。価格レベル(1〜5)に
     // good→-0.5 / neutral→0 / bad→+0.5 の補正を加える。同点時は元のlevelが小さい方を優先。
     function _fareRecommendScore(level, tier) {
@@ -3515,8 +3532,8 @@
       const pillsHtml = ordered.map(city => {
         const climateStr = city.climate[idx];
         const tier = _fareScoreTier(_fareRecommendScore(city.levels[idx], _fareClimateTier(climateStr)));
-        const tierIcon = FARE_CLIMATE_TIER_ICON[_fareClimateTier(climateStr)] || '';
-        return `<button class="cal-fare-pill cal-fare-pill-${tier}" data-fare-city="${city.id}">${tierIcon ? tierIcon + ' ' : ''}${escapeHtml(city.name)}</button>`;
+        const flag = _fareCountryFlag(city.country);
+        return `<button class="cal-fare-pill cal-fare-pill-${tier}" data-fare-city="${city.id}">${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</button>`;
       }).join('');
 
       panel.innerHTML = `
@@ -3555,10 +3572,11 @@
 
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sijsHit = ((schoolHolidays && schoolHolidays.sijs) || []).includes(month);
-      const schoolMarkHtml = [
-        moeHit ? '<div class="cal-fare-detail-row">🏫 現地校(MOE)休暇と重なる月です。' + escapeHtml(sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : '') + '</div>' : '',
-        sijsHit ? '<div class="cal-fare-detail-row">🎒 日本人学校(SIJS)休暇と重なる月です。' + escapeHtml(sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : '') + '</div>' : '',
-      ].join('');
+      const schoolIcons = [moeHit ? '🏫' : '', sijsHit ? '🎒' : ''].filter(Boolean).join('');
+      const schoolLabel = [moeHit ? '現地校(MOE)休暇' : '', sijsHit ? '日本人学校(SIJS)休暇' : ''].filter(Boolean).join('・');
+      const schoolMarkHtml = schoolIcons
+        ? `<div class="cal-fare-detail-row">${schoolIcons} ${escapeHtml(schoolLabel)}と重なる月です。${escapeHtml(sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : '')}</div>`
+        : '';
 
       const lv = city.levels[idx];
       const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)] || '-';
