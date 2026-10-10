@@ -3582,11 +3582,8 @@
         : `${FARE_LEVEL_SHORT_LABEL[minLv] || ''}〜${FARE_LEVEL_SHORT_LABEL[maxLv] || ''}`;
 
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
-      const sijsHit = ((schoolHolidays && schoolHolidays.sijs) || []).includes(month);
-      const schoolIcons = [moeHit ? '🏫' : '', sijsHit ? '🎒' : ''].filter(Boolean).join('');
-      const schoolLabel = [moeHit ? '現地校(MOE)休暇' : '', sijsHit ? '日本人学校(SIJS)休暇' : ''].filter(Boolean).join('・');
-      const schoolMarkHtml = schoolIcons
-        ? `<div class="cal-fare-detail-row">${schoolIcons} ${escapeHtml(schoolLabel)}と重なる月です。${escapeHtml(sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : '')}</div>`
+      const schoolMarkHtml = moeHit
+        ? `<div class="cal-fare-detail-row">🏫 現地校(MOE)休暇と重なる月です。${escapeHtml(sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : '')}</div>`
         : '';
 
       const lv = city.levels[idx];

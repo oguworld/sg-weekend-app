@@ -21688,3 +21688,9 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - **付随**: 6月が3になった都市の`cheapestMonths`から6を除去(バンコク[5,9]・プーケット[5,9]・モルディブ[5]・シドニー[5]・パース[5])。`notes`に6月を狙い目とする記述は残っていないことを確認
 - **未対応**: 1月は多くの東南アジア近距離都市で「最安」とする情報が多かったが、旧正月前後の動きで結論が変わるため確度が低く、今回は変更していない。**実運賃との突き合わせは引き続き未実施**
 - 実装メモ: orchestratorが起動直後にAPIエラーで3回失敗したため、forkが builder/checker/closer を直接実施した。`validate-fare-seasons.js`合格(19都市)、`GET /api/fare-seasons`への反映をcurlで確認、`content/`配下のためpm2再起動不要
+
+### 設計書222 追記17(2026-10-10): 都市詳細から日本人学校(SIJS)休暇の表示を削除
+- 理由: 航空券の価格に効くのは現地校(MOE)の休暇で、日本人学校の休暇はほぼ影響しない。詳細パネルではMOEと同じ「航空券がやや上がりやすい」文言(`sgFactors.schoolHolidayBoost`)がSIJSにも付いており、関係が強いように誤解されるため。ユーザーが選択肢1(表示を消す)を選択
+- 変更: `public/app.js`の`_fareDetailHtml()`から`sijsHit`・🎒・「日本人学校(SIJS)休暇」の扱いを削除し、学校休暇の行はMOEのみ。`GET /api/fare-seasons`の`schoolHolidays.sijs`は互換性のため返し続ける(表示しないだけ)。`CLAUDE.md`の航空券シーズン表の記述も更新
+- キャッシュバスティング: `app.js?v=20261010l`、`CACHE_NAME` v952
+- orchestratorが起動直後のAPIエラーで使えなかったため、forkがbuilder→checker→closerを代行した
