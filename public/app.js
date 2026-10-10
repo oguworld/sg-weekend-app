@@ -3609,6 +3609,7 @@
       if (!detail) return;
       const cityId = pillEl.dataset.fareCity;
       const month = Number(panel.dataset.fareMonth);
+      panel.querySelectorAll('.cal-fare-pill-active').forEach(p => p.classList.remove('cal-fare-pill-active'));
       if (_fareSelectedCityId === cityId) {
         _fareSelectedCityId = null;
         detail.style.display = 'none';
@@ -3616,6 +3617,7 @@
         return;
       }
       _fareSelectedCityId = cityId;
+      pillEl.classList.add('cal-fare-pill-active');
       const city = (FARE_SEASONS_DATA.cities || []).find(c => c.id === cityId);
       if (!city) return;
       detail.innerHTML = _fareDetailHtml(city, month);

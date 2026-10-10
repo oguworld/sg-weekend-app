@@ -21651,3 +21651,22 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 🔴Critical無し
 
 **変更しなかったもの(スコープ外として維持)**: トグルの開閉ロジック(`toggleFarePanel()`)・展開時のパネル(`.cal-fare-panel`)の見た目・ピル表示・色分け・データ取得はすべて無変更。この環境はブラウザ描画確認ができないため、最終的な見た目はユーザーの実機/ブラウザ確認待ち。
+
+### 設計書222 追記15(2026-10-10): 都市ピルの選択状態を視覚的に表示(builder→checker→closer)
+
+**背景**: 「〇月のおすすめ行き先」パネルで都市ピルをタップすると下に詳細が展開されるが、どのピルがタップされて選択中なのかが見た目で分からないとユーザーから指摘があった(実機スクリーンショットで確認、ピル自体の見た目が選択前後で一切変化していない)。
+
+**原因**: `selectFarePill(pillEl)`関数がタップされたピル・他のピルいずれにもclassを付け外ししておらず、`.cal-fare-detail`の中身だけを直接書き換えていた。ピル生成側(`renderFarePanel()`)にも選択状態classの出し分けが無かった。
+
+**実装内容**:
+- `public/app.js`の`selectFarePill(pillEl)`: 関数冒頭で`panel.querySelectorAll('.cal-fare-pill-active').forEach(p => p.classList.remove('cal-fare-pill-active'));`を追加し、パネル内の既存の選択表示をクリア。新しく選択する分岐(`_fareSelectedCityId = cityId;`の直後)に`pillEl.classList.add('cal-fare-pill-active');`を追加。同じピルの再タップで閉じる分岐は冒頭のクリア処理により見た目も自動的に外れるため変更不要
+- `public/app.css`: `.cal-fare-pill-expensive`定義の直後に`.cal-fare-pill-active { box-shadow: 0 0 0 2px var(--midnight) inset; font-weight: 800; }`を新規追加。既存の「選択中」表現パターン(`.fare-cell-selected`等)を踏襲
+- キャッシュバスティング: `public/index.html`のCSS/JSクエリを`20261010h→i`/`20261010j→k`、`public/sw.js`の`CACHE_NAME`を`v950→v951`
+
+**checker結果**:
+- `node --check public/app.js`: OK。CSS波括弧バランス368/368でOK
+- ロジックレビュー: 別のピルをタップした場合は冒頭のクリア処理で前の選択表示が正しく外れ新しいピルにアクティブ表示が付く、同じピルを再タップした場合はクリア処理後に`_fareSelectedCityId === cityId`判定でreturnするため選択表示も連動して外れる、いずれも意図通りであることを確認
+- `pm2 restart sg-weekend`後、curlで実配信(`https://dosuru.app`)のCSS/JSクエリが`20261010i`/`20261010k`、`sw.js`の`CACHE_NAME`が`v951`に更新され、新しい`.cal-fare-pill-active`定義と`selectFarePill()`の新ロジックが反映されていることを確認
+- 🔴Critical無し
+
+**変更しなかったもの(スコープ外として維持)**: トグルの開閉ロジック(`toggleFarePanel()`)・パネルの開閉・ピルの色分け(`_fareScoreTier()`)・データ取得はすべて無変更。ライト/ダーク両モードでの最終的な視認性はこの環境では描画確認できないため、ユーザーの実機確認待ち(見えにくい場合は`html[data-theme="dark"] .cal-fare-pill-active`の上書き定義追加を想定)。

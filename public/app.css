@@ -1514,6 +1514,10 @@
     .cal-fare-pill-cheap { background: var(--fare-tier-cheap-pale); color: var(--fare-tier-cheap-text); }
     .cal-fare-pill-normal { background: var(--fare-tier-normal-pale); color: var(--fare-tier-normal-text); }
     .cal-fare-pill-expensive { background: var(--fare-tier-expensive-pale); color: var(--fare-tier-expensive-text); }
+    .cal-fare-pill-active {
+      box-shadow: 0 0 0 2px var(--midnight) inset;
+      font-weight: 800;
+    }
 
     .cal-fare-detail {
       margin-top: 10px; padding: 10px 12px; background: var(--sand); border-radius: 10px;
