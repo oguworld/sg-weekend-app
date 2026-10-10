@@ -21289,3 +21289,85 @@ UI再設計(追記2)後、ユーザー実機確認で2件の不具合が発覚�
 - `public/sw.js`の`CACHE_NAME`を`v935→v936`、`index.html`のCSSクエリを`20261009c→20261009d`、JSクエリを`20261009b→20261009c`にバンプ
 - **変更不要として維持**: `content/fare-seasons.json`、`scripts/validate-fare-seasons.js`、`server.js`の`GET /api/fare-seasons`(curlで無変更を確認済み)、localStorageフォールバック
 - **実機確認未実施**: この環境ではPlaywright等が使えずiOS/Android実機でのタッチ動作確認は不可。特に吹き出しの位置計算(画面右端に近い月・ボタンでの矢印ズレ)と吹き出し内スクロールの実機確認が必要。月選択チップ方式で発生していた「タップ無反応」問題(追記4で未解決)は、チップ行自体を廃止したことで構造的に解消されている可能性が高いが、新方式での別の不具合(吹き出し内のタップ等)が無いことは実機で要確認
+
+## 設計書223: Google Play本番公開のVPS上Node.jsスクリプトによる自動化(2026-10-10)
+
+### 背景・決定事項(ユーザー承認済み)
+- 実装方式: Fastlane/CI化はせず、**VPS上で手動実行するNode.jsスクリプト**(Google Play Developer APIを`googleapis`パッケージ経由で直接呼ぶ)。既存の「Android版はCI化せずVPS手動ビルド」方針(CLAUDE.md記載)を維持
+- 公開: 審査提出後、Googleの審査に通過したら人間の追加操作なしで即座に一般公開される「完全自動」をユーザーが指定。本番トラックへのリリースを`status:'completed'`・`userFraction`省略(100%ロールアウト)で作成することでこれに相当させる(Managed Publishing機能は使わない、デフォルトの「審査通過=即公開」の挙動のまま)
+- 前提: Google Play Developer APIのサービスアカウント連携は現状一切存在しない。サービスアカウントの作成・Play ConsoleでのAPIアクセス権限付与はGoogleアカウントの対話操作が必要なため**ユーザー自身が行う必要がある**(エージェントからは実施不可)。今回はその手順をCLAUDE.mdにドキュメント化し、スクリプト自体は認証情報(JSON鍵ファイル)が用意されれば動く状態まで実装
+
+### 実装内容
+1. **新規スクリプト`android-app/scripts/publish-android.js`**(Node.js、CommonJS、既存の`scripts/*.js`群と書き味を統一):
+   - `googleapis`パッケージの`androidpublisher`(v3)を使い、サービスアカウントJSON鍵(環境変数`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH`でファイルパス指定、デフォルト`~/android-keystore/play-publisher-service-account.json`)で認証
+   - 引数: `--aab <path>`(デフォルト`android/app/build/outputs/bundle/release/app-release.aab`、`ROOT`基準)・`--version-code <number>`(省略時`android-app/package.json`の`androidVersionCode`から自動取得、引数指定があれば上書き)
+   - 処理フロー: `edits.insert`→`edits.bundles.upload`(AABアップロード)→`edits.tracks.update(track:'production', releases:[{versionCodes:[...], status:'completed'}])`→`edits.commit`。アップロード後のAAB内versionCodeと指定値が不一致の場合は警告を出しAAB側の値を優先
+   - **安全策**: 対話的確認プロンプト(`readline`)で「本番トラックへ公開します。アプリ: SG在住Navi (app.dosuru)、versionCode: X。続行しますか? (本番公開を実行するには production と入力)」を表示し、正確に`production`と入力しない限り処理を中断(スキップ用引数は意図的に用意しない)
+   - エラーハンドリング: サービスアカウントJSON鍵・AABファイルがそれぞれ存在しない場合、分かりやすいメッセージ(CLAUDE.md参照の案内含む)を出して終了。いずれのチェックも対話確認プロンプトより前に実行されるため、鍵・AAB未配置の状態で誤って本番公開フローに入ることはない
+2. `android-app/package.json`に`googleapis`(^178.0.0)を依存として追加、VPS上で`npm install googleapis --save`を実行し`package.json`/`package-lock.json`の更新を確認済み
+3. **CLAUDE.md「Androidアプリ化」節に新規項目「Play Developer API 本番公開自動化(設計書223)」を追記**: スクリプトの使い方・処理フロー・ユーザーが事前に行う必要がある手動セットアップ手順(Google Cloud Consoleでのサービスアカウント作成→JSON鍵ダウンロード→Play Console「設定 > API アクセス」でのリンク・「製品版への公開」権限付与→VPS上`~/android-keystore/play-publisher-service-account.json`への配置)・既存のAPK/AAB/zip配布(一時的、撤去予定)との違いを明記
+
+### 検証内容(checker)
+- `node --check android-app/scripts/publish-android.js`で構文確認OK
+- `require('googleapis')`のロード・`google.androidpublisher`の型確認OK
+- サービスアカウントJSON鍵が存在しない状態で実行→対話確認プロンプトに到達せず分かりやすいエラーメッセージで終了することを確認
+- AABファイルが存在しない状態で実行→同様に安全にエラー終了することを確認
+- ダミーの鍵・AABファイルを用いて対話確認プロンプトを実際に起動し、`production`以外の入力(`no`)では「中断しました。本番公開は実行されていません。」と表示され`exit(0)`で安全に終了することを確認(本番公開APIは一切呼ばれない)
+
+### スコープ外(今回実施しないこと)
+- Google Cloud Console・Play Console側の実際のサービスアカウント作成・権限付与(ユーザー自身が行う、エージェントからは不可)
+- 実際にこのスクリプトを使った本番公開の実行(サービスアカウントJSON鍵が用意されてから、ユーザーが実際に手動実行して初めて検証できる)
+
+### 残作業・ユーザーへの申し送り
+- サービスアカウント作成・Play Console権限付与の具体的な手順はCLAUDE.md「Androidアプリ化」節の「Play Developer API 本番公開自動化」を参照
+- 鍵配置後、初回はversionCodeを上げた軽微な更新で一度試すことを推奨(大きな変更と同時に自動公開パイプラインを初めて使うのはリスクが高いため)
+- 既存の「APK配布の一時的な仕組み」(`/dl/:token`等)の撤去タスクとは別件
+
+---
+
+## 2026-10-10 設計書224: iOS App Store本番審査提出をFastlane/GitHub Actionsで自動化（builder→checker→closer）
+
+### 背景
+これまでApp Store本番審査提出（審査提出・公開）はユーザーが手動でApp Store Connect上から行っていた。plannerの事前調査（直前のorchestrator実行とは別セッション）により、既存の`release`ブランチpush→TestFlight配信フロー（`ios-deploy.yml`/`deploy`レーン）とは別に、審査提出まで自動化する仕組みを追加することになった。
+
+### 決定事項（ユーザー承認済み）
+- トリガー: 既存の`release`ブランチpush（TestFlight配信用）とは完全に分離した**新規ワークフロー**を作り、**`workflow_dispatch`のみ**で起動する（pushでは絶対に起動しない）
+- 公開: 審査提出時に`automatic_release: true`を指定し、Appleの審査に通過したら人間の追加操作なしで即座に一般公開される（「完全自動」とユーザー指定）
+- メタデータ管理はリポジトリ化しない（スコープ外）
+
+### 調査で判明していた事実（前提）
+1. `ios-app/fastlane/Appfile`に`app_identifier("app.dosuru.odenavi")`という誤った値があった。実際のバンドルIDは`app.dosuru`（Fastfile内の既存`deploy`レーンでハードコードされている値と一致）
+2. 既存`deploy`レーンは証明書インポート→`build_app`→`upload_to_testflight`まで。本対応では一切変更していない
+3. 既存のApp Store Connect API認証情報（`ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`、GitHub Secrets）をそのまま使う。このAPIキーが`deliver`（審査提出）に必要な権限（App Manager以上）を持っているかは未確認
+4. アプリは既に`id6787159354`としてApp Store公開済み。今回の自動化は「次のアップデートの審査提出」を指す
+
+### 実装内容
+1. `ios-app/fastlane/Appfile`: `app_identifier`を`app.dosuru`に修正
+2. `ios-app/fastlane/Fastfile`: 新規レーン`release_production`を追加（既存`deploy`レーンは無変更、末尾に追記のみ）。証明書インポート～`build_app`までは`deploy`レーンと同一の手順を踏み、最後に`deliver`アクションで以下を実行:
+   - `skip_metadata: true` / `skip_screenshots: true`（App Store Connect側の既存メタデータをそのまま使う、メタデータ変更は引き続き人間がApp Store Connect画面で行う運用）
+   - `submit_for_review: true`
+   - `automatic_release: true`（審査通過後、即座に一般公開）
+   - `force: true`（CI非対話実行のため確認プロンプトをスキップ）
+   - 既存`deploy`レーンと同じ`app_store_connect_api_key`呼び出しパターンをそのまま流用
+3. 新規ワークフローファイル`.github/workflows/ios-release-production.yml`を作成:
+   - `on: workflow_dispatch:`のみ（`push`トリガーは一切含めない、最重要）
+   - `inputs.confirm`（required: true、文字列）を設け、ジョブ最初のステップで厳密に`"SUBMIT"`と一致するか確認し、不一致なら`exit 1`
+   - 既存`ios-deploy.yml`と同じmacOS runner・証明書インポート・アイコン生成・privacy manifest対応・entitlements設定等のセットアップステップを流用し、最後に`bundle exec fastlane release_production`を実行
+   - 既存`ios-deploy.yml`自体は一切変更していない（`git diff`で無変更を確認済み）
+4. `ios-app/README.md`: `app_identifier`の誤り（`app.dosuru.odenavi`→`app.dosuru`）を修正。Fastlane Matchを使用していない実態（配布証明書・プロビジョニングプロファイルは手動作成してbase64化しGitHub Secretsに登録する運用）に合わせて記述を修正（旧版は`fastlane match init`等Match前提の記述だったが実装はそもそもMatchを使っていない）。新しい`release_production`レーン・ワークフローの使い方（Actionsタブからの手動実行方法、`confirm`欄に`SUBMIT`と入力する必要があること、`automatic_release: true`のため初回は軽微な変更で試すことを推奨する旨）を追記
+
+### checker結果
+- YAML構文: 新規ワークフロー・既存`ios-deploy.yml`ともPython `yaml.safe_load()`でパース成功
+- 新規ワークフローの`on:`は`workflow_dispatch`のみであることを確認（`push`トリガー無し、最重要確認事項）
+- `confirm`ガードは文字列完全一致（`!=`）で判定し、不一致時に`exit 1`する実装を確認
+- `git diff`で既存`ios-deploy.yml`に差分が無いことを確認
+- `Fastfile`の既存`deploy`レーンに変更が無く、新規`release_production`レーンは末尾への追記のみであることを確認（VPS上にRubyが入っておらず`ruby -c`での構文チェックは実施不可だったため、既存レーンと同じブロック/ハッシュパターンを踏襲していることを目視で確認）
+- `Appfile`の`app_identifier`修正を確認
+- 🔴Critical無し
+
+### 申し送り（ユーザー対応が必要）
+- **実際に初回実行する前に、App Store Connect上で現在のAPIキー（`ASC_KEY_ID`等）のロールがApp Manager以上か確認すること**。権限不足の場合、`release_production`レーンの`deliver`呼び出し時にエラーになる（ビルド自体は成功するため既存TestFlight配信には影響しない）。不足していれば、App Store Connect（ユーザー: WILLOA PTE. LTD.、Team ID: `4P3SWV4X5U`）で新しいAPIキーをApp Manager以上のロールで発行し、GitHub Secretsの`ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`を更新する
+- **初回実行時は何かまず軽微な変更（文言修正等）をTestFlightにアップロードした上で、このワークフローを手動実行して動作確認することを推奨**（`automatic_release: true`のため審査通過後は即座に一般公開される点に注意）
+- 今回の静的な正しさの担保のみで、実際にワークフローを実行した動作確認はスコープ外（ユーザーが実際に手動実行して初めて検証可能）
+- 今回の作業中、作業ディレクトリに本タスクとは無関係な未コミット変更（`android-app/package.json`/`package-lock.json`/新規`android-app/scripts/publish-android.js`、Google Play公開自動化関連と見られる）が既に存在していたことを確認した。これは今回のbuilderが作成したものではなく、今回のコミット対象には含めていない（手を加えず、未コミットのまま残置）
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）。新規ワークフローファイル自体はGitHub上にマージされるまで実行不可（`workflow_dispatch`はデフォルトブランチまたは対象ブランチにワークフローファイルが存在する必要があるため、マージ後に有効化される）

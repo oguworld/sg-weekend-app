@@ -94,8 +94,10 @@ sg-weekend-app/
 - `_isCapacitorApp`: `window.Capacitor?.isNativePlatform?.()`で検出(`app.js`先頭)
 - `API_BASE`: Capacitor環境では`https://dosuru.app`、Web環境では空文字列。**全fetchに必須付与**
 - GA4・Instagram embed.jsは`public/index.html`の`<head>`先頭のスクリプトが、ホスト名が`dosuru.app`(Web版)のときだけ読み込む(Capacitorではホスト名が`localhost`)。**以前は静的な`<script>`と`gtag('config')`が先に実行され、app.js側の`window.gtag = function(){}`(今も残置)では間に合わず、iOS/Androidアプリでもアクセスデータが送られていた(設計書221で修正、Play Storeのデータ安全性の申告のため)。iOS版に反映するには次回ビルドが必要**。外部リンクは`a[target="_blank"]`クリックを`Capacitor.Plugins.Browser.open()`へ。SW登録・インストールバナーはCapacitor環境でスキップ/非表示
-- CI/CD: `release`ブランチpush→GitHub Actions(macOS runner)→Fastlane deploy→TestFlight配信(社内テストのみ、`distribute_external: false`)。Fastlaneレーンは`deploy`のみ(`upload_to_testflight`、本番申請は含まない・別途手動対応要)
-- GitHub Secrets: `ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`/`MATCH_PASSWORD`/`MATCH_GIT_BASIC_AUTH`
+- CI/CD: `release`ブランチpush→GitHub Actions(`ios-deploy.yml`、macOS runner)→Fastlane `deploy`レーン→TestFlight配信(社内テストのみ、`distribute_external: false`)
+- 証明書管理はFastlane Matchを使用していない(`ios-app/fastlane/Appfile`/`Fastfile`に実装なし)。配布証明書(`.p12`)・プロビジョニングプロファイル(`.mobileprovision`)は事前に手動作成してbase64化しGitHub Secretsに登録する運用
+- GitHub Secrets: `ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`/`DIST_CERT_BASE64`/`DIST_CERT_PASSWORD`/`PROVISION_PROFILE_BASE64`/`APPLE_TEAM_ID`
+- **本番審査提出の自動化(設計書223)**: `release`ブランチpushトリガーの既存フローとは完全に分離した新規ワークフロー`.github/workflows/ios-release-production.yml`を`workflow_dispatch`専用(pushトリガー無し)で追加。手動実行時に`inputs.confirm`へ厳密に`SUBMIT`と入力しないとジョブ先頭で`exit 1`する安全策あり。Fastlaneレーン`release_production`(`deploy`と同じ証明書インポート～`build_app`を経て`deliver`を呼ぶ、`deploy`レーン自体は無変更)が`skip_metadata: true`/`skip_screenshots: true`(メタデータはApp Store Connect側の既存設定をそのまま使用、リポジトリ管理化はスコープ外)・`submit_for_review: true`・`automatic_release: true`(審査通過後に人間の追加操作なしで即座に一般公開)・`force: true`で`deliver`を実行。既存`ASC_KEY_ID`等のAPIキーが`deliver`に必要なApp Manager以上の権限を持つかは未確認(権限不足時はCI実行時にエラーになるのみで既存TestFlight配信には影響しない)
 - 詳細手順: `ios-app/README.md`参照
 
 ## iOSアプリのAPNsプッシュ通知対応
@@ -125,6 +127,12 @@ VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラ
 - **APK配布(一時的な仕組み、恒久機能ではない)**: `releases/android/`(`.gitignore`対象)にビルド済みAPKを配置、`server.js`の`GET /dl/:token`(UUID v4トークンハードコード、`/api/*`向けCORSミドルウェアとは無関係の別パス)でAndroid実機のブラウザから直接ダウンロードさせる。ユーザーの実機動作確認が完了次第、このルートと`releases/`ディレクトリごと撤去する想定(次回別タスク)
 - `android-app/android/`(ビルド生成物、巨大)は`.gitignore`対象でコミットしない
 - **Play Store申請準備(設計書216、進行中)**: `android-app/store-assets/feature-graphic.png`(1024×500、24bit・アルファ無し)に承認済みフィーチャーグラフィック(クリーム系デザイン)を配置済み。`store-assets/screenshots/`にAndroid実機のスクリーンショット3枚(くらし・おでかけ・カレンダー、1338×2670、24bit PNG)を配置済み。**Playの規格は「長辺が短辺の2倍以内」「アルファ無し」「各辺320〜3840px」「枚数2〜8」**で、実機の縦長画面(1200×2670、比2.225)は超えるため、`android-app/scripts/make-store-screenshots.js`が左右の端を広げて比1.9955にする(見切れたチップの行は背景色で塗る)。同スクリプトはステータスバー(時刻・電池など、実機画面でy=33〜76)も背景色で塗って消す(2026-10-04ユーザー指示)。スクリーンショットを撮り直したら同スクリプトで処理する。アプリ名「SG在住Navi」確定、プライバシーポリシーは`https://willoa.net/privacy-policy`を流用方針(最新性未確認)。残作業: スクリーンショット撮影・連絡先メール確定・Developer登録料$25支払い・Play Console申請操作(いずれもユーザー対応、詳細は`plan.md`設計書216参照)
+- **Play Developer API 本番公開自動化(設計書223)**: `android-app/scripts/publish-android.js`(Node.js、CommonJS)が`googleapis`パッケージ経由でGoogle Play Developer API(androidpublisher v3)を直接呼び、審査提出から本番トラック公開までを自動化する。**Fastlane/CI化はせず、VPS上で手動実行する運用**(Android版は既存方針通りCI化しない)。処理フロー: `edits.insert`→`edits.bundles.upload`(AABアップロード)→`edits.tracks.update(track:'production', releases:[{versionCodes:[...], status:'completed'}])`→`edits.commit`。`status:'completed'`・`userFraction`省略(100%ロールアウト)のため、**Googleの審査に通過すると人間の追加操作なしで即座に一般公開される**(Managed Publishingは使わない、デフォルトの「審査通過=即公開」の挙動)
+  - **使い方**: `node android-app/scripts/publish-android.js --version-code X`(AABパスは省略時`app/build/outputs/bundle/release/app-release.aab`、`--aab <path>`で明示指定可。versionCodeは省略時`android-app/package.json`の`androidVersionCode`を使用)。実行すると「本番トラックへ公開します。アプリ: SG在住Navi (app.dosuru)、versionCode: X。続行しますか?」と対話確認プロンプトが出て、**`production`と正確に入力しないと中断する**(スキップ用の引数は意図的に用意していない、誤操作・誤自動化防止のため)
+  - **ユーザーが事前に行う必要がある手動セットアップ**(エージェントからは実施不可、Googleアカウントの対話操作が必要): (a) Google Cloud Consoleで新規または既存のプロジェクトにサービスアカウントを作成 (b) そのサービスアカウントのJSON鍵をダウンロード (c) Play Console「設定 > API アクセス」でそのサービスアカウントをリンクし、アプリ`app.dosuru`に対して「製品版への公開」権限を付与 (d) ダウンロードしたJSON鍵をVPS上の`~/android-keystore/play-publisher-service-account.json`に配置(リポジトリ外のため`.gitignore`不要、既存の`dosuru-upload.jks`と同ディレクトリ、chmod 600推奨)。鍵パスは環境変数`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH`で上書き可能
+  - 鍵未配置・AAB未存在時は分かりやすいエラーメッセージを出して終了する(本番公開への誤操作が発生しないことを確認済み)
+  - 上記「APK配布/AAB配布/掲載画像zipの配布(一時的)」の撤去タスクとは別件(このスクリプトはPlay Console提出後の本番公開手順そのものを自動化するもの、撤去タスクは実機確認用の配布導線の後始末)
+  - 初回利用時はversionCodeを上げた軽微な更新で一度試すことを推奨(大きな変更と同時に自動公開パイプラインを初めて使うのはリスクが高いため)
 
 ## イベントカードのDOM差分更新
 `renderEventCards()`は`grid.innerHTML`一括再代入ではなく、**イベントID+言語をキーにしたDOM要素キャッシュ(`_cardElCache`)による差分更新**方式(Instagram埋め込み等`<iframe>`を含むカードの不要な再読み込みを避けるため)。
