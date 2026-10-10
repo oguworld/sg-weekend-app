@@ -2644,7 +2644,7 @@
       const canvas = document.getElementById('qr-code-canvas');
       if (canvas && !canvas.hasChildNodes()) {
         const qr = qrcode(0, 'M');
-        qr.addData('https://apps.apple.com/app/id6787159354');
+        qr.addData('https://about.dosuru.app');
         qr.make();
         canvas.innerHTML = qr.createSvgTag(6, 4);
       }

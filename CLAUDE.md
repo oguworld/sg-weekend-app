@@ -235,7 +235,7 @@ SG発の航空券が高い/安い月を行き先別の5段階で示す**静的�
 ## アプリ共有機能
 設定画面「シェア」ボタン(`#do-share-btn`)は**まずQRコード表示シートを開く**(直接`navigator.share`/クリップボードコピーには分岐しない)。シート内「リンクを共有」ボタン(`#qr-share-link-btn`)から従来の`doShare()`を呼ぶ。
 - QRコード生成: `public/qrcode-generator.js`(Kazuhiko Arase氏のMIT製、依存なし)。`qrcode(0,'M').addData(url); .make(); .createSvgTag(6,4)`でSVG取得、`#qr-code-canvas`にキャッシュ挿入
-- QRコードURL: 既存`doShare()`と同じApp Store URL(`https://apps.apple.com/app/id6787159354`)
+- QRコードURL: 紹介LP(`https://about.dosuru.app`、iOS/Android両方のダウンロードリンクを掲載、2026-10-10変更)。`doShare()`のテキスト共有は引き続き紹介LP・App Store URL両方を含む文言(変更なし)
 - シートの見た目・開閉パターンは`#backup-passphrase-overlay`と同じ(`classList.add/remove('visible')`、`lockScroll()`/`unlockScroll()`)
 - `#qr-code-canvas`背景は`#fff`固定(CSS変数不使用、ダークモードでも読み取り精度確保のため)
 - おでかけ画面: tabs-section(いつ行く？4タブ)は廃止済み。`#filter-row-category`がheader直下に常時表示、`#event-filter-btn`→`#event-filter-sheet`ボトムシート(いつ行く？/誰と/エリア/キーワード)。プロフィールのwhoフィルターは廃止、`filterWho`(シート選択)に統一
