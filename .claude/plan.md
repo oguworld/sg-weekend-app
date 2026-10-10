@@ -21615,3 +21615,20 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 🔴Critical無し
 
 **変更しなかったもの(スコープ外として維持)**: トグルの開閉ロジック(`toggleFarePanel()`)・ピル表示・色分け(`_fareScoreTier()`)・データ取得(`content/fare-seasons.json`・`GET /api/fare-seasons`)はすべて無変更。都市リスト(18都市、追記8以降無変更)。
+
+### 設計書222 追記13(2026-10-10): 都市説明(notes)の簡潔化(builder→checker→closer)
+
+**背景**: `content/fare-seasons.json`各都市の`notes`フィールドが冗長(詳細パネルの🗓ベストシーズン・💰価格帯の行とほぼ同じ内容を文章で繰り返している)とユーザーから指摘があり、重複情報を削り各都市固有の一言に絞った簡潔な文言に差し替える。
+
+**実装内容**:
+- `content/fare-seasons.json`の18都市すべての`notes`フィールドを、ユーザー指定の簡潔な文言に置き換え(他フィールドは無変更)
+- 例: 東京「お盆(8月)・年末年始(12月)・GW(4〜5月)は日本人の帰省と観光需要が重なり高くなりやすい月です。6月・10月は閑散期で狙い目です。」→「お盆・年末年始・GWは帰省需要と重なり混みやすい時期です。」
+
+**checker結果**:
+- `node scripts/validate-fare-seasons.js`: 18都市検証OK
+- 18都市すべての`notes`を対応表と1件ずつ照合、都市の取り違え無く全件一致を確認(Pythonスクリプトで機械的に検証)
+- `git diff`でnotes行以外の差分が無いことを確認(levels/climate/cheapestMonths等は無変更)
+- `GET /api/fare-seasons`のレスポンス(curl)に新しいnotesが反映されていることを確認(`content/`配下のため`pm2 restart`不要)
+- 🔴Critical無し
+
+**変更しなかったもの(スコープ外として維持)**: 都市リスト(18都市)・levels・climate・cheapestMonths・flightHours等の他フィールド、トグル行+パネルのUI構造・ロジック(追記10〜12で確定済み、無変更)。
