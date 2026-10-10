@@ -215,6 +215,8 @@ VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラ
 - **スクロールトップFAB(`#fab-top`)**: `calendar-scroll-content`も監視対象。新しい`.screen-scroll-content`画面追加時はスクロールリスナー・`fabScrollTop()`のtargetId分岐の2箇所を必ず更新
 
 ### 航空券シーズン表（設計書222→2回のUI再設計を経て月カード統合+吹き出しポップオーバー方式に確定、2026-10-09）
+**2026-10-10時点で一時非表示化済み**(`public/app.css`の`.cal-fare-icon-btn`に`display:none !important`を追記)。理由: 都市リスト見直し(札幌・クアラルンプール除外、フーコック島・コタキナバル・ジョグジャカルタ等の追加候補)が未着手のまま本番リリース(iOS/Android)を迎えてしまうため、ユーザー指示でUIのみ一時的に隠した。**コード・データは一切削除しておらず、ロジック(`loadFareSeasonsData()`・`toggleFareBubble()`・`renderFareBubble()`等)・`content/fare-seasons.json`・`GET /api/fare-seasons`はすべて残置**。再表示する際は`public/app.css`に追加した非表示ルールを削除するだけでよい(都市リスト見直し完了後が前提)。以下は非表示化前の設計内容(ロジック自体は現存):
+
 SG発の航空券が高い/安い月を行き先別の5段階で示す**静的な目安表**(実運賃は扱わない)。初版15都市: 東京・大阪・札幌・クアラルンプール・ペナン・バンコク・プーケット・バリ・ホーチミン・ダナン・セブ・モルディブ・シドニー・パース・台北。**UIは「別シート(月選択チップ＋ランキングリスト)」方式から、各月カードの見出し行に統合する「吹き出しポップオーバー」方式に作り直し済み**(カレンダー機能とフィットしていないとのフィードバックのため2回再設計。データ・API・ロジックは一貫して無変更)。
 
 - **データ**: `content/fare-seasons.json`(**`data/`配下ではなくgit管理対象**。手書きで磨くコンテンツのため`data/`のgitignoreから意図的に外している)。都市ごとに`levels`[12か月、1〜5]・`climate`[12か月]・`haul`(near/mid/far)・`direct`・`flightHours`・`cheapestMonths`・`notes`を保持。編集時は`node scripts/validate-fare-seasons.js`で形式検証(levels/climateが12要素、レベル1〜5の整数、cheapestMonthsに挙げた月のレベルが実際に最安値と一致、等)してからコミットする

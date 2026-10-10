@@ -21481,3 +21481,24 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - `submit_existing_draft`はApp Store Connect上に審査提出対象のビルド・メタデータのドラフトが**事前に人間の手で用意されていること**が前提。実際にこれらのワークフローを実行した動作確認は未実施（静的な正しさの担保のみ）
 - `ios-app/README.md`に両機能の使い方（起動方法・前提条件・ローカル実行コマンド）を追記済み
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）
+
+---
+
+### 設計書222 追記6(2026-10-10): 航空券シーズン表を一時非表示化(builder→checker→closer)
+
+**背景**: 都市リストの見直し(札幌・クアラルンプール除外、フーコック島・コタキナバル・ジョグジャカルタ等の追加候補)が未着手のまま本番リリース(iOS/Android)を迎えてしまうため、UIのみ一時的に隠すことになった(ユーザー指示)。コード・データは一切削除しない。
+
+**実装内容**:
+- `public/app.css`の`.cal-fare-icon-btn`既存ブロック直後に、同セレクタへの新規ルール`.cal-fare-icon-btn { display: none !important; }`を追記し、各月カード見出しの✈アイコンボタンを非表示化。既存の`.cal-fare-icon-btn`定義自体は無変更
+- 吹き出し(`.cal-fare-bubble`)を開く経路は`toggleFareBubble()`の呼び出し元(ボタンの`onclick`属性＋`#calendar-list`のtouchend委譲)の2箇所のみで、他にJSから直接呼ばれる経路が無いことを確認済み。ボタン非表示化のみで吹き出しも開けなくなるため、`.cal-fare-bubble`自体のCSS変更は不要と判断(変更せず)
+- `public/app.js`・`server.js`・`content/fare-seasons.json`・`scripts/validate-fare-seasons.js`・`GET /api/fare-seasons`はいずれも無変更(ロジック・データは残置)
+- キャッシュバスティング: `public/index.html`のCSSクエリを`20261009d→20261010a`、`public/sw.js`の`CACHE_NAME`を`v937→v938`にバンプ(app.cssのみ変更のためJSクエリは無変更)
+
+**checker結果**:
+- CSS構文: 波括弧の対応をNode.jsスクリプトで確認しバランスOK
+- `pm2 restart sg-weekend`後、`curl`で実配信された`/app.css`に`.cal-fare-icon-btn { display: none !important; }`が既存ブロック直後に追加されていることを確認
+- `.cal-season-icon-btn`・`.cal-month-season-bubble`・`.cal-month-head-outer`等、他の月見出し要素のセレクタ定義に変更・巻き込みが無いことを確認(セレクタ名完全一致のため影響範囲は`.cal-fare-icon-btn`のみ)
+- `curl`で`/`(index.html)のCSSクエリが`20261010a`、`/sw.js`の`CACHE_NAME`が`v938`になっていることを実配信ベースで確認
+- 🔴Critical無し
+
+**再表示する際の手順**: `public/app.css`に追加した`.cal-fare-icon-btn { display: none !important; }`ルール(コメント含む)を削除するだけでよい(CSSキャッシュバスティングのバンプは再表示時にも必要)。
