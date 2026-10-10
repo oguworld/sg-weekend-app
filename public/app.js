@@ -1752,7 +1752,18 @@
 
     // ─── カレンダー画面 予定のinfoボタン・月見出しの季節アイコン・航空券トグル行・航空券ピル
     //     即時タップ対応（いずれも動的に再描画されるため#calendar-listへのイベント委譲） ───
+    // filter-row-category等と同じパターン: touchstartで開始座標を記録し、touchendで移動量(dx/dy)が
+    // 閾値を超えていればスクロール/ドラッグとみなしタップ処理をしない（ボタン上から指を離さず
+    // スクロールするとトグルが開閉してしまう不具合の修正）
+    let _calListTouchStartX = 0, _calListTouchStartY = 0;
+    document.getElementById('calendar-list')?.addEventListener('touchstart', e => {
+      _calListTouchStartX = e.touches[0].clientX;
+      _calListTouchStartY = e.touches[0].clientY;
+    }, { passive: true });
     document.getElementById('calendar-list')?.addEventListener('touchend', e => {
+      const dx = Math.abs(e.changedTouches[0].clientX - _calListTouchStartX);
+      const dy = Math.abs(e.changedTouches[0].clientY - _calListTouchStartY);
+      if (dx > 8 || dy > 8) return;
       const seasonBtn = e.target.closest('.cal-season-icon-btn');
       if (seasonBtn) {
         e.preventDefault();
