@@ -15,7 +15,7 @@ MacInCloud（またはローカルMac）で一度だけ初期セットアップ�
 - Xcode 15以上がインストールされていること
 - Node.js 20以上がインストールされていること
 - Apple Developer Programに登録済みであること（$99/年）
-- App Store ConnectでApp IDを作成済みであること（`app.dosuru.odenavi`）
+- App Store ConnectでApp IDを作成済みであること（`app.dosuru`）
 
 ### 1. リポジトリのクローン
 
@@ -52,7 +52,7 @@ npx cap open ios
 ```
 
 Xcodeが開いたら以下を確認してください：
-- Bundle Identifier: `app.dosuru.odenavi`
+- Bundle Identifier: `app.dosuru`
 - Signing & Capabilities でDeveloperアカウントを選択
 - ビルドが通ることを確認（実機またはシミュレーター）
 
@@ -74,23 +74,12 @@ fastlane init
 
 プロンプトに従ってApp Store Connect APIキーを設定します。
 
-### 8. Match（証明書管理）の初期化
+**注意**: 現行の`Fastfile`（`deploy`/`release_production`レーン）はFastlane Match（証明書の自動管理）を
+使用していません。配布証明書（`.p12`、`DIST_CERT_BASE64`/`DIST_CERT_PASSWORD`）とプロビジョニング
+プロファイル（`.mobileprovision`、`PROVISION_PROFILE_BASE64`）は、事前に手動で作成しbase64化して
+GitHub Secretsに登録する運用です。`fastlane match init`は本プロジェクトでは不要です。
 
-証明書を管理するためのprivate GitHubリポジトリを事前に作成してください（例: `sg-weekend-certs`）。
-
-```bash
-fastlane match init
-```
-
-GitリポジトリのURLを入力して初期化します。
-
-```bash
-fastlane match appstore
-```
-
-App Store用の証明書・プロビジョニングプロファイルを生成してGitHubに保存します。
-
-### 9. GitHub Secretsに認証情報を登録
+### 8. GitHub Secretsに認証情報を登録
 
 GitHubリポジトリの Settings → Secrets and variables → Actions に以下を登録してください：
 
@@ -99,18 +88,21 @@ GitHubリポジトリの Settings → Secrets and variables → Actions に以�
 | `ASC_KEY_ID` | App Store Connect APIキーのID |
 | `ASC_ISSUER_ID` | App Store Connect APIキーの発行者ID |
 | `ASC_PRIVATE_KEY` | `.p8` ファイルの中身（改行含む文字列） |
-| `MATCH_PASSWORD` | Match証明書リポジトリの暗号化パスワード |
-| `MATCH_GIT_BASIC_AUTH` | 証明書repoへのアクセス用（`username:token` 形式） |
+| `DIST_CERT_BASE64` | 配布用証明書（`.p12`）をbase64化した文字列 |
+| `DIST_CERT_PASSWORD` | 上記`.p12`のパスワード |
+| `PROVISION_PROFILE_BASE64` | App Store配布用プロビジョニングプロファイル（`.mobileprovision`）をbase64化した文字列 |
+| `APPLE_TEAM_ID` | Apple Developer Team ID（`4P3SWV4X5U`） |
+
+※ `release_production`レーン（本番審査提出）も上記と同じSecretsをそのまま使います。追加のSecret登録は不要です。
 
 ---
 
-## 日常的なリリース手順
+## 日常的なリリース手順（TestFlight配信）
 
 1. `main` ブランチで開発・テスト
 2. リリースしたいタイミングで `release` ブランチにマージ/push
-3. GitHub Actionsが自動でビルド → App Store申請
-4. App Store Connectで審査に提出
-5. Appleの審査通過 → ユーザーに届く
+3. GitHub Actions（`ios-deploy.yml`）が自動でビルド → TestFlightへアップロード（社内テストのみ、`distribute_external: false`）
+4. TestFlightで動作確認
 
 ```bash
 git checkout release
@@ -120,20 +112,52 @@ git push origin release
 
 ---
 
+## App Store本番審査提出（`release_production`、設計書223）
+
+既存のTestFlight配信フロー（`release`ブランチpush→`ios-deploy.yml`）とは完全に分離した、
+**手動実行専用**のワークフローです。`push`では絶対に起動しません。
+
+- ワークフローファイル: `.github/workflows/ios-release-production.yml`
+- 起動方法: GitHubリポジトリの Actions タブ →「iOS Release to App Store (Production Review Submission)」→
+  「Run workflow」→ `confirm`入力欄に**厳密に`SUBMIT`**と入力して実行（大文字小文字・前後の空白も含めて完全一致が必要。
+  一致しない場合はジョブの最初のステップで`exit 1`し、以降の処理は一切実行されません）
+- 実行内容: 証明書インポート・ビルドまでは`deploy`レーンと同一。最後に`fastlane release_production`を実行し、
+  `deliver`アクションで以下を行う:
+  - `skip_metadata: true` / `skip_screenshots: true`（説明文・スクリーンショット等は変更せず、
+    App Store Connect上に既に設定済みのメタデータをそのまま使う）
+  - `submit_for_review: true`（審査に提出）
+  - `automatic_release: true`（**審査通過後、人間の追加操作なしで即座に一般公開**）
+  - `force: true`（CI非対話実行のため確認プロンプトをスキップ）
+
+### 実行前に必ず確認すること
+
+1. **App Store Connect APIキーの権限確認**: 既存の`ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`は
+   TestFlightアップロード用に発行されたものであり、`deliver`（審査提出）に必要な権限（App Manager以上）を
+   持っているかは未確認です。権限不足の場合はワークフロー実行時にエラーになります（ビルド自体は成功して
+   いるため、既存のTestFlight配信には影響しません）。権限不足の場合は、App Store Connect
+   （ユーザー: WILLOA PTE. LTD.、Team ID: `4P3SWV4X5U`）で新しいAPIキーをApp Manager以上のロールで発行し、
+   GitHub Secretsの該当3つを更新してください。
+2. **初回実行は何か軽微な変更を含むビルドで試すことを推奨**: `automatic_release: true`により審査通過後は
+   即座に一般公開されるため、まずは文言修正等の軽微な変更を一度TestFlightにアップロードした上で、この
+   ワークフローを手動実行して一連の動作（ビルド→審査提出→可能であれば権限確認）を確かめてから本格運用に
+   入ることを推奨します。
+
+---
+
 ## ローカルでFastlaneを手動実行する場合
 
 TestFlight経由でテスト配信:
 
 ```bash
 cd ios-app
-bundle exec fastlane beta
+bundle exec fastlane deploy
 ```
 
-App Storeに本番申請:
+App Store本番審査提出（`automatic_release: true`、実行注意は上記参照）:
 
 ```bash
 cd ios-app
-bundle exec fastlane deploy
+bundle exec fastlane release_production
 ```
 
 ---
@@ -163,9 +187,7 @@ npx cap sync ios
 
 ### 証明書エラーが出る場合
 
-```bash
-cd ios-app
-bundle exec fastlane match appstore --force
-```
-
-で証明書を再生成してください。
+本プロジェクトはFastlane Matchを使用していません。`DIST_CERT_BASE64`/`DIST_CERT_PASSWORD`/
+`PROVISION_PROFILE_BASE64`（GitHub Secrets）の配布証明書・プロビジョニングプロファイルが
+有効期限切れ・失効していないか、Apple Developerサイトで確認してください。失効している場合は
+新しい証明書・プロビジョニングプロファイルを作成し、base64化してSecretsを更新してください。

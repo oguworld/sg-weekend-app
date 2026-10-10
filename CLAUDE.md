@@ -97,7 +97,7 @@ sg-weekend-app/
 - CI/CD: `release`ブランチpush→GitHub Actions(`ios-deploy.yml`、macOS runner)→Fastlane `deploy`レーン→TestFlight配信(社内テストのみ、`distribute_external: false`)
 - 証明書管理はFastlane Matchを使用していない(`ios-app/fastlane/Appfile`/`Fastfile`に実装なし)。配布証明書(`.p12`)・プロビジョニングプロファイル(`.mobileprovision`)は事前に手動作成してbase64化しGitHub Secretsに登録する運用
 - GitHub Secrets: `ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`/`DIST_CERT_BASE64`/`DIST_CERT_PASSWORD`/`PROVISION_PROFILE_BASE64`/`APPLE_TEAM_ID`
-- **本番審査提出の自動化(設計書223)**: `release`ブランチpushトリガーの既存フローとは完全に分離した新規ワークフロー`.github/workflows/ios-release-production.yml`を`workflow_dispatch`専用(pushトリガー無し)で追加。手動実行時に`inputs.confirm`へ厳密に`SUBMIT`と入力しないとジョブ先頭で`exit 1`する安全策あり。Fastlaneレーン`release_production`(`deploy`と同じ証明書インポート～`build_app`を経て`deliver`を呼ぶ、`deploy`レーン自体は無変更)が`skip_metadata: true`/`skip_screenshots: true`(メタデータはApp Store Connect側の既存設定をそのまま使用、リポジトリ管理化はスコープ外)・`submit_for_review: true`・`automatic_release: true`(審査通過後に人間の追加操作なしで即座に一般公開)・`force: true`で`deliver`を実行。既存`ASC_KEY_ID`等のAPIキーが`deliver`に必要なApp Manager以上の権限を持つかは未確認(権限不足時はCI実行時にエラーになるのみで既存TestFlight配信には影響しない)
+- **本番審査提出の自動化(設計書224)**: `release`ブランチpushトリガーの既存フローとは完全に分離した新規ワークフロー`.github/workflows/ios-release-production.yml`を`workflow_dispatch`専用(pushトリガー無し)で追加。手動実行時に`inputs.confirm`へ厳密に`SUBMIT`と入力しないとジョブ先頭で`exit 1`する安全策あり。Fastlaneレーン`release_production`(`deploy`と同じ証明書インポート～`build_app`を経て`deliver`を呼ぶ、`deploy`レーン自体は無変更)が`skip_metadata: true`/`skip_screenshots: true`(メタデータはApp Store Connect側の既存設定をそのまま使用、リポジトリ管理化はスコープ外)・`submit_for_review: true`・`automatic_release: true`(審査通過後に人間の追加操作なしで即座に一般公開)・`force: true`で`deliver`を実行。既存`ASC_KEY_ID`等のAPIキーが`deliver`に必要なApp Manager以上の権限を持つかは未確認(権限不足時はCI実行時にエラーになるのみで既存TestFlight配信には影響しない)
 - 詳細手順: `ios-app/README.md`参照
 
 ## iOSアプリのAPNsプッシュ通知対応

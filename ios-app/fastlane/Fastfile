@@ -87,4 +87,75 @@ platform :ios do
       notify_external_testers:           false
     )
   end
+
+  # 設計書223: App Store本番審査提出の自動化（workflow_dispatchのみ、release/deployレーンとは完全分離）。
+  # 証明書インポート～build_appまでは上記deployレーンと同一の手順を踏み、最後にTestFlightアップロード
+  # ではなくdeliverで審査提出まで行う。既存のdeployレーン・TestFlight配信フローには一切変更を加えない。
+  desc "Build and submit for App Store review (fully automatic, workflow_dispatch only)"
+  lane :release_production do
+    setup_ci if ENV['CI']
+
+    cert_path = File.join(Dir.tmpdir, "dist.p12")
+    File.binwrite(cert_path, Base64.decode64(ENV['DIST_CERT_BASE64']))
+    import_certificate(
+      certificate_path:     cert_path,
+      certificate_password: ENV['DIST_CERT_PASSWORD'],
+      keychain_name:        "fastlane_tmp_keychain",
+      keychain_password:    ""
+    )
+
+    profile_path = File.join(Dir.tmpdir, "profile.mobileprovision")
+    File.binwrite(profile_path, Base64.decode64(ENV['PROVISION_PROFILE_BASE64']))
+    install_provisioning_profile(path: profile_path)
+
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      team_id:               ENV['APPLE_TEAM_ID'],
+      bundle_identifier:     "app.dosuru",
+      code_sign_identity:    "Apple Distribution",
+      profile_name:          "dosuru_appstore",
+      path:                  "ios/App/App.xcodeproj"
+    )
+
+    app_version = ENV['APP_VERSION'] || "1.1"
+
+    build_app(
+      workspace:      "ios/App/App.xcworkspace",
+      scheme:         "App",
+      export_method:  "app-store",
+      xcargs:         "DEVELOPMENT_TEAM=#{ENV['APPLE_TEAM_ID']} CODE_SIGN_STYLE=Manual CURRENT_PROJECT_VERSION=#{ENV['BUILD_NUMBER']} MARKETING_VERSION=#{app_version}",
+      export_options: {
+        teamID:               ENV['APPLE_TEAM_ID'],
+        provisioningProfiles: { "app.dosuru" => "dosuru_appstore" }
+      }
+    )
+
+    # 既存deployレーンと同じApp Store Connect API認証情報を使う。
+    # 注意: このAPIキーがdeliver（審査提出）に必要な権限（App Manager以上）を
+    # 持っているかは未確認。権限不足の場合はここでエラーになる（ビルド自体は成功済みのため
+    # TestFlightには影響しない）。権限エラーが出た場合は、App Store Connect
+    # （ユーザー: WILLOA PTE. LTD.、Team ID: 4P3SWV4X5U）で新しいAPIキーをApp Manager以上の
+    # ロールで発行し、GitHub SecretsのASC_KEY_ID/ASC_ISSUER_ID/ASC_PRIVATE_KEYを更新すること。
+    api_key = app_store_connect_api_key(
+      key_id:      ENV['ASC_KEY_ID'],
+      issuer_id:   ENV['ASC_ISSUER_ID'],
+      key_content: ENV['ASC_PRIVATE_KEY']
+    )
+
+    # メタデータ・スクリーンショットはリポジトリ管理にしていないため、
+    # App Store Connect側に既存のメタデータ（説明文・スクリーンショット等、
+    # 既にアプリ公開時に設定済み）をそのまま使う。今回自動化するのは
+    # 「次のビルドの審査提出」のみで、メタデータ変更は引き続き人間が
+    # App Store Connect画面で行う。
+    deliver(
+      api_key:              api_key,
+      app_identifier:       "app.dosuru",
+      skip_metadata:        true,
+      skip_screenshots:     true,
+      skip_binary_upload:   false,
+      submit_for_review:    true,
+      automatic_release:    true,
+      force:                true
+    )
+  end
 end

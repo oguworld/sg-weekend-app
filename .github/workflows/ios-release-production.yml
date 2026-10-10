@@ -1,0 +1,276 @@
+name: iOS Release to App Store (Production Review Submission)
+
+# 設計書223: 本番App Store審査提出の自動化。
+# 既存のios-deploy.yml（releaseブランチpushトリガー、TestFlight配信用）とは完全に分離した
+# 別ワークフロー。pushトリガーは一切持たず、workflow_dispatch（手動実行）のみで起動する。
+# 誤爆防止のため、confirm入力欄に厳密に "SUBMIT" と入力しない限りジョブ自体を失敗させる。
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '本番審査提出を実行する場合のみ SUBMIT と入力してください（大文字小文字・前後の空白も厳密一致）'
+        required: true
+        type: string
+
+jobs:
+  release_production:
+    runs-on: macos-latest
+    steps:
+      - name: Guard - require exact "SUBMIT" confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "SUBMIT" ]; then
+            echo "confirm入力が 'SUBMIT' と一致しないため、本番審査提出を中止します。"
+            exit 1
+          fi
+          echo "confirm確認OK。本番審査提出を開始します。"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Capacitor dependencies
+        run: |
+          cd ios-app
+          npm install
+
+      - name: Add iOS platform
+        run: |
+          cd ios-app
+          npx cap add ios
+
+      - name: Generate app icons and splash screen
+        run: |
+          cd ios-app
+          npx capacitor-assets generate --ios
+
+      # 設計書195と同内容（ios-deploy.ymlと同一処理）: Notifications用20ptを含む
+      # iOS標準フルサイズAppIconセット一式をios-app/resources/icon.pngから生成し、
+      # Contents.jsonを丸ごと置き換える。
+      - name: (通知アイコン修正v2) Replace single-size AppIcon with full-size icon set including Notifications (20pt)
+        run: |
+          cd ios-app
+          npm install --no-save sharp
+          node - <<'NODEEOF'
+          const sharp = require('sharp');
+          const fs = require('fs');
+          const path = require('path');
+
+          const SOURCE_ICON = path.join(__dirname, 'resources', 'icon.png');
+          const APPICONSET_DIR = path.join(__dirname, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset');
+          const CONTENTS_JSON_PATH = path.join(APPICONSET_DIR, 'Contents.json');
+
+          const ICON_SET = [
+            { idiom: 'iphone', size: '20x20',     scale: '2x', px: 40,   filename: 'AppIcon-20@2x.png' },
+            { idiom: 'iphone', size: '20x20',     scale: '3x', px: 60,   filename: 'AppIcon-20@3x.png' },
+            { idiom: 'iphone', size: '29x29',     scale: '2x', px: 58,   filename: 'AppIcon-29@2x.png' },
+            { idiom: 'iphone', size: '29x29',     scale: '3x', px: 87,   filename: 'AppIcon-29@3x.png' },
+            { idiom: 'iphone', size: '40x40',     scale: '2x', px: 80,   filename: 'AppIcon-40@2x.png' },
+            { idiom: 'iphone', size: '40x40',     scale: '3x', px: 120,  filename: 'AppIcon-40@3x.png' },
+            { idiom: 'iphone', size: '60x60',     scale: '2x', px: 120,  filename: 'AppIcon-60@2x.png' },
+            { idiom: 'iphone', size: '60x60',     scale: '3x', px: 180,  filename: 'AppIcon-60@3x.png' },
+            { idiom: 'ipad',   size: '20x20',     scale: '1x', px: 20,   filename: 'AppIcon-20~ipad.png' },
+            { idiom: 'ipad',   size: '20x20',     scale: '2x', px: 40,   filename: 'AppIcon-20@2x~ipad.png' },
+            { idiom: 'ipad',   size: '29x29',     scale: '1x', px: 29,   filename: 'AppIcon-29~ipad.png' },
+            { idiom: 'ipad',   size: '29x29',     scale: '2x', px: 58,   filename: 'AppIcon-29@2x~ipad.png' },
+            { idiom: 'ipad',   size: '40x40',     scale: '1x', px: 40,   filename: 'AppIcon-40~ipad.png' },
+            { idiom: 'ipad',   size: '40x40',     scale: '2x', px: 80,   filename: 'AppIcon-40@2x~ipad.png' },
+            { idiom: 'ipad',   size: '76x76',     scale: '1x', px: 76,   filename: 'AppIcon-76.png' },
+            { idiom: 'ipad',   size: '76x76',     scale: '2x', px: 152,  filename: 'AppIcon-76@2x.png' },
+            { idiom: 'ipad',   size: '83.5x83.5', scale: '2x', px: 167,  filename: 'AppIcon-83.5@2x.png' },
+            { idiom: 'ios-marketing', size: '1024x1024', scale: '1x', px: 1024, filename: 'AppIcon-1024.png' },
+          ];
+
+          async function main() {
+            if (!fs.existsSync(SOURCE_ICON)) {
+              throw new Error(`Source icon not found: ${SOURCE_ICON}`);
+            }
+            if (!fs.existsSync(APPICONSET_DIR)) {
+              throw new Error(`AppIcon.appiconset not found: ${APPICONSET_DIR}`);
+            }
+
+            for (const entry of fs.readdirSync(APPICONSET_DIR)) {
+              if (entry.toLowerCase().endsWith('.png')) {
+                fs.unlinkSync(path.join(APPICONSET_DIR, entry));
+                console.log(`REMOVE stale icon ${entry}`);
+              }
+            }
+
+            for (const { filename, px } of ICON_SET) {
+              const outPath = path.join(APPICONSET_DIR, filename);
+              let pipeline = sharp(SOURCE_ICON).resize(px, px);
+              if (filename === 'AppIcon-1024.png') {
+                pipeline = pipeline.flatten({ background: '#ffffff' });
+              }
+              await pipeline.png().toFile(outPath);
+
+              const meta = await sharp(outPath).metadata();
+              if (meta.hasAlpha) {
+                await sharp(outPath).removeAlpha().png().toFile(outPath + '.tmp');
+                fs.renameSync(outPath + '.tmp', outPath);
+                console.log(`REMOVE-ALPHA re-encoded ${filename} (had alpha channel)`);
+              }
+              console.log(`CREATE ios icon ${outPath} (${px}x${px})`);
+            }
+
+            const newContents = {
+              images: ICON_SET.map(({ idiom, size, scale, filename }) => ({ idiom, size, scale, filename })),
+              info: { author: 'xcode', version: 1 },
+            };
+
+            fs.writeFileSync(CONTENTS_JSON_PATH, JSON.stringify(newContents, null, 2));
+            console.log('Contents.json replaced with full-size icon set:');
+            console.log(JSON.stringify(newContents.images, null, 2));
+          }
+
+          main().catch((e) => {
+            console.error(e);
+            process.exit(1);
+          });
+          NODEEOF
+
+      - name: Sync Capacitor
+        run: |
+          cd ios-app
+          npx cap sync ios
+
+      - name: (App Store審査対応) Ensure privacy manifests for GoogleSignIn/GTMAppAuth/GTMSessionFetcher
+        run: |
+          cd ios-app
+          python3 ../scripts/ensure-privacy-manifests.py ios/App/Podfile
+
+      - name: (App Store審査対応) Ensure minimum iOS version is 15.0 (ITMS-90068)
+        run: |
+          cd ios-app
+          python3 ../scripts/ensure-min-ios-version.py ios
+
+      - name: (App Store審査対応) Re-run pod install after Podfile patch
+        run: |
+          cd ios-app/ios/App
+          pod install
+
+      - name: (課題1) Ensure APNs bridge methods in AppDelegate.swift
+        run: |
+          cd ios-app
+          python3 ../scripts/ensure-apns-bridge.py ios/App/App/AppDelegate.swift
+
+      - name: Set export compliance in Info.plist
+        run: |
+          cd ios-app
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" ios/App/App/Info.plist
+
+      - name: Set status bar style in Info.plist
+        run: |
+          cd ios-app
+          /usr/libexec/PlistBuddy -c "Add :UIViewControllerBasedStatusBarAppearance bool false" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :UIViewControllerBasedStatusBarAppearance false" ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UIStatusBarStyle string UIStatusBarStyleDarkContent" ios/App/App/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Set :UIStatusBarStyle UIStatusBarStyleDarkContent" ios/App/App/Info.plist
+
+      - name: Set Google Sign-In URL scheme in Info.plist
+        run: |
+          cd ios-app
+          python3 - <<'PYEOF'
+          import plistlib
+
+          plist_path = "ios/App/App/Info.plist"
+          reversed_client_id = "com.googleusercontent.apps.928776929755-ne2tlcmg60esqkgfb1uiuujgh7k13bh4"
+
+          with open(plist_path, "rb") as f:
+              plist = plistlib.load(f)
+
+          url_types = plist.get("CFBundleURLTypes", [])
+          url_types.append({"CFBundleURLSchemes": [reversed_client_id]})
+          plist["CFBundleURLTypes"] = url_types
+
+          with open(plist_path, "wb") as f:
+              plistlib.dump(plist, f)
+
+          print(f"CFBundleURLTypes now: {plist['CFBundleURLTypes']}")
+          PYEOF
+
+      - name: Create App.entitlements (Push Notifications + Sign in with Apple capabilities)
+        run: |
+          cd ios-app
+          ENTITLEMENTS_PATH="ios/App/App/App.entitlements"
+          if [ ! -f "$ENTITLEMENTS_PATH" ]; then
+            printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n</dict>\n</plist>\n' > "$ENTITLEMENTS_PATH"
+          fi
+          /usr/libexec/PlistBuddy -c "Add :aps-environment string production" "$ENTITLEMENTS_PATH" || \
+          /usr/libexec/PlistBuddy -c "Set :aps-environment production" "$ENTITLEMENTS_PATH"
+          python3 - <<'PYEOF'
+          import plistlib
+          path = "ios/App/App/App.entitlements"
+          with open(path, "rb") as f:
+              ent = plistlib.load(f)
+          ent["com.apple.developer.applesignin"] = ["Default"]
+          with open(path, "wb") as f:
+              plistlib.dump(ent, f)
+          print(f"entitlements now: {ent}")
+          PYEOF
+          cat "$ENTITLEMENTS_PATH"
+
+      - name: Select Xcode 26
+        run: |
+          XCODE=$(ls /Applications/ | grep -E '^Xcode_26' | sort -r | head -1)
+          if [ -n "$XCODE" ]; then
+            sudo xcode-select -s "/Applications/${XCODE}"
+            echo "Selected: $XCODE"
+          else
+            echo "Xcode 26 not found, using default: $(xcode-select -p)"
+          fi
+          xcodebuild -version
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ios-app
+
+      - name: Wire App.entitlements into Xcode project build settings
+        run: |
+          cd ios-app
+          bundle exec ruby -e '
+            require "xcodeproj"
+            project_path = "ios/App/App.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.find { |t| t.name == "App" }
+            raise "App target not found" unless target
+            target.build_configurations.each do |config|
+              config.build_settings["CODE_SIGN_ENTITLEMENTS"] = "App/App.entitlements"
+            end
+            project.save
+            puts "CODE_SIGN_ENTITLEMENTS set for #{target.build_configurations.map(&:name).join(%q{, })}"
+          '
+
+      - name: Extract release notes from package.json
+        id: notes
+        run: |
+          NOTES=$(node -p "require('./ios-app/package.json').releaseNotes || 'バグ修正とパフォーマンス改善'")
+          VER=$(node -p "require('./ios-app/package.json').version")
+          {
+            echo "release_notes<<RELEASE_NOTES_EOF"
+            echo "$NOTES"
+            echo "RELEASE_NOTES_EOF"
+          } >> $GITHUB_OUTPUT
+          echo "app_version=${VER}" >> $GITHUB_OUTPUT
+
+      - name: Build and submit for App Store review (automatic release)
+        run: |
+          cd ios-app
+          bundle exec fastlane release_production
+        env:
+          ASC_KEY_ID:               ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:            ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY:          ${{ secrets.ASC_PRIVATE_KEY }}
+          DIST_CERT_BASE64:         ${{ secrets.DIST_CERT_BASE64 }}
+          DIST_CERT_PASSWORD:       ${{ secrets.DIST_CERT_PASSWORD }}
+          PROVISION_PROFILE_BASE64: ${{ secrets.PROVISION_PROFILE_BASE64 }}
+          APPLE_TEAM_ID:            ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_NUMBER:             ${{ github.run_number }}
+          APP_VERSION:              ${{ steps.notes.outputs.app_version }}
