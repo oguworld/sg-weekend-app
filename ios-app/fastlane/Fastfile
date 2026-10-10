@@ -147,7 +147,16 @@ platform :ios do
     # 既にアプリ公開時に設定済み）をそのまま使う。今回自動化するのは
     # 「次のビルドの審査提出」のみで、メタデータ変更は引き続き人間が
     # App Store Connect画面で行う。
-    deliver(
+    #
+    # 設計書224（拡張）: ENV['RELEASE_NOTES']が指定された場合のみ、
+    # App Store Connectの「新機能」欄（ja）をdeliver経由で更新する。
+    # skip_metadata:trueのままでもrelease_notesパラメータを明示的に渡せば
+    # 「新機能」欄だけが更新され、他のメタデータ・スクリーンショットには
+    # 影響しない（Fastlane deliverの仕様）。未指定時はパラメータ自体を渡さず、
+    # 従来通りの挙動を維持する（後方互換）。
+    release_notes = ENV['RELEASE_NOTES']
+
+    deliver_options = {
       api_key:              api_key,
       app_identifier:       "app.dosuru",
       skip_metadata:        true,
@@ -156,6 +165,43 @@ platform :ios do
       submit_for_review:    true,
       automatic_release:    true,
       force:                true
+    }
+
+    unless release_notes.nil? || release_notes.strip.empty?
+      deliver_options[:release_notes] = { "ja" => release_notes }
+    end
+
+    deliver(deliver_options)
+  end
+
+  # 設計書224（拡張、機能2）: App Store Connect上に人間が事前に用意した既存ドラフト／ビルドを
+  # そのまま審査提出する専用レーン。build_app・証明書インポート等の一切のビルド関連処理を
+  # 行わない（新規ビルドを作らないため不要）。skip_binary_upload:trueにより、deliverは
+  # バイナリをアップロードせず、App Store Connect上に既にあるビルドを審査提出対象とする。
+  desc "Submit an existing App Store Connect draft/build for review without building a new binary"
+  lane :submit_existing_draft do
+    api_key = app_store_connect_api_key(
+      key_id:      ENV['ASC_KEY_ID'],
+      issuer_id:   ENV['ASC_ISSUER_ID'],
+      key_content: ENV['ASC_PRIVATE_KEY']
     )
+
+    release_notes = ENV['RELEASE_NOTES']
+    has_release_notes = !(release_notes.nil? || release_notes.strip.empty?)
+
+    deliver_options = {
+      api_key:              api_key,
+      app_identifier:       "app.dosuru",
+      skip_binary_upload:   true,
+      skip_screenshots:     true,
+      skip_metadata:        !has_release_notes,
+      submit_for_review:    true,
+      automatic_release:    true,
+      force:                true
+    }
+
+    deliver_options[:release_notes] = { "ja" => release_notes } if has_release_notes
+
+    deliver(deliver_options)
   end
 end

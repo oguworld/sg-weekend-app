@@ -11,6 +11,10 @@ on:
         description: '本番審査提出を実行する場合のみ SUBMIT と入力してください（大文字小文字・前後の空白も厳密一致）'
         required: true
         type: string
+      release_notes:
+        description: 'App Storeの「新機能」欄に反映するリリースノート。空なら更新しない'
+        required: false
+        type: string
 
 jobs:
   release_production:
@@ -274,3 +278,4 @@ jobs:
           APPLE_TEAM_ID:            ${{ secrets.APPLE_TEAM_ID }}
           BUILD_NUMBER:             ${{ github.run_number }}
           APP_VERSION:              ${{ steps.notes.outputs.app_version }}
+          RELEASE_NOTES:            ${{ inputs.release_notes }}

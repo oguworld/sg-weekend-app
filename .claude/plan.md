@@ -21448,3 +21448,36 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - releaserエージェントがこのスクリプトを呼び出す際は、本番審査提出の都度`--version-code`を正しく上げた値で呼ぶこと(事前チェックが古い/同一値を検知して止めるが、呼び出し側でも`androidVersionCode`の更新を徹底する運用が望ましい)
 - サービスアカウント鍵が未配置の現状では、事前チェック・本体処理ともに鍵未存在エラーで停止する(設計書223時点の既存挙動のまま)。鍵配置後、初回は`--non-interactive`を使わず人間が対話モードで一度試すことを推奨(設計書223の申し送り内容を維持)
 - ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）。新規ワークフローファイル自体はGitHub上にマージされるまで実行不可（`workflow_dispatch`はデフォルトブランチまたは対象ブランチにワークフローファイルが存在する必要があるため、マージ後に有効化される）
+
+---
+
+## 2026-10-10 設計書224拡張: release_productionへのリリースノート指定・既存ドラフト審査提出レーンの追加（builder→checker→closer）
+
+### 背景
+設計書224で実装済みの`release_production`レーン（毎回新規ビルド→審査提出）に対し、(1)App Store Connectの「新機能」欄をCIから更新する手段、(2)既にApp Store Connect上に用意されている既存ビルド・ドラフトを、新規ビルドなしでそのまま審査提出する手段、の2機能を追加した。
+
+### 実装内容
+
+**機能1: release_productionレーンへのリリースノート指定**
+- `ios-app/fastlane/Fastfile`の`release_production`レーン: `ENV['RELEASE_NOTES']`を読み、値がある場合のみ`deliver`呼び出しに`release_notes: { "ja" => release_notes }`を追加する。未指定（nilまたは空文字）の場合は`deliver_options`に`release_notes`キー自体を追加せず、既存の6パラメータ（`skip_metadata`/`skip_screenshots`/`skip_binary_upload`/`submit_for_review`/`automatic_release`/`force`）のみの呼び出しと完全に同一になる（後方互換）
+- `.github/workflows/ios-release-production.yml`の`workflow_dispatch.inputs`に`release_notes`（optional, string）を追加し、`RELEASE_NOTES: ${{ inputs.release_notes }}`としてFastlane実行時に環境変数で渡す
+
+**機能2: 既存ドラフトをビルドし直さず審査提出する新レーン・新ワークフロー**
+- `ios-app/fastlane/Fastfile`に新規レーン`submit_existing_draft`を追加。`build_app`・証明書インポート等のビルド関連処理を一切含まない。`app_store_connect_api_key`で認証後、`deliver(skip_binary_upload: true, skip_screenshots: true, skip_metadata: リリースノート未指定ならtrue/指定ならfalse, submit_for_review: true, automatic_release: true, force: true)`を呼ぶ。リリースノート指定時のみ機能1と同様に`release_notes: {"ja"=>...}`を渡す
+- 新規ワークフローファイル`.github/workflows/ios-submit-existing-draft.yml`を作成。`on: workflow_dispatch:`のみ（`push`トリガーなし）。`inputs.confirm`（required、厳密に`"SUBMIT"`一致を要求、不一致なら`exit 1`）と`inputs.release_notes`（optional）を設ける。証明書インポート等の重いセットアップは不要なため、`actions/checkout`→`ruby/setup-ruby`（`ios-app`ディレクトリ）→`bundle exec fastlane submit_existing_draft`のみのシンプルなジョブ構成
+- 既存の`ios-deploy.yml`・`ios-release-production.yml`の既存ロジックには変更を加えていない（`ios-release-production.yml`への変更は`release_notes` input追加の後方互換な追記のみ）
+
+### checker結果
+- YAML構文: `ios-release-production.yml`・新規`ios-submit-existing-draft.yml`ともPython `yaml.safe_load()`でパース成功
+- `ios-submit-existing-draft.yml`は`on: workflow_dispatch`のみで`push`トリガーが含まれないことを確認（最重要）
+- `confirm`ガードは既存`ios-release-production.yml`と同じ文字列完全一致パターンで実装されていることを確認
+- `git diff --stat`で`ios-deploy.yml`に差分が無いこと、`ios-release-production.yml`の差分が`release_notes` input追加の5行のみであることを確認
+- `release_production`レーンにおいて、`RELEASE_NOTES`未指定時は`deliver_options`に`release_notes`キーが追加されず既存の`deliver()`呼び出しと完全一致することをPythonスクリプトでFastfile文字列を抽出・検証し後方互換性を確認
+- `submit_existing_draft`レーンが`build_app`等のビルド関連処理を含まないこと、`skip_binary_upload: true`を含むことを確認
+- Ruby構文チェック（`ruby -c`）はVPS上にRubyが入っておらず実施不可。括弧・`do`/`end`の対応を目視で確認（既存レーンと同じハッシュリテラル・条件分岐パターンを踏襲）
+- 🔴Critical無し
+
+### 申し送り
+- `submit_existing_draft`はApp Store Connect上に審査提出対象のビルド・メタデータのドラフトが**事前に人間の手で用意されていること**が前提。実際にこれらのワークフローを実行した動作確認は未実施（静的な正しさの担保のみ）
+- `ios-app/README.md`に両機能の使い方（起動方法・前提条件・ローカル実行コマンド）を追記済み
+- ローカルコミットのみ実施。`main`/`release`いずれのリモートへのpushも未実施（ユーザーの明示指示があるまで待機）

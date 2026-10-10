@@ -142,6 +142,41 @@ git push origin release
    ワークフローを手動実行して一連の動作（ビルド→審査提出→可能であれば権限確認）を確かめてから本格運用に
    入ることを推奨します。
 
+### `release_notes`入力でApp Storeの「新機能」欄を更新する（設計書224で追加）
+
+「Run workflow」実行時、`release_notes`欄にテキストを入力すると、`deliver`が`skip_metadata: true`の
+ままでも「新機能」欄（App Store Connect上の言語コード`ja`）だけを更新します。他のメタデータ・
+スクリーンショットには影響しません。空欄のままなら従来通り何も更新しません（後方互換）。
+
+---
+
+## 既存ドラフトをビルドし直さず審査提出する（`submit_existing_draft`、設計書224で追加）
+
+**App Store Connect上に人間が事前に用意した既存のドラフト／ビルドを、新規ビルドなしでそのまま
+審査提出する**ための専用ワークフローです。`release_production`（毎回新規ビルドしてから審査提出）とは
+別物で、証明書インポート・`build_app`等の一切のビルド関連処理を行いません。
+
+- ワークフローファイル: `.github/workflows/ios-submit-existing-draft.yml`
+- 起動方法: GitHubリポジトリの Actions タブ →「iOS Submit Existing Draft to App Store Review」→
+  「Run workflow」→ `confirm`入力欄に**厳密に`SUBMIT`**と入力して実行（一致しない場合はジョブの
+  最初のステップで`exit 1`し、以降の処理は一切実行されません）
+- **前提条件**: App Store Connect上に、審査提出対象となるビルド・メタデータのドラフトが**既に人間の手で
+  用意されていること**。本ワークフローは`skip_binary_upload: true`でバイナリアップロードを一切行わず、
+  App Store Connect上に既にあるビルドをそのまま審査提出対象にします
+- `release_notes`入力欄にテキストを入れると、上記`release_production`と同様に「新機能」欄（`ja`）だけを
+  更新したうえで審査提出します（空欄なら何も更新しません）
+- `push`トリガーは一切持たず、`workflow_dispatch`のみで起動します（`ios-release-production.yml`・
+  `ios-deploy.yml`には一切変更を加えていません）
+
+ローカル実行:
+
+```bash
+cd ios-app
+RELEASE_NOTES="任意の新機能文言（省略可）" \
+ASC_KEY_ID=... ASC_ISSUER_ID=... ASC_PRIVATE_KEY=... \
+bundle exec fastlane submit_existing_draft
+```
+
 ---
 
 ## ローカルでFastlaneを手動実行する場合

@@ -1,0 +1,54 @@
+name: iOS Submit Existing Draft to App Store Review
+
+# 設計書224（拡張、機能2）: App Store Connect上に人間が事前に用意した既存ドラフト／ビルドを
+# 新規ビルドなしでそのまま審査提出するための専用ワークフロー。
+# ios-release-production.yml（毎回新規ビルドしてから審査提出）・ios-deploy.yml
+# （releaseブランチpushトリガー、TestFlight配信用）とは完全に分離した別ワークフロー。
+# pushトリガーは一切持たず、workflow_dispatch（手動実行）のみで起動する。
+# 誤爆防止のため、confirm入力欄に厳密に "SUBMIT" と入力しない限りジョブ自体を失敗させる。
+#
+# 前提: App Store Connect上に、審査提出対象となるビルド・メタデータのドラフトが
+# 既に人間の手で用意されていること（本ワークフローはバイナリアップロードを一切行わない）。
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'このワークフローは新規ビルドを行わず、App Store Connect上の既存ドラフトをそのまま審査提出します。実行するには SUBMIT と入力してください'
+        required: true
+        type: string
+      release_notes:
+        description: 'App Storeの「新機能」欄に反映するリリースノート。空なら更新しない'
+        required: false
+        type: string
+
+jobs:
+  submit_existing_draft:
+    runs-on: macos-latest
+    steps:
+      - name: Guard - require exact "SUBMIT" confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "SUBMIT" ]; then
+            echo "confirm入力が 'SUBMIT' と一致しないため、審査提出を中止します。"
+            exit 1
+          fi
+          echo "confirm確認OK。既存ドラフトの審査提出を開始します。"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ios-app
+
+      - name: Submit existing App Store Connect draft for review (no new build)
+        run: |
+          cd ios-app
+          bundle exec fastlane submit_existing_draft
+        env:
+          ASC_KEY_ID:      ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:   ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          RELEASE_NOTES:   ${{ inputs.release_notes }}

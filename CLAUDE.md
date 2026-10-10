@@ -99,6 +99,8 @@ sg-weekend-app/
 - 証明書管理はFastlane Matchを使用していない(`ios-app/fastlane/Appfile`/`Fastfile`に実装なし)。配布証明書(`.p12`)・プロビジョニングプロファイル(`.mobileprovision`)は事前に手動作成してbase64化しGitHub Secretsに登録する運用
 - GitHub Secrets: `ASC_KEY_ID`/`ASC_ISSUER_ID`/`ASC_PRIVATE_KEY`/`DIST_CERT_BASE64`/`DIST_CERT_PASSWORD`/`PROVISION_PROFILE_BASE64`/`APPLE_TEAM_ID`
 - **本番審査提出の自動化(設計書224)**: `release`ブランチpushトリガーの既存フローとは完全に分離した新規ワークフロー`.github/workflows/ios-release-production.yml`を`workflow_dispatch`専用(pushトリガー無し)で追加。手動実行時に`inputs.confirm`へ厳密に`SUBMIT`と入力しないとジョブ先頭で`exit 1`する安全策あり。Fastlaneレーン`release_production`(`deploy`と同じ証明書インポート～`build_app`を経て`deliver`を呼ぶ、`deploy`レーン自体は無変更)が`skip_metadata: true`/`skip_screenshots: true`(メタデータはApp Store Connect側の既存設定をそのまま使用、リポジトリ管理化はスコープ外)・`submit_for_review: true`・`automatic_release: true`(審査通過後に人間の追加操作なしで即座に一般公開)・`force: true`で`deliver`を実行。既存`ASC_KEY_ID`等のAPIキーが`deliver`に必要なApp Manager以上の権限を持つかは未確認(権限不足時はCI実行時にエラーになるのみで既存TestFlight配信には影響しない)
+  - **リリースノート指定(設計書224拡張)**: `workflow_dispatch.inputs.release_notes`(optional)に値を入れると、`release_production`レーンが`deliver`に`release_notes: {"ja"=>...}`を渡し、App Store Connectの「新機能」欄(ja)だけを更新する(`skip_metadata: true`のままでも反映される、他のメタデータ・スクリーンショットには影響しない)。未指定時は`release_notes`パラメータ自体を渡さず従来通りの挙動(後方互換)
+  - **既存ドラフトの審査提出専用レーン(設計書224拡張)**: 新規ワークフロー`.github/workflows/ios-submit-existing-draft.yml`(`workflow_dispatch`専用、同様の`confirm`="SUBMIT"必須ガードあり)とFastlaneレーン`submit_existing_draft`。`build_app`・証明書インポート等のビルド関連処理を一切行わず、`deliver(skip_binary_upload: true, ...)`のみ実行して**App Store Connect上に人間が事前に用意した既存のビルド・ドラフトをそのまま審査提出**する(新規ビルドは作られない)。`release_notes` inputも同様にサポート。使い方・前提条件は`ios-app/README.md`参照
 - 詳細手順: `ios-app/README.md`参照
 
 ## iOSアプリのAPNsプッシュ通知対応
