@@ -21670,3 +21670,14 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 🔴Critical無し
 
 **変更しなかったもの(スコープ外として維持)**: トグルの開閉ロジック(`toggleFarePanel()`)・パネルの開閉・ピルの色分け(`_fareScoreTier()`)・データ取得はすべて無変更。ライト/ダーク両モードでの最終的な視認性はこの環境では描画確認できないため、ユーザーの実機確認待ち(見えにくい場合は`html[data-theme="dark"] .cal-fare-pill-active`の上書き定義追加を想定)。
+
+### 設計書222 追記10(2026-10-10): 都市リスト19件化（大阪削除・チェンマイ/ランカウイ追加）
+
+ユーザー判断により`content/fare-seasons.json`の都市リストを更新(builder→checker→closer)。
+
+- **削除**: 「大阪」(id: osaka)を削除。理由: 東京と傾向が同じで冗長なため
+- **追加**: 「チェンマイ」(id: chiangmai、タイ、直行約2.5時間)・「ランカウイ」(id: langkawi、マレーシア、直行約1.5時間)を既存スキーマ(`{id, name, country, haul, direct, flightHours, levels[12], climate[12], cheapestMonths[], notes}`)に従い末尾に追加
+- **検証**: `node scripts/validate-fare-seasons.js`で19都市・エラーなしを確認。新規2都市の`climate`配列全要素を`_fareClimateTier()`の分類ロジック(BAD_WORDS/GOOD_WORDS/EVENT_WORDSの部分一致)でシミュレートし、「雨季入り」「雨季明け」→bad、「涼しい・年末年始」「乾季・年末年始ピーク」→goodなど意図通りの分類であることを確認。osakaのID参照が他コードに残置していないことを`grep`で確認(`content/fare-seasons.json`以外に参照なし)。`GET /api/fare-seasons`のレスポンスにも反映されていることをcurlで確認(`content/`配下のデータ更新のみのためpm2再起動不要)
+- 🔴Critical無し
+- **残課題**: チェンマイ・ランカウイの`levels`/`flightHours`/`cheapestMonths`は実運賃との突き合わせを行っていない一般知識ベースの初稿データ(プレースホルダー)。他の新規都市データと同様、近いうちの実運賃突き合わせ確認を推奨
+- CLAUDE.md更新は不要と判断(軽微なデータ更新のため)。ローカルコミットのみ、push未実施
