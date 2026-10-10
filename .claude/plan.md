@@ -21523,3 +21523,27 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 🔴Critical無し
 
 **変更しなかったもの(スコープ外として維持)**: `content/fare-seasons.json`のデータ構造・内容、`GET /api/fare-seasons`、`.cal-fare-icon-btn`の非表示状態、都市リスト(札幌・クアラルンプールの扱い等は別件として保留中)
+
+### 設計書222 追記8(2026-10-10): 対象都市リストの更新(札幌・クアラルンプール削除、5都市追加、builder→checker→closer)
+
+**背景**: 追記7で保留とした都市リストの見直し本体。機能はUI上`.cal-fare-icon-btn { display: none !important; }`により非表示のままで、今回はデータ内容の更新のみ。
+
+**実装内容**:
+- `content/fare-seasons.json`の`cities`配列を15件→18件に変更
+  - 削除: 札幌(`sapporo`)・クアラルンプール(`kualalumpur`)
+  - notes追記: ダナン(`danang`)の`notes`末尾に「ホイアンも日帰り圏内です。」を追加(ホイアンは空港を持たないため独立都市としては追加せず)
+  - 新規追加(5件、既存スキーマ`{id, name, country, haul, direct, flightHours, levels[12], climate[12], cheapestMonths[], notes}`準拠): フーコック島(`phuquoc`、ベトナム)・コタキナバル(`kotakinabalu`、マレーシア)・ジョグジャカルタ(`yogyakarta`、インドネシア)・ロンボック島(`lombok`、インドネシア)・シェムリアップ(`siemreap`、カンボジア)
+- `public/app.js`・`server.js`・`.cal-fare-icon-btn`の非表示設定は無変更
+
+**checker結果**:
+- `node scripts/validate-fare-seasons.js` → 「✅ fare-seasons.json 検証OK（18都市）」
+- 削除した`sapporo`/`kualalumpur`のidは`public/app.js`・`server.js`・`scripts/*.js`いずれにもハードコード参照無し(データ駆動のため想定通り)
+- 新規5都市の`climate`配列を含む実データ全31種類のclimate文字列すべてが既存の`_fareClimateTier()`判定ルール(bad語/good語/event語/neutral)で分類可能であることを確認。未分類語は無く、`_fareClimateTier()`への追加は不要だった
+- `GET /api/fare-seasons?city=sg`のレスポンス構造は無変更(トップレベルキー・`cities[0]`スキーマとも既存同一)、新規5都市のidが実際にレスポンスに含まれることをcurlで確認
+- `.cal-fare-icon-btn`非表示状態は維持。`public/app.js`は無変更(`node --check`OK)
+- 変更ファイルは`content/fare-seasons.json`のみ。`pm2 restart`不要(`content/`配下は`data/`配下とは別だが同様に都度`fs.readFileSync`方式のため、再起動せずcurlで即時反映を確認済み)
+- 🔴Critical無し
+
+**最終18都市リスト**: 東京・大阪・ペナン・バンコク・プーケット・バリ・ホーチミン・ダナン・セブ・モルディブ・シドニー・パース・台北・フーコック島・コタキナバル・ジョグジャカルタ・ロンボック島・シェムリアップ
+
+**重要な申し送り**: 新規5都市(フーコック島・コタキナバル・ジョグジャカルタ・ロンボック島・シェムリアップ)の`levels`(価格帯)・`flightHours`・`cheapestMonths`等は、実運賃との突き合わせを行っていない一般知識ベースの初稿データ(プレースホルダー)。機能自体が現在非表示のため実害はないが、**将来再表示する際は公開前に実際の運賃データとの突き合わせ確認が必須**(既存都市にも同様のリスクがあったが、この5都市は特に未検証)。
