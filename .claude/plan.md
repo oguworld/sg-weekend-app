@@ -21565,3 +21565,33 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 🔴Critical無し
 
 **今後の留意点(追記8からの引き続き)**: 新規5都市(フーコック島・コタキナバル・ジョグジャカルタ・ロンボック島・シェムリアップ)の価格帯データは実運賃との突き合わせ未実施のプレースホルダーのまま。再表示により実際にユーザーの目に触れる状態になったため、**近いうちに実運賃データとの突き合わせ確認を行うことを推奨**。iOS/Androidアプリは今回のスコープ外(Web版のみ)、次回それぞれのビルド時に自動同梱される。
+
+### 設計書222 追記10(2026-10-10): 最終UI(3回目の再設計、トグル行+ピル方式。ユーザーが別会話でプロトタイプ試作し確定、builder→checker→closer)
+
+**背景**: 追記7で実装した「✈アイコン→吹き出しポップオーバーで都市ランキング表示」方式を、ユーザーが別会話でプロトタイプを複数案試作・比較検討した結果、「月見出しの下の全幅トグル行→タップでインラインに展開し、都市をピル型で色分け表示」方式に全面的に置き換える最終デザインが確定した。データ・API(`content/fare-seasons.json`・`GET /api/fare-seasons`)は無変更、フロントの構造・見た目・ロジックの一部のみ変更。
+
+**新UI**:
+- 月カード(`.cal-month-card`)の先頭(既存の日付グループより前)に全幅トグル行`.cal-fare-toggle`(「✈️ ○月のおすすめ渡航先」+キャレット▾/▴)を配置。タップで`.cal-fare-panel`をアコーディオン開閉(通常のドキュメントフロー内、absolute配置・z-index・位置計算は一切不要)
+- 月をまたいだ相互排他は廃止(複数月のパネルを同時に開いたままにしてよい、フロート要素ではないため競合しない)
+- パネル内: 凡例(🟢安め 🟡普通 🟠高め、数字バッジは廃止)→都市ピル(`.cal-fare-pill`、天気アイコン+都市名のみ、価格ラベル・climate文字列・学校休暇マークはピルから除去)→詳細領域(`.cal-fare-detail`、1つを使い回し)→注記
+- ピルの色は新規`_fareScoreTier(score)`で3分類(score<2.5→cheap/<3.5→normal/それ以外→expensive)、新規CSS変数`--fare-tier-cheap`/`--fare-tier-normal`/`--fare-tier-expensive`/`--fare-tier-text`(ライト/ダーク両対応)で色付け。並び順はおすすめ度スコア昇順(既存`ordered`ソートを流用)
+- ピルタップで`.cal-fare-detail`に展開: 12か月分の色帯(`.cal-fare-month-strip`、現在月のセグメントのみ`.cal-fare-month-seg-current`で枠線強調)・ベストシーズン(climateが'good'の月、最大3つ)・価格帯の目安(levels配列のmin/maxを`FARE_LEVEL_SHORT_LABEL`で表現)・`city.notes`・学校休暇マーク(MOE/SIJSと重なる月のみ、ここに移動)。再タップで閉じる
+
+**実装内容**:
+- `public/app.js`: `toggleFareBubble()`→`toggleFarePanel()`、`renderFareBubble()`→`renderFarePanel()`、`selectFareRankItem()`→`selectFarePill()`に全面置き換え。新設: `_fareScoreTier(score)`、`_fareDetailHtml(city, month)`。削除: `_fareSimpleDetailHtml()`、`FARE_LEVEL_SHORT_LABEL`参照先の変更(凡例チップ用途→価格帯目安用途に転用)。`_closeAllCalBubbles()`・touchend委譲(`#calendar-list`)・`renderCalendarList()`内の月カード生成からfare吹き出し関連コードを削除し新トグル行/パネルマークアップに置き換え。3点セット原則(onclick guard + touchend委譲 + 配列更新)を`.cal-fare-toggle`/`.cal-fare-pill`に適用
+  - 副次修正: ✈アイコン削除に伴い`.cal-month-season-badge`span二重ネストが発生していたのを修正(季節タグが無い月はラベルのみのシンプルな行になる)
+- `public/app.css`: `.cal-fare-icon-btn`・`.cal-fare-bubble`・`.fare-bubble-*`・`.fare-legend-*`・`.fare-rank-*`・`.fare-lv-1`〜`5`・`--fare-lv1`〜`5`・`--fare-lv-text`を全廃し、`.cal-fare-toggle`・`.cal-fare-panel`・`.cal-fare-legend`・`.cal-fare-pills`・`.cal-fare-pill`・`.cal-fare-pill-{cheap,normal,expensive}`・`.cal-fare-detail`・`.cal-fare-month-strip`・`.cal-fare-month-seg-*`・`.cal-fare-footnote`・`--fare-tier-cheap/normal/expensive/text`に置き換え
+- キャッシュバスティング: `index.html`のCSS/JSクエリを`20261010c→20261010d`/`20261010b→20261010c`、`sw.js`の`CACHE_NAME`を`v940→v941`
+
+**checker結果**:
+- `node --check public/app.js`: OK。CSS波括弧バランスOK
+- 旧コード(`.cal-fare-icon-btn`/`.cal-fare-bubble`/`.fare-rank-item`/`.fare-lv-N`/`toggleFareBubble`/`renderFareBubble`/`selectFareRankItem`/`_fareSimpleDetailHtml`)をgrepで全削除確認(0件)
+- `_positionCalBubbleUnderBtn()`は季節アイコン用途(`toggleMonthSeasonNote`)の呼び出しのみ残存、fare用の呼び出しは削除済みであることを確認
+- 実データ(18都市)で1月・6月・12月のtier振り分けを手計算検証: 1月・12月(観光ピーク・年末年始)はほぼ全都市expensive、6月はシドニー・パース(南半球の冬)がcheap、他はnormal中心、という意図通りの分布を確認
+- 東京の詳細表示(ベストシーズン3月・4月・5月、価格帯「安め〜高額」)を手計算し`_fareDetailHtml()`のロジックと一致することを確認
+- `pm2 restart sg-weekend`後、curlで実配信された`/app.js`・`/app.css`に新コードが反映され旧コードが完全に消えていることを確認。`/api/fare-seasons`・`/api/calendar`のレスポンスは無変更であることも確認
+- 🔴Critical無し
+
+**変更しなかったもの(スコープ外として維持)**: `content/fare-seasons.json`のデータ構造・内容、`GET /api/fare-seasons`、都市リスト(18都市、追記8時点から無変更)。新規5都市(フーコック島・コタキナバル・ジョグジャカルタ・ロンボック島・シェムリアップ)の価格帯データは実運賃との突き合わせ未実施のプレースホルダーのままで、追記9からの申し送り(近いうちに実運賃データとの突き合わせ確認を推奨)は継続
+
+**注記**: 実機でのタッチ動作確認はこの環境では引き続き不可(Playwright等が使えないため)。今回はフロート要素を排除したシンプルなアコーディオン構造のため、以前のような吹き出しの位置計算・z-index起因の不具合リスクは構造的に大幅に下がっている。iOS/Androidアプリは今回のスコープ外(Web版のみ)、次回それぞれのビルド時に自動同梱される。
