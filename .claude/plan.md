@@ -21694,3 +21694,10 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 変更: `public/app.js`の`_fareDetailHtml()`から`sijsHit`・🎒・「日本人学校(SIJS)休暇」の扱いを削除し、学校休暇の行はMOEのみ。`GET /api/fare-seasons`の`schoolHolidays.sijs`は互換性のため返し続ける(表示しないだけ)。`CLAUDE.md`の航空券シーズン表の記述も更新
 - キャッシュバスティング: `app.js?v=20261010l`、`CACHE_NAME` v952
 - orchestratorが起動直後のAPIエラーで使えなかったため、forkがbuilder→checker→closerを代行した
+
+### 設計書222 追記18(2026-10-10): ジョグジャカルタを直行便ありに修正
+- 理由: ユーザー指摘により、シンガポール〜ジョグジャカルタに直行便があることが判明。従来の「経由便・乗継ぎ前提」の記述が誤りだった。
+- 変更: `content/fare-seasons.json`のyogyakartaのみ。`direct: false`→`true`、`flightHours`を「直行約3時間」に変更(所要時間は一般的な目安で、正確な時刻表による裏取りは未実施)、`notes`の「直行便が無く乗継ぎ前提。」を「直行便があり、」に置換。
+- `levels`・`climate`・`cheapestMonths`・`haul`は変更なし(価格面は別件)。
+- 他箇所(server.js・public/・scripts/・CLAUDE.md)に乗継ぎ前提の記述は無かったため変更なし。
+- orchestratorが起動直後のAPIエラーで使えなかったため、forkがbuilder→checker→closerを代行した。
