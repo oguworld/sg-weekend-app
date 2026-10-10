@@ -3317,12 +3317,22 @@
 
       let html = '';
       let currentMonth = null;
+      let currentMonthNum = null;
       for (const [date, dayItems] of byDate) {
         const month = date.slice(0, 7); // 'YYYY-MM'
         if (month !== currentMonth) {
-          if (currentMonth !== null) html += `</div>`; // 前の月カードを閉じる
+          if (currentMonth !== null) {
+            // 前の月のトグル行+パネルをカード末尾（予定一覧の後）に出力してから閉じる
+            html += `<button class="cal-fare-toggle" data-month-num="${currentMonthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
+              <span class="cal-fare-toggle-label">✈️ ${currentMonthNum}月のおすすめ渡航先</span>
+              <span class="cal-fare-toggle-caret">▾</span>
+            </button>
+            <div class="cal-fare-panel" style="display:none;"></div>`;
+            html += `</div>`; // 前の月カードを閉じる
+          }
           currentMonth = month;
           const monthNum = Number(month.slice(5));
+          currentMonthNum = monthNum;
           const seasonTags = MONTH_SEASONAL_TAGS[monthNum] || [];
           const seasonBadgeHtml = seasonTags.length
             ? `<span class="cal-month-season-badge">` +
@@ -3336,12 +3346,7 @@
             ${seasonBadgeHtml}
             <div class="cal-month-season-bubble"></div>
           </div>
-          <div class="cal-month-card" data-month="${month}">
-            <button class="cal-fare-toggle" data-month-num="${monthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
-              <span class="cal-fare-toggle-label">✈️ ${monthNum}月のおすすめ渡航先</span>
-              <span class="cal-fare-toggle-caret">▾</span>
-            </button>
-            <div class="cal-fare-panel" style="display:none;"></div>`;
+          <div class="cal-month-card" data-month="${month}">`;
         }
         html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
         dayItems.forEach(it => {
@@ -3364,7 +3369,15 @@
         });
         html += `</div>`;
       }
-      if (currentMonth !== null) html += `</div>`; // 最後の月カードを閉じる
+      if (currentMonth !== null) {
+        // 最後の月のトグル行+パネルをカード末尾に出力してから閉じる
+        html += `<button class="cal-fare-toggle" data-month-num="${currentMonthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
+          <span class="cal-fare-toggle-label">✈️ ${currentMonthNum}月のおすすめ渡航先</span>
+          <span class="cal-fare-toggle-caret">▾</span>
+        </button>
+        <div class="cal-fare-panel" style="display:none;"></div>`;
+        html += `</div>`; // 最後の月カードを閉じる
+      }
       listEl.innerHTML = html;
 
       // 「すべて」表示は今月合わせスクロールの対象のため、12月が年内最後のカードでも
@@ -3380,9 +3393,10 @@
     }
 
     // ─── 航空券シーズン表（設計書222→UI再設計3回目、確定版。SG発の航空券が高い/安い月を行き先別の目安で示す静的な表、実運賃は扱わない）
-    // UIは「吹き出しポップオーバーで都市ランキング表示」方式から、月カードの先頭に置く全幅トグル行を
+    // UIは「吹き出しポップオーバーで都市ランキング表示」方式から、月カード内に置く全幅トグル行を
     // タップしてインラインにパネルを展開し、都市をピル型で色分け表示する方式に変更
     // （フロート要素を排除した通常のアコーディオン、位置計算・z-index調整が不要）。
+    // トグル行+パネルの配置は月カード末尾（その月の予定一覧をすべて出力した後）。
     // データ・API・ロジックは無変更、フロントの見た目と構造のみ変更。 ───
     const FARE_SEASONS_CACHE_KEY = 'sg_fare_seasons_cache';
     let FARE_SEASONS_DATA = null;      // { legend, bookingLeadTime, cities, schoolHolidays, sgFactors } をそのまま保持
@@ -3450,7 +3464,7 @@
       }
     }
 
-    // 月カード先頭のトグル行をタップ → そのカード内のパネルをアコーディオン開閉（初回タップ時に未取得ならデータ遅延ロード）
+    // 月カード末尾のトグル行をタップ → そのカード内のパネルをアコーディオン開閉（初回タップ時に未取得ならデータ遅延ロード）
     // 月をまたいだ相互排他は不要（フロート要素ではないため複数月のパネルを同時に開いたままにしてよい）
     function toggleFarePanel(toggleBtn) {
       const card = toggleBtn.closest('.cal-month-card');
