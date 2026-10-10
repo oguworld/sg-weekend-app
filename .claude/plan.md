@@ -21502,3 +21502,24 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 🔴Critical無し
 
 **再表示する際の手順**: `public/app.css`に追加した`.cal-fare-icon-btn { display: none !important; }`ルール(コメント含む)を削除するだけでよい(CSSキャッシュバスティングのバンプは再表示時にも必要)。
+
+### 設計書222 追記7(2026-10-10): ロジック再設計「安い順」→「おすすめ渡航先」(機能は非表示のまま、builder→checker→closer)
+
+**背景**: 機能は追記6で非表示化済みだが、再表示時に備えてロジック・見せ方を先行で改善。ユーザー要望: 2〜3ヶ月先の旅行を考える際、安さだけでなく「現地が良い季節かどうか」も含めて候補地を決めたい。新しいデータ追加はせず、既存`content/fare-seasons.json`の`levels`(価格1〜5)と`climate`(月ごとの気候・季節説明文)の2つのみで実現。
+
+**実装内容**:
+- `public/app.js`:
+  - `_fareClimateTier(climateStr)`新設: climate文字列をgood/neutral/badの3段階に機械的に分類。判定順序は①bad語(梅雨/雨季/台風)を含む→bad ②good語(乾季/過ごしやすい/涼しい/初夏/避暑/観光シーズン)を含む→good ③イベント語(ソンクラーン/旧正月)を含む→good(例外的に「そこに行く理由」として) ④その他→neutral
+  - `FARE_CLIMATE_TIER_ICON`(good:☀️ / bad:🌧 / neutral:空文字)、`_fareRecommendScore(level, tier)`(good→-0.5 / neutral→0 / bad→+0.5の補正)を新設
+  - `renderFareBubble()`: 並べ替えを価格レベル昇順から「おすすめ度スコア」昇順に変更(同点時はlevel小さい方→id順で安定ソート)。見出しを「〇月の航空券シーズン目安」→「〇月のおすすめ渡航先」に変更。各行に気候tierアイコンと`climate`文字列(例:「・暑い・ソンクラーン」)を併記。注記文を「※気候・季節感も含めた目安です。実際の価格は予約前に確認してください。」に更新
+- `public/app.css`: `.fare-rank-climate`(climate文字列の併記用)・`.fare-climate-icon`(tierアイコン用)を新規追加
+- キャッシュバスティング: `index.html`のCSS/JSクエリを`20261010a→20261010b`、`sw.js`の`CACHE_NAME`を`v938→v939`
+
+**checker結果**:
+- `node --check public/app.js`: OK。CSS波括弧バランス375/375で一致
+- 実データ中の気候文字列31種類すべてが分類済み(分類漏れなし)。good14種・neutral8種・bad9種。設計書の判定基準例(「乾季・観光ピーク」「乾季・過ごしやすい」→good、「梅雨」「雨季」「台風シーズン」「暑い・台風」→bad、「暑い・ソンクラーン」「涼しい・旧正月」→good例外)と完全一致を確認
+- 6月・4月・12月×15都市の組み合わせを実データに対し手計算検証。価格が同程度でも気候良好な都市が繰り上がり(例: 6月の札幌がlevel2・過ごしやすいでscore1.5の1位)、悪天候シーズンの都市が繰り下がる(雨季/梅雨のlevel2都市群がscore2.5)動作を確認
+- `pm2 restart sg-weekend`後、curlで実配信ファイルのキャッシュバスティング反映(`20261010b`/`v939`)・`.cal-fare-icon-btn`非表示状態の維持・`GET /api/fare-seasons`レスポンス構造の無変更・`content/fare-seasons.json`/`server.js`が無変更であることを確認
+- 🔴Critical無し
+
+**変更しなかったもの(スコープ外として維持)**: `content/fare-seasons.json`のデータ構造・内容、`GET /api/fare-seasons`、`.cal-fare-icon-btn`の非表示状態、都市リスト(札幌・クアラルンプールの扱い等は別件として保留中)

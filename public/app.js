@@ -3398,6 +3398,34 @@
       5: '高額',
     };
 
+    // 設計書222再設計(2026-10-10): 「安い順」から「この月に行くならどこがおすすめか」へ。
+    // content/fare-seasons.jsonの climate 文字列を good/neutral/bad の3段階に機械的に分類する。
+    // 判定ルール(優先順位): ①悪天候・災害リスク語(梅雨/雨季/台風)を含む→bad
+    // ②過ごしやすさ・観光適期語(乾季/過ごしやすい/涼しい/初夏/避暑/観光シーズン)を含む→good
+    // ③ソンクラーン・旧正月等イベント性のある語を含む→good(「そこに行く理由」になるため例外的に)
+    // ④その他(暑い/寒い/冬/晩夏/真夏/積雪/残雪等、好悪どちらとも言えないもの)→neutral
+    // データ自体は変更しない。実データに出現する文字列(31種)はすべてこのロジックで分類される。
+    function _fareClimateTier(climateStr) {
+      if (!climateStr) return 'neutral';
+      const BAD_WORDS = ['梅雨', '雨季', '台風'];
+      const GOOD_WORDS = ['乾季', '過ごしやすい', '涼しい', '初夏', '避暑', '観光シーズン'];
+      const EVENT_WORDS = ['ソンクラーン', '旧正月'];
+      if (BAD_WORDS.some(w => climateStr.includes(w))) return 'bad';
+      if (GOOD_WORDS.some(w => climateStr.includes(w))) return 'good';
+      if (EVENT_WORDS.some(w => climateStr.includes(w))) return 'good';
+      return 'neutral';
+    }
+
+    // 気候tierに応じた小さいアイコン(good: ☀️ / bad: 🌧 / neutral: アイコンなし)
+    const FARE_CLIMATE_TIER_ICON = { good: '☀️', bad: '🌧', neutral: '' };
+
+    // 気候補正込みの「おすすめ度スコア」(小さいほどおすすめ)。価格レベル(1〜5)に
+    // good→-0.5 / neutral→0 / bad→+0.5 の補正を加える。同点時は元のlevelが小さい方を優先。
+    function _fareRecommendScore(level, tier) {
+      const adjust = tier === 'good' ? -0.5 : (tier === 'bad' ? 0.5 : 0);
+      return level + adjust;
+    }
+
     async function loadFareSeasonsData() {
       try {
         const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}`);
@@ -3450,7 +3478,17 @@
       const moeSet = new Set((schoolHolidays && schoolHolidays.moe) || []);
       const sijsSet = new Set((schoolHolidays && schoolHolidays.sijs) || []);
       const mark = moeSet.has(month) && sijsSet.has(month) ? '🏫🎒' : moeSet.has(month) ? '🏫' : sijsSet.has(month) ? '🎒' : '';
-      const ordered = [...cities].sort((a, b) => a.levels[idx] - b.levels[idx]);
+
+      // 「安い順」ではなく「おすすめ順」: 価格レベルに気候の良し悪しで補正したスコアの昇順に並べ替える
+      const ordered = [...cities].sort((a, b) => {
+        const climateA = a.climate[idx];
+        const climateB = b.climate[idx];
+        const scoreA = _fareRecommendScore(a.levels[idx], _fareClimateTier(climateA));
+        const scoreB = _fareRecommendScore(b.levels[idx], _fareClimateTier(climateB));
+        if (scoreA !== scoreB) return scoreA - scoreB;
+        if (a.levels[idx] !== b.levels[idx]) return a.levels[idx] - b.levels[idx];
+        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+      });
 
       const legendHtml = Object.keys(legend).sort().map(lv =>
         `<span class="fare-legend-chip"><span class="fare-legend-swatch fare-lv-${lv}">${lv}</span>${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || legend[lv])}</span>`
@@ -3458,6 +3496,9 @@
 
       const listHtml = ordered.map(city => {
         const lv = city.levels[idx];
+        const climateStr = city.climate[idx];
+        const tier = _fareClimateTier(climateStr);
+        const tierIcon = FARE_CLIMATE_TIER_ICON[tier] || '';
         const isSelected = _fareSelectedCityId === city.id;
         return `<div class="fare-rank-item${isSelected ? ' fare-rank-selected' : ''}" data-fare-city="${city.id}">
           <span class="fare-rank-badge fare-lv-${lv}">${lv}</span>
@@ -3465,8 +3506,9 @@
             <span class="fare-rank-name-wrap">
               <span class="fare-rank-name">${escapeHtml(city.name)}</span>
               ${mark ? `<span class="fare-school-mark">${mark}</span>` : ''}
+              ${tierIcon ? `<span class="fare-climate-icon">${tierIcon}</span>` : ''}
             </span>
-            <span class="fare-rank-label">${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || '')}</span>
+            <span class="fare-rank-label">${escapeHtml(FARE_LEVEL_SHORT_LABEL[lv] || '')}${climateStr ? `<span class="fare-rank-climate">・${escapeHtml(climateStr)}</span>` : ''}</span>
           </span>
           <span class="fare-rank-chevron">${isSelected ? '︿' : '﹀'}</span>
         </div>
@@ -3474,10 +3516,10 @@
       }).join('');
 
       bubble.innerHTML = `
-        <div class="fare-bubble-title">✈ ${month}月の航空券シーズン目安</div>
+        <div class="fare-bubble-title">✈ ${month}月のおすすめ渡航先</div>
         <div class="fare-legend-row">${legendHtml}</div>
         <div class="fare-bubble-list">${listHtml}</div>
-        <div class="fare-bubble-footnote">※あくまで目安です。予約前に実際の価格を確認してください。</div>
+        <div class="fare-bubble-footnote">※気候・季節感も含めた目安です。実際の価格は予約前に確認してください。</div>
       `;
     }
 

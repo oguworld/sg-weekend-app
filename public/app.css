@@ -1540,7 +1540,9 @@
     .fare-rank-name-wrap { display: flex; align-items: center; gap: 5px; }
     .fare-rank-name { font-size: 13px; font-weight: 700; color: var(--midnight); }
     .fare-rank-label { font-size: 11px; color: var(--warm-gray); }
+    .fare-rank-climate { color: var(--warm-gray); }
     .fare-school-mark { font-size: 10px; line-height: 1; flex-shrink: 0; }
+    .fare-climate-icon { font-size: 10px; line-height: 1; flex-shrink: 0; }
     .fare-rank-chevron { color: var(--warm-gray); font-size: 12px; }
     .fare-rank-detail {
       grid-column: 1 / -1; margin: -2px 0 6px; padding: 6px 8px;
