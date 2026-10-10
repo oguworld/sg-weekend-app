@@ -34,6 +34,9 @@
       --fare-tier-cheap-pale: rgba(111,174,122,0.16);
       --fare-tier-normal-pale: rgba(232,195,92,0.18);
       --fare-tier-expensive-pale: rgba(224,138,79,0.16);
+      --fare-tier-cheap-text: #2A5F36;
+      --fare-tier-normal-text: #6E540F;
+      --fare-tier-expensive-text: #94451C;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
@@ -1508,9 +1511,9 @@
       cursor: pointer; font-family: inherit;
     }
     .cal-fare-pill:active { opacity: 0.7; }
-    .cal-fare-pill-cheap { background: var(--fare-tier-cheap-pale); color: var(--fare-tier-cheap); }
-    .cal-fare-pill-normal { background: var(--fare-tier-normal-pale); color: var(--fare-tier-normal); }
-    .cal-fare-pill-expensive { background: var(--fare-tier-expensive-pale); color: var(--fare-tier-expensive); }
+    .cal-fare-pill-cheap { background: var(--fare-tier-cheap-pale); color: var(--fare-tier-cheap-text); }
+    .cal-fare-pill-normal { background: var(--fare-tier-normal-pale); color: var(--fare-tier-normal-text); }
+    .cal-fare-pill-expensive { background: var(--fare-tier-expensive-pale); color: var(--fare-tier-expensive-text); }
 
     .cal-fare-detail {
       margin-top: 10px; padding: 10px 12px; background: var(--sand); border-radius: 10px;
@@ -1634,6 +1637,9 @@
       --fare-tier-cheap-pale: rgba(62,138,84,0.28);
       --fare-tier-normal-pale: rgba(168,135,47,0.28);
       --fare-tier-expensive-pale: rgba(176,90,46,0.28);
+      --fare-tier-cheap-text: #6FC989;
+      --fare-tier-normal-text: #E8C35C;
+      --fare-tier-expensive-text: #F0A268;
       color-scheme: dark;
     }
     html[data-theme="dark"] .screen-auth-gate {
