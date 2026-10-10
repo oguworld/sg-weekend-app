@@ -157,14 +157,18 @@ platform :ios do
     release_notes = ENV['RELEASE_NOTES']
 
     deliver_options = {
-      api_key:              api_key,
-      app_identifier:       "app.dosuru",
-      skip_metadata:        true,
-      skip_screenshots:     true,
-      skip_binary_upload:   false,
-      submit_for_review:    true,
-      automatic_release:    true,
-      force:                true
+      api_key:                     api_key,
+      app_identifier:              "app.dosuru",
+      skip_metadata:                true,
+      skip_screenshots:             true,
+      skip_binary_upload:           false,
+      submit_for_review:            true,
+      automatic_release:            true,
+      force:                        true,
+      # App Store Connect APIキー認証ではprecheckがIn-app purchasesを確認できず
+      # 例外で落ちるfastlane既知の制限（本アプリはIn-app purchases非搭載のため
+      # このチェック自体が不要）。2026-10-10、本番審査提出が毎回ここで失敗していたため追加。
+      run_precheck_before_submit:   false
     }
 
     unless release_notes.nil? || release_notes.strip.empty?
