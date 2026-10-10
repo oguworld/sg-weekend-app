@@ -150,16 +150,21 @@ platform :ios do
     #
     # 設計書224（拡張）: ENV['RELEASE_NOTES']が指定された場合のみ、
     # App Store Connectの「新機能」欄（ja）をdeliver経由で更新する。
-    # skip_metadata:trueのままでもrelease_notesパラメータを明示的に渡せば
-    # 「新機能」欄だけが更新され、他のメタデータ・スクリーンショットには
-    # 影響しない（Fastlane deliverの仕様）。未指定時はパラメータ自体を渡さず、
-    # 従来通りの挙動を維持する（後方互換）。
+    #
+    # 2026-10-10判明: skip_metadata:trueのままrelease_notesを渡しても、
+    # fastlane deliverはメタデータアップロードのステップ自体を丸ごとスキップするため
+    # 「新機能」欄は更新されない（Fastfile内の旧コメントの記述は誤り、実機ログで確認済み）。
+    # さらに「新機能」欄が空のまま審査提出するとApple側が
+    # "You must provide a value for the attribute 'whatsNew'" で提出自体を拒否する。
+    # そのため release_notes が指定された場合は skip_metadata を明示的に false にする
+    # （skip_screenshots:true は維持するため、スクリーンショット自体への影響はない）。
     release_notes = ENV['RELEASE_NOTES']
+    has_release_notes = !(release_notes.nil? || release_notes.strip.empty?)
 
     deliver_options = {
       api_key:                     api_key,
       app_identifier:              "app.dosuru",
-      skip_metadata:                true,
+      skip_metadata:                !has_release_notes,
       skip_screenshots:             true,
       skip_binary_upload:           false,
       submit_for_review:            true,
@@ -171,7 +176,7 @@ platform :ios do
       run_precheck_before_submit:   false
     }
 
-    unless release_notes.nil? || release_notes.strip.empty?
+    if has_release_notes
       deliver_options[:release_notes] = { "ja" => release_notes }
     end
 
