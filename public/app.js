@@ -3376,10 +3376,10 @@
             ? `<button class="cal-info-btn" aria-label="説明を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
                <div class="cal-note-bubble">${escapeHtml(it.note)}</div>`
             : '';
-          // 祝日系は塗りつぶしのラベル、それ以外は色の点+小さな文字(塗りなし)。右端に置く
+          // 祝日系は塗りつぶしのラベル、それ以外は塗りなしの小さな文字。右端に置く
           const labelHtml = CALENDAR_FILLED_LABEL_CATEGORIES.includes(it.category)
             ? `<span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>`
-            : `<span class="cal-tag"><span class="cal-tag-dot" style="background:${c.color};"></span>${label}</span>`;
+            : `<span class="cal-tag">${label}</span>`;
           html += `<div class="cal-item">
             <div class="cal-item-head">
               <span class="cal-name-wrap">
