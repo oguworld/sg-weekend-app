@@ -21767,3 +21767,25 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - **確認**: 本番で`cache-control: no-cache`、ETag付き、`If-None-Match`付きで`304`、`&v=2`付きの本文に`monthly`が19都市分。pm2はonlineでログにエラー無し。
 - **影響**: データを更新すると、旧バンドルのiOS/Androidアプリを含め、次回の取得で即座に反映される。後方互換(ヘッダーだけの変更)。
 - **注意**: 実機・ブラウザでの表示は未確認。
+
+### 設計書222 追記27(2026-10-11): コード整理と、APIキャッシュを1日に緩和
+
+ユーザー指示「綺麗にできるところはして。この情報は今後固定なので、キャッシュや毎回の読み込みは控えめでいい」。orchestratorが不安定なためforkが実行した。
+
+**A. コード整理(見た目・動作は不変。コミット `3592415`)**
+- `renderCalendarList()`内に2箇所複製されていたトグル行+パネルのテンプレートを、`_fareToggleHtml(monthNum)`に1本化。
+- `_fareSelectedCityId`(全月のパネルで共有される1つの変数)を廃止し、選択状態を各パネル内の`.cal-fare-pill-active`で判断する形に変更。`selectFarePill`は「そのピルが選択中か」をDOMから読む。**これが唯一の挙動変更**: 旧実装では、複数の月のパネルを開いたまま別の月で同じ都市をタップすると「再タップ」と誤判定され、詳細が開かなかった(疑似DOMで旧実装のNG・新実装のOKを確認)。通常の操作(開く・別のピルで差し替え・同じピルで閉じる)は不変。
+- `_fareScoreTier(score)`は実際には価格レベル(1〜5)を受け取っていたため、`_fareLevelTier(level)`に改名(閾値は同じ: 1〜2→cheap、3→normal、4〜5→expensive)。
+- 未参照の削除: `STRINGS`内の旧UI文言3件(`fareEntryBtn`/`fareSheetTitle`/`fareSheetSub`)、`FARE_CLIMATE_TIER_ICON`、`app.css`の`--fare-tier-text`(ライト・ダーク)。`app.css`のfare関連クラス22個はすべて使用中のため残した。`FARE_LEVEL_SHORT_LABEL`は既に存在しなかった。
+- 古いUI(別シート・吹き出し・表・チップ)の経緯を語る長いコメントを、現状の仕様の説明に縮小。経緯はこのplan.mdに残っている。
+- 三点セット(`.cal-fare-toggle`/`.cal-fare-pill`の`onclick`ガード、`#calendar-list`のtouchend委譲と8px超の移動の無視)は維持。
+- 検証: 整理前(`HEAD:public/app.js`)と整理後を、同じ実データ(19都市)でNode上で動かして比較し、ピル12か月・詳細228件・トグル12か月のHTMLが**不一致0件**。比較の仕組みが機能していることを、わざと閾値を壊した版で201件の不一致を検出して確認(陰性対照)。配信中の`app.js`でも不一致0件。
+
+**B. キャッシュの緩和(コミット `bf8160b`)**
+- `GET /api/fare-seasons`の`Cache-Control`を`no-cache`から`public, max-age=86400`(1日)に変更。ETagは維持。変更はヘッダーだけ。
+- 理由: 都市・価格・天候・現地の情報は固定に近く、毎回の再検証は不要。
+- **運用手順(重要)**: `content/fare-seasons.json`を更新して即座に全員へ反映したい時は、`loadFareSeasonsData()`の取得URL(`...&v=2`)の数字を上げ、`public/index.html`のJSクエリと`public/sw.js`のCACHE_NAMEをバンプする。新しいURLになるので、端末に残る1日キャッシュを避けられる。これを忘れると、データだけを更新した場合に最大1日、古い表示が残る。
+- サーバー側のメモリキャッシュは追加していない(HTTPキャッシュで足りるため)。
+- 確認: 本番で`cache-control: public, max-age=86400`・ETag・`If-None-Match`付きで304、本文に`monthly`が19都市。`pm2`はonline。
+
+**未確認**: 実機・ブラウザでの見た目と操作。
