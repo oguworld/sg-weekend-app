@@ -21971,3 +21971,11 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - **変えていないもの**: 都市のピル`.cal-fare-pills`、詳細、注記`.cal-fare-footnote`の位置。`app.js`の変更はない(CSSだけで済んだ)。
 - **未確認**: 実機・ブラウザでの見た目。この環境では描画できない。
 - キャッシュ更新: `app.css?v=20261011k`、`sw.js`の`CACHE_NAME`は`v972`。
+
+### 設計書222 追記(2026-10-11): 価格の凡例を左寄せに戻す
+- **ユーザー指示**: 「やっぱりレジェンドだけは左かな」。直前の追記(トグルの文字と凡例を右寄せ)のうち、**凡例だけ**を左寄せに戻す。
+- **変更(`public/app.css`のみ)**: `.cal-fare-legend`から`text-align: right`と`margin-right: -2px`(右端の補正)を外し、変更前の定義(`font-size: 11px; color: var(--warm-gray); margin-bottom: 8px;`)に戻した。
+- **維持したもの**: トグル行`.cal-fare-toggle`の右寄せ(`justify-content: flex-end; gap: 6px`、「〇月のおすすめ旅行先 ▾」が右端)。都市のピル、詳細、注記の位置は変えていない。`app.js`の変更はない。
+- **確認**: CSSの括弧は396対396。配信中の`app.css`に、凡例の`text-align: right`・`margin-right: -2px`が残っていないこと、トグル行の右寄せが残っていることを`curl`で確認した。
+- **未確認**: 実機・ブラウザでの見た目。この環境では描画できない。
+- キャッシュ更新: `app.css?v=20261011l`、`sw.js`の`CACHE_NAME`は`v973`。

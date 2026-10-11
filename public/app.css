@@ -1510,7 +1510,7 @@
     .cal-fare-toggle[aria-expanded="true"] .cal-fare-toggle-caret { transform: rotate(180deg); }
     .cal-fare-panel { margin: -2px 0 12px; padding: 0 2px; }
 
-    .cal-fare-legend { font-size: 11px; color: var(--warm-gray); margin-bottom: 8px; text-align: right; margin-right: -2px; /* .cal-fare-panelの左右2pxの内側の余白を打ち消し、右端を予定行のラベルにそろえる */ }
+    .cal-fare-legend { font-size: 11px; color: var(--warm-gray); margin-bottom: 8px; }
 
     .cal-fare-pills { display: flex; flex-wrap: wrap; gap: 6px; }
     .cal-fare-pill {
