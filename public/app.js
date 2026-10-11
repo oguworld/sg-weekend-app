@@ -3523,7 +3523,7 @@
         <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         <div class="cal-fare-detail" style="display:none;"></div>
-        <div class="cal-fare-footnote">※気候・季節感も含めた目安です。実際の価格は予約前に確認してください。</div>
+        <div class="cal-fare-footnote">※目安です。実際の価格は予約前にご確認ください。</div>
       `;
     }
 
