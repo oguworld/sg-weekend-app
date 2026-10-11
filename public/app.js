@@ -3145,6 +3145,8 @@
       'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '文化・催し',
       'school-vacation': '学校行事',
     };
+    // 休みかどうかが大事な祝日系だけ、塗りつぶしのラベルで目立たせる(それ以外は点+文字)
+    const CALENDAR_FILLED_LABEL_CATEGORIES = ['holiday-sg', 'holiday-jp'];
     // 月ごとに毎年繰り返す季節の話題（気候・食べ物・GSS）。年に依存しない固定マッピング。
     // calendar-events.json（年次の日付レンジイベント）とは別の性質のデータのため静的定数として保持する（設計書194）。
     const MONTH_SEASONAL_TAGS = {
@@ -3374,15 +3376,19 @@
             ? `<button class="cal-info-btn" aria-label="説明を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
                <div class="cal-note-bubble">${escapeHtml(it.note)}</div>`
             : '';
+          // 祝日系は塗りつぶしのラベル、それ以外は色の点+小さな文字(塗りなし)。右端に置く
+          const labelHtml = CALENDAR_FILLED_LABEL_CATEGORIES.includes(it.category)
+            ? `<span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>`
+            : `<span class="cal-tag"><span class="cal-tag-dot" style="background:${c.color};"></span>${label}</span>`;
           html += `<div class="cal-item">
-            <span class="cal-name-wrap">
-              <span class="cal-name">${it.name}</span>
-              ${infoBtn}
-            </span>
-            <span class="cal-item-sub">
-              <span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>
-              ${range ? `<span class="cal-range">${range}</span>` : ''}
-            </span>
+            <div class="cal-item-head">
+              <span class="cal-name-wrap">
+                <span class="cal-name">${it.name}</span>
+                ${infoBtn}
+              </span>
+              ${labelHtml}
+            </div>
+            ${range ? `<div class="cal-range">${range}</div>` : ''}
           </div>`;
         });
         html += `</div></div>`;
