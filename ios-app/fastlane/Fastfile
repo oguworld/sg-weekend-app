@@ -206,7 +206,9 @@ platform :ios do
       skip_metadata:        !has_release_notes,
       submit_for_review:    true,
       automatic_release:    true,
-      force:                true
+      force:                true,
+      # APIキー認証では、precheckがアプリ内課金を調べられず例外になる(release_productionレーンと同じ。設計書224)
+      run_precheck_before_submit: false
     }
 
     deliver_options[:release_notes] = { "ja" => release_notes } if has_release_notes
