@@ -868,6 +868,25 @@ app.get('/api/fare-seasons', (req, res) => {
   }
 });
 
+// 新機能の紹介(What's New)。内容は手書きのコンテンツのため data/ 外(git管理対象)。画像は public/ に置くとアプリに同梱されるため content/ に置く（設計書227）
+const WHATS_NEW_PATH = path.join(__dirname, 'content', 'whats-new.json');
+app.use('/whats-new-images', express.static(path.join(__dirname, 'content', 'whats-new', 'images'), { maxAge: '1d' }));
+
+// GET /api/whats-new?version=X.Y.Z — その版の紹介内容。無い・不正・ファイル欠落・壊れたJSONは、いずれも { entry: null }（常に200）
+app.get('/api/whats-new', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=86400');
+  const version = String(req.query.version || '');
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return res.json({ entry: null });
+  try {
+    const data = JSON.parse(fs.readFileSync(WHATS_NEW_PATH, 'utf8'));
+    const entries = data && data.entries;
+    const entry = entries && Object.prototype.hasOwnProperty.call(entries, version) ? entries[version] : null;
+    res.json({ entry: entry || null });
+  } catch (_) {
+    res.json({ entry: null });
+  }
+});
+
 // POST /api/debug-log — 実機デバッグ用ログ収集（原因特定後に削除すること）
 app.post('/api/debug-log', (req, res) => {
   const line = JSON.stringify({ receivedAt: new Date().toISOString(), ...req.body }) + '\n';

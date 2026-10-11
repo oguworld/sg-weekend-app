@@ -1535,6 +1535,51 @@
     .cal-fare-footnote { color: var(--warm-gray); font-size: 11px; margin-top: 8px; }
 
     /* ─── PROMO MODAL（Web版→iOSアプリ誘導、中央モーダル、設計書206） ─── */
+    /* ─── 新機能の紹介(What's New、設計書227)。Web版の誘導ポップアップ(3603/3604)より上に出す ─── */
+    .whatsnew-overlay {
+      position: fixed; inset: 0; z-index: 3800;
+      background: rgba(44,36,32,0.45);
+      opacity: 0; pointer-events: none; display: none;
+      transition: opacity 0.3s ease;
+    }
+    .whatsnew-overlay.visible { display: block; opacity: 1; pointer-events: auto; }
+    .whatsnew-modal {
+      position: fixed; top: 50%; left: 50%; z-index: 3801;
+      transform: translate(-50%, -50%);
+      width: min(380px, calc(100vw - 40px));
+      max-height: 86vh; max-height: 86dvh;
+      display: none; flex-direction: column;
+      background: var(--warm-white); border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+    }
+    .whatsnew-modal.visible { display: flex; }
+    .whatsnew-body {
+      flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+      padding: 28px 22px 8px; text-align: center;
+    }
+    .whatsnew-chip {
+      display: inline-block; padding: 4px 12px; border-radius: 50px;
+      background: var(--caramel-pale); color: var(--caramel); font-size: 12px; font-weight: 700;
+    }
+    .whatsnew-title { font-family: var(--font-heading); font-size: 20px; font-weight: 800; color: var(--midnight); margin: 10px 0 4px; }
+    .whatsnew-sub { font-size: 13px; color: var(--warm-gray); margin-bottom: 16px; }
+    .whatsnew-img { display: block; width: 100%; height: auto; border-radius: 16px; margin: 0 0 16px; box-shadow: var(--shadow-soft); }
+    .whatsnew-items { display: flex; flex-direction: column; gap: 12px; text-align: left; padding-bottom: 12px; }
+    .whatsnew-item { display: flex; gap: 12px; align-items: flex-start; background: var(--cream); border-radius: 16px; padding: 12px 14px; }
+    .whatsnew-item-icon {
+      flex: 0 0 36px; height: 36px; border-radius: 12px; background: var(--caramel-pale);
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .whatsnew-item-title { font-size: 15px; font-weight: 700; color: var(--midnight); margin-bottom: 2px; }
+    .whatsnew-item-body { font-size: 13px; color: var(--warm-gray); line-height: 1.6; }
+    .whatsnew-footer { flex-shrink: 0; padding: 12px 22px 20px; text-align: center; }
+    .whatsnew-start-btn {
+      display: block; width: 100%; padding: 14px; border: none; border-radius: var(--radius-btn);
+      background: var(--caramel); color: white; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .whatsnew-start-btn:active { opacity: 0.85; }
+    .whatsnew-note { font-size: 11px; color: var(--warm-gray); margin-top: 10px; }
+
     .promo-modal-overlay {
       position: fixed; inset: 0;
       background: rgba(44,36,32,0.45);

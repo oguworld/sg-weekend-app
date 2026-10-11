@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20261011b">
+  <link rel="stylesheet" href="/app.css?v=20261011c">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -535,6 +535,16 @@
     <div class="promo-modal-dismiss" id="promo-modal-dismiss-link" onclick="if(!_touchCapableDetected) closePromoModal()">今はしない</div>
   </div>
 
+  <!-- 新機能の紹介(What's New)。更新後の初回起動で1回だけ。内容はサーバーから取得（設計書227） -->
+  <div class="whatsnew-overlay" id="whatsnew-overlay"></div>
+  <div class="whatsnew-modal" id="whatsnew-modal" role="dialog" aria-modal="true" aria-labelledby="whatsnew-title">
+    <div class="whatsnew-body" id="whatsnew-body"></div>
+    <div class="whatsnew-footer">
+      <button class="whatsnew-start-btn" id="whatsnew-start-btn" onclick="if(!_touchCapableDetected) closeWhatsNew()">はじめる</button>
+      <div class="whatsnew-note">この画面は、更新後に1回だけ表示されます</div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div class="toast" id="toast"></div>
 
@@ -542,7 +552,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20261011h"></script>
+  <script src="/app.js?v=20261011i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

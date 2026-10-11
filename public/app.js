@@ -463,6 +463,13 @@
     function getLang() { return 'ja'; }
     function t(key) { const s = STRINGS.ja; return (s && s[key] !== undefined) ? s[key] : key; }
 
+    // 新規インストールか(新機能の紹介を出さない判定、設計書227)。sg_themeは下のテーマ移行が初回起動で書くため、
+    // 移行より前に評価する。2026-07以降の版を一度でも起動した既存ユーザーは必ず持ち、まっさらな新規だけが持たない
+    const _isFreshInstall = (() => { try { return localStorage.getItem('sg_theme') === null; } catch (_) { return false; } })();
+    // 起動処理(initWhatsNew)が同期で触るため、TDZを避けて早い位置で宣言する
+    const _WHATSNEW_SEEN_KEY = 'app_whatsnew_seen';
+    let _whatsNewPending = null; // 表示中の紹介: { version, persist }
+
     // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
     // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
     (function migratePaletteToTheme() {
@@ -2057,6 +2064,7 @@
       ['qr-share-link-btn', () => doShare()],
       ['promo-modal-overlay', () => closePromoModal()],
       ['promo-modal-dismiss-link', () => closePromoModal()],
+      ['whatsnew-start-btn', () => closeWhatsNew()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -2092,6 +2100,7 @@
     loadLifeInfoNewsScreen(); // ニュースタブを初期表示画面にしたため起動時に直接読み込む（2026-08-28）
     setTimeout(() => _debugLogScreenMetrics('news'), 500); // 診断: 初期表示時点のメトリクス（使い捨て）
     initPushState().then(() => _maybePromptPushOnboarding());
+    initWhatsNew();
     initSettingsProfile();
     initSettingsGenres();
 
@@ -3631,6 +3640,93 @@
     }
 
     checkNavParam();
+
+    // ─── 新機能の紹介(What's New、設計書227) ───
+    // 更新後の初回起動で1回だけ出す1枚ページ。内容は content/whats-new.json (GET /api/whats-new?version=)。
+    // 紹介を用意した版だけ出し、新規インストールには出さない。Webは ?whatsnew=<版> を付けた時だけ確認用に表示する。
+
+    // 何をするかを決めるだけの純関数(localStorageにもDOMにも触らない)
+    //   { action: 'none' }  何もしない
+    //   { action: 'markSeen', version }  紹介は出さず、見た版として記録する(新規インストール)
+    //   { action: 'fetch', version, persist }  その版の内容を取りに行く。persist=true なら、見終わった時に記録する
+    function _decideWhatsNew({ isFresh, seen, current, previewVersion, isNative }) {
+      const semver = /^\d+\.\d+\.\d+$/;
+      if (!isNative) {
+        return semver.test(previewVersion || '') ? { action: 'fetch', version: previewVersion, persist: false } : { action: 'none' };
+      }
+      if (!semver.test(current || '')) return { action: 'none' };
+      if (isFresh) return { action: 'markSeen', version: current };
+      if (seen === current) return { action: 'none' };
+      return { action: 'fetch', version: current, persist: true };
+    }
+
+    async function initWhatsNew() {
+      try {
+        const previewVersion = new URLSearchParams(location.search).get('whatsnew') || '';
+        let current = '';
+        if (_isCapacitorApp) {
+          const appPlugin = window.Capacitor?.Plugins?.App;
+          if (appPlugin) current = (await appPlugin.getInfo()).version || '';
+        }
+        const decision = _decideWhatsNew({
+          isFresh: _isFreshInstall,
+          seen: localStorage.getItem(_WHATSNEW_SEEN_KEY),
+          current, previewVersion, isNative: _isCapacitorApp,
+        });
+        if (decision.action === 'markSeen') {
+          localStorage.setItem(_WHATSNEW_SEEN_KEY, decision.version);
+          return;
+        }
+        if (decision.action !== 'fetch') return;
+        const res = await fetch(`${API_BASE}/api/whats-new?version=${encodeURIComponent(decision.version)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.entry) {
+          openWhatsNew(data.entry, decision);
+        } else if (decision.persist) {
+          localStorage.setItem(_WHATSNEW_SEEN_KEY, decision.version); // 紹介の無い版は、毎回取りに行かない
+        }
+      } catch (_) { /* 通信に失敗した時は何も保存しない(次回の起動で再試行) */ }
+    }
+
+    function openWhatsNew(entry, decision) {
+      const overlay = document.getElementById('whatsnew-overlay');
+      const modal = document.getElementById('whatsnew-modal');
+      const body = document.getElementById('whatsnew-body');
+      if (!overlay || !modal || !body || _whatsNewPending) return;
+      const image = entry.image
+        ? `<img class="whatsnew-img" src="${API_BASE}/whats-new-images/${encodeURIComponent(entry.image)}" alt="" onerror="this.remove()">`
+        : '';
+      const items = (entry.items || []).map(it => `
+        <div class="whatsnew-item">
+          <div class="whatsnew-item-icon">${escapeHtml(it.icon || '')}</div>
+          <div>
+            <div class="whatsnew-item-title">${escapeHtml(it.title || '')}</div>
+            <div class="whatsnew-item-body">${escapeHtml(it.body || '')}</div>
+          </div>
+        </div>`).join('');
+      body.innerHTML = `
+        <span class="whatsnew-chip">v${escapeHtml(decision.version)}</span>
+        <div class="whatsnew-title" id="whatsnew-title">${escapeHtml(entry.title || '')}</div>
+        <div class="whatsnew-sub">${escapeHtml(entry.subtitle || '')}</div>
+        ${image}
+        <div class="whatsnew-items">${items}</div>`;
+      body.scrollTop = 0;
+      _whatsNewPending = { version: decision.version, persist: decision.persist };
+      lockScroll();
+      overlay.classList.add('visible');
+      modal.classList.add('visible');
+    }
+
+    function closeWhatsNew() {
+      if (!_whatsNewPending) return;
+      const { version, persist } = _whatsNewPending;
+      _whatsNewPending = null;
+      if (persist) { try { localStorage.setItem(_WHATSNEW_SEEN_KEY, version); } catch (_) {} }
+      unlockScroll();
+      document.getElementById('whatsnew-overlay')?.classList.remove('visible');
+      document.getElementById('whatsnew-modal')?.classList.remove('visible');
+    }
 
     // ─── PROMO MODAL（Web版→iOSアプリ誘導、設計書206） ───
     function maybeShowWebPromoModal() {
