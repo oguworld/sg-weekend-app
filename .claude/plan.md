@@ -22002,3 +22002,123 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 幅の確認(右端=92+幅、余裕=カード内側の右端-右端): 画面360pxで幅228px・余裕4px、375pxで243px・4px、390pxで258px・4px、430pxで298px・4px、480px以上は300pxで頭打ち。
 - 行数の見積もり(`note`のある41件、12px・本文幅=幅-22px、全角12px・半角約6.7pxで概算): 画面430pxで平均3.1行→2.3行、5行以上3件→1件、31/41件で行数が減る。390pxで平均3.1→2.7行、18/41件。375pxで3.1→2.9行、360pxは3.1→3.0行で、効果は小さい。最長の`note`(「SJ60フラッグシップイベント」95文字)は、6行→5行(390px・430px)。
 - `.cal-month-season-bubble`(月見出しの季節アイコンの吹き出し)は、指定がないので220pxのまま。位置が、タップしたアイコンに追従する別の仕組みで、同じ式を当てるには計算が別に要る。
+
+## 2026-10-11 設計書229: アプリ本体のWilloaドメイン(willoa.net配下のサブドメイン)への移行（設計中・ユーザー確認待ち）
+
+ユーザー依頼: 「dosuru.appドメインにあるアプリを、すべてWilloaドメインの下に移動したい。プライバシーポリシーは`willoa.net/privacy-policy`に移行済みで、あとは本体のページだけ。サブドメインは作れる。まず設計して」。**この設計書は調査と設計のみ。実装・nginx・DNS・証明書の変更は一切していない。**
+
+### 目的とやらないこと
+- 目的: ユーザーに見える入口(Web版・紹介LP・お問い合わせ・QR・共有文面・ストア掲載のリンク)を、`willoa.net`配下の1つのサブドメインに集約する。
+- やらない: バンドルID(`app.dosuru`、ストア上の識別子で変更不可)、APNs、データ構造、Capacitorのオリジン(`capacitor://localhost`・`https://localhost`)、`dosuru.app`のAPIの停止。
+
+### 現状(調査結果、2026-10-11)
+- **配信構成**: Express(`localhost:3000`)1つが、`dosuru.app`・`www.dosuru.app`・`about.dosuru.app`をすべて配信。nginx(`/etc/nginx/sites-available/dosuru.app`)は、80→443の301と、443で`proxy_pass http://localhost:3000`だけ(証明書はLet's Encryptの`dosuru.app`と`about.dosuru.app`)。`dosuru.app`は**Cloudflare経由**(`server: cloudflare`、IPは104.21.x・172.67.x)。リポジトリの`update-nginx.sh`・`nginx-sg-weekend.conf`は古い下書きで、実機の設定と異なる(LINE webhookやキャッシュの指定は、実機の設定にない)。
+- **willoa.net配下の前例**: `willoa.net`(ポート3001)、`bus.willoa.net`(ポート3010、別アプリのsg-bus-navi)。どちらも**DNSのAレコードが直接VPS(194.233.82.43)を指し、Cloudflareは経由しない**。`bus.willoa.net`のnginx設定の冒頭コメントに適用手順があり、`listen 80`の最小の`server`ブロック(`proxy_pass`、`proxy_set_header Host $host`など)を置き、`sudo certbot --nginx -d bus.willoa.net`(HTTP-01方式)で証明書を取ると、certbotが443のブロックと80→443のリダイレクトを追記する。新しいサブドメインも、この前例にそのまま合わせられる。
+- **`server.js`のドメイン依存**: `ALLOWED_ORIGINS`に`https://about.dosuru.app`(235行目付近)。`GET /`が`req.hostname === 'about.dosuru.app'`の時だけ`about.html`を返す(263行目付近)。`/about`・`/contact`のルートはホスト名に関係なく動く(1668・1671行目)。`app.get('*')`のSPAフォールバック(1727行目)。`sendPushToAll`の既定のURL`https://dosuru.app/?nav=news`(84行目)。都市ごとの`appUrl`3件(280・287・294行目、X投稿・LINE通知で使う)。**新しいホスト名は、ルート追加なしで動く**(`/`=SPA、`/about`=LP、`/contact`=お問い合わせ)。
+- **`public/`のドメイン依存**: `app.js` 3行目`API_BASE`(Capacitorで`https://dosuru.app`)、2650行目の共有文面と2664行目のQRコード(`https://about.dosuru.app`)、3791行目の`shareApp`(`https://dosuru.app`)、3725行目のWhat's New画像(`${API_BASE}/whats-new-images/...`)。`index.html`は、先頭のGA4・Instagramの読み込み判定が`/(^|\.)dosuru\.app$/`(5〜12行目)、設定画面とフッターのLPリンク2か所(364・502行目)。`about.html`は`og:image`・`og:url`(10・11行目)とフッターのリンク(509・510行目)。`contact.html`は、ナビとフッターのリンク4か所(58・62・83・84行目)と、フォームの送信先`https://dosuru.app/api/feedback`(99行目、`about.dosuru.app`からのクロスオリジン)、送信文面の`[about.dosuru.app お問い合わせ]`(102行目)。`sw.js`・`manifest.json`は相対パスで、ドメイン依存なし。
+- **古いアプリが`dosuru.app`に依存する点(重要)**: ストアにあるiOS/Android(1.8.9以前、1.8.9は審査中)のバンドルには、`API_BASE`=`https://dosuru.app`、LPリンク(設定画面)、共有・QRの`about.dosuru.app`が焼き込まれている。アプリは更新を強制できないので、`dosuru.app`の**API(`/api/*`)**、**`/whats-new-images/*`**(1.8.10以降のアプリが`API_BASE`経由で読む)、**`about.dosuru.app`のページ**は、古いアプリが使われなくなるまで、動き続ける必要がある。
+- **プッシュ通知**: 購読19件は**すべてiOS(APNs)で、Web Push(VAPID)の購読は0件**(`data/push-subscriptions.json`で確認)。Webのオリジンを移しても、通知への影響はない。通知のURLは、アプリ側で`new URL(url, 'https://dosuru.app')`として`nav`パラメータを取り出すだけで、ホスト名は挙動に無関係。
+- **ストア掲載情報**: リポジトリ内には、`dosuru.app`系のURLを書いた掲載文はない(`android-app/store-assets/listing-ja.md`にURLなし、iOSは`deliver`が`skip_metadata:true`でメタデータを触らない)。App Store Connectのサポートurl・マーケティングurl、Google Playのウェブサイトの実際の値は、**画面でしか確認できない**(ユーザーに確認が必要)。プライバシーポリシーは、`willoa.net/privacy-policy`に移行済み。
+- **運用スクリプト**: `scripts/post-to-x.js`の`appUrl`3件と文面の`dosuru.app`(cronは、LINEへ下書きを送る`--to-line`だけが稼働中)、`scripts/release-ios.sh`75行目の古い案内(`https://dosuru.app/privacy`、プライバシーポリシーは移行済みなので、実態と食い違う)。
+- **Web版の利用者の規模は不明**: nginxのアクセスログは`root:adm`で、私の権限では読めない。ユーザーがsudoで数える方法を、下の作業一覧に書く。
+
+### 制約
+1. 古いアプリのため、`dosuru.app`のAPI・画像・LPは、当面、残す(上記)。
+2. Web版の`localStorage`(ピン留め・いいね・テーマ)とService Workerは、オリジンごとに別なので、Webのオリジンを移すと、Webユーザーのローカルデータは引き継がれない(アプリ版は影響なし)。購読が0件なので、通知は問題ない。
+3. nginx・証明書・DNSは、この環境の私にsudoの権限がなく、**ユーザーの作業**(`! sudo ...`の形で依頼する)。
+4. ストアのコンソールの操作は、ユーザーが行う。
+
+### 提案する構成
+- **ホスト名**(推奨: A)
+  - **A. `navi.willoa.net`(推奨)**: アプリ名「SG在住Navi」の「Navi」と、`bus.willoa.net`の前例(短い英単語)に合う。`dosuru`の名前から離れたい意図にも合う。
+  - B. `dosuru.willoa.net`: 旧ドメインの名前を残せるが、移行の目的(`dosuru`から離れる)と逆行する。
+  - C. `sg.willoa.net`: 「SG」と合うが、BKK・SYDの再開(コードは都市別のパスに対応済み)を考えると、都市の名前を入れるのは窮屈。
+- **URL設計**: `https://navi.willoa.net/` = Web版アプリ、`/about` = 紹介LP、`/contact` = お問い合わせ。紹介LP専用のサブドメイン(`about.navi.willoa.net`など)は作らない(証明書とDNSが増えるため)。QR・共有文面の紹介ページは`https://navi.willoa.net/about`。
+- **`dosuru.app`の扱い**: APIと`/whats-new-images/`は、永続的に残す。`dosuru.app`と`about.dosuru.app`の**画面**は、新しいドメインへ302リダイレクト(しばらく後に301)。フェーズ3。
+- **APIのホスト**: 当面`dosuru.app`のまま(フェーズ4の節を参照)。
+
+### 移行フェーズ
+**フェーズ0(ユーザー、約30分): DNS・nginx・証明書**
+- やること: `navi.willoa.net`のAレコード(`194.233.82.43`、Cloudflareの経由なし。`bus.willoa.net`と同じ)を作る。`nginx-navi.willoa.net.conf`(下の案。フェーズ1でリポジトリに追加)を`sites-available`に置いて有効にし、`nginx -t`、`reload`、`certbot --nginx -d navi.willoa.net`。
+- 確認: `getent hosts navi.willoa.net`が`194.233.82.43`、`curl -sI https://navi.willoa.net/`が200(まだ`dosuru.app`と同じアプリが出る)、`systemctl list-timers | grep certbot`で自動更新が有効。
+- 戻し方: `sites-enabled`のリンクを消して`nginx -t && reload`、DNSのレコードを削除。`dosuru.app`には影響しない。
+
+**フェーズ1(コード、約半日): 両方のドメインで同じアプリを配信し、見える所を新ドメインに寄せる**
+- やること(下の「変更ファイル」): 紹介LP・お問い合わせ・QR・共有文面・LPリンク・GA4の判定・X投稿のURLを、`navi.willoa.net`にする。`contact.html`のフォーム送信先は相対パス`/api/feedback`にする(どちらのホストでも同一オリジンになり、`ALLOWED_ORIGINS`の追加が不要)。`GET /`の`about.dosuru.app`判定は、フェーズ1では残す(古いアプリのLPリンクが動き続ける)。
+- 確認: ホストを指定した`curl`(`curl -H "Host: navi.willoa.net" http://localhost:3000/about`など)で、ローカルで検証してから、DNS反映後に`https://navi.willoa.net/`・`/about`・`/contact`をブラウザで確認。お問い合わせの送信が通ること。GA4が`navi.willoa.net`で読み込まれること。
+- 戻し方: `git revert`と`pm2 restart`。`dosuru.app`側は変わらないので、古いリンクは動き続ける。
+
+**フェーズ2(ユーザー、約20分): ストア掲載情報などのURLの手動更新**
+- App Store Connectのマーケティングurl・サポートurl、Google Playのウェブサイト、Xのプロフィール(`@willoa_sg`)のリンクなどが、`about.dosuru.app`を向いていれば、`https://navi.willoa.net/about`に変更。**iOSは、サポートurl・マーケティングurlが、版のメタデータに属するので、次の版を提出する前に、App Store Connectの「提出準備中」の版のページで直す**(`release_production`は`skip_metadata:true`でメタデータを触らない)。急ぎではない(フェーズ3で、旧URLは新URLにリダイレクトされる)。
+- 戻し方: コンソールの値を戻す。
+
+**フェーズ3(任意、約2時間): `dosuru.app`の画面を新ドメインへリダイレクト**
+- やること: `server.js`のミドルウェアで、ホストが`dosuru.app`・`www.dosuru.app`・`about.dosuru.app`の時、新ドメインの同じパスへ**まず302**でリダイレクトする。**`/api/`・`/whats-new-images/`・`/dl*`・`/sw.js`は除外**する。`about.dosuru.app/`は`https://navi.willoa.net/about`へ。数週間、問題がなければ301に変える。
+- 確認(必須、古いアプリを壊さないための事前確認): `curl -s -o /dev/null -w "%{http_code}\n" -H "Origin: capacitor://localhost" https://dosuru.app/api/version`が200、`curl -i -X OPTIONS -H "Origin: capacitor://localhost" -H "Access-Control-Request-Method: POST" https://dosuru.app/api/feedback`が204(リダイレクトされない)、`/whats-new-images/flight-v3.webp`が200、`https://dosuru.app/`が302で`https://navi.willoa.net/`へ、`https://about.dosuru.app/`が302で`/about`へ。
+- 戻し方: ミドルウェアを`git revert`して`pm2 restart`。**301は、ブラウザが長く覚えるので、戻しにくい。そのため、最初は302にする。**
+
+**フェーズ4(任意、急がない): アプリの`API_BASE`を新ドメインに切り替える**
+- やること: 次以降のアプリのリリースで、`API_BASE`を`https://navi.willoa.net`にする(CORSは、Capacitorのオリジンが同じなので変更不要)。`dosuru.app`のAPIは、古い版が使われなくなるまで残す。
+- **利点**: 呼び出し先のドメインが1つに揃う。将来、`dosuru.app`を手放しやすくなる。**危険**: 新しいAPIホストの稼働に、全アプリが依存する(今は、Cloudflare経由の`dosuru.app`と、直接VPSの`navi.willoa.net`で、障害の性質が違う)。古いアプリが残る限り、`dosuru.app`のドメインの更新を続ける必要があり、手放しのメリットは、すぐには得られない。**ユーザーには、APIのホスト名が見えない**ので、見える所(フェーズ1〜3)を移すだけで、目的はほぼ達成できる。
+- 推奨: **フェーズ4は、当面やらない**。やる場合も、古いアプリの利用が十分減ってから(`dosuru.app`のAPIへのアクセスの割合を確認して判断する)。
+
+### nginx設定の案(`nginx-navi.willoa.net.conf`、フェーズ1でリポジトリに追加、`bus.willoa.net`の前例どおり)
+```
+server {
+    server_name navi.willoa.net;
+    listen 80;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+`certbot --nginx -d navi.willoa.net`が、443のブロックと80→443のリダイレクトを追記する。
+
+### 変更ファイル(コード側、フェーズ1・3)
+- `server.js`: 都市の`appUrl`3件(新ドメインへ)、`sendPushToAll`の既定のURL(任意)、フェーズ3のリダイレクトのミドルウェア、`GET /`の`about.dosuru.app`判定(フェーズ3で302に変更)。`ALLOWED_ORIGINS`は、変更不要(`contact.html`を相対パスにするため)。
+- `public/app.js`: 共有文面(2650行目)とQR(2664行目)を`https://navi.willoa.net/about`、`shareApp`の`appUrl`(3791行目)を`https://navi.willoa.net`。`API_BASE`はフェーズ4まで変えない。
+- `public/index.html`: GA4・Instagramの判定を`/(^|\.)(dosuru\.app|navi\.willoa\.net)$/`にする、LPリンク2か所を`https://navi.willoa.net/about`。
+- `public/about.html`: `og:url`・`og:image`、フッターのリンク(`/about`・`/contact`)。
+- `public/contact.html`: ナビ・フッターのリンク4か所、フォームの送信先を`/api/feedback`(相対)、送信文面の`[about.dosuru.app お問い合わせ]`を新しい名前に。
+- `scripts/post-to-x.js`: `appUrl`3件と文面。`scripts/release-ios.sh`: 古い案内の修正。
+- `nginx-navi.willoa.net.conf`(新規)。`update-nginx.sh`・`nginx-sg-weekend.conf`: 古い下書きなので、注記を足すか削除する。
+- `CLAUDE.md`: ドメイン・LP・Web版・QR・共有の記述(11か所)。
+- `public/sw.js`・`public/manifest.json`: 変更なし(相対パス)。
+
+### ユーザーの作業一覧(コマンド案。実行はしていない)
+1. フェーズ0: DNSに`navi.willoa.net`のAレコード(`194.233.82.43`)を追加。その後、リポジトリに`nginx-navi.willoa.net.conf`が入ってから:
+   - `! sudo cp /home/masahiko/sg-weekend-app/nginx-navi.willoa.net.conf /etc/nginx/sites-available/navi.willoa.net`
+   - `! sudo ln -s /etc/nginx/sites-available/navi.willoa.net /etc/nginx/sites-enabled/`
+   - `! sudo nginx -t`(エラーがないこと)→ `! sudo systemctl reload nginx`
+   - `! sudo certbot --nginx -d navi.willoa.net`
+2. Web版の利用者の規模を確認(任意、判断材料): `! sudo sh -c "zcat -f /var/log/nginx/access.log* | grep -c 'GET /app.js'"`(Webのページ読み込みの回数。アプリは`/app.js`を読まない)と、`... | grep -c 'GET /api/'`(API全体)を比べる。
+3. フェーズ2: App Store Connect・Play Console・Xなどの、リンク先の更新(上記)。
+4. フェーズ3の前: 事前確認の`curl`の結果を、一緒に見る。
+
+### リスクと注意
+- **最大のリスク**: フェーズ3のリダイレクトが、`/api/`や`/whats-new-images/`に及ぶこと。古いアプリはまとめて更新できず、`fetch`のリダイレクト(特に`POST`と、CORSのプリフライト)で、全アプリのAPIが止まる。除外パスの指定と、上記の事前確認の`curl`を必須にする。
+- DNSの反映待ちと、証明書の取得失敗(HTTP-01は、DNSが反映されないと失敗する。`bus.willoa.net`の前例も、この注意が書いてある)。
+- Cloudflareを経由しないため、新ドメインは、CDN・WAFがない(`willoa.net`・`bus.willoa.net`と同じ状態)。画像のキャッシュ(これまでのCloudflareの1日キャッシュ)の問題は、新ドメインでは起きない。
+- Web版のローカルデータ(ピン留め・いいね・テーマ)が、新ドメインでは引き継がれない。Webの利用者が少なければ許容できるが、規模は未確認(作業一覧の2で確認)。Web Pushの購読は0件。
+- GA4の判定の正規表現に、新ドメインを足さないと、Webの計測が止まる。
+- 検索エンジン・SNSの古いリンク(Xの投稿、`about.dosuru.app`)は、リダイレクトで生かす。QRコードの印刷物があれば、同様にリダイレクトで生きる。
+- `dosuru.app`ドメインの更新(有料)は、古いアプリが残る限り、続ける必要がある。
+- `contact.html`の相対パス化により、`about.dosuru.app`でも`navi.willoa.net`でも、フォームが、そのホスト自身の`/api/feedback`に送られる(どちらもExpressが処理する)。
+
+### ユーザーに決めてもらうこと(推奨つき)
+1. **ホスト名**: A `navi.willoa.net`(推奨) / B `dosuru.willoa.net` / C `sg.willoa.net`。
+2. **紹介LP・お問い合わせの置き場所**: 同じホストの`/about`・`/contact`(推奨) / 別のサブドメイン。
+3. **`dosuru.app`の画面**: 新ドメインへのリダイレクト(最初は302、推奨) / リダイレクトせず両方を配信し続ける。APIは、どちらでも残す。
+4. **APIのホスト**: 当面`dosuru.app`のまま(推奨) / 次のリリースで新ドメインに切り替える。
+5. **1.8.10のリリースとの順番**: フェーズ0〜1を先に終わらせてから1.8.10を出す(推奨。QR・共有・設定のLPリンクが、新ドメインの形でアプリに入る) / 1.8.10を先に出し、移行後の1.8.11で入れ替える(1.8.10のアプリは、旧URLを使い続けるが、リダイレクトで動く)。
+6. **X投稿(LINE下書き)のURL**: 新ドメインに変える(推奨) / 変えない。
+7. **ストア掲載のURL**: App Store Connect・Play Consoleに、`dosuru.app`系のURLが入っているか、画面で確認してほしい(私は確認できない)。
+
+### 状況
+設計のみ。実装なし、サーバー設定の変更なし、コミットなし(この追記は、`.claude/plan.md`に、未コミットで残している)。
