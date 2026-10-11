@@ -1248,13 +1248,12 @@
     .cal-day-holiday .cal-day-wd { color: var(--holiday-red); opacity: 0.75; }
     .cal-day-events { min-width: 0; }
     .cal-item + .cal-item { margin-top: 8px; }
-    /* 名前の行: 左=予定名(+infoアイコン)、右端=種類のラベル。期間は名前の下の小さな行(期間のある予定だけ) */
+    /* 名前の行: 左=予定名(+infoアイコン)、右端=種類のラベル。期間は、infoアイコンの吹き出しの1行目に出す */
     .cal-item-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .cal-badge { flex: 0 0 auto; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 50px; white-space: nowrap; }
     .cal-tag { flex: 0 0 auto; font-size: 12px; color: var(--warm-gray); white-space: nowrap; }
     .cal-name-wrap { position: relative; display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
     .cal-item .cal-name { font-size: 14px; font-weight: 600; color: var(--midnight); }
-    .cal-item .cal-range { margin-top: 2px; font-size: 11px; color: var(--warm-gray); }
     .cal-info-btn {
       flex-shrink: 0; width: 18px; height: 18px; padding: 0; border: none; background: none;
       color: var(--light-gray); cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -1270,6 +1269,8 @@
       padding: 8px 10px; box-shadow: var(--shadow-card);
     }
     .cal-note-bubble.visible { display: block; }
+    .cal-note-range { font-weight: 600; }
+    .cal-note-range + .cal-note-text { margin-top: 4px; }
     .cal-note-bubble::before {
       content: ''; position: absolute; top: -6px; left: 10px; width: 10px; height: 10px;
       background: var(--warm-white); border-left: 1px solid var(--sand-dark); border-top: 1px solid var(--sand-dark);

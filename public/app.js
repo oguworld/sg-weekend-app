@@ -3198,6 +3198,15 @@
       const d = new Date(dateStr + 'T00:00:00');
       return { day: d.getDate(), weekday: WEEKDAY_JA[d.getDay()] };
     }
+    // 期間の文字(例: 「10/7(水)〜10/8(木)」)。年は書かない。期間がなければ空文字
+    function _calendarRangeText(it) {
+      if (!it.endDate || it.endDate === it.date) return '';
+      const fmt = dateStr => {
+        const d = new Date(dateStr + 'T00:00:00');
+        return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_JA[d.getDay()]})`;
+      };
+      return `${fmt(it.date)}〜${fmt(it.endDate)}`;
+    }
 
     async function loadCalendarScreen(scrollToCurrent) {
       const key = `${getCity()}_${_calendarYear}`;
@@ -3371,11 +3380,13 @@
         dayItems.forEach(it => {
           const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['festival'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
-          const range = it.endDate && it.endDate !== it.date ? `〜${it.endDate.slice(5).replace('-', '/')}` : '';
-          // 日本の祝日は説明不要（馴染みがあるため）。それ以外でnoteがあればinfoアイコンを出す
-          const infoBtn = (it.note && it.category !== 'holiday-jp')
-            ? `<button class="cal-info-btn" aria-label="説明を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
-               <div class="cal-note-bubble">${escapeHtml(it.note)}</div>`
+          const range = _calendarRangeText(it);
+          // 日本の祝日はnoteを出さない（馴染みがあるため）。noteがある予定、または期間がある予定にinfoアイコンを出す。
+          // 吹き出しの1行目は期間、noteがあれば2行目以降に続ける
+          const noteText = (it.note && it.category !== 'holiday-jp') ? it.note : '';
+          const infoBtn = (noteText || range)
+            ? `<button class="cal-info-btn" aria-label="詳細を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
+               <div class="cal-note-bubble">${range ? `<div class="cal-note-range">${range}</div>` : ''}${noteText ? `<div class="cal-note-text">${escapeHtml(noteText)}</div>` : ''}</div>`
             : '';
           // 祝日系は塗りつぶしのラベル、それ以外は塗りなしの小さな文字。右端に置く
           const labelHtml = CALENDAR_FILLED_LABEL_CATEGORIES.includes(it.category)
@@ -3389,7 +3400,6 @@
               </span>
               ${labelHtml}
             </div>
-            ${range ? `<div class="cal-range">${range}</div>` : ''}
           </div>`;
         });
         html += `</div></div>`;
