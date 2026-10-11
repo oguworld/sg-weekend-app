@@ -1239,11 +1239,11 @@
     .cal-season-icon-btn:active { opacity: 0.6; }
     /* 予定の並び: 左=日付の列(日+曜日、月は月カードの見出しに出ているため省く)、右=予定の列。
        同じ日の予定は日付の列を1回だけ出して右に縦に積む。予定名の文字サイズは据え置き(14px・600) */
-    .cal-day-group { display: grid; grid-template-columns: 30px 1fr; gap: 8px; padding: 9px 0; }
+    .cal-day-group { display: grid; grid-template-columns: 30px 1fr; gap: 8px; padding: 13px 0; }
     .cal-day-group:first-child { padding-top: 0; }
     .cal-day-date { text-align: center; line-height: 1.15; padding-top: 1px; }
     .cal-day-num { display: block; font-size: 14px; font-weight: 700; color: var(--warm-gray); }
-    .cal-day-wd { display: block; font-size: 10px; color: var(--warm-gray); opacity: 0.7; }
+    .cal-day-wd { display: block; font-size: 12px; color: var(--warm-gray); opacity: 0.7; }
     .cal-day-holiday .cal-day-num { color: var(--holiday-red); }
     .cal-day-holiday .cal-day-wd { color: var(--holiday-red); opacity: 0.75; }
     .cal-day-events { min-width: 0; }
