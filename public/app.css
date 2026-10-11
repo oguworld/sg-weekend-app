@@ -1499,7 +1499,7 @@
        通常のドキュメントフロー内でパネルがアコーディオン展開する方式（吹き出しポップオーバーは廃止）。
        フロート要素ではないため位置計算・z-index調整が不要。 ─── */
     .cal-fare-toggle {
-      display: flex; align-items: center; justify-content: space-between; width: 100%;
+      display: flex; align-items: center; justify-content: flex-end; gap: 6px; width: 100%;
       border: none; border-top: 1px solid var(--sand); background: none; border-radius: 0;
       padding: 10px 0; margin-bottom: 10px; cursor: pointer;
       font-family: inherit;
@@ -1510,7 +1510,7 @@
     .cal-fare-toggle[aria-expanded="true"] .cal-fare-toggle-caret { transform: rotate(180deg); }
     .cal-fare-panel { margin: -2px 0 12px; padding: 0 2px; }
 
-    .cal-fare-legend { font-size: 11px; color: var(--warm-gray); margin-bottom: 8px; }
+    .cal-fare-legend { font-size: 11px; color: var(--warm-gray); margin-bottom: 8px; text-align: right; margin-right: -2px; /* .cal-fare-panelの左右2pxの内側の余白を打ち消し、右端を予定行のラベルにそろえる */ }
 
     .cal-fare-pills { display: flex; flex-wrap: wrap; gap: 6px; }
     .cal-fare-pill {
