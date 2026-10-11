@@ -317,9 +317,6 @@
       ja: {
         headerSubtitle: 'シンガポール在住者の週末おでかけガイド', // city-specific: overridden by updateCityUI()
         labelCity: '都市',
-        fareEntryBtn: '✈ 航空券',
-        fareSheetTitle: '✈ 航空券シーズン表',
-        fareSheetSub: 'SG発の航空券が高い/安いおおよその目安です。実際の価格は予約前に確認してください。',
         shareLabel: 'シェア',
         tabsLabel: 'いつ行く？',
         tabWeekend: '今週',
@@ -3333,12 +3330,7 @@
         const month = date.slice(0, 7); // 'YYYY-MM'
         if (month !== currentMonth) {
           if (currentMonth !== null) {
-            // 前の月のトグル行+パネルをカード末尾（予定一覧の後）に出力してから閉じる
-            html += `<button class="cal-fare-toggle" data-month-num="${currentMonthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
-              <span class="cal-fare-toggle-label">${currentMonthNum}月のおすすめ旅行先</span>
-              <span class="cal-fare-toggle-caret">▾</span>
-            </button>
-            <div class="cal-fare-panel" style="display:none;"></div>`;
+            html += _fareToggleHtml(currentMonthNum);
             html += `</div>`; // 前の月カードを閉じる
           }
           currentMonth = month;
@@ -3381,12 +3373,7 @@
         html += `</div>`;
       }
       if (currentMonth !== null) {
-        // 最後の月のトグル行+パネルをカード末尾に出力してから閉じる
-        html += `<button class="cal-fare-toggle" data-month-num="${currentMonthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
-          <span class="cal-fare-toggle-label">${currentMonthNum}月のおすすめ旅行先</span>
-          <span class="cal-fare-toggle-caret">▾</span>
-        </button>
-        <div class="cal-fare-panel" style="display:none;"></div>`;
+        html += _fareToggleHtml(currentMonthNum);
         html += `</div>`; // 最後の月カードを閉じる
       }
       listEl.innerHTML = html;
@@ -3403,23 +3390,21 @@
       }
     }
 
-    // ─── 航空券シーズン表（設計書222→UI再設計3回目、確定版。SG発の航空券が高い/安い月を行き先別の目安で示す静的な表、実運賃は扱わない）
-    // UIは「吹き出しポップオーバーで都市ランキング表示」方式から、月カード内に置く全幅トグル行を
-    // タップしてインラインにパネルを展開し、都市をピル型で色分け表示する方式に変更
-    // （フロート要素を排除した通常のアコーディオン、位置計算・z-index調整が不要）。
-    // トグル行+パネルの配置は月カード末尾（その月の予定一覧をすべて出力した後）。
-    // データ・API・ロジックは無変更、フロントの見た目と構造のみ変更。 ───
+    // ─── 航空券シーズン表（設計書222。SG発の航空券の月別の目安。実運賃は扱わない）───
+    // 各月カード末尾のトグル行を開くと、都市ピル(価格レベルで色分け)を表示する。ピルをタップすると、その月の詳細を1つ表示する。
     const FARE_SEASONS_CACHE_KEY = 'sg_fare_seasons_cache';
-    let FARE_SEASONS_DATA = null;      // { legend, bookingLeadTime, cities, schoolHolidays, sgFactors } をそのまま保持
-    let _fareSelectedCityId = null;    // パネル内で詳細を展開表示中の都市id（パネルごとに切り替わる想定のため、同時に複数パネルを開いても表示上の実害はない）
+    let FARE_SEASONS_DATA = null;      // /api/fare-seasons の応答をそのまま保持
 
-    // 設計書222再設計(2026-10-10): 「安い順」から「この月に行くならどこがおすすめか」へ。
-    // content/fare-seasons.jsonの climate 文字列を good/neutral/bad の3段階に機械的に分類する。
-    // 判定ルール(優先順位): ①悪天候・災害リスク語(梅雨/雨季/台風)を含む→bad
-    // ②過ごしやすさ・観光適期語(乾季/過ごしやすい/涼しい/初夏/避暑/観光シーズン)を含む→good
-    // ③ソンクラーン・旧正月等イベント性のある語を含む→good(「そこに行く理由」になるため例外的に)
-    // ④その他(暑い/寒い/冬/晩夏/真夏/積雪/残雪等、好悪どちらとも言えないもの)→neutral
-    // データ自体は変更しない。実データに出現する文字列(31種)はすべてこのロジックで分類される。
+    function _fareToggleHtml(monthNum) {
+      return `<button class="cal-fare-toggle" data-month-num="${monthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
+        <span class="cal-fare-toggle-label">${monthNum}月のおすすめ旅行先</span>
+        <span class="cal-fare-toggle-caret">▾</span>
+      </button>
+      <div class="cal-fare-panel" style="display:none;"></div>`;
+    }
+
+    // climate文字列を good/neutral/bad に分類する。悪天候語を先に判定し、次に過ごしやすさ・イベント語(行く理由になる)を good とする。
+    // 並び順のタイブレークにだけ使う(ピルの色は価格レベルのみで決まる)。
     function _fareClimateTier(climateStr) {
       if (!climateStr) return 'neutral';
       const BAD_WORDS = ['梅雨', '雨季', '台風'];
@@ -3431,10 +3416,7 @@
       return 'neutral';
     }
 
-    // 気候tierに応じた小さいアイコン(good: ☀️ / bad: 🌧 / neutral: アイコンなし)
-    const FARE_CLIMATE_TIER_ICON = { good: '☀️', bad: '🌧', neutral: '' };
-
-    // 国名(日本語)→国旗絵文字。content/fare-seasons.jsonのcityごとのcountryフィールドに対応。
+    // 国名(日本語)→国旗絵文字。city.country に対応。
     const FARE_COUNTRY_FLAG = {
       '日本': '🇯🇵',
       'タイ': '🇹🇭',
@@ -3451,18 +3433,16 @@
       return FARE_COUNTRY_FLAG[country] || '';
     }
 
-    // 気候補正込みの「おすすめ度スコア」(小さいほどおすすめ)。価格レベル(1〜5)に
-    // good→-0.5 / neutral→0 / bad→+0.5 の補正を加える。同点時は元のlevelが小さい方を優先。
+    // 気候補正込みのおすすめ度スコア(小さいほど上位)。価格レベルに good→-0.5 / bad→+0.5 を加える。
     function _fareRecommendScore(level, tier) {
       const adjust = tier === 'good' ? -0.5 : (tier === 'bad' ? 0.5 : 0);
       return level + adjust;
     }
 
-    // 価格レベル(1〜5)をピル・色帯の3段階(cheap/normal/expensive)に分類する。
-    // レベル1〜2→cheap、3→normal、4〜5→expensive。天候補正は入れない(価格情報を正とする)
-    function _fareScoreTier(score) {
-      if (score < 2.5) return 'cheap';
-      if (score < 3.5) return 'normal';
+    // 価格レベル(1〜5)をピル・色帯の3段階に分類する。1〜2→cheap、3→normal、4〜5→expensive(天候補正は入れない)。
+    function _fareLevelTier(level) {
+      if (level <= 2) return 'cheap';
+      if (level === 3) return 'normal';
       return 'expensive';
     }
 
@@ -3483,8 +3463,7 @@
       }
     }
 
-    // 月カード末尾のトグル行をタップ → そのカード内のパネルをアコーディオン開閉（初回タップ時に未取得ならデータ遅延ロード）
-    // 月をまたいだ相互排他は不要（フロート要素ではないため複数月のパネルを同時に開いたままにしてよい）
+    // トグル行でそのカード内のパネルを開閉する。データは初回に遅延ロード。複数月のパネルを同時に開いてよい。
     function toggleFarePanel(toggleBtn) {
       const card = toggleBtn.closest('.cal-month-card');
       const panel = card?.querySelector('.cal-fare-panel');
@@ -3499,7 +3478,6 @@
       toggleBtn.setAttribute('aria-expanded', 'true');
       panel.style.display = 'block';
       panel.dataset.fareMonth = String(month);
-      _fareSelectedCityId = null;
       (async () => {
         if (!FARE_SEASONS_DATA) {
           panel.innerHTML = '<div style="padding:8px 2px;color:var(--warm-gray);font-size:12px;">読み込み中…</div>';
@@ -3524,7 +3502,7 @@
       // 色は価格レベルのみで決める(天候補正は入れない)。おすすめ度は同色・同国内のタイブレークにだけ使う
       const TIER_ORDER = { cheap: 0, normal: 1, expensive: 2 };
       const scoreOf = city => _fareRecommendScore(city.levels[idx], _fareClimateTier(city.climate[idx]));
-      const tierOf = city => TIER_ORDER[_fareScoreTier(city.levels[idx])];
+      const tierOf = city => TIER_ORDER[_fareLevelTier(city.levels[idx])];
       const ordered = [...cities].sort((a, b) => {
         const tierDiff = tierOf(a) - tierOf(b);
         if (tierDiff !== 0) return tierDiff;
@@ -3536,7 +3514,7 @@
       });
 
       const pillsHtml = ordered.map(city => {
-        const tier = _fareScoreTier(city.levels[idx]);
+        const tier = _fareLevelTier(city.levels[idx]);
         const flag = _fareCountryFlag(city.country);
         return `<button class="cal-fare-pill cal-fare-pill-${tier}" data-fare-city="${city.id}" onclick="if(!_touchCapableDetected) selectFarePill(this)">${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</button>`;
       }).join('');
@@ -3557,7 +3535,7 @@
       const idx = month - 1;
 
       const stripHtml = city.levels.map((lv, i) => {
-        const tier = _fareScoreTier(lv);
+        const tier = _fareLevelTier(lv);
         return `<span class="cal-fare-month-seg cal-fare-month-seg-${tier}${i === idx ? ' cal-fare-month-seg-current' : ''}"></span>`;
       }).join('');
 
@@ -3582,26 +3560,22 @@
       `;
     }
 
-    // ピルタップで詳細を展開/折りたたみ（同じピルの再タップで閉じる、別ピルタップで内容を差し替え）
+    // ピルで詳細を開閉する。選択中のピルは .cal-fare-pill-active で表し、再タップで閉じ、別のピルなら差し替える(選択はパネルごと)。
     function selectFarePill(pillEl) {
       const panel = pillEl.closest('.cal-fare-panel');
-      if (!panel) return;
-      const detail = panel.querySelector('.cal-fare-detail');
+      const detail = panel?.querySelector('.cal-fare-detail');
       if (!detail) return;
-      const cityId = pillEl.dataset.fareCity;
-      const month = Number(panel.dataset.fareMonth);
+      const wasActive = pillEl.classList.contains('cal-fare-pill-active');
       panel.querySelectorAll('.cal-fare-pill-active').forEach(p => p.classList.remove('cal-fare-pill-active'));
-      if (_fareSelectedCityId === cityId) {
-        _fareSelectedCityId = null;
+      if (wasActive) {
         detail.style.display = 'none';
         detail.innerHTML = '';
         return;
       }
-      _fareSelectedCityId = cityId;
-      pillEl.classList.add('cal-fare-pill-active');
-      const city = (FARE_SEASONS_DATA.cities || []).find(c => c.id === cityId);
+      const city = (FARE_SEASONS_DATA.cities || []).find(c => c.id === pillEl.dataset.fareCity);
       if (!city) return;
-      detail.innerHTML = _fareDetailHtml(city, month);
+      pillEl.classList.add('cal-fare-pill-active');
+      detail.innerHTML = _fareDetailHtml(city, Number(panel.dataset.fareMonth));
       detail.style.display = 'block';
     }
 

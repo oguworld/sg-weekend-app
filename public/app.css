@@ -30,7 +30,6 @@
       --fare-tier-cheap: #6FAE7C;
       --fare-tier-normal: #E8C35C;
       --fare-tier-expensive: #E08A4F;
-      --fare-tier-text: #2B2B27;
       --fare-tier-cheap-pale: rgba(111,174,122,0.16);
       --fare-tier-normal-pale: rgba(232,195,92,0.18);
       --fare-tier-expensive-pale: rgba(224,138,79,0.16);
@@ -1638,7 +1637,6 @@
       --fare-tier-cheap: #3E8A54;
       --fare-tier-normal: #A8872F;
       --fare-tier-expensive: #B05A2E;
-      --fare-tier-text: #EDEAE3;
       --fare-tier-cheap-pale: rgba(62,138,84,0.28);
       --fare-tier-normal-pale: rgba(168,135,47,0.28);
       --fare-tier-expensive-pale: rgba(176,90,46,0.28);
