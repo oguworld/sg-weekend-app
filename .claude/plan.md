@@ -21979,3 +21979,7 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - **確認**: CSSの括弧は396対396。配信中の`app.css`に、凡例の`text-align: right`・`margin-right: -2px`が残っていないこと、トグル行の右寄せが残っていることを`curl`で確認した。
 - **未確認**: 実機・ブラウザでの見た目。この環境では描画できない。
 - キャッシュ更新: `app.css?v=20261011l`、`sw.js`の`CACHE_NAME`は`v973`。
+
+### 設計書227 追記(2026-10-11): 紹介画像を撮り直したスクショに差し替え
+- ユーザーが撮った航空券の画面(都市を選び詳細を開いた状態、トグルは右寄せ・注記1行の最新版)から、`scripts/make-whatsnew-image.js`で切り出し範囲(元画像1290x2796のうち left=56, top=595, width=1180, height=1605)を指定して`flight-v2.webp`(720x979、約49KB)を作成した。ステータスバー・右下のスクロールボタン・下の注記は写らない。
+- 仮画像`flight.webp`を同名で差し替えたところ、Cloudflareが古い画像を最大1日キャッシュし(`cf-cache-status: HIT`)、`dosuru.app`経由では古い画像が返った。サーバー直(localhost)は新しかった。**画像は新しいファイル名で作り、`content/whats-new.json`の`image`を書き換える**運用にした(`flight-v2.webp`)。`flight.webp`は削除した。CLAUDE.mdに手順を記載済み。
