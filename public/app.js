@@ -3413,16 +3413,6 @@
     let FARE_SEASONS_DATA = null;      // { legend, bookingLeadTime, cities, schoolHolidays, sgFactors } をそのまま保持
     let _fareSelectedCityId = null;    // パネル内で詳細を展開表示中の都市id（パネルごとに切り替わる想定のため、同時に複数パネルを開いても表示上の実害はない）
 
-    // レベル(1〜5)ごとの短いラベル文言。legend(JSONの日本語、凡例表示用)とは別に
-    // 詳細の価格帯表現に使う一言用（アプリのトーンに合わせた表現、データ側の変更は不要）
-    const FARE_LEVEL_SHORT_LABEL = {
-      1: '最安・狙い目',
-      2: '安め',
-      3: '普通',
-      4: 'やや高め',
-      5: '高額',
-    };
-
     // 設計書222再設計(2026-10-10): 「安い順」から「この月に行くならどこがおすすめか」へ。
     // content/fare-seasons.jsonの climate 文字列を good/neutral/bad の3段階に機械的に分類する。
     // 判定ルール(優先順位): ①悪天候・災害リスク語(梅雨/雨季/台風)を含む→bad
@@ -3559,46 +3549,36 @@
       `;
     }
 
-    // 詳細表示: 12か月分の色帯(当月を枠線で強調)・過ごしやすい月・価格帯の目安・メモ・学校休暇マーク
+    // 詳細表示: 12か月分の色帯(当月を枠線で強調) + 5行(所要・価格・天候・現地・SG側)。
+    // 価格は色と同じ基準(価格レベルのみ)の凡例語。天候・現地は content/fare-seasons.json の monthly(一般的な傾向)。
+    // SG側は現地校(MOE)の休暇と重なる月かどうかのみ(日本人学校の休暇は航空券への影響が薄いため出さない)。
     function _fareDetailHtml(city, month) {
-      const { bookingLeadTime, schoolHolidays, sgFactors } = FARE_SEASONS_DATA;
+      const { legend, bookingLeadTime, schoolHolidays } = FARE_SEASONS_DATA;
       const idx = month - 1;
 
-      // 12か月分の色帯（現在表示中の月のセグメントのみ枠線で強調）
       const stripHtml = city.levels.map((lv, i) => {
         const tier = _fareScoreTier(lv);
         return `<span class="cal-fare-month-seg cal-fare-month-seg-${tier}${i === idx ? ' cal-fare-month-seg-current' : ''}"></span>`;
       }).join('');
 
-      // 過ごしやすい月: climateが'good'になる月（最大3つまで、多すぎる場合は表示が煩雑になるため）
-      const goodMonths = city.climate
-        .map((c, i) => _fareClimateTier(c) === 'good' ? i + 1 : null)
-        .filter(m => m !== null);
-      const bestSeasonText = goodMonths.length
-        ? `過ごしやすい月: ${goodMonths.slice(0, 3).map(m => `${m}月`).join('・')}`
-        : '気候面で過ごしやすい月はありません';
-
-      // 価格帯の目安: levels配列のmin/maxからFARE_LEVEL_SHORT_LABEL相当の短い表現で
-      const minLv = Math.min(...city.levels);
-      const maxLv = Math.max(...city.levels);
-      const priceRangeText = minLv === maxLv
-        ? (FARE_LEVEL_SHORT_LABEL[minLv] || '')
-        : `${FARE_LEVEL_SHORT_LABEL[minLv] || ''}〜${FARE_LEVEL_SHORT_LABEL[maxLv] || ''}`;
-
-      const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
-      const schoolMarkHtml = moeHit
-        ? `<div class="cal-fare-detail-row">🏫 現地校(MOE)休暇と重なる月です。${escapeHtml(sgFactors && sgFactors.schoolHolidayBoost ? sgFactors.schoolHolidayBoost : '')}</div>`
-        : '';
-
       const lv = city.levels[idx];
-      const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)] || '-';
+      const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)];
+      const priceText = `${(legend && legend[String(lv)]) || ''}${leadTime ? `（予約は${leadTime}が目安）` : ''}`;
+
+      const monthly = Array.isArray(city.monthly) ? city.monthly[idx] : null;
+      const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
+      const sgText = moeHit ? '現地校(MOE)の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
+
+      const row = (label, value) =>
+        `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${escapeHtml(value)}</span></div>`;
 
       return `
         <div class="cal-fare-month-strip">${stripHtml}</div>
-        <div class="cal-fare-detail-row">🗓 ${escapeHtml(bestSeasonText)}</div>
-        <div class="cal-fare-detail-row">💰 価格帯の目安: ${escapeHtml(priceRangeText)}（予約目安: ${escapeHtml(leadTime)}前後）</div>
-        ${city.notes ? `<div class="cal-fare-detail-row">📝 ${escapeHtml(city.notes)}</div>` : ''}
-        ${schoolMarkHtml}
+        ${row('所要', city.flightHours || '')}
+        ${row('価格', priceText)}
+        ${monthly && monthly.weather ? row('天候', monthly.weather) : ''}
+        ${monthly && monthly.local ? row('現地', monthly.local) : ''}
+        ${row('SG側', sgText)}
       `;
     }
 
