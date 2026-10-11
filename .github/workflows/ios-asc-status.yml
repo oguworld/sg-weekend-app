@@ -1,0 +1,36 @@
+name: iOS App Store Connect Status (read-only)
+
+# 設計書224（追記、2026-10-11の事故の再発防止）: App Store Connectの審査の列に、
+# 審査待ち(WAITING_FOR_REVIEW)/審査中(IN_REVIEW)の版がないかを、読み取りだけで確認する。
+# releaserが、リリースを始める前に実行する(~/.claude/agents/releaser.md のStep -1)。
+#
+# 読み取りだけ(Fastlaneのasc_statusレーンは、変更系のAPIを一切呼ばない)ので、
+# 誤爆しても害がなく、confirm入力は不要。pushトリガーは持たず、workflow_dispatchのみ。
+# 結果は、ログの ASC_VERSION / ASC_WARN / ASC_STATUS_OK|BLOCKED|ERROR の行で読む。
+# BLOCKED(審査待ち/審査中の版がある)と、ERROR(状態を取得できない)は、ジョブを失敗させる。
+on:
+  workflow_dispatch:
+
+jobs:
+  asc_status:
+    # Xcodeは不要(App Store Connect APIを読むだけ)なので、軽いLinuxのランナーで動かす
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ios-app
+
+      - name: Read App Store Connect version states (read-only)
+        run: |
+          cd ios-app
+          bundle exec fastlane asc_status
+        env:
+          ASC_KEY_ID:      ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:   ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}

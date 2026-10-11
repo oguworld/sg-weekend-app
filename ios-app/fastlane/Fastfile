@@ -215,4 +215,65 @@ platform :ios do
 
     deliver(deliver_options)
   end
+
+  # 設計書224（追記: 2026-10-11の事故の再発防止）: App Store Connectの審査の列に載っている版が
+  # ないかを、読み取りだけで確認するレーン。releaserが、リリースを始める前に実行する。
+  # 前の版が「審査待ち/審査中」のまま次のリリースを始めると、Fastlaneは審査待ちの版を
+  # 「編集できる版」として扱い、版の名前と文言を書き換えて、新しいビルドを紐づけられずに失敗する。
+  # 変更系のAPI(作成・更新・削除・提出)は、一切呼ばない。
+  # 出力: ASC_VERSION <版> <状態> / ASC_WARN <状態> <版> / ASC_STATUS_OK|BLOCKED|ERROR
+  desc "Read-only: list App Store versions and fail if any version is waiting for / in review"
+  lane :asc_status do
+    api_key = app_store_connect_api_key(
+      key_id:      ENV['ASC_KEY_ID'],
+      issuer_id:   ENV['ASC_ISSUER_ID'],
+      key_content: ENV['ASC_PRIVATE_KEY']
+    )
+
+    queue_states = %w[WAITING_FOR_REVIEW IN_REVIEW]
+    warn_states  = %w[PREPARE_FOR_SUBMISSION READY_FOR_REVIEW WAITING_FOR_EXPORT_COMPLIANCE
+                      PENDING_DEVELOPER_RELEASE PENDING_APPLE_RELEASE
+                      REJECTED DEVELOPER_REJECTED METADATA_REJECTED INVALID_BINARY]
+
+    # 版の状態は、appStoreState(従来)またはappVersionState(新しい名前)のどちらかで返る
+    state_of = lambda do |v|
+      st = v.respond_to?(:app_store_state) ? v.app_store_state.to_s : ""
+      st = v.respond_to?(:app_version_state) ? v.app_version_state.to_s : "" if st.empty?
+      st
+    end
+
+    versions = nil
+    begin
+      Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(hash: api_key)
+      app = Spaceship::ConnectAPI::App.find("app.dosuru")
+      raise "app.dosuru のアプリが見つかりません" if app.nil?
+      versions = app.get_app_store_versions(filter: { platform: "IOS" })
+    rescue => e
+      puts "ASC_STATUS_ERROR #{e.class}: #{e.message}"
+      UI.user_error!("ASC_STATUS_ERROR: App Store Connectの状態を取得できませんでした")
+    end
+
+    # 状態が取れない版が1つでもあれば、確認できていないので、安全側(エラー)で止める
+    unknown = versions.select { |v| state_of.call(v).empty? }
+    unless unknown.empty?
+      puts "ASC_STATUS_ERROR 状態を取得できない版があります: #{unknown.map(&:version_string).join(', ')}"
+      UI.user_error!("ASC_STATUS_ERROR: 状態を取得できない版があります")
+    end
+
+    versions.each { |v| puts "ASC_VERSION #{v.version_string} #{state_of.call(v)}" }
+
+    versions.each do |v|
+      st = state_of.call(v)
+      puts "ASC_WARN #{st} #{v.version_string}" if warn_states.include?(st)
+    end
+
+    blocked = versions.select { |v| queue_states.include?(state_of.call(v)) }
+    if blocked.empty?
+      puts "ASC_STATUS_OK"
+    else
+      detail = blocked.map { |v| "#{v.version_string}=#{state_of.call(v)}" }.join(", ")
+      puts "ASC_STATUS_BLOCKED #{detail}"
+      UI.user_error!("ASC_STATUS_BLOCKED: 審査待ち/審査中の版があります(#{detail})。前の審査が終わるまで、リリースを始めないでください。")
+    end
+  end
 end
