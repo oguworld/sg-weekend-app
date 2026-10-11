@@ -3529,14 +3529,17 @@
       const { cities } = FARE_SEASONS_DATA;
       const idx = month - 1;
 
-      // 「安い順」ではなく「おすすめ順」: 価格レベルに気候の良し悪しで補正したスコアの昇順に並べ替える
+      // 並び順: 色(安め→普通→高め) → 国名 → おすすめ度 → id
+      const TIER_ORDER = { cheap: 0, normal: 1, expensive: 2 };
+      const scoreOf = city => _fareRecommendScore(city.levels[idx], _fareClimateTier(city.climate[idx]));
+      const tierOf = city => TIER_ORDER[_fareScoreTier(scoreOf(city))];
       const ordered = [...cities].sort((a, b) => {
-        const climateA = a.climate[idx];
-        const climateB = b.climate[idx];
-        const scoreA = _fareRecommendScore(a.levels[idx], _fareClimateTier(climateA));
-        const scoreB = _fareRecommendScore(b.levels[idx], _fareClimateTier(climateB));
-        if (scoreA !== scoreB) return scoreA - scoreB;
-        if (a.levels[idx] !== b.levels[idx]) return a.levels[idx] - b.levels[idx];
+        const tierDiff = tierOf(a) - tierOf(b);
+        if (tierDiff !== 0) return tierDiff;
+        const countryDiff = a.country.localeCompare(b.country, 'ja');
+        if (countryDiff !== 0) return countryDiff;
+        const scoreDiff = scoreOf(a) - scoreOf(b);
+        if (scoreDiff !== 0) return scoreDiff;
         return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
       });
 

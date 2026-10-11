@@ -21701,3 +21701,6 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - `levels`・`climate`・`cheapestMonths`・`haul`は変更なし(価格面は別件)。
 - 他箇所(server.js・public/・scripts/・CLAUDE.md)に乗継ぎ前提の記述は無かったため変更なし。
 - orchestratorが起動直後のAPIエラーで使えなかったため、forkがbuilder→checker→closerを代行した。
+
+### 設計書222 追記19(2026-10-11): ピルの並び順を「色→国名→おすすめ度→id」に変更
+ユーザー指示「色の次は国でソート」。`renderFarePanel()`の並べ替えを、色(安め→普通→高め)で大きく分け、同じ色の中は国名(`localeCompare('ja')`)順、同じ国の中はおすすめ度の昇順、最後にidで安定化する形に変更した。ピルの見た目・データ・APIは無変更。キャッシュは `app.js?v=20261010m` / `sw.js` `v953`。orchestratorがAPIエラーで使えなかったためforkで実施。
