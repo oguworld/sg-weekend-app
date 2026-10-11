@@ -3736,8 +3736,8 @@
         <span class="whatsnew-chip">v${escapeHtml(decision.version)}</span>
         <div class="whatsnew-title" id="whatsnew-title">${escapeHtml(entry.title || '')}</div>
         <div class="whatsnew-sub">${escapeHtml(entry.subtitle || '')}</div>
-        ${image}
-        <div class="whatsnew-items">${items}</div>`;
+        <div class="whatsnew-items">${items}</div>
+        ${image}`;
       body.scrollTop = 0;
       _whatsNewPending = { version: decision.version, persist: decision.persist };
       lockScroll();

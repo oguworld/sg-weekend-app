@@ -1572,7 +1572,7 @@
     }
     .whatsnew-title { font-family: var(--font-heading); font-size: 20px; font-weight: 800; color: var(--midnight); margin: 10px 0 4px; }
     .whatsnew-sub { font-size: 13px; color: var(--warm-gray); margin-bottom: 16px; }
-    .whatsnew-img { display: block; width: 100%; height: auto; border-radius: 16px; margin: 0 0 16px; box-shadow: var(--shadow-soft); }
+    .whatsnew-img { display: block; width: 100%; height: auto; border-radius: 16px; margin: 4px 0 12px; box-shadow: var(--shadow-soft); }
     .whatsnew-items { display: flex; flex-direction: column; gap: 12px; text-align: left; padding-bottom: 12px; }
     .whatsnew-item { display: flex; gap: 12px; align-items: flex-start; background: var(--cream); border-radius: 16px; padding: 12px 14px; }
     .whatsnew-item-icon {
