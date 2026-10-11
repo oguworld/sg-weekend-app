@@ -3558,7 +3558,7 @@
       `;
     }
 
-    // 詳細表示: 12か月分の色帯(当月を枠線で強調)・ベストシーズン・価格帯の目安・メモ・学校休暇マーク
+    // 詳細表示: 12か月分の色帯(当月を枠線で強調)・過ごしやすい月・価格帯の目安・メモ・学校休暇マーク
     function _fareDetailHtml(city, month) {
       const { bookingLeadTime, schoolHolidays, sgFactors } = FARE_SEASONS_DATA;
       const idx = month - 1;
@@ -3569,13 +3569,13 @@
         return `<span class="cal-fare-month-seg cal-fare-month-seg-${tier}${i === idx ? ' cal-fare-month-seg-current' : ''}"></span>`;
       }).join('');
 
-      // ベストシーズン: climateが'good'になる月（最大3つまで、多すぎる場合は表示が煩雑になるため）
+      // 過ごしやすい月: climateが'good'になる月（最大3つまで、多すぎる場合は表示が煩雑になるため）
       const goodMonths = city.climate
         .map((c, i) => _fareClimateTier(c) === 'good' ? i + 1 : null)
         .filter(m => m !== null);
       const bestSeasonText = goodMonths.length
-        ? `${goodMonths.slice(0, 3).map(m => `${m}月`).join('・')}がベストシーズン`
-        : '気候面で特に狙い目の月はありません';
+        ? `過ごしやすい月: ${goodMonths.slice(0, 3).map(m => `${m}月`).join('・')}`
+        : '気候面で過ごしやすい月はありません';
 
       // 価格帯の目安: levels配列のmin/maxからFARE_LEVEL_SHORT_LABEL相当の短い表現で
       const minLv = Math.min(...city.levels);
