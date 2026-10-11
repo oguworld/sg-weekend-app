@@ -111,6 +111,18 @@ function main() {
     if (!city.notes || typeof city.notes !== 'string') {
       errors.push(`${label}: notesが無いか文字列ではありません`);
     }
+
+    if (!Array.isArray(city.monthly) || city.monthly.length !== 12) {
+      errors.push(`${label}: monthlyが12要素の配列ではありません(実際: ${Array.isArray(city.monthly) ? city.monthly.length : typeof city.monthly}要素)`);
+    } else {
+      city.monthly.forEach((m, i) => {
+        ['weather', 'local'].forEach(key => {
+          if (!m || typeof m[key] !== 'string' || m[key].trim() === '') {
+            errors.push(`${label}: monthly[${i}] (${i + 1}月) の${key}が空か文字列ではありません`);
+          }
+        });
+      });
+    }
   });
 
   if (!data.legend || typeof data.legend !== 'object') {
