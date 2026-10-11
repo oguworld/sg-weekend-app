@@ -21798,3 +21798,57 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 他の箇所に同じ文言は残っていない(`public/`・`CLAUDE.md`をgrep)。`.cal-fare-footnote`のCSSは`font-size: 11px`のみで、折り返しを強制する指定や幅の制約はない。
 - キャッシュ更新: `app.js?v=20261011h`、`sw.js`の`CACHE_NAME`は`v961`。
 - **未確認**: 実機・ブラウザでの見た目(1行に収まるか)。
+
+## 2026-10-11 設計書227: 新機能の紹介(What's New)画面(更新後の初回起動で1回だけ出す1枚ページ、ユーザー承認済み、fork代行で設計→実装→検証→記録)
+
+### 背景・目的
+リリースで追加した機能(例: 航空券の「おすすめ旅行先」)を、アプリ更新後の初回起動で1枚ページで紹介したい(ユーザー要望)。見た目はモック(暗い背景の上に中央のカード1枚。版のチップ、タイトル、サブタイトル、任意のスクショ、機能の一覧、「はじめる」ボタン)で合意済み。
+
+### ユーザー決定
+1. **出す条件**: 紹介を用意した版だけ(サーバーに内容があるときだけ)。バグ修正だけの版では出さない。
+2. **新規インストール**: 出さない(今ある機能がすべて新しいはずなので)。
+3. **場所**: iOS/Androidアプリだけ自動表示。Webは`?whatsnew=<版>`を付けた時だけ表示(確認用)。
+
+### 仕組み
+- **内容はサーバー主導**: `content/whats-new.json`(git管理。`data/`はgitignore対象のため使わない)に`entries`を版ごとに書く。キーは`ios-app/package.json`の`version`と同じ値。アプリ側は自分の版で`GET /api/whats-new?version=X.Y.Z`を呼び、`entry`があれば表示する。内容や画像の差し替えにアプリの更新は不要。
+- **画像**: `content/whats-new/images/`に置き、`/whats-new-images/`で配信する。`public/`に置くとCapacitorのwebDirでアプリに同梱されて重くなるため置かない。読み込みに失敗したら画像だけ非表示にして文章だけで表示する。作成は`scripts/make-whatsnew-image.js`(iPhoneのスクショを切り出し→角丸→幅720px→WebP)。
+- **API**: `GET /api/whats-new?version=X.Y.Z`。`version`は`^\d+\.\d+\.\d+$`に一致するときだけ処理し、それ以外・該当なし・ファイル欠落・壊れたJSONはいずれも`{ "entry": null }`(常に200)。認証不要。`Cache-Control: public, max-age=86400`。
+
+### 表示判定(副作用と分離した純関数`_decideWhatsNew`)
+入力: `isFresh`(新規インストールか)、`seen`(`localStorage`の`app_whatsnew_seen`)、`current`(アプリの版)、`previewVersion`(Webの`?whatsnew=`)、`isNative`。出力は「何をするか」(`skip` / `markSeen` / `fetch`+`persist`の別)だけで、`localStorage`やDOMには触らない。
+- Webで`?whatsnew=<版>`あり → その版の`entry`を取って表示(`app_whatsnew_seen`は読まず・書かない)。パラメータなしのWeb → 何もしない。
+- アプリで版が取れない → 何もしない。
+- 新規インストール → 紹介を出さず、`app_whatsnew_seen`を現在の版にする(次の更新から正しく動かすため)。
+- `seen`が現在の版と同じ → 何もしない。
+- それ以外(既存ユーザー、`seen`が古い版または未設定) → APIを取得。`entry`があれば表示し、「はじめる」で`seen`を現在の版にする。`entry`が`null`なら表示せず`seen`を現在の版にする(毎回取りに行かないため)。**通信に失敗したら何も保存しない**(次回の起動で再試行)。
+
+### 新規インストールの判定の根拠
+起動の最初(`migratePaletteToTheme`より前)に`localStorage.getItem('sg_theme') === null`を評価して保持する。`sg_theme`を書くのは`app.js`のテーマ移行処理(設計書184、2026-07以降の全版)と、設定画面のテーマ切替だけで、`index.html`の`<head>`のスクリプトは読むだけで書かない。したがって、2026-07以降の版を1度でも起動した既存ユーザーは必ず`sg_theme`を持ち、まっさらな新規インストールだけが持たない。例外は、2026-07より前の版を最後に一度も起動していない人と、`localStorage`が端末側で消えた人で、どちらも新規扱い(紹介が出ない)になるだけで実害は小さい。
+
+### 通知の案内との順番
+`_maybePromptPushOnboarding()`はアプリだけで、`app_push_onboarding_prompted`で1端末1回しか動かず、HTMLのモーダルではなくOSの許可ダイアログを出す。既存ユーザーは通過済みで、新規ユーザーには紹介を出さないので、両者は重ならない。**変更不要**。Web版の「アプリを入手」案内(`maybeShowWebPromoModal`、z-index 3603/3604)は、Webの確認用表示と重なる可能性があるため、紹介のz-indexを3800/3801にして上に出す。
+
+### UI
+- `index.html`の`<body>`直下に`#whatsnew-overlay`と`#whatsnew-modal`。表示切替は`classList.add/remove('visible')`のみ(インラインstyleは使わない)。z-indexは3800/3801(ボトムナビ9999未満の3000番台の規約。ほかのモーダルと同じくナビは操作できる)。`lockScroll()`/`unlockScroll()`を使う。
+- カードは`max-height`を設け、はみ出す時は内部で縦スクロール(`_preventBgScroll`は縦スクロール可能な祖先を許可する)。
+- 「はじめる」ボタンのみで閉じる(背景タップでは閉じない。誤って閉じにくくする)。三点セット: `onclick="if(!_touchCapableDetected) ..."`と、オーバーレイ・モーダル閉じる用の配列によるtouchendの両方。
+- CSSは`:root`の既存変数だけを使う(生の色値は書かない)。ダークモードでも読める。
+
+### リリース時の手順(重要)
+紹介を出したい版は、リリースの**前**に`content/whats-new.json`へその版のキーを足しておく。キーがアプリの版と一致しないと出ない。この画面自体は、実装したあとの最初のリリース(1.8.10の見込み)からアプリに入る。1.8.9には入っていないので、1.8.9で追加した機能の紹介を1.8.9のアプリで出すことはできない。
+
+### 変更ファイル
+`content/whats-new.json`・`content/whats-new/images/flight.webp`(新規)、`scripts/make-whatsnew-image.js`(新規)、`server.js`、`public/index.html`・`public/app.css`・`public/app.js`・`public/sw.js`(`CACHE_NAME`バンプのみ)、`CLAUDE.md`。`ios-app/`・`android-app/`は無変更(アプリへの反映は次回リリース)。
+
+### スコープ外
+複数枚のスライド、スクショの自動撮影、紹介の再表示(設定からもう一度見る)、ユーザーごとの出し分け、ダークモード専用の画像。
+
+### 設計書227 実装結果(2026-10-11)
+- **実装**: `content/whats-new.json`(1.8.10の紹介: おすすめ旅行先、アプリの共有)、`content/whats-new/images/flight.webp`(仮画像、720x850、約39KB)、`scripts/make-whatsnew-image.js`、`server.js`(`GET /api/whats-new`、`/whats-new-images/`の静的配信)、`public/index.html`・`public/app.css`・`public/app.js`、`CLAUDE.md`の新しい節。`public/sw.js`は`CACHE_NAME`を`v962`に、`index.html`のクエリはcss `20261011c`・js `20261011i`に更新。`ios-app/`・`android-app/`は無変更。
+- **検証**: `node --check`(app.js・server.js・スクリプト)、CSS括弧387/387。APIは`?version=1.8.10`でentry、`9.9.9`・`../x`・`1.8`・`abc`・`__proto__`・`constructor`・空・パラメータなしはいずれも`{"entry":null}`。画像は200 `image/webp`。パス脱出(`../`・`%2e%2e`・`..%2f`)は、いずれもアプリのフォールバック(index.html)が返り、`server.js`・`whats-new.json`の中身は漏れない。画像が無い時もHTMLが返るので、`<img>`の読み込みに失敗して`onerror`で消える。CORSは`capacitor://localhost`・`https://localhost`の両方で`access-control-allow-origin`が付く。`public/`に画像は無く、アプリには同梱されない。
+- **判定ロジック**: `app.js`の該当関数をそのまま取り出して疑似環境で動かし、11パターンとHTMLのエスケープが合格(新規インストール/既存初回/更新後/既に見た/紹介なしの版/通信失敗(例外・HTTP500)/Webパラメータなし・あり・不正/アプリで版が取れない)。「はじめる」で閉じたあと、記録・スクロールのロック解除が正しく、二重に閉じても壊れない。
+- **新規インストールの判定の根拠**: `sg_theme`は`app.js`のテーマ移行(`migratePaletteToTheme`)と設定のテーマ切替だけが書く。`index.html`の`<head>`のスクリプトは読むだけ。起動の最初に評価するので、2026-07以降の版を起動した既存ユーザーは持ち、新規は持たない。
+- **通知の案内との順番**: `_maybePromptPushOnboarding()`はアプリのみ・1端末1回(`app_push_onboarding_prompted`)・OSの許可ダイアログ。既存ユーザーは通過済みで新規には紹介を出さないため、重ならない。変更不要。
+- **TDZの注意**: `initWhatsNew()`は起動の途中(`initPushState`の直後)で呼ばれる。同期で触る定数・状態(`_isFreshInstall`・`_WHATSNEW_SEEN_KEY`・`_whatsNewPending`)は、`migratePaletteToTheme`の直前に宣言した。`lockScroll()`は、通信を待ったあと(スクリプトの最後まで評価されたあと)にしか呼ばれない。
+- **未確認**: 実機・ブラウザでの見た目と操作。Webの確認は`https://dosuru.app/?whatsnew=1.8.10`。
+- **残作業(ユーザー)**: ①実機で見た目を確認 ②仮画像を、撮り直したスクショに差し替えるか判断(同じスクリプトで作り直せる) ③リリース時、紹介を出す版のキー(`content/whats-new.json`)を、リリースの前に足す。なお、1.8.9のアプリにはこの画面が入っていないので、1.8.9での紹介は出せない。
