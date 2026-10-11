@@ -860,7 +860,7 @@ app.get('/api/fare-seasons', (req, res) => {
   try {
     const city = resolveCity(req);
     const data = JSON.parse(fs.readFileSync(FARE_SEASONS_PATH, 'utf8'));
-    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Cache-Control', 'no-cache');
     res.json({ ...data, schoolHolidays: computeSchoolHolidayMonths(city) });
   } catch (e) {
     res.status(500).json({ error: e.message });
