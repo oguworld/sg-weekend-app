@@ -1263,7 +1263,7 @@
     /* ─── 予定のinfoアイコン用吹き出し ─── */
     .cal-note-bubble {
       position: absolute; top: calc(100% + 9px); left: 18px; z-index: 20;
-      display: none; width: max-content; max-width: 220px;
+      display: none; width: max-content; max-width: min(300px, calc(100vw - 132px));
       font-size: 12px; line-height: 1.6; color: var(--midnight); font-weight: 400;
       background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: 10px;
       padding: 8px 10px; box-shadow: var(--shadow-card);
