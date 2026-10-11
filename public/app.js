@@ -3538,7 +3538,7 @@
       const pillsHtml = ordered.map(city => {
         const tier = _fareScoreTier(city.levels[idx]);
         const flag = _fareCountryFlag(city.country);
-        return `<button class="cal-fare-pill cal-fare-pill-${tier}" data-fare-city="${city.id}">${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</button>`;
+        return `<button class="cal-fare-pill cal-fare-pill-${tier}" data-fare-city="${city.id}" onclick="if(!_touchCapableDetected) selectFarePill(this)">${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</button>`;
       }).join('');
 
       panel.innerHTML = `

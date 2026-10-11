@@ -21749,3 +21749,12 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - **今回は追加していない大きな未記載イベント**: ダナン国際花火大会(6〜7月)、オーストラリアデー(1月26日)・アンザックデー(4月25日)・シドニー、パースのフリンジワールド(1月中旬〜)、台北のランタンフェスティバル(2月)、ペナンのタイプーサム(1〜2月)、ロンボック島のバウニャレ(2〜3月)。確信度にばらつきがあるため見送り。
 - **検証**: `validate-fare-seasons.js`は19都市で合格。`git diff`は11行のみ。11件すべてが指定文言と一致し、対象外の変更なし。`GET /api/fare-seasons`にも反映済み(`content/`配下のためpm2再起動は不要)。
 - forkがbuilder→checker→closerを代行した(orchestratorが不安定なため)。
+
+### 設計書222 追記25(2026-10-11): 都市ピルにonclickが無く、マウス操作で詳細が出なかった不具合を修正
+- **症状**: 「〇月のおすすめ旅行先」パネルの都市ピルをパソコンのブラウザ(マウスクリック)で押しても、詳細が出ない。
+- **原因**: `renderFarePanel()`内のピル生成に`onclick`が無く、`#calendar-list`の`touchend`委譲リスナーにしか反応しなかった。CLAUDE.mdの「3点セット原則」(onclickの`if(!_touchCapableDetected)`ガード + touchend委譲 + 配列)に反していた。トグル行(`.cal-fare-toggle`)には付いていた。
+- **修正**: ピルのテンプレートに`onclick="if(!_touchCapableDetected) selectFarePill(this)"`を追加。タッチ端末では`_touchCapableDetected`がtrueになりonclickは無効化され、`touchend`側だけが動く(二重実行なし)。`selectFarePill`は変更なし。
+- **確認**: `node --check`OK。配信中の`app.js?v=20261011e`にonclickが入っていること、`renderFarePanel(month=10)`の出力で19個のピルすべてにonclickが付くことをNodeで確認。航空券パネル内でonclickの無い操作要素は他になかった。
+- **キャッシュ**: `index.html`のJSクエリを`20261011e`、`sw.js`のCACHE_NAMEを`v958`に。
+- **気になる点(未対応)**: 選択中の都市`_fareSelectedCityId`が全月のパネルで共有される1つの変数。複数の月のパネルを同時に開くと、別の月のパネルで選択状態の見た目(`cal-fare-pill-active`)が残ることがある。トグルを開くたびにリセットされるため実害は小さいと判断し、今回は変更していない。
+- **未確認**: 実機・ブラウザでの見た目と操作は確認できていない。forkがbuilder→checker→closerを代行した(orchestratorが不安定なため)。
