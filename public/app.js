@@ -3678,7 +3678,11 @@
           return;
         }
         if (decision.action !== 'fetch') return;
-        const res = await fetch(`${API_BASE}/api/whats-new?version=${encodeURIComponent(decision.version)}`);
+        // 確認用(persist=false)は、1日キャッシュの古い内容が出ないよう、毎回サーバーに確認する
+        const res = await fetch(
+          `${API_BASE}/api/whats-new?version=${encodeURIComponent(decision.version)}`,
+          decision.persist ? undefined : { cache: 'no-cache' }
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (data && data.entry) {

@@ -21852,3 +21852,10 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - **TDZの注意**: `initWhatsNew()`は起動の途中(`initPushState`の直後)で呼ばれる。同期で触る定数・状態(`_isFreshInstall`・`_WHATSNEW_SEEN_KEY`・`_whatsNewPending`)は、`migratePaletteToTheme`の直前に宣言した。`lockScroll()`は、通信を待ったあと(スクリプトの最後まで評価されたあと)にしか呼ばれない。
 - **未確認**: 実機・ブラウザでの見た目と操作。Webの確認は`https://dosuru.app/?whatsnew=1.8.10`。
 - **残作業(ユーザー)**: ①実機で見た目を確認 ②仮画像を、撮り直したスクショに差し替えるか判断(同じスクリプトで作り直せる) ③リリース時、紹介を出す版のキー(`content/whats-new.json`)を、リリースの前に足す。なお、1.8.9のアプリにはこの画面が入っていないので、1.8.9での紹介は出せない。
+
+### 設計書227 追記(2026-10-11): 紹介を「おすすめ旅行先」のみに変更、確認用の取得を`no-cache`に
+- **内容の変更**: ユーザー指示で、`content/whats-new.json`の`entries["1.8.10"].items`から「アプリの共有」(設定の「シェア」のQRコード)を削除し、「おすすめ旅行先」の1項目だけにした。版は1.8.10のまま(まだリリースしていないため)。`title`・`subtitle`・`image`・「おすすめ旅行先」の文言は変更なし。上の「実装結果」にある「アプリの共有」は、この追記で置き換え済み。
+- **確認用の取得**: `/api/whats-new`は1日キャッシュ(`max-age=86400`)のため、Webの確認用URL(`?whatsnew=<版>`)で、内容を直しても古い内容が出る。確認用(`decision.persist`が偽の時)だけ、`fetch(..., { cache: 'no-cache' })`で、毎回サーバーに確認する。通常のアプリでの取得(`persist`が真)は変更なし。
+- **項目が1つの時の見た目**: `.whatsnew-items`は縦並び(`flex-direction: column`)で、項目数に依存する指定がないため、CSSの変更は不要。
+- **キャッシュ更新**: `index.html`のJSクエリを`20261011j`、`sw.js`の`CACHE_NAME`を`v963`に更新。
+- **確認**: `GET /api/whats-new?version=1.8.10`の`items`が「おすすめ旅行先」1件、`image`が`flight.webp`。配信中の`app.js`に`cache: 'no-cache'`が入っている。`node --check`・JSONの検証は合格。実機・ブラウザでの見た目は未確認。
