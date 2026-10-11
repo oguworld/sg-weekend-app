@@ -1244,6 +1244,8 @@
     .cal-day-date { text-align: center; line-height: 1.15; padding-top: 1px; }
     .cal-day-num { display: block; font-size: 14px; font-weight: 700; color: var(--warm-gray); }
     .cal-day-wd { display: block; font-size: 10px; color: var(--warm-gray); opacity: 0.7; }
+    .cal-day-holiday .cal-day-num { color: var(--holiday-red); }
+    .cal-day-holiday .cal-day-wd { color: var(--holiday-red); opacity: 0.75; }
     .cal-day-events { min-width: 0; }
     .cal-item + .cal-item { margin-top: 8px; }
     /* 名前の行: 左=予定名(+infoアイコン)、右端=種類のラベル。期間は名前の下の小さな行(期間のある予定だけ) */

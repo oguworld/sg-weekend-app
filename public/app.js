@@ -3364,7 +3364,8 @@
           <div class="cal-month-card" data-month="${month}">`;
         }
         const dayParts = _calendarDayParts(date);
-        html += `<div class="cal-day-group">
+        const isHolidayDay = dayItems.some(it => it.category === 'holiday-sg');
+        html += `<div class="cal-day-group${isHolidayDay ? ' cal-day-holiday' : ''}">
           <div class="cal-day-date"><span class="cal-day-num">${dayParts.day}</span><span class="cal-day-wd">${dayParts.weekday}</span></div>
           <div class="cal-day-events">`;
         dayItems.forEach(it => {
