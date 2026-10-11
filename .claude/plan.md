@@ -21711,3 +21711,6 @@ plannerの事前調査（本orchestrator実行の直前に別セッションで�
 - 理由: 表示は価格ではなく気候(climateのgood判定)から決めている。「ベストシーズン」だと安い時期と誤解されるため。
 - 表示月は従来どおり先頭3つまで(10・11月等が省略される点は据え置き)。
 - 変更: public/app.js(_fareDetailHtml)、public/index.html(app.jsクエリ v=20261011a)、public/sw.js(CACHE_NAME v954)
+
+### 設計書222 追記21(2026-10-11): トグル行の文言を「おすすめ行き先」→「おすすめ旅行先」に変更
+ユーザー指示。`public/app.js`の`.cal-fare-toggle-label`(2箇所)の文言のみ変更。ロジック・データは無変更。CLAUDE.mdの「航空券シーズン表」節の表示文言も現状に合わせて更新(「✈️ ○月のおすすめ渡航先」→「○月のおすすめ旅行先」、✈️は追記12で削除済み)。キャッシュバスティング: `app.js?v=20261011b`、`CACHE_NAME` v955。orchestratorがAPIエラーで起動できなかったためforkで実行。

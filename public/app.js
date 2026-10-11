@@ -3335,7 +3335,7 @@
           if (currentMonth !== null) {
             // 前の月のトグル行+パネルをカード末尾（予定一覧の後）に出力してから閉じる
             html += `<button class="cal-fare-toggle" data-month-num="${currentMonthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
-              <span class="cal-fare-toggle-label">${currentMonthNum}月のおすすめ行き先</span>
+              <span class="cal-fare-toggle-label">${currentMonthNum}月のおすすめ旅行先</span>
               <span class="cal-fare-toggle-caret">▾</span>
             </button>
             <div class="cal-fare-panel" style="display:none;"></div>`;
@@ -3383,7 +3383,7 @@
       if (currentMonth !== null) {
         // 最後の月のトグル行+パネルをカード末尾に出力してから閉じる
         html += `<button class="cal-fare-toggle" data-month-num="${currentMonthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
-          <span class="cal-fare-toggle-label">${currentMonthNum}月のおすすめ行き先</span>
+          <span class="cal-fare-toggle-label">${currentMonthNum}月のおすすめ旅行先</span>
           <span class="cal-fare-toggle-caret">▾</span>
         </button>
         <div class="cal-fare-panel" style="display:none;"></div>`;
