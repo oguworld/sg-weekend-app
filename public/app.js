@@ -3468,7 +3468,8 @@
       return level + adjust;
     }
 
-    // おすすめ度スコアをピル表示用の3段階(cheap/normal/expensive)に分類する（設計書222再設計3回目）
+    // 価格レベル(1〜5)をピル・色帯の3段階(cheap/normal/expensive)に分類する。
+    // レベル1〜2→cheap、3→normal、4〜5→expensive。天候補正は入れない(価格情報を正とする)
     function _fareScoreTier(score) {
       if (score < 2.5) return 'cheap';
       if (score < 3.5) return 'normal';
@@ -3530,9 +3531,10 @@
       const idx = month - 1;
 
       // 並び順: 色(安め→普通→高め) → 国名 → おすすめ度 → id
+      // 色は価格レベルのみで決める(天候補正は入れない)。おすすめ度は同色・同国内のタイブレークにだけ使う
       const TIER_ORDER = { cheap: 0, normal: 1, expensive: 2 };
       const scoreOf = city => _fareRecommendScore(city.levels[idx], _fareClimateTier(city.climate[idx]));
-      const tierOf = city => TIER_ORDER[_fareScoreTier(scoreOf(city))];
+      const tierOf = city => TIER_ORDER[_fareScoreTier(city.levels[idx])];
       const ordered = [...cities].sort((a, b) => {
         const tierDiff = tierOf(a) - tierOf(b);
         if (tierDiff !== 0) return tierDiff;
@@ -3544,8 +3546,7 @@
       });
 
       const pillsHtml = ordered.map(city => {
-        const climateStr = city.climate[idx];
-        const tier = _fareScoreTier(_fareRecommendScore(city.levels[idx], _fareClimateTier(climateStr)));
+        const tier = _fareScoreTier(city.levels[idx]);
         const flag = _fareCountryFlag(city.country);
         return `<button class="cal-fare-pill cal-fare-pill-${tier}" data-fare-city="${city.id}">${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</button>`;
       }).join('');
@@ -3565,7 +3566,7 @@
 
       // 12か月分の色帯（現在表示中の月のセグメントのみ枠線で強調）
       const stripHtml = city.levels.map((lv, i) => {
-        const tier = _fareScoreTier(_fareRecommendScore(lv, _fareClimateTier(city.climate[i])));
+        const tier = _fareScoreTier(lv);
         return `<span class="cal-fare-month-seg cal-fare-month-seg-${tier}${i === idx ? ' cal-fare-month-seg-current' : ''}"></span>`;
       }).join('');
 
