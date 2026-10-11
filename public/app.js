@@ -3429,7 +3429,7 @@
 
     function _fareToggleHtml(monthNum) {
       return `<button class="cal-fare-toggle" data-month-num="${monthNum}" aria-expanded="false" onclick="if(!_touchCapableDetected) toggleFarePanel(this)">
-        <span class="cal-fare-toggle-label">${monthNum}月のおすすめ旅行先</span>
+        <span class="cal-fare-toggle-label">${monthNum}月の旅行シーズン情報</span>
         <span class="cal-fare-toggle-caret">▾</span>
       </button>
       <div class="cal-fare-panel" style="display:none;"></div>`;
