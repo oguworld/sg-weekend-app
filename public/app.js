@@ -3191,9 +3191,10 @@
     let _calendarCategory = '';
 
     const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
-    function _calendarDayLabel(dateStr) {
+    // 日付の列に出す「日」と「曜日」。月は月カードの見出しに出ているため省く
+    function _calendarDayParts(dateStr) {
       const d = new Date(dateStr + 'T00:00:00');
-      return `${d.getMonth() + 1}月${d.getDate()}日(${WEEKDAY_JA[d.getDay()]})`;
+      return { day: d.getDate(), weekday: WEEKDAY_JA[d.getDay()] };
     }
 
     async function loadCalendarScreen(scrollToCurrent) {
@@ -3360,7 +3361,10 @@
           </div>
           <div class="cal-month-card" data-month="${month}">`;
         }
-        html += `<div class="cal-day-group"><div class="cal-day-head">${_calendarDayLabel(date)}</div>`;
+        const dayParts = _calendarDayParts(date);
+        html += `<div class="cal-day-group">
+          <div class="cal-day-date"><span class="cal-day-num">${dayParts.day}</span><span class="cal-day-wd">${dayParts.weekday}</span></div>
+          <div class="cal-day-events">`;
         dayItems.forEach(it => {
           const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['festival'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
@@ -3371,15 +3375,17 @@
                <div class="cal-note-bubble">${escapeHtml(it.note)}</div>`
             : '';
           html += `<div class="cal-item">
-            <span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>
             <span class="cal-name-wrap">
               <span class="cal-name">${it.name}</span>
               ${infoBtn}
             </span>
-            ${range ? `<span class="cal-range">${range}</span>` : ''}
+            <span class="cal-item-sub">
+              <span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>
+              ${range ? `<span class="cal-range">${range}</span>` : ''}
+            </span>
           </div>`;
         });
-        html += `</div>`;
+        html += `</div></div>`;
       }
       if (currentMonth !== null) {
         html += _fareToggleHtml(currentMonthNum);
