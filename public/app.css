@@ -1248,7 +1248,7 @@
     .cal-item + .cal-item { margin-top: 8px; }
     /* 名前の行: 左=予定名(+infoアイコン)、右端=種類のラベル。期間は名前の下の小さな行(期間のある予定だけ) */
     .cal-item-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .cal-badge { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 50px; white-space: nowrap; }
+    .cal-badge { flex: 0 0 auto; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 50px; white-space: nowrap; }
     .cal-tag { flex: 0 0 auto; font-size: 12px; color: var(--warm-gray); white-space: nowrap; }
     .cal-name-wrap { position: relative; display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
     .cal-item .cal-name { font-size: 14px; font-weight: 600; color: var(--midnight); }
