@@ -860,7 +860,8 @@ app.get('/api/fare-seasons', (req, res) => {
   try {
     const city = resolveCity(req);
     const data = JSON.parse(fs.readFileSync(FARE_SEASONS_PATH, 'utf8'));
-    res.set('Cache-Control', 'no-cache');
+    // 固定データなので1日キャッシュ。即反映したい時はクライアントの取得URLの &v= を上げる(CLAUDE.md参照)
+    res.set('Cache-Control', 'public, max-age=86400');
     res.json({ ...data, schoolHolidays: computeSchoolHolidayMonths(city) });
   } catch (e) {
     res.status(500).json({ error: e.message });
