@@ -3145,8 +3145,8 @@
       'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '文化・催し',
       'school-vacation': '学校行事',
     };
-    // 休みかどうかが大事な祝日系だけ、塗りつぶしのラベルで目立たせる(それ以外は点+文字)
-    const CALENDAR_FILLED_LABEL_CATEGORIES = ['holiday-sg', 'holiday-jp'];
+    // 休みかどうかが大事な祝日(SG)だけ、塗りつぶしのラベルで目立たせる(日本の祝日・文化・催し・学校行事は塗りなしの文字)
+    const CALENDAR_FILLED_LABEL_CATEGORIES = ['holiday-sg'];
     // 月ごとに毎年繰り返す季節の話題（気候・食べ物・GSS）。年に依存しない固定マッピング。
     // calendar-events.json（年次の日付レンジイベント）とは別の性質のデータのため静的定数として保持する（設計書194）。
     const MONTH_SEASONAL_TAGS = {
@@ -3388,7 +3388,7 @@
             ? `<button class="cal-info-btn" aria-label="詳細を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
                <div class="cal-note-bubble">${range ? `<div class="cal-note-range">${range}</div>` : ''}${noteText ? `<div class="cal-note-text">${escapeHtml(noteText)}</div>` : ''}</div>`
             : '';
-          // 祝日系は塗りつぶしのラベル、それ以外は塗りなしの小さな文字。右端に置く
+          // 祝日(SG)は塗りつぶしのラベル、それ以外は塗りなしの小さな文字。右端に置く
           const labelHtml = CALENDAR_FILLED_LABEL_CATEGORIES.includes(it.category)
             ? `<span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>`
             : `<span class="cal-tag">${label}</span>`;
