@@ -22122,3 +22122,9 @@ server {
 
 ### 状況
 設計のみ。実装なし、サーバー設定の変更なし、コミットなし(この追記は、`.claude/plan.md`に、未コミットで残している)。
+
+### 設計書224 追記(2026-10-11): 審査待ちの版があるままリリースを始める事故の再発防止(asc_status)
+- **事故**: 1.8.9が審査待ち(WAITING_FOR_REVIEW)のまま1.8.10のリリースを始めた。`release_production`レーン(`deliver`)は、審査待ちの版を「編集できる版」として扱い、1.8.9の版の名前を1.8.10に書き換え、新しいビルド(1.8.10)を紐づける段階で`A relationship value is not acceptable for the current resource state`で失敗した。結果として、App Store Connectに「名前は1.8.10、ビルドは1.8.9」の食い違った審査待ちの版が残った。`submit_existing_draft`で出し直しても、同じ段階で失敗した(さらに、このレーンに`run_precheck_before_submit:false`が抜けていた別の不具合も判明し、コミット`a34ff1d`で修正)。ユーザーがApp Store Connectで「このバージョンを審査から削除」したあと、`submit_existing_draft`でビルド6(1.8.10)を選んで審査提出に成功した(run `38139704417`)。
+- **再発防止**: 読み取りだけの`asc_status`レーン(`ios-app/fastlane/Fastfile`)と、`.github/workflows/ios-asc-status.yml`(`workflow_dispatch`のみ、`ubuntu-latest`、入力なし)を追加。App Store Connectの版の状態を、`ASC_VERSION <版> <状態>`で出力し、審査待ち/審査中があれば`ASC_STATUS_BLOCKED`、取得できなければ`ASC_STATUS_ERROR`で失敗する。提出準備中・リジェクトなどは、`ASC_WARN`として出力するだけで止めない。状態の取得は`appStoreState`と`appVersionState`の両方に対応し、どちらも取れない版があれば、安全側(ERROR)で止める。変更系のAPIは一切呼ばない。
+- **`releaser`の手順書**(`~/.claude/agents/releaser.md`、リポジトリ外): Step 0の前に「Step -1: 前回の審査の確認」を追加。`BLOCKED`/`ERROR`ならバージョン更新・コミット・push・ビルドを一切せず、iOSもAndroidも進めずに中止して報告する。
+- **検証**: 本番で実行(run `38140229592`)。ログに`ASC_VERSION 1.8.10 WAITING_FOR_REVIEW`と`ASC_STATUS_BLOCKED 1.8.10=WAITING_FOR_REVIEW`が出て、ジョブが失敗した。これは**意図した動作(`BLOCKED`)**で、実装の誤りではない(`ASC_STATUS_ERROR`は0件)。`ASC_STATUS_OK`の経路は、審査中の版があるため未検証(コード上の分岐を読んで確認した)。
