@@ -22186,3 +22186,9 @@ server {
 - 食い違い(未対応、ユーザー判断): モルディブ3月は色が高い(4)だが、Cheapflightsは3月を最安月(S$758)としている(Kayakの最安は11月)。demand扱いのまま、色は変えていない。
 - 出典の注意: 公開されているのは最安月・最高月だけで、月別の価格表は無い。Cheapflightsの文言は「cheapest month in which you can book」で旅行月か予約月かが曖昧。
 - スクリプト: `scripts/list-fare-reasons.js`(新規。--city/--basis/--level)、`scripts/validate-fare-seasons.js`(priceBasis/priceSourceの検査を追加)。
+
+## 2026-10-12: priceBasisに「check(要確認)」を追加(設計書222追記)
+- ユーザー方針「よくわからないところは要確認と書く」。`priceBasis`を fare / demand / check の3区分に。check=実運賃の出典で確認できず、出典と食い違う・根拠が弱い・過大の疑いがある月(見直しの最優先)。
+- 洗い出し: demand 54か月を機械チェック(出典の最安・最高月との矛盾、localと色の方向の食い違い、priceReasonがnullで色が普通以外)後、1件ずつ目で確認して11か月をcheckに(fare 41 / demand 43 / check 11)。色・理由・他フィールドは不変。
+- check一覧: モルディブ3月(Cheapflightsは最安月なのに色は高い)、シドニー2月・シェムリアップ2月(色は普通で「高めの可能性」コメントのみ。シェムリアップ2月はCheapflightsが高い月とするので色を高めにする候補)、プーケット1月・モルディブ1月・台北1月・フーコック島1月・シェムリアップ1月(色=最高だが出典の高い月の上位に入らない)、ジョグジャカルタ7月(Kayakに月別記載なし)、パース2月(最安3月・高い12月、2月は裏づけなし)。
+- スクリプト: `list-fare-reasons.js`に`--basis=check`と`check⚠要確認`表示・優先順の並び・内訳にcheck件数。`validate-fare-seasons.js`は`check`を許容し`priceSource`必須。画面・`&v=`は変更なし(APIは追加値を返すだけ)。

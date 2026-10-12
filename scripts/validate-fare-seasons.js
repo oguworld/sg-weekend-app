@@ -132,11 +132,11 @@ function main() {
         }
         const pb = m && m.priceBasis;
         const ps = m && m.priceSource;
-        if (pb !== undefined && pb !== 'fare' && pb !== 'demand') {
-          errors.push(`${label}: monthly[${i}] (${i + 1}月) のpriceBasisはfareかdemandのみです(実際: ${pb})`);
+        if (pb !== undefined && pb !== 'fare' && pb !== 'demand' && pb !== 'check') {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) のpriceBasisはfare・demand・checkのいずれかです(実際: ${pb})`);
         }
-        if (pb === 'fare' && (typeof ps !== 'string' || ps.trim() === '')) {
-          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisがfareなのでpriceSource(出典)が必要です`);
+        if ((pb === 'fare' || pb === 'check') && (typeof ps !== 'string' || ps.trim() === '')) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisが${pb}なのでpriceSource(出典・理由)が必要です`);
         }
         if (lv !== 3 && pb === undefined) {
           warnings.push(`${city.name} ${i + 1}月(レベル${lv}): 根拠(priceBasis)が未記入`);
