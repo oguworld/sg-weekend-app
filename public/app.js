@@ -930,7 +930,7 @@
                 ${imgHtml}
               </div>`;
           })()}
-            ${displayContent ? `<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;">${displayContent}</p>` : ''}
+            ${displayContent ? `<p style="font-size:15px;color:var(--warm-gray);line-height:1.65;margin-bottom:10px;line-break:strict;">${_noBreakJa(displayContent)}</p>` : ''}
             <div class="card-sub-row">
               ${_likeButtonHtml('event', e.id)}
               ${pinLinkHtml}

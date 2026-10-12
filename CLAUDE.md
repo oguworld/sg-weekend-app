@@ -144,6 +144,7 @@ VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラ
 `renderEventCards()`は`grid.innerHTML`一括再代入ではなく、**イベントID+言語をキーにしたDOM要素キャッシュ(`_cardElCache`)による差分更新**方式(Instagram埋め込み等`<iframe>`を含むカードの不要な再読み込みを避けるため)。
 - 既存キャッシュがあれば`renderEventCard()`を呼ばずDOM要素を再利用、新規のみ`_getOrCreateCardEl()`で生成。除外カードは破棄せず`display:none`。`loadEventData()`冒頭で`_cardElCache.clear()`
 - 画像読み込み失敗時は`handleImgError()`が1.2秒後に1回だけ自動リトライしてから絵文字フォールバック
+- **説明文の折り返し調整(2026-10-13)**: おでかけのイベントカードの説明文(`e.content`)は`_noBreakJa()`(数字+単位・英単語・カタカナ語・文末4文字ほどをnowrapの塊にし、途中で折り返さない)を通し、`line-break:strict`を付ける。同じ処理をカレンダーの説明・旅行シーズン情報の詳細にも適用済み。くらしカードの要約(`item.summary`)は未適用。`_noBreakJa()`は内部で`escapeHtml()`するため、生HTMLを含む文字列には使わない(イベントの`content`は`&`以外のHTMLを含まないことを確認済み)
 - **同様のパターンを他画面に導入する際の注意**: `grid.innerHTML`丸ごと再代入が別分岐に残っていると、そこでキャッシュ済みノード(iframe含む)がdocumentから切り離され破棄される
 
 ## 公開いいね機能（設計書210→設計書211で双方向トグルに変更）
