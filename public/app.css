@@ -1283,7 +1283,7 @@
       display: none; width: max-content; max-width: 260px;
       font-size: 14px; line-height: 1.6; color: var(--midnight); font-weight: 400;
       background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: 10px;
-      padding: 8px 10px; box-shadow: var(--shadow-card);
+      padding: 8px 10px; box-shadow: 0 6px 20px rgba(43,43,39,0.22), 0 1px 4px rgba(43,43,39,0.12);
     }
     .cal-month-season-bubble.visible { display: block; }
     .cal-month-season-bubble::before {
