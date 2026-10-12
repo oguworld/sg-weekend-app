@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 航空券シーズン表の「色(価格レベル)・理由・根拠」を一覧する見直し用スクリプト（設計書222）
-// 実行: node scripts/list-fare-reasons.js [--city=bali] [--basis=fare|demand|check] [--level=high|low]
-// 画面には出さない。priceBasis: fare=SG発の実運賃の出典あり / demand=需要・天候からの推定(実運賃は未確認) / check=要確認(出典と食い違う・根拠が弱い。見直しの最優先)
+// 実行: node scripts/list-fare-reasons.js [--city=bali] [--basis=fare|demand|check|unsupported] [--level=high|low]
+// 画面には出さない。priceBasis: fare=SG発の実運賃の出典あり / demand=需要・天候からの推定(実運賃は未確認) / check=要確認(出典が逆。画面はグレー、見直しの最優先) / unsupported=出典で裏づけなし(画面は普通の色・コメントなし、見直し用の記録のみ)
 // 並び順: check → demand → fare（見直しの優先度順）、同じ根拠の中は都市・月順
 
 const fs = require('fs');
@@ -16,15 +16,16 @@ const args = Object.fromEntries(process.argv.slice(2).map(a => {
 const data = JSON.parse(fs.readFileSync(FILE_PATH, 'utf8'));
 const levelLabel = lv => (lv >= 4 ? '高い' : lv <= 2 ? '安い' : '普通') + `(${lv})`;
 const estLabel = lv => (lv >= 4 ? '高め' : lv <= 2 ? '安め' : '普通') + `(${lv})`;
-// 色の列: fare=実運賃の出典がある月は色どおり / demand=推察(estLevel基準、画面では普通の色+推察コメント) / check=要確認(estLevel基準、画面ではグレー)
+// 色の列: fare=実運賃の出典がある月は色どおり / demand=推察(estLevel基準、画面では普通の色+推察コメント) / check=要確認(画面はグレー) / unsupported=出典なし(画面は普通の色)。いずれも元の想定をestLevel基準で表示
 function colorLabel(mo, lv) {
   if (mo.priceBasis === 'demand' && mo.estLevel) return `推察 ${estLabel(mo.estLevel)}`;
-  if (mo.priceBasis === 'check' && mo.estLevel) return `要確認 ${estLabel(mo.estLevel)}`;
+  if (mo.priceBasis === 'check' && mo.estLevel) return `要確認(グレー) 元の想定 ${estLabel(mo.estLevel)}`;
+  if (mo.priceBasis === 'unsupported' && mo.estLevel) return `出典なし(普通表示) 元の想定 ${estLabel(mo.estLevel)}`;
   return levelLabel(lv);
 }
 
-const BASIS_ORDER = { check: 0, '未記入': 1, demand: 2, fare: 3 };
-const BASIS_LABEL = { check: 'check⚠要確認' };
+const BASIS_ORDER = { check: 0, unsupported: 1, '未記入': 2, demand: 3, fare: 4 };
+const BASIS_LABEL = { check: 'check⚠要確認', unsupported: 'unsupported(出典なし)' };
 const rows = [];
 const unmarked = [];
 for (const city of data.cities) {
@@ -47,5 +48,5 @@ console.log(['都市', '月', '色', '理由', '根拠', '出典'].join('\t'));
 for (const r of rows) console.log([r.city, r.month, r.level, r.reason, BASIS_LABEL[r.basis] || r.basis, r.source].join('\t'));
 
 const count = k => rows.filter(r => r.basis === k).length;
-console.log(`\n件数: ${rows.length}（fare ${count('fare')} / demand ${count('demand')} / check(要確認) ${count('check')} / 根拠未記入 ${count('未記入')} / 理由なし ${rows.filter(r => r.reason === '-').length}）`);
+console.log(`\n件数: ${rows.length}（fare ${count('fare')} / demand ${count('demand')} / check(要確認) ${count('check')} / unsupported(出典なし) ${count('unsupported')} / 根拠未記入 ${count('未記入')} / 理由なし ${rows.filter(r => r.reason === '-').length}）`);
 if (unmarked.length) console.warn(`⚠️ 色が普通以外なのに根拠(priceBasis)が未記入: ${unmarked.join(', ')}`);

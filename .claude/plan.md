@@ -22204,3 +22204,11 @@ server {
 - 画面: ピル・色帯は`levels`ベースのまま(demandは自動的に普通の色)。価格行は`demand`+estLevel≠3で「推察: 高めの可能性（理由）。予約は〇が目安」、「推察:」は`.cal-fare-est`(--warm-gray)。`&v=7`、index.htmlのJS/CSSクエリ(20261012g)、sw.js CACHE_NAME(v983)をバンプ。
 - スクリプト: validate(demand→levels=3&estLevel必須、fare→levels≠3、check→estLevel必須、空cheapestMonths許容)、list-fare-reasons(色列を推察/要確認表示、--levelはestLevel基準)。
 - アプリ(1.8.10)は`levels`のみ参照するため、推察の月は普通の色に変わるが、「推察」コメント・グレーは1.8.11から。
+
+#### 追記(2026-10-12): 要確認(check)を「出典が逆の2か月」に絞り、残りはunsupported(普通表示)に
+- ユーザー方針: 出典ベースで高い・安いが確認できない月はすべて普通の色。グレー(要確認)は「出典が逆のとき」だけ。
+- `priceBasis:'check'`(グレー): モルディブ3月(Cheapflightsは年間の最安月、当初の色は高い)・シェムリアップ2月(Cheapflightsは高い月、当初はレベル3+高めコメント)の2か月のみ。`levels`は3、`priceReason`は`null`、`estLevel`は元の想定(4)。画面はグレーのピル、価格行は「要確認（運賃の出典と食い違う可能性）」。凡例「⚪要確認」はグレーのピルがある月のパネルだけ。
+- `priceBasis:'unsupported'`(新設、普通の色・コメントなし・画面に出ない・見直し用の記録のみ): 出典で裏づけなし/高い月に入らないだけで逆ではない9か月(プーケット1月・モルディブ1月・シドニー2月・パース2月・台北1月・フーコック島1月・ジョグジャカルタ7月・シェムリアップ1月・ランカウイ1月)。`levels`は3、`priceReason`は`null`(元の文言は`priceSource`末尾「元の想定: …」)、`estLevel`は保持、`priceSource`は「出典で裏づけなし: …」。
+- 画面コード(`unknown`区分・`--fare-tier-unknown`・凡例・並び順)は維持。`&v=8`、index.htmlのJS/CSSクエリ(20261012h)、sw.js CACHE_NAME(v984)をバンプ。`cheapestMonths`は変更なし。
+- スクリプト: validate(check/unsupported→levels=3&estLevel必須、unsupported/check/fare→priceSource必須)、list-fare-reasons(`--basis=unsupported`、「出典なし(普通表示) 元の想定 高め(4)」「要確認(グレー) 元の想定 …」)。
+- 色が付く月: 41か月(実運賃の出典あり)+グレー2か月。アプリ1.8.10は`levels`のみ参照→9か月は普通の色になる。グレー・推察コメントは1.8.11から。

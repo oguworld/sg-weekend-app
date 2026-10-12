@@ -3487,7 +3487,7 @@
 
     async function loadFareSeasonsData() {
       try {
-        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=7`);
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=8`);
         if (!res.ok) throw new Error('fare-seasons fetch failed');
         FARE_SEASONS_DATA = await res.json();
         try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
@@ -3590,7 +3590,7 @@
       const leadText = leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : '';
       let priceHtml;
       if (isUnknown) {
-        priceHtml = escapeHtml(reason ? `要確認（${reason}。運賃の裏づけなし）` : '要確認（運賃の裏づけなし）');
+        priceHtml = escapeHtml('要確認（運賃の出典と食い違う可能性）');
       } else if (estWord) {
         priceHtml = `<span class="cal-fare-est">推察:</span> ${escapeHtml(`${estWord}の可能性${reason ? `（${reason}）` : ''}${leadText}`)}`;
       } else {

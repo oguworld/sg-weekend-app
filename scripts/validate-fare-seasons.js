@@ -135,10 +135,10 @@ function main() {
         }
         const pb = m && m.priceBasis;
         const ps = m && m.priceSource;
-        if (pb !== undefined && pb !== 'fare' && pb !== 'demand' && pb !== 'check') {
-          errors.push(`${label}: monthly[${i}] (${i + 1}月) のpriceBasisはfare・demand・checkのいずれかです(実際: ${pb})`);
+        if (pb !== undefined && pb !== 'fare' && pb !== 'demand' && pb !== 'check' && pb !== 'unsupported') {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) のpriceBasisはfare・demand・check・unsupportedのいずれかです(実際: ${pb})`);
         }
-        if ((pb === 'fare' || pb === 'check') && (typeof ps !== 'string' || ps.trim() === '')) {
+        if ((pb === 'fare' || pb === 'check' || pb === 'unsupported') && (typeof ps !== 'string' || ps.trim() === '')) {
           errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisが${pb}なのでpriceSource(出典・理由)が必要です`);
         }
         const el = m && m.estLevel;
@@ -151,8 +151,8 @@ function main() {
         if (pb === 'fare' && lv === 3) {
           errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisがfareなのにlevelsが3です`);
         }
-        if (pb === 'check' && el === undefined) {
-          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisがcheckなのでestLevel(見立て)が必要です`);
+        if ((pb === 'check' || pb === 'unsupported') && (el === undefined || lv !== 3)) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisが${pb}なのでlevelsは3、estLevel(元の想定)が必要です(出典で高い・安いが確認できない月は普通の色)`);
         }
         if (lv !== 3 && pb === undefined) {
           warnings.push(`${city.name} ${i + 1}月(レベル${lv}): 根拠(priceBasis)が未記入`);
