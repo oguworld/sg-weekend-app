@@ -3480,7 +3480,7 @@
 
     async function loadFareSeasonsData() {
       try {
-        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=2`);
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=3`);
         if (!res.ok) throw new Error('fare-seasons fetch failed');
         FARE_SEASONS_DATA = await res.json();
         try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
@@ -3573,9 +3573,9 @@
 
       const lv = city.levels[idx];
       const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)];
-      const priceText = `${(legend && legend[String(lv)]) || ''}${leadTime ? `（予約は${leadTime}が目安）` : ''}`;
-
       const monthly = Array.isArray(city.monthly) ? city.monthly[idx] : null;
+      const reason = monthly && typeof monthly.priceReason === 'string' ? monthly.priceReason : '';
+      const priceText = `${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : ''}`;
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sgText = moeHit ? '現地校(MOE)の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
 

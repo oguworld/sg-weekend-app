@@ -33,6 +33,7 @@ function main() {
   }
 
   const errors = [];
+  const warnings = [];
 
   if (!Array.isArray(data.cities) || data.cities.length === 0) {
     fail(['cities配列が存在しないか空です']);
@@ -121,6 +122,14 @@ function main() {
             errors.push(`${label}: monthly[${i}] (${i + 1}月) の${key}が空か文字列ではありません`);
           }
         });
+        const pr = m && m.priceReason;
+        if (pr !== undefined && pr !== null && (typeof pr !== 'string' || pr.trim() === '' || pr.length > 30)) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) のpriceReasonは1〜30文字の文字列かnullにしてください`);
+        }
+        const lv = Array.isArray(city.levels) ? city.levels[i] : 3;
+        if (lv !== 3 && (pr === undefined || pr === null)) {
+          warnings.push(`${city.name} ${i + 1}月(レベル${lv}): 価格の理由(priceReason)が未記入`);
+        }
       });
     }
   });
@@ -152,6 +161,10 @@ function main() {
     return;
   }
 
+  if (warnings.length > 0) {
+    console.warn(`⚠️ 価格の理由が未記入の月 (${warnings.length}件):`);
+    for (const w of warnings) console.warn(`  - ${w}`);
+  }
   console.log(`✅ fare-seasons.json 検証OK（${data.cities.length}都市）`);
 }
 
