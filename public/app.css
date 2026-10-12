@@ -1260,7 +1260,7 @@
     /* ─── 予定の説明(期間・note)。画面ヘッダーのスイッチで#calendar-list.cal-notes-onにして全月まとめて開く ─── */
     .cal-item-note { line-break: strict; display: none; margin-top: 6px; font-size: 15px; line-height: 1.65; color: var(--warm-gray); font-weight: 400; }
     .cal-notes-on .cal-item-note { display: block; }
-    .cal-item-note .nb { white-space: nowrap; }
+    .nb { white-space: nowrap; }
     .cal-item-note-range { display: block; font-weight: 400; color: var(--midnight); margin-bottom: 1px; }
     .cal-notes-switch {
       flex-shrink: 0; align-self: center; display: flex; align-items: center; gap: 6px;
@@ -1536,7 +1536,7 @@
     .cal-fare-row { display: flex; gap: 10px; align-items: baseline; margin-top: 6px; }
     .cal-fare-row-k { flex: 0 0 48px; color: var(--warm-gray); font-size: 14px; font-weight: 700; }
     .cal-fare-est { color: var(--warm-gray); font-weight: 700; }
-    .cal-fare-row-v { flex: 1; min-width: 0; font-size: 15px; line-height: 1.6; color: var(--midnight); }
+    .cal-fare-row-v { flex: 1; min-width: 0; line-break: strict; font-size: 15px; line-height: 1.6; color: var(--midnight); }
     .cal-fare-month-strip { display: flex; gap: 2px; margin-bottom: 8px; }
     .cal-fare-month-seg { flex: 1; height: 8px; border-radius: 3px; }
     .cal-fare-month-seg-cheap { background: var(--fare-tier-cheap); }

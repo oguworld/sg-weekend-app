@@ -3630,15 +3630,15 @@
       if (isUnknown) {
         priceHtml = escapeHtml('要確認（運賃の出典と食い違う可能性）');
       } else if (estWord) {
-        priceHtml = `<span class="cal-fare-est">推察:</span> ${escapeHtml(`${estWord}の可能性${reason ? `（${reason}）` : ''}${leadText}`)}`;
+        priceHtml = `<span class="cal-fare-est">推察:</span> ${_noBreakJa(`${estWord}の可能性${reason ? `（${reason}）` : ''}${leadText}`)}`;
       } else {
-        priceHtml = escapeHtml(`${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadText}`);
+        priceHtml = _noBreakJa(`${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadText}`);
       }
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sgText = moeHit ? 'ローカル校の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
 
       const row = (label, value, isHtml) =>
-        `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${isHtml ? value : escapeHtml(value)}</span></div>`;
+        `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${isHtml ? value : _noBreakJa(value)}</span></div>`;
 
       return `
         <div class="cal-fare-month-strip">${stripHtml}</div>
