@@ -537,6 +537,18 @@
       sel.value = ACTIVE_CITIES.includes(city) ? city : ACTIVE_CITIES[0];
     }
 
+    // 日本語の文で、数字+単位・英単語・カタカナ語の途中で折り返さないよう、塊をnowrapのspanで包む(長すぎる塊は包まない)
+    function _noBreakJa(text) {
+      const re = /(\d+(?:[\/:.,]\d+)*(?:[〜~\-]\d+(?:[\/:.,]\d+)*)?(?:周年|万人|万|か月|月|日|年|時|分|人|%|番)?(?:[上中下]旬)?)|([A-Za-z][A-Za-z0-9]*(?:[-'][A-Za-z0-9]+)*)|([ァ-ヶー]+・?)/g;
+      let out = '', last = 0, m;
+      while ((m = re.exec(text)) !== null) {
+        out += escapeHtml(text.slice(last, m.index));
+        out += (m[0].length >= 2 && m[0].length <= 16) ? `<span class="nb">${escapeHtml(m[0])}</span>` : escapeHtml(m[0]);
+        last = m.index + m[0].length;
+      }
+      return out + escapeHtml(text.slice(last));
+    }
+
     function escapeHtml(str) {
       if (str == null) return '';
       return String(str)
@@ -3373,7 +3385,7 @@
           // 画面ヘッダーのスイッチ(#calendar-list.cal-notes-on)でCSSの表示を切り替える。1行目は期間、noteがあれば続ける
           const noteText = (it.note && it.category !== 'holiday-jp') ? it.note : '';
           const noteHtml = (noteText || range)
-            ? `<div class="cal-item-note">${range ? `<span class="cal-item-note-range">${range}</span>` : ''}${noteText ? escapeHtml(noteText) : ''}</div>`
+            ? `<div class="cal-item-note">${range ? `<span class="cal-item-note-range">${range}</span>` : ''}${noteText ? _noBreakJa(noteText) : ''}</div>`
             : '';
           // 祝日(SG)は塗りつぶしのラベル、それ以外は塗りなしの小さな文字。右端に置く
           const labelHtml = CALENDAR_FILLED_LABEL_CATEGORIES.includes(it.category)
