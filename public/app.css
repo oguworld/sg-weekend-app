@@ -1258,7 +1258,7 @@
     .cal-name-wrap { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
     .cal-item .cal-name { font-size: 14px; font-weight: 600; color: var(--midnight); }
     /* ─── 予定の説明(期間・note)。画面ヘッダーのスイッチで#calendar-list.cal-notes-onにして全月まとめて開く ─── */
-    .cal-item-note { display: none; margin-top: 6px; font-size: 12.5px; line-height: 1.55; color: var(--warm-gray); font-weight: 400; }
+    .cal-item-note { display: none; margin-top: 6px; font-size: 14px; line-height: 1.55; color: var(--warm-gray); font-weight: 400; }
     .cal-notes-on .cal-item-note { display: block; }
     .cal-item-note-range { display: block; font-weight: 400; color: var(--midnight); margin-bottom: 1px; }
     .cal-notes-switch {
