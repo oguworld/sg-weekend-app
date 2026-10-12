@@ -3480,7 +3480,7 @@
 
     async function loadFareSeasonsData() {
       try {
-        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=4`);
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=5`);
         if (!res.ok) throw new Error('fare-seasons fetch failed');
         FARE_SEASONS_DATA = await res.json();
         try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
