@@ -342,6 +342,7 @@
         pinScreenTitle: '📌 ピン留め',
         homeScreenTitle: 'おでかけ情報',
         settingsTitle: '設定',
+        calNotesSwitch: '説明',
         secProfile: 'プロフィール',
         secAppSettings: 'アプリ設定',
         secData: 'データ',
@@ -1754,7 +1755,7 @@
       }, { passive: false });
     }
 
-    // ─── カレンダー画面 予定のinfoボタン・月見出しの季節アイコン・航空券トグル行・航空券ピル
+    // ─── カレンダー画面 月見出しの季節アイコン・航空券トグル行・航空券ピル
     //     即時タップ対応（いずれも動的に再描画されるため#calendar-listへのイベント委譲） ───
     // filter-row-category等と同じパターン: touchstartで開始座標を記録し、touchendで移動量(dx/dy)が
     // 閾値を超えていればスクロール/ドラッグとみなしタップ処理をしない（ボタン上から指を離さず
@@ -1784,12 +1785,7 @@
       if (farePill) {
         e.preventDefault();
         selectFarePill(farePill);
-        return;
       }
-      const btn = e.target.closest('.cal-info-btn');
-      if (!btn) return;
-      e.preventDefault();
-      toggleCalNote(btn);
     }, { passive: false });
 
     // ─── PSI・デング熱指標タップでクライテリア表示 即時タップ対応 ───
@@ -3271,16 +3267,9 @@
       _scrollCalendarToCurrentMonth();
     }
 
-    function toggleCalNote(btn) {
-      const bubble = btn.nextElementSibling;
-      const wasVisible = bubble?.classList.contains('visible');
-      _closeAllCalBubbles();
-      if (bubble && !wasVisible) bubble.classList.add('visible');
-    }
-    // 吹き出し系(予定note・季節アイコン)の相互排他を一括で閉じる共通処理
+    // 月見出しの季節アイコンの吹き出しを閉じる共通処理
     // （航空券シーズン表は設計書222再設計3回目でフロート吹き出し方式を廃止、アコーディオンのため対象外）
     function _closeAllCalBubbles() {
-      document.querySelectorAll('.cal-note-bubble.visible').forEach(b => b.classList.remove('visible'));
       document.querySelectorAll('.cal-month-season-bubble.visible').forEach(b => b.classList.remove('visible'));
     }
     // 月見出しの季節アイコン（気候・食べ物・GSS）タップで説明の吹き出しを表示（設計書194、
@@ -3315,8 +3304,7 @@
     }
     // 吹き出し表示中に他の場所をタップしたら閉じる
     document.addEventListener('touchend', e => {
-      if (e.target.closest('.cal-info-btn') || e.target.closest('.cal-note-bubble')
-          || e.target.closest('.cal-season-icon-btn') || e.target.closest('.cal-month-season-bubble')) return;
+      if (e.target.closest('.cal-season-icon-btn') || e.target.closest('.cal-month-season-bubble')) return;
       _closeAllCalBubbles();
     }, { passive: true });
 
@@ -3381,12 +3369,11 @@
           const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['festival'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
           const range = _calendarRangeText(it);
-          // 日本の祝日はnoteを出さない（馴染みがあるため）。noteがある予定、または期間がある予定にinfoアイコンを出す。
-          // 吹き出しの1行目は期間、noteがあれば2行目以降に続ける
+          // 日本の祝日はnoteを出さない（馴染みがあるため）。説明(期間・note)は常にDOMに置き、
+          // 画面ヘッダーのスイッチ(#calendar-list.cal-notes-on)でCSSの表示を切り替える。1行目は期間、noteがあれば続ける
           const noteText = (it.note && it.category !== 'holiday-jp') ? it.note : '';
-          const infoBtn = (noteText || range)
-            ? `<button class="cal-info-btn" aria-label="詳細を見る" onclick="if(!_touchCapableDetected) toggleCalNote(this)"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="7.5" r="1.3"/><rect x="10.8" y="10.5" width="2.4" height="7" rx="1.2"/></svg></button>
-               <div class="cal-note-bubble">${range ? `<div class="cal-note-range">${range}</div>` : ''}${noteText ? `<div class="cal-note-text">${escapeHtml(noteText)}</div>` : ''}</div>`
+          const noteHtml = (noteText || range)
+            ? `<div class="cal-item-note">${range ? `<span class="cal-item-note-range">${range}</span>` : ''}${noteText ? escapeHtml(noteText) : ''}</div>`
             : '';
           // 祝日(SG)は塗りつぶしのラベル、それ以外は塗りなしの小さな文字。右端に置く
           const labelHtml = CALENDAR_FILLED_LABEL_CATEGORIES.includes(it.category)
@@ -3396,10 +3383,10 @@
             <div class="cal-item-head">
               <span class="cal-name-wrap">
                 <span class="cal-name">${it.name}</span>
-                ${infoBtn}
               </span>
               ${labelHtml}
             </div>
+            ${noteHtml}
           </div>`;
         });
         html += `</div></div>`;
@@ -3414,13 +3401,52 @@
       // きっちり画面最上部に寄せられるよう、最後のカード自身の高さを差し引いた分だけ
       // 末尾に余白を確保する（固定値だと画面サイズやカードの中身の量で過不足が出るため、
       // 実測して必要な分だけ確保する。2026-09-07）
-      if (_calendarCategory === '' && scrollEl) {
-        const cards = listEl.querySelectorAll('.cal-month-card');
-        const lastCard = cards[cards.length - 1];
-        const need = lastCard ? Math.max(0, scrollEl.clientHeight - lastCard.getBoundingClientRect().height) : 0;
-        listEl.style.paddingBottom = `${need}px`;
-      }
+      _updateCalendarEndPadding();
     }
+
+    // 「すべて」表示時の末尾余白を実測して付与する(今月合わせスクロールで12月まで先頭に寄せられるように)
+    function _updateCalendarEndPadding() {
+      const listEl = document.getElementById('calendar-list');
+      const scrollEl = document.getElementById('calendar-scroll-content');
+      if (!listEl || !scrollEl || _calendarCategory !== '') return;
+      const cards = listEl.querySelectorAll('.cal-month-card');
+      const lastCard = cards[cards.length - 1];
+      const need = lastCard ? Math.max(0, scrollEl.clientHeight - lastCard.getBoundingClientRect().height) : 0;
+      listEl.style.paddingBottom = `${need}px`;
+    }
+
+    // 画面ヘッダーの「説明」スイッチ: 全ての月の予定の説明(期間・note)をまとめて開閉する。状態はlocalStorage(sg_cal_notes)
+    let _calNotesOn = false;
+    try { _calNotesOn = localStorage.getItem('sg_cal_notes') === '1'; } catch (_) {}
+    function _applyCalNotesState() {
+      document.getElementById('calendar-list')?.classList.toggle('cal-notes-on', _calNotesOn);
+      document.getElementById('cal-notes-switch')?.setAttribute('aria-checked', _calNotesOn ? 'true' : 'false');
+    }
+    function toggleCalNotes() {
+      const scrollEl = document.getElementById('calendar-scroll-content');
+      // 切替前後で、画面上端に見えている最初の予定の位置が動かないようにスクロールを補正する
+      const anchorOf = () => {
+        if (!scrollEl) return null;
+        const top = scrollEl.getBoundingClientRect().top;
+        return [...document.querySelectorAll('#calendar-list .cal-item')].find(el => el.getBoundingClientRect().bottom > top + 1) || null;
+      };
+      const anchor = anchorOf();
+      const before = anchor && scrollEl ? anchor.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top : 0;
+      _calNotesOn = !_calNotesOn;
+      try { localStorage.setItem('sg_cal_notes', _calNotesOn ? '1' : '0'); } catch (_) {}
+      _applyCalNotesState();
+      if (anchor && scrollEl) {
+        const after = anchor.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top;
+        scrollEl.scrollTop += after - before;
+      }
+      _updateCalendarEndPadding();
+    }
+    _applyCalNotesState();
+    // 画面ヘッダーのスイッチ 即時タップ対応(onclick属性はゴーストクリック対策のガード付き)
+    document.getElementById('cal-notes-switch')?.addEventListener('touchend', e => {
+      e.preventDefault();
+      toggleCalNotes();
+    }, { passive: false });
 
     // ─── 航空券シーズン表（設計書222。SG発の航空券の月別の目安。実運賃は扱わない）───
     // 各月カード末尾のトグル行を開くと、都市ピル(価格レベルで色分け)を表示する。ピルをタップすると、その月の詳細を1つ表示する。
