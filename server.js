@@ -792,7 +792,7 @@ app.get('/api/calendar', (req, res) => {
     } catch (e) { /* ファイル未作成の場合は無視 */ }
 
     // 学校休暇（school-calendar.json＝日本人学校(SIJS)の休暇をcategory:'school-vacation'として正規化。
-    // シンガポール現地校(MOE)の休暇はcalendar-events.json側に直接収録し、ここでは名称に「日本人学校」と付けて区別する）
+    // シンガポールのローカル校(MOE)の休暇はcalendar-events.json側に直接収録し、ここでは名称に「日本人学校」と付けて区別する）
     try {
       const school = JSON.parse(fs.readFileSync(calendarPath(city), 'utf8'));
       for (const v of school.vacations || []) {
@@ -833,7 +833,7 @@ function monthsInRange(startStr, endStr) {
   return months;
 }
 
-// シンガポールの学校休暇（MOE＝現地校、SIJS＝日本人学校）が及ぶ月番号をcalendar-events.json/school-calendar.jsonから計算
+// シンガポールの学校休暇（MOE＝ローカル校、SIJS＝日本人学校）が及ぶ月番号をcalendar-events.json/school-calendar.jsonから計算
 // （手書きの月配列を二重管理しないため、既存カレンダーデータから都度算出する。設計書222）
 function computeSchoolHolidayMonths(city) {
   const moe = new Set();
@@ -841,7 +841,7 @@ function computeSchoolHolidayMonths(city) {
   try {
     const curated = JSON.parse(fs.readFileSync(calendarEventsPath(city), 'utf8'));
     for (const item of curated.items || []) {
-      if (item.category === 'school-vacation' && typeof item.name === 'string' && item.name.startsWith('現地校(MOE):')) {
+      if (item.category === 'school-vacation' && typeof item.name === 'string' && item.name.startsWith('ローカル校:')) {
         for (const m of monthsInRange(item.date, item.endDate || item.date)) moe.add(m);
       }
     }

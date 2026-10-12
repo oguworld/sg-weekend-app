@@ -3595,7 +3595,7 @@
 
     // 詳細表示: 12か月分の色帯(当月を枠線で強調) + 5行(所要・価格・天候・現地・SG側)。
     // 価格は色と同じ基準(価格レベルのみ)の凡例語。天候・現地は content/fare-seasons.json の monthly(一般的な傾向)。
-    // SG側は現地校(MOE)の休暇と重なる月かどうかのみ(日本人学校の休暇は航空券への影響が薄いため出さない)。
+    // SG側はローカル校(MOE)の休暇と重なる月かどうかのみ(日本人学校の休暇は航空券への影響が薄いため出さない)。
     function _fareDetailHtml(city, month) {
       const { legend, bookingLeadTime, schoolHolidays } = FARE_SEASONS_DATA;
       const idx = month - 1;
@@ -3623,7 +3623,7 @@
         priceHtml = escapeHtml(`${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadText}`);
       }
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
-      const sgText = moeHit ? '現地校(MOE)の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
+      const sgText = moeHit ? 'ローカル校の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
 
       const row = (label, value, isHtml) =>
         `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${isHtml ? value : escapeHtml(value)}</span></div>`;
