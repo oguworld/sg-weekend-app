@@ -1237,7 +1237,7 @@
       display: flex; align-items: center; justify-content: center;
       border: none; border-radius: 50%;
       background: var(--warm-white); box-shadow: var(--shadow-card);
-      padding: 0; margin: 0; font-size: 15px; line-height: 1; cursor: pointer;
+      padding: 0; margin: 0; font-size: 14px; line-height: 1; cursor: pointer;
     }
     .cal-season-icon-btn:active { opacity: 0.6; }
     /* 予定の並び: 左=日付の列(日+曜日、月は月カードの見出しに出ているため省く)、右=予定の列。
