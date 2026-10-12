@@ -130,6 +130,17 @@ function main() {
         if (lv !== 3 && (pr === undefined || pr === null)) {
           warnings.push(`${city.name} ${i + 1}月(レベル${lv}): 価格の理由(priceReason)が未記入`);
         }
+        const pb = m && m.priceBasis;
+        const ps = m && m.priceSource;
+        if (pb !== undefined && pb !== 'fare' && pb !== 'demand') {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) のpriceBasisはfareかdemandのみです(実際: ${pb})`);
+        }
+        if (pb === 'fare' && (typeof ps !== 'string' || ps.trim() === '')) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisがfareなのでpriceSource(出典)が必要です`);
+        }
+        if (lv !== 3 && pb === undefined) {
+          warnings.push(`${city.name} ${i + 1}月(レベル${lv}): 根拠(priceBasis)が未記入`);
+        }
       });
     }
   });
@@ -162,7 +173,7 @@ function main() {
   }
 
   if (warnings.length > 0) {
-    console.warn(`⚠️ 価格の理由が未記入の月 (${warnings.length}件):`);
+    console.warn(`⚠️ 価格の理由・根拠が未記入の月 (${warnings.length}件):`);
     for (const w of warnings) console.warn(`  - ${w}`);
   }
   console.log(`✅ fare-seasons.json 検証OK（${data.cities.length}都市）`);
