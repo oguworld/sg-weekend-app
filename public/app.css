@@ -1537,6 +1537,7 @@
     }
     .cal-fare-row { display: flex; gap: 10px; align-items: baseline; margin-top: 6px; }
     .cal-fare-row-k { flex: 0 0 40px; color: var(--warm-gray); font-size: 12px; font-weight: 700; }
+    .cal-fare-est { color: var(--warm-gray); font-weight: 700; }
     .cal-fare-row-v { flex: 1; min-width: 0; font-size: 14px; line-height: 1.6; color: var(--midnight); }
     .cal-fare-month-strip { display: flex; gap: 2px; margin-bottom: 8px; }
     .cal-fare-month-seg { flex: 1; height: 8px; border-radius: 3px; }

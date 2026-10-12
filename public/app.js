@@ -3487,7 +3487,7 @@
 
     async function loadFareSeasonsData() {
       try {
-        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=6`);
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=7`);
         if (!res.ok) throw new Error('fare-seasons fetch failed');
         FARE_SEASONS_DATA = await res.json();
         try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
@@ -3584,19 +3584,28 @@
       const monthly = Array.isArray(city.monthly) ? city.monthly[idx] : null;
       const reason = monthly && typeof monthly.priceReason === 'string' ? monthly.priceReason : '';
       const isUnknown = _fareMonthTier(city, idx) === 'unknown';
-      const priceText = isUnknown
-        ? (reason ? `要確認（${reason}。運賃の裏づけなし）` : '要確認（運賃の裏づけなし）')
-        : `${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : ''}`;
+      // 推定の月(priceBasis==='demand')は色を付けず(levelsは3)、estLevelの見立てを「推察」コメントで示す
+      const estLevel = monthly && monthly.priceBasis === 'demand' ? monthly.estLevel : null;
+      const estWord = { 1: 'かなり安め', 2: '安め', 4: '高め', 5: 'かなり高め' }[estLevel];
+      const leadText = leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : '';
+      let priceHtml;
+      if (isUnknown) {
+        priceHtml = escapeHtml(reason ? `要確認（${reason}。運賃の裏づけなし）` : '要確認（運賃の裏づけなし）');
+      } else if (estWord) {
+        priceHtml = `<span class="cal-fare-est">推察:</span> ${escapeHtml(`${estWord}の可能性${reason ? `（${reason}）` : ''}${leadText}`)}`;
+      } else {
+        priceHtml = escapeHtml(`${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadText}`);
+      }
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sgText = moeHit ? '現地校(MOE)の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
 
-      const row = (label, value) =>
-        `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${escapeHtml(value)}</span></div>`;
+      const row = (label, value, isHtml) =>
+        `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${isHtml ? value : escapeHtml(value)}</span></div>`;
 
       return `
         <div class="cal-fare-month-strip">${stripHtml}</div>
         ${row('所要', city.flightHours || '')}
-        ${row('価格', priceText)}
+        ${row('価格', priceHtml, true)}
         ${monthly && monthly.weather ? row('天候', monthly.weather) : ''}
         ${monthly && monthly.local ? row('現地', monthly.local) : ''}
         ${row('SG側', sgText)}

@@ -89,8 +89,8 @@ function main() {
       });
     }
 
-    if (!Array.isArray(city.cheapestMonths) || city.cheapestMonths.length === 0) {
-      errors.push(`${label}: cheapestMonthsが無いか空です`);
+    if (!Array.isArray(city.cheapestMonths)) {
+      errors.push(`${label}: cheapestMonthsが配列ではありません(最安レベルが3以上の都市は空配列[])`);
     } else {
       city.cheapestMonths.forEach(m => {
         if (!Number.isInteger(m) || m < 1 || m > 12) {
@@ -100,6 +100,9 @@ function main() {
       // cheapestMonthsとlevelsの整合性（最安月として挙げた月のlevelが最低値と一致しているか）
       if (Array.isArray(city.levels) && city.levels.length === 12) {
         const minLevel = Math.min(...city.levels);
+        if (city.cheapestMonths.length === 0 && minLevel < 3) {
+          errors.push(`${label}: 最安レベル(${minLevel})の月があるのにcheapestMonthsが空です`);
+        }
         city.cheapestMonths.forEach(m => {
           const lv = city.levels[m - 1];
           if (lv !== minLevel) {
@@ -137,6 +140,19 @@ function main() {
         }
         if ((pb === 'fare' || pb === 'check') && (typeof ps !== 'string' || ps.trim() === '')) {
           errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisが${pb}なのでpriceSource(出典・理由)が必要です`);
+        }
+        const el = m && m.estLevel;
+        if (el !== undefined && (!Number.isInteger(el) || el < 1 || el > 5)) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) のestLevelは1〜5の整数です(実際: ${el})`);
+        }
+        if (pb === 'demand' && (lv !== 3 || el === undefined)) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisがdemand(推定)なのでlevelsは3、estLevelが必要です(色は実運賃の出典がある月のみ)`);
+        }
+        if (pb === 'fare' && lv === 3) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisがfareなのにlevelsが3です`);
+        }
+        if (pb === 'check' && el === undefined) {
+          errors.push(`${label}: monthly[${i}] (${i + 1}月) はpriceBasisがcheckなのでestLevel(見立て)が必要です`);
         }
         if (lv !== 3 && pb === undefined) {
           warnings.push(`${city.name} ${i + 1}月(レベル${lv}): 根拠(priceBasis)が未記入`);
