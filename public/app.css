@@ -1280,8 +1280,8 @@
     /* left/矢印位置はJS(toggleMonthSeasonNote)がタップされたアイコンの位置に合わせて動的に設定する */
     .cal-month-season-bubble {
       position: absolute; top: calc(100% + 8px); left: 16px; z-index: 20;
-      display: none; width: max-content; max-width: 220px;
-      font-size: 12px; line-height: 1.6; color: var(--midnight); font-weight: 400;
+      display: none; width: max-content; max-width: 260px;
+      font-size: 14px; line-height: 1.6; color: var(--midnight); font-weight: 400;
       background: var(--warm-white); border: 1px solid var(--sand-dark); border-radius: 10px;
       padding: 8px 10px; box-shadow: var(--shadow-card);
     }
