@@ -22212,3 +22212,10 @@ server {
 - 画面コード(`unknown`区分・`--fare-tier-unknown`・凡例・並び順)は維持。`&v=8`、index.htmlのJS/CSSクエリ(20261012h)、sw.js CACHE_NAME(v984)をバンプ。`cheapestMonths`は変更なし。
 - スクリプト: validate(check/unsupported→levels=3&estLevel必須、unsupported/check/fare→priceSource必須)、list-fare-reasons(`--basis=unsupported`、「出典なし(普通表示) 元の想定 高め(4)」「要確認(グレー) 元の想定 …」)。
 - 色が付く月: 41か月(実運賃の出典あり)+グレー2か月。アプリ1.8.10は`levels`のみ参照→9か月は普通の色になる。グレー・推察コメントは1.8.11から。
+
+## 設計書230(2026-10-12): カレンダーの予定のiアイコン・吹き出しを廃止し、ヘッダーの「説明」スイッチで全月まとめて開閉(ユーザー決定: モック4案からD案)
+- 背景: 予定名の横のiが邪魔になってきた。モック(A行タップ展開/B月ごとボタン/C1行プレビュー/D画面スイッチ)から、ユーザーがDを選択。
+- 実装: ヘッダー「カレンダー」の右端に`#cal-notes-switch`(role=switch)。状態は`localStorage`の`sg_cal_notes`(既定オフ)、`#calendar-list.cal-notes-on`で`.cal-item-note`(1行目=期間、続けてnote。`holiday-jp`はnote無し、期間も`note`も無い予定は作らない)を表示。`.cal-item-note`は常にDOMに置き、スイッチ操作では再描画しない。スクロール補正は、画面上端に見えている最初の`.cal-item`の位置を保つ方式(月カード基準より精度が高い)、末尾余白は`_updateCalendarEndPadding()`で再計算。
+- 撤去: `.cal-info-btn`・`.cal-note-bubble`・`toggleCalNote`・touchend委譲の該当分・外側タップ閉じの該当条件・CSS。季節アイコンの吹き出しは残置(`_closeAllCalBubbles()`はそれだけを閉じる)。`.cal-name-wrap`の`position:relative`(吹き出しの基準)も撤去。
+- 検証: 2026年の実データ(`/api/calendar?city=sg&year=2026`)をNodeで描画。予定48件、`.cal-item-note`48件(期待48件=holiday-jp以外でnoteか期間のある予定)、期間の行25件、旧`.cal-info-btn`/`.cal-note-bubble`は0件、`holiday-jp`のnote漏れなし。**実ブラウザの目視は未実施**(この環境のChromiumが起動しない)。
+- 反映: Web版はすぐ。アプリは画面コードを同梱するため、公開済み1.8.11では従来のi、新方式は次のリリース(1.8.12)から。キャッシュは`app.js`/`app.css`のクエリ20261012i、`sw.js`のCACHE_NAME v985。
