@@ -3537,7 +3537,7 @@
       const { cities } = FARE_SEASONS_DATA;
       const idx = month - 1;
 
-      // 並び順: 色(安め→普通→高め→傾向は未確認) → 国名 → おすすめ度 → id
+      // 並び順: 色(安め→普通→高め→未確認) → 国名 → おすすめ度 → id
       // 色は価格レベルのみで決める(天候補正は入れない)。おすすめ度は同色・同国内のタイブレークにだけ使う
       const TIER_ORDER = { cheap: 0, normal: 1, expensive: 2, unknown: 3 };
       const scoreOf = city => _fareRecommendScore(city.levels[idx], _fareClimateTier(city.climate[idx]));
@@ -3560,7 +3560,7 @@
 
       const hasUnknown = cities.some(city => _fareMonthTier(city, idx) === 'unknown');
       panel.innerHTML = `
-        <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め${hasUnknown ? ' ⚪傾向は未確認' : ''}</div>
+        <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め${hasUnknown ? ' ⚪未確認' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         <div class="cal-fare-detail" style="display:none;"></div>
         <div class="cal-fare-footnote">※目安です。実際の価格は予約前にご確認ください。</div>
@@ -3585,7 +3585,7 @@
       const reason = monthly && typeof monthly.priceReason === 'string' ? monthly.priceReason : '';
       const isUnknown = _fareMonthTier(city, idx) === 'unknown';
       const priceText = isUnknown
-        ? (reason ? `傾向は未確認（${reason}。ただし運賃の出典では確認できていません）` : '傾向は未確認（運賃の出典で確認できていません）')
+        ? (reason ? `未確認（${reason}。運賃の裏づけなし）` : '未確認（運賃の裏づけなし）')
         : `${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : ''}`;
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sgText = moeHit ? '現地校(MOE)の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
