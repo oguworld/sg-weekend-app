@@ -1256,7 +1256,7 @@
     .cal-badge { flex: 0 0 auto; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 50px; white-space: nowrap; }
     .cal-tag { flex: 0 0 auto; font-size: 12px; color: var(--warm-gray); white-space: nowrap; }
     .cal-name-wrap { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
-    .cal-item .cal-name { font-size: 16px; font-weight: 700; color: var(--midnight); }
+    .cal-item .cal-name { font-size: 15px; font-weight: 700; color: var(--midnight); }
     /* ─── 予定の説明(期間・note)。画面ヘッダーのスイッチで#calendar-list.cal-notes-onにして全月まとめて開く ─── */
     .cal-item-note { display: none; margin-top: 6px; font-size: 15px; line-height: 1.65; color: var(--warm-gray); font-weight: 400; }
     .cal-notes-on .cal-item-note { display: block; }
@@ -1505,8 +1505,8 @@
       font-family: inherit;
     }
     .cal-fare-toggle:active { opacity: 0.7; }
-    .cal-fare-toggle-label { font-size: 13px; font-weight: 700; color: var(--midnight); }
-    .cal-fare-toggle-caret { color: var(--warm-gray); font-size: 13px; transition: transform 0.2s ease; }
+    .cal-fare-toggle-label { font-size: 15px; font-weight: 700; color: var(--midnight); }
+    .cal-fare-toggle-caret { color: var(--warm-gray); font-size: 15px; transition: transform 0.2s ease; }
     .cal-fare-toggle[aria-expanded="true"] .cal-fare-toggle-caret { transform: rotate(180deg); }
     .cal-fare-panel { margin: -2px 0 12px; padding: 0 2px; }
 
@@ -1515,7 +1515,7 @@
     .cal-fare-pills { display: flex; flex-wrap: wrap; gap: 6px; }
     .cal-fare-pill {
       display: inline-flex; align-items: center; gap: 4px; border: none; border-radius: 50px;
-      padding: 6px 12px; font-size: 12px; font-weight: 700;
+      padding: 6px 12px; font-size: 15px; font-weight: 700;
       cursor: pointer; font-family: inherit;
     }
     .cal-fare-pill:active { opacity: 0.7; }
@@ -1533,9 +1533,9 @@
       font-size: 14px; line-height: 1.8; color: var(--midnight);
     }
     .cal-fare-row { display: flex; gap: 10px; align-items: baseline; margin-top: 6px; }
-    .cal-fare-row-k { flex: 0 0 40px; color: var(--warm-gray); font-size: 12px; font-weight: 700; }
+    .cal-fare-row-k { flex: 0 0 48px; color: var(--warm-gray); font-size: 14px; font-weight: 700; }
     .cal-fare-est { color: var(--warm-gray); font-weight: 700; }
-    .cal-fare-row-v { flex: 1; min-width: 0; font-size: 14px; line-height: 1.6; color: var(--midnight); }
+    .cal-fare-row-v { flex: 1; min-width: 0; font-size: 15px; line-height: 1.6; color: var(--midnight); }
     .cal-fare-month-strip { display: flex; gap: 2px; margin-bottom: 8px; }
     .cal-fare-month-seg { flex: 1; height: 8px; border-radius: 3px; }
     .cal-fare-month-seg-cheap { background: var(--fare-tier-cheap); }
