@@ -537,16 +537,29 @@
       sel.value = ACTIVE_CITIES.includes(city) ? city : ACTIVE_CITIES[0];
     }
 
-    // 日本語の文で、数字+単位・英単語・カタカナ語の途中で折り返さないよう、塊をnowrapのspanで包む(長すぎる塊は包まない)
+    // 日本語の文で、数字+単位・英単語・カタカナ語の途中で折り返さないよう、塊をnowrapのspanで包む(長すぎる塊は包まない)。
+    // 末尾4文字ほども1つの塊にして、折り返した最後の行が1〜2文字だけになるのを防ぐ(短い文には適用しない)
     function _noBreakJa(text) {
+      text = text == null ? '' : String(text);
       const re = /(\d+(?:[\/:.,]\d+)*(?:[〜~\-]\d+(?:[\/:.,]\d+)*)?(?:周年|万人|万|か月|月|日|年|時|分|人|%|番)?(?:[上中下]旬)?)|([A-Za-z][A-Za-z0-9]*(?:[-'][A-Za-z0-9]+)*)|([ァ-ヶー]+・?)/g;
-      let out = '', last = 0, m;
+      const wrap = (str) => {
+        let out = '', last = 0, m;
+        re.lastIndex = 0;
+        while ((m = re.exec(str)) !== null) {
+          out += escapeHtml(str.slice(last, m.index));
+          out += (m[0].length >= 2 && m[0].length <= 16) ? `<span class="nb">${escapeHtml(m[0])}</span>` : escapeHtml(m[0]);
+          last = m.index + m[0].length;
+        }
+        return out + escapeHtml(str.slice(last));
+      };
+      if (text.length <= 10) return wrap(text);
+      let tailStart = text.length - 4, m;
+      re.lastIndex = 0;
       while ((m = re.exec(text)) !== null) {
-        out += escapeHtml(text.slice(last, m.index));
-        out += (m[0].length >= 2 && m[0].length <= 16) ? `<span class="nb">${escapeHtml(m[0])}</span>` : escapeHtml(m[0]);
-        last = m.index + m[0].length;
+        if (m.index < tailStart && tailStart < m.index + m[0].length) { tailStart = m.index; break; }
       }
-      return out + escapeHtml(text.slice(last));
+      if (text.length - tailStart > 16) return wrap(text);
+      return wrap(text.slice(0, tailStart)) + `<span class="nb">${wrap(text.slice(tailStart))}</span>`;
     }
 
     function escapeHtml(str) {
