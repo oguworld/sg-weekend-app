@@ -3478,9 +3478,16 @@
       return 'expensive';
     }
 
+    // その月が「要確認」(priceBasis==='check')なら、価格レベルに関わらず 'unknown'(グレー)。それ以外は価格レベルの3段階
+    function _fareMonthTier(city, idx) {
+      const m = Array.isArray(city.monthly) ? city.monthly[idx] : null;
+      if (m && m.priceBasis === 'check') return 'unknown';
+      return _fareLevelTier(city.levels[idx]);
+    }
+
     async function loadFareSeasonsData() {
       try {
-        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=5`);
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=6`);
         if (!res.ok) throw new Error('fare-seasons fetch failed');
         FARE_SEASONS_DATA = await res.json();
         try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
@@ -3530,11 +3537,11 @@
       const { cities } = FARE_SEASONS_DATA;
       const idx = month - 1;
 
-      // 並び順: 色(安め→普通→高め) → 国名 → おすすめ度 → id
+      // 並び順: 色(安め→普通→高め→傾向は未確認) → 国名 → おすすめ度 → id
       // 色は価格レベルのみで決める(天候補正は入れない)。おすすめ度は同色・同国内のタイブレークにだけ使う
-      const TIER_ORDER = { cheap: 0, normal: 1, expensive: 2 };
+      const TIER_ORDER = { cheap: 0, normal: 1, expensive: 2, unknown: 3 };
       const scoreOf = city => _fareRecommendScore(city.levels[idx], _fareClimateTier(city.climate[idx]));
-      const tierOf = city => TIER_ORDER[_fareLevelTier(city.levels[idx])];
+      const tierOf = city => TIER_ORDER[_fareMonthTier(city, idx)];
       const ordered = [...cities].sort((a, b) => {
         const tierDiff = tierOf(a) - tierOf(b);
         if (tierDiff !== 0) return tierDiff;
@@ -3546,13 +3553,14 @@
       });
 
       const pillsHtml = ordered.map(city => {
-        const tier = _fareLevelTier(city.levels[idx]);
+        const tier = _fareMonthTier(city, idx);
         const flag = _fareCountryFlag(city.country);
         return `<button class="cal-fare-pill cal-fare-pill-${tier}" data-fare-city="${city.id}" onclick="if(!_touchCapableDetected) selectFarePill(this)">${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</button>`;
       }).join('');
 
+      const hasUnknown = cities.some(city => _fareMonthTier(city, idx) === 'unknown');
       panel.innerHTML = `
-        <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め</div>
+        <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め${hasUnknown ? ' ⚪傾向は未確認' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         <div class="cal-fare-detail" style="display:none;"></div>
         <div class="cal-fare-footnote">※目安です。実際の価格は予約前にご確認ください。</div>
@@ -3567,7 +3575,7 @@
       const idx = month - 1;
 
       const stripHtml = city.levels.map((lv, i) => {
-        const tier = _fareLevelTier(lv);
+        const tier = _fareMonthTier(city, i);
         return `<span class="cal-fare-month-seg cal-fare-month-seg-${tier}${i === idx ? ' cal-fare-month-seg-current' : ''}"></span>`;
       }).join('');
 
@@ -3575,7 +3583,10 @@
       const leadTime = (bookingLeadTime[city.haul] || {})[String(lv)];
       const monthly = Array.isArray(city.monthly) ? city.monthly[idx] : null;
       const reason = monthly && typeof monthly.priceReason === 'string' ? monthly.priceReason : '';
-      const priceText = `${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : ''}`;
+      const isUnknown = _fareMonthTier(city, idx) === 'unknown';
+      const priceText = isUnknown
+        ? (reason ? `傾向は未確認（${reason}。ただし運賃の出典では確認できていません）` : '傾向は未確認（運賃の出典で確認できていません）')
+        : `${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : ''}`;
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sgText = moeHit ? '現地校(MOE)の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
 

@@ -36,6 +36,9 @@
       --fare-tier-cheap-text: #2A5F36;
       --fare-tier-normal-text: #6E540F;
       --fare-tier-expensive-text: #94451C;
+      --fare-tier-unknown: #9C9C94;
+      --fare-tier-unknown-pale: rgba(140,140,132,0.2);
+      --fare-tier-unknown-text: #5C5C56;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
@@ -1522,6 +1525,7 @@
     .cal-fare-pill-cheap { background: var(--fare-tier-cheap-pale); color: var(--fare-tier-cheap-text); }
     .cal-fare-pill-normal { background: var(--fare-tier-normal-pale); color: var(--fare-tier-normal-text); }
     .cal-fare-pill-expensive { background: var(--fare-tier-expensive-pale); color: var(--fare-tier-expensive-text); }
+    .cal-fare-pill-unknown { background: var(--fare-tier-unknown-pale); color: var(--fare-tier-unknown-text); }
     .cal-fare-pill-active {
       box-shadow: 0 0 0 2px var(--midnight) inset;
       font-weight: 800;
@@ -1539,6 +1543,7 @@
     .cal-fare-month-seg-cheap { background: var(--fare-tier-cheap); }
     .cal-fare-month-seg-normal { background: var(--fare-tier-normal); }
     .cal-fare-month-seg-expensive { background: var(--fare-tier-expensive); }
+    .cal-fare-month-seg-unknown { background: var(--fare-tier-unknown); }
     .cal-fare-month-seg-current { outline: 2px solid var(--midnight); outline-offset: 1px; }
 
     .cal-fare-footnote { color: var(--warm-gray); font-size: 11px; margin-top: 8px; }
@@ -1697,6 +1702,9 @@
       --fare-tier-cheap-text: #6FC989;
       --fare-tier-normal-text: #E8C35C;
       --fare-tier-expensive-text: #F0A268;
+      --fare-tier-unknown: #77776F;
+      --fare-tier-unknown-pale: rgba(150,150,142,0.24);
+      --fare-tier-unknown-text: #B8B8B0;
       color-scheme: dark;
     }
     html[data-theme="dark"] .screen-auth-gate {
