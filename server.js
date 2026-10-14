@@ -719,8 +719,8 @@ app.get('/api/widget-stats', async (req, res) => {
   if (psiSettled.status === 'fulfilled' && psiSettled.value) {
     const readings = psiSettled.value.data.items[0].readings.psi_twenty_four_hourly;
     const values = Object.values(readings);
-    const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-    cityCache.psi = { value: { value: avg, level: psiLevel(avg) }, cachedAt: now };
+    const central = Number.isFinite(readings.central) ? readings.central : Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+    cityCache.psi = { value: { value: central, level: psiLevel(central) }, cachedAt: now };
   } else if (psiSettled.status === 'rejected') {
     console.error('widget-stats psi error:', psiSettled.reason.message);
   }
