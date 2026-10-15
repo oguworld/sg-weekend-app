@@ -81,7 +81,13 @@ function savePushSubs(subs) {
 function subPlatform(sub) {
   return sub.platform || 'web';
 }
+// 緊急停止スイッチ: data/push-paused ファイルがある間は、全てのユーザー向けプッシュ(Web/iOS)を送らない(再起動不要)。
+// 停止: touch data/push-paused / 再開: rm data/push-paused
+const PUSH_PAUSE_FLAG = path.join(__dirname, 'data', 'push-paused');
+function isPushPaused() { return fs.existsSync(PUSH_PAUSE_FLAG); }
+
 async function sendPushToAll(cityKey, title = '最新情報を更新しました', body = 'おでかけ情報・生活情報の最新記事をチェックしてみましょう！', url = 'https://dosuru.app/?nav=news') {
+  if (isPushPaused()) { console.log('[push] 緊急停止中(data/push-paused)のため送信しません'); return 0; }
   const cityConf = CITIES[cityKey] || CITIES.sg;
   const payload = JSON.stringify({ title, body, data: { url } });
   const subs = loadPushSubs();
@@ -1620,6 +1626,10 @@ function getTodayCalendarNotification(cityKey = 'sg') {
 app.post('/api/notify-events-updated', requireAdminSecret, async (req, res) => {
   const city = req.query.city || 'sg';
   try {
+    if (isPushPaused()) {
+      console.log('[notify-events-updated] 緊急停止中(data/push-paused)のためプッシュ通知スキップ');
+      return res.json({ ok: true, sent: 0, paused: true });
+    }
     const todayItem = getTodayCalendarNotification(city);
     if (!todayItem) {
       console.log(`[notify-events-updated] 本日該当する行事なしのためプッシュ通知スキップ (city=${city})`);
