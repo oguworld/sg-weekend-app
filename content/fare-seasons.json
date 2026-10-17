@@ -375,32 +375,6 @@
       ]
     },
     {
-      "id": "siemreap",
-      "name": "シェムリアップ",
-      "country": "カンボジア",
-      "haul": "near",
-      "direct": true,
-      "flightHours": "直行約2.3時間",
-      "levels": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-      "climate": ["乾季・観光ピーク", "乾季・過ごしやすい", "暑い", "暑い・乾季明け", "雨季入り", "雨季", "雨季", "雨季", "雨季", "雨季", "乾季入り", "乾季・年末年始ピーク"],
-      "cheapestMonths": [],
-      "notes": "アンコールワット観光が人気。3〜5月は非常に暑くなります。",
-      "monthly": [
-        { "weather": "乾季で晴れが続き、朝晩は涼しく快適", "local": "アンコール遺跡の観光ピーク。人気スポットは混雑", "priceReason": null, "priceBasis": "unsupported", "priceSource": "出典で裏づけなし: Cheapflightsの高い月は2月で、1月は裏づけなし。色(最高)が過大の疑い ／元の想定: 乾季の観光ピーク", "estLevel": 5 },
-        { "weather": "乾季で乾燥し、日中は暑さが増し始める", "local": "旧正月の頃は、国内外の旅行客が増える", "priceReason": null, "priceBasis": "check", "priceSource": "要確認: 色は普通。Cheapflightsは2月を高い月とするため、色を高めにする候補(旧正月の需要は未確認) ／元の想定: 旅行客が増える時期で高めの可能性", "estLevel": 4 },
-        { "weather": "暑さが強まり、日中は35度を超えることも", "local": "観光は落ち着き始める。遺跡は朝夕の見学が快適" },
-        { "weather": "年間で最も暑い時期。日中の屋外は消耗しやすい", "local": "14〜16日前後はクメール正月で、国内が連休に" },
-        { "weather": "雨季入り。スコールで暑さが少し和らぐ", "local": "オフシーズン入りで、遺跡の混雑も緩む", "priceReason": "雨季入りでオフシーズン", "priceBasis": "demand", "priceSource": "需要・天候からの推定(実運賃は未確認): climate: 雨季入り / MOE休暇月 / local記述", "estLevel": 2 },
-        { "weather": "雨季。午後や夜にスコールが降りやすい", "local": "観光客が少なく、遺跡をゆっくり見学できる" },
-        { "weather": "雨季の盛り。蒸し暑く、雨は短時間で降る", "local": "閑散期で静か。緑の濃い遺跡が楽しめる" },
-        { "weather": "雨季で雨が多く、道がぬかるむ日もある", "local": "観光は閑散期。静かな遺跡巡りに向く" },
-        { "weather": "雨季のピーク。雨が多く、曇りの日も続く", "local": "閑散期。緑の濃い遺跡を静かに回れる", "priceReason": "雨季ピークの観光閑散期", "priceBasis": "demand", "priceSource": "需要・天候からの推定(実運賃は未確認): climate: 雨季 / MOE休暇月 / local記述", "estLevel": 2 },
-        { "weather": "雨季。9月に次いで雨が多く、月末から乾季に向かう", "local": "プチュンベン(先祖供養の祭)の連休で国内が混む。観光は落ち着く", "priceReason": "雨季で観光が落ち着く", "priceBasis": "demand", "priceSource": "需要・天候からの推定(実運賃は未確認): climate: 雨季 / local記述", "estLevel": 2 },
-        { "weather": "乾季入りで雨が減り、湿度も下がり過ごしやすい", "local": "水祭りの連休で国内が混む。遺跡は賑わい出す" },
-        { "weather": "乾季で晴れが多く、朝晩は涼しい", "local": "年末年始の旅行客で観光はピーク。遺跡周辺が混雑", "priceReason": "乾季の年末年始ピーク", "priceBasis": "demand", "priceSource": "需要・天候からの推定(実運賃は未確認): climate: 乾季・年末年始ピーク / MOE休暇月 / local記述", "estLevel": 5 }
-      ]
-    },
-    {
       "id": "chiangmai",
       "name": "チェンマイ",
       "country": "タイ",

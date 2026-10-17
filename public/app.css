@@ -1528,6 +1528,7 @@
     .fare-mon-step-btn:active { opacity: 0.6; }
     .fare-mon-step-label { min-width: 72px; text-align: center; font-size: 22px; font-weight: 800; color: var(--caramel); }
     .cal-fare-hint, .cal-fare-state { color: var(--warm-gray); font-size: 14px; line-height: 1.6; padding: 12px 2px; }
+    .cal-fare-hint { padding: 0 2px 10px; }
 
     .cal-fare-legend { font-size: 11px; color: var(--warm-gray); margin-bottom: 8px; }
 

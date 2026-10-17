@@ -3488,7 +3488,6 @@
       'モルディブ': '🇲🇻',
       'オーストラリア': '🇦🇺',
       '台湾': '🇹🇼',
-      'カンボジア': '🇰🇭',
       'アラブ首長国連邦': '🇦🇪'
     };
     function _fareCountryFlag(country) {
@@ -3511,7 +3510,7 @@
 
     async function loadFareSeasonsData() {
       try {
-        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=9`);
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=10`);
         if (!res.ok) throw new Error('fare-seasons fetch failed');
         FARE_SEASONS_DATA = await res.json();
         try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
@@ -3585,7 +3584,7 @@
         ['タイ'],
         ['ベトナム'],
         ['マレーシア'],
-        ['フィリピン', 'カンボジア', 'モルディブ', 'アラブ首長国連邦'],
+        ['フィリピン', 'モルディブ', 'アラブ首長国連邦'],
       ];
       const rowOf = country => { const g = FARE_PILL_ROWS.findIndex(r => r.includes(country)); return g < 0 ? FARE_PILL_ROWS.length - 1 : g; };
       const posOf = country => { const g = FARE_PILL_ROWS.findIndex(r => r.includes(country)); return g < 0 ? 99 : FARE_PILL_ROWS[g].indexOf(country); };
@@ -3602,9 +3601,7 @@
 
       const hasUnknown = cities.some(city => _fareMonthTier(city, idx) === 'unknown');
       const selected = cities.find(c => c.id === _fareSheetCity);
-      const detailHtml = selected
-        ? `<div class="cal-fare-detail">${_fareDetailHtml(selected, month)}</div>`
-        : `<div class="cal-fare-hint">${escapeHtml(t('fareSheetHint'))}</div>`;
+      const detailHtml = selected ? `<div class="cal-fare-detail">${_fareDetailHtml(selected, month)}</div>` : '';
 
       _setFareSheetBody(`
         <div class="fare-mon-step">
@@ -3612,6 +3609,7 @@
           <span class="fare-mon-step-label">${month}月</span>
           <button class="fare-mon-step-btn" aria-label="${escapeHtml(t('fareSheetNextMonth'))}" onclick="stepFareSheetMonth(1)">›</button>
         </div>
+        <div class="cal-fare-hint">${escapeHtml(t('fareSheetHint'))}</div>
         <div class="cal-fare-legend">🟢安め 🟠高め${hasUnknown ? ' ⚪要確認' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         ${detailHtml}
