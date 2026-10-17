@@ -439,6 +439,8 @@
         fareSheetPrevMonth: '前の月',
         fareSheetNextMonth: '次の月',
         fareSheetHint: '都市をタップすると、その月の詳細が出ます',
+        fareLegendMonth: 'この月の目安',
+        fareLegendYear: '12か月の目安',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
@@ -3610,7 +3612,7 @@
           <button class="fare-mon-step-btn" aria-label="${escapeHtml(t('fareSheetNextMonth'))}" onclick="stepFareSheetMonth(1)">›</button>
         </div>
         <div class="cal-fare-hint">${escapeHtml(t('fareSheetHint'))}</div>
-        <div class="cal-fare-legend">🟢安め 🟠高め${hasUnknown ? ' ⚪要確認' : ''}</div>
+        <div class="cal-fare-legend"><b>${escapeHtml(t('fareLegendMonth'))}</b><span><i class="cal-fare-lg-pill cal-fare-lg-pill-cheap"></i>安め</span><span><i class="cal-fare-lg-pill cal-fare-lg-pill-normal"></i>普通</span><span><i class="cal-fare-lg-pill cal-fare-lg-pill-expensive"></i>高め</span>${hasUnknown ? '<span><i class="cal-fare-lg-pill cal-fare-lg-pill-unknown"></i>要確認</span>' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         ${detailHtml}
         <div class="cal-fare-footnote">※目安です。実際の価格は予約前にご確認ください。</div>
@@ -3644,6 +3646,7 @@
       const idx = month - 1;
 
       // 各月の列=上に月の数字+下に色のセグメント。列のタップでその月に切り替える(専用画面内)
+      const stripHasUnknown = city.levels.some((_, i) => _fareMonthTier(city, i) === 'unknown');
       const stripHtml = city.levels.map((lv, i) => {
         const tier = _fareMonthTier(city, i);
         const cur = i === idx;
@@ -3674,6 +3677,7 @@
         `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${isHtml ? value : _noBreakJa(value)}</span></div>`;
 
       return `
+        <div class="cal-fare-legend"><b>${escapeHtml(t('fareLegendYear'))}</b><span><i class="cal-fare-lg-bar cal-fare-lg-bar-cheap"></i>安め</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-normal"></i>普通</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-expensive"></i>高め</span>${stripHasUnknown ? '<span><i class="cal-fare-lg-bar cal-fare-lg-bar-unknown"></i>要確認</span>' : ''}</div>
         <div class="cal-fare-month-strip">${stripHtml}</div>
         ${row('所要', city.flightHours || '')}
         ${row('価格', priceHtml, true)}
