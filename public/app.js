@@ -439,6 +439,7 @@
         fareSheetPrevMonth: '前の月',
         fareSheetNextMonth: '次の月',
         fareSheetHint: '都市をタップすると、その月の詳細が出ます',
+        fareBarHint: 'バーをタップすると、その月に切り替わります',
         fareLegendMonth: 'この月の目安',
         fareLegendYear: '12か月の目安',
         fareSheetLoading: '読み込み中…',
@@ -3677,6 +3678,7 @@
         `<div class="cal-fare-row"><span class="cal-fare-row-k">${label}</span><span class="cal-fare-row-v">${isHtml ? value : _noBreakJa(value)}</span></div>`;
 
       return `
+        <div class="cal-fare-hint">${escapeHtml(t('fareBarHint'))}</div>
         <div class="cal-fare-legend"><b>${escapeHtml(t('fareLegendYear'))}</b><span><i class="cal-fare-lg-bar cal-fare-lg-bar-cheap"></i>安め</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-normal"></i>普通</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-expensive"></i>高め</span>${stripHasUnknown ? '<span><i class="cal-fare-lg-bar cal-fare-lg-bar-unknown"></i>要確認</span>' : ''}</div>
         <div class="cal-fare-month-strip">${stripHtml}</div>
         ${row('所要', city.flightHours || '')}
