@@ -22311,3 +22311,9 @@ server {
 
 ### リリース・検証
 画面コードの追加のため、**アプリの更新(1.8.14)が必要**。リリースの前に`content/whats-new.json`へ1.8.14のキーを足す(設計書227の注意)。Web版は`?whatsnew=1.8.14`でカードと「使ってみる」まで確認できる。**スポットライトの位置・吹き出しの向き・暗幕のタップは、実機での確認が必須**(この環境ではブラウザが起動しない)。工数: 中(`app.js`・`app.css`・`index.html`・`whats-new.json`)。
+
+### 設計書232 追記(2026-10-17): 決定事項と実装完了
+- 決定: (A)ボタン=「使ってみる」(主)+「あとで」(従)、CTAなしの版は「はじめる」。(B)ツアー=説明のみ(対象は押せない)。(C)2ステップ(「説明」スイッチ→「✈ 旅行」ピル)。(D)「あとで」の人にはツアーを出さない(1回限り)。(E)新規インストールは出さない。(F)1.8.14の紹介は**画像なし**、文面は「カレンダーが使いやすくなりました」+2項目。
+- 実装: `content/whats-new.json`に`1.8.14`(`cta`+`tours`)。`public/app.js`に`_whatsNewCta()`/`whatsNewPrimary()`/ツアー一式(`startTour`・`_tourShow`・`_tourReposition`・`_tourPlaceTip`・`tourNext`/`tourSkip`・`_tourEnd`)、`public/index.html`に`#whatsnew-later-btn`と`#tour-layer`、`data-tour`アンカー2種、`public/app.css`にスタイル。キャッシュは`app.js`/`app.css`=20261017i、`sw.js`=v1015。`server.js`は変更なし(entryをそのまま返すため)。
+- 検証: jsdomで、CTAあり/なしのフッター切り替え、許可外screenの倒れ込み、ツアーの表示・終了・記録、記録済みなら画面移動のみ、`persist:false`は記録しない、アンカー無しで飛ばす/全て無ければ出さない・記録しない、文言がHTMLにならない、`_tourPlaceTip`の上下選択と画面内収まり、を19項目確認(全てOK)。**jsdomは`getBoundingClientRect()`が0を返すため、寸法はスタブした値でのテスト。スポットライトの位置・吹き出しの向き・暗幕のタップの実際の見た目は未確認。実機で要確認**。
+- 反映: Web版はすぐ(`?whatsnew=1.8.14`で確認可、記録はしない)。アプリは1.8.14のリリースから。
