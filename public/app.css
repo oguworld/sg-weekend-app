@@ -1530,7 +1530,8 @@
 
     .cal-fare-legend { font-size: 11px; color: var(--warm-gray); margin-bottom: 8px; }
 
-    .cal-fare-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cal-fare-pills { display: flex; flex-direction: column; gap: 6px; }
+    .cal-fare-pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
     .cal-fare-pill {
       display: inline-flex; align-items: center; gap: 4px; border: none; border-radius: 50px;
       padding: 6px 12px; font-size: 14px; font-weight: 500;
