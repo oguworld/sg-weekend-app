@@ -3612,7 +3612,7 @@
           <span class="fare-mon-step-label">${month}月</span>
           <button class="fare-mon-step-btn" aria-label="${escapeHtml(t('fareSheetNextMonth'))}" onclick="stepFareSheetMonth(1)">›</button>
         </div>
-        <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め${hasUnknown ? ' ⚪要確認' : ''}</div>
+        <div class="cal-fare-legend">🟢安め 🟠高め${hasUnknown ? ' ⚪要確認' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         ${detailHtml}
         <div class="cal-fare-footnote">※目安です。実際の価格は予約前にご確認ください。</div>
