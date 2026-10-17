@@ -3534,7 +3534,8 @@
     }
 
     let _fareSheetMonth = 1;
-    let _fareSheetCity = null;   // 選択中の都市ID。月を替えても保持し、開くたびに未選択から始める
+    const _FARE_SHEET_DEFAULT_CITY = 'tokyo';   // 開いた直後に選んでおく都市(2026-10-17ユーザー指定。何を見る画面か分かりやすいため)
+    let _fareSheetCity = _FARE_SHEET_DEFAULT_CITY;   // 選択中の都市ID。月を替えても保持し、開くたびに東京から始める
     function _isFareSheetOpen() {
       return !!document.getElementById('fare-sheet-overlay')?.classList.contains('visible');
     }
@@ -3546,7 +3547,7 @@
     function openFareSheet(month) {
       if (_isFareSheetOpen()) return;
       _fareSheetMonth = month;
-      _fareSheetCity = null;
+      _fareSheetCity = _FARE_SHEET_DEFAULT_CITY;
       const scrollEl = document.getElementById('fare-sheet-scroll');
       if (scrollEl) scrollEl.scrollTop = 0;
       document.getElementById('fare-sheet-overlay')?.classList.add('visible');
