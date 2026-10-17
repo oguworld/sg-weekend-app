@@ -3488,7 +3488,8 @@
       'モルディブ': '🇲🇻',
       'オーストラリア': '🇦🇺',
       '台湾': '🇹🇼',
-      'カンボジア': '🇰🇭'
+      'カンボジア': '🇰🇭',
+      'アラブ首長国連邦': '🇦🇪'
     };
     function _fareCountryFlag(country) {
       return FARE_COUNTRY_FLAG[country] || '';
@@ -3510,7 +3511,7 @@
 
     async function loadFareSeasonsData() {
       try {
-        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=8`);
+        const res = await fetch(`${API_BASE}/api/fare-seasons?city=${getCity()}&v=9`);
         if (!res.ok) throw new Error('fare-seasons fetch failed');
         FARE_SEASONS_DATA = await res.json();
         try { localStorage.setItem(FARE_SEASONS_CACHE_KEY, JSON.stringify(FARE_SEASONS_DATA)); } catch (_) {}
@@ -3576,7 +3577,7 @@
 
       // 並びは固定(下のFARE_PILL_ROWS)。色では並べず、月を替えてもピルが動かない
       // 都市ピルは「行のグループ」ごとに改行する固定の並び(国ごとに1行に収まりやすくするため。2026-10-17ユーザー指定:
-      // 1行目=東京・台北・シドニー・パース、続いてインドネシア/タイ/ベトナム/マレーシア、最後に1都市の国をまとめた行。セブは最後)。
+      // 1行目=東京・台北・シドニー・パース、続いてインドネシア/タイ/ベトナム/マレーシア、最後に1都市の国をまとめた行(セブ→シェムリアップ→モルディブ→ドバイ))。
       // グループ内の国の順はリストの順、同国内は元データ(cities配列)の順。リストに無い国は最後のグループの末尾(日本語ロケール順)
       const FARE_PILL_ROWS = [
         ['日本', '台湾', 'オーストラリア'],
@@ -3584,7 +3585,7 @@
         ['タイ'],
         ['ベトナム'],
         ['マレーシア'],
-        ['カンボジア', 'モルディブ', 'フィリピン'],
+        ['フィリピン', 'カンボジア', 'モルディブ', 'アラブ首長国連邦'],
       ];
       const rowOf = country => { const g = FARE_PILL_ROWS.findIndex(r => r.includes(country)); return g < 0 ? FARE_PILL_ROWS.length - 1 : g; };
       const posOf = country => { const g = FARE_PILL_ROWS.findIndex(r => r.includes(country)); return g < 0 ? 99 : FARE_PILL_ROWS[g].indexOf(country); };
