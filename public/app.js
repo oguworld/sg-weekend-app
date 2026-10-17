@@ -3571,10 +3571,10 @@
       const month = _fareSheetMonth;
       const idx = month - 1;
 
-      // 並びは国名(日本語ロケール)順+同国内は元データ(cities配列)の順の固定。色では並べず、月を替えてもピルが動かない
+      // 並びは国名(日本語ロケール)順+同国内は元データ(cities配列)の順の固定。ただしフィリピン(セブ)は最後(国ごとに1行に収まりやすくするため、2026-10-17ユーザー指定)。色では並べず、月を替えてもピルが動かない
       const ordered = cities
         .map((city, i) => ({ city, i }))
-        .sort((a, b) => a.city.country.localeCompare(b.city.country, 'ja') || a.i - b.i)
+        .sort((a, b) => (a.city.country === 'フィリピン') - (b.city.country === 'フィリピン') || a.city.country.localeCompare(b.city.country, 'ja') || a.i - b.i)
         .map(x => x.city);
 
       const pillsHtml = ordered.map(city => {
