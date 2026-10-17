@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-12",
+  "updatedAt": "2026-10-17",
   "note": "SG発の航空券が高い/安いおおよその傾向を示す目安表です。実際の価格は航空会社・予約タイミングにより変動します。予約前に実際の価格を確認してください。",
   "legend": {
     "1": "かなり安い",
@@ -450,6 +450,32 @@
         { "weather": "雨季で雨が多く、曇りの日が続く", "local": "観光は閑散期。フェリーは欠航することも", "priceReason": "雨季の観光閑散期", "priceBasis": "fare", "priceSource": "Cheapflights https://www.cheapflights.com.sg/flights-to-Langkawi/Singapore-City/: 10月が最安(S$140) / Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Langkawi-Island-LGK: 10月が最安(S$155) ※SIN発往復・2026-10-12取得" },
         { "weather": "雨季の終盤。雨は減り始めるが、まだ多い日もある", "local": "シーズン前で落ち着く。年末に向けて予約が増える" },
         { "weather": "乾季入りで晴れが増え、海も静かになっていく", "local": "クリスマスと年末年始の旅行客で、リゾートは満室", "priceReason": "クリスマス・年末年始の旅行需要", "priceBasis": "fare", "priceSource": "Cheapflights https://www.cheapflights.com.sg/flights-to-Langkawi/Singapore-City/: 12月が高い月(S$307) / Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Langkawi-Island-LGK: 12月が高い月(S$314) ※SIN発往復・2026-10-12取得" }
+      ]
+    },
+    {
+      "id": "dubai",
+      "name": "ドバイ",
+      "country": "アラブ首長国連邦",
+      "haul": "far",
+      "direct": true,
+      "flightHours": "直行約7.5時間",
+      "levels": [3, 3, 3, 3, 3, 3, 4, 3, 3, 2, 3, 5],
+      "climate": ["涼季・観光ピーク", "涼季・観光ピーク", "過ごしやすい", "暑くなる", "猛暑", "猛暑・閑散期", "猛暑・閑散期", "猛暑・閑散期", "猛暑", "暑さが和らぐ", "過ごしやすい・シーズン入り", "涼季・年末年始ピーク"],
+      "cheapestMonths": [10],
+      "notes": "11〜3月が観光のベストシーズンで、年末年始は混雑・高騰します。6〜9月は40℃前後の猛暑で、屋外観光は厳しい時期です。ラマダン・イードの時期は年により動きます。渡航前に外務省の海外安全情報で危険レベルをご確認ください。",
+      "monthly": [
+        { "weather": "涼しく過ごしやすい。日中は24℃前後で、朝晩は15℃前後まで下がる", "local": "ショッピングフェスティバルの時期で、観光のピーク。ホテルは高め。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は26℃前後で快適。雨が降る日も少しある", "local": "観光のピークが続き、一年で最も混む月の一つ。ラマダン(年により時期が動く)に入る年がある。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は29℃前後で、屋外観光がしやすい最後の時期。暑さが増していく", "local": "ドバイ・ワールドカップ(競馬)の頃。イードや学校の春休みで混む年がある。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は34℃前後で、暑さが本格化する。雨はほとんど降らない", "local": "ピークを過ぎた時期(ショルダーシーズン)。春休みやイースターは家族連れが増える。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は38℃前後の猛暑。乾燥して日差しが強い", "local": "ピークを過ぎた時期(ショルダーシーズン)。イード・アル・アドハー(年により時期が動く)が入る年がある。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は40℃を超える猛暑。屋外は短時間でも厳しい", "local": "猛暑のオフシーズンで、ホテルは安くなる傾向。サマー・サプライズ(夏のショッピングイベント)が始まる頃。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は41℃前後の猛暑で、湿度も高い。屋外観光は避けたい", "local": "サマー・サプライズが続く。現地の家族連れは、夏休みで国外へ出る時期。渡航前に外務省の海外安全情報を確認", "priceReason": "夏休みシーズンの旅行需要", "priceBasis": "fare", "priceSource": "Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Dubai-DXB: 7月が高い月(S$700、最高は12月) ※SIN発往復・2026-10-17取得。Cheapflightsは7月に触れておらず、Kayakのみの出典。理由は一般的な表現" },
+        { "weather": "日中は42℃前後で、一年で最も暑い", "local": "猛暑のオフシーズン。サマー・サプライズが続く。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は39℃前後の暑さが続く。夜も気温が下がりにくい", "local": "新学期が始まり、居住者が戻ってくる時期。観光はまだ閑散。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は36℃前後と、暑さが和らぎ始める", "local": "シーズン前で、観光客が増え始める時期。10月下旬から、ドバイ・フィットネス・チャレンジ(市内の運動イベント)が始まる。渡航前に外務省の海外安全情報を確認", "priceReason": "シーズン前のオフ期で運賃が安め", "priceBasis": "fare", "priceSource": "Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Dubai-DXB: 10月が最安(S$596) / Cheapflights https://www.cheapflights.com.sg/flights-to-Dubai/Singapore-City/: 10月が最安(平均S$595) / Momondo https://www.momondo.com/flights/singapore-city/dubai: 10月が最安(オフシーズンのため) ※SIN発往復・2026-10-17取得。2026年は中東情勢の影響を受けている可能性あり" },
+        { "weather": "日中は31℃前後で過ごしやすい。海も泳げる水温", "local": "観光のベストシーズンの始まり。ドバイ・デザイン・ウィーク(デザインの催し)などが開かれる。渡航前に外務省の海外安全情報を確認" },
+        { "weather": "日中は26℃前後で快適。雨が降る日も増える", "local": "12月上旬はナショナルデー(建国記念日)の連休。年末年始は一年で最も混み、ホテルも高騰する。渡航前に外務省の海外安全情報を確認", "priceReason": "年末年始の旅行ピーク", "priceBasis": "fare", "priceSource": "Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Dubai-DXB: 12月が最高(S$844、最安の10月より約41%高い) / Cheapflights https://www.cheapflights.com.sg/flights-to-Dubai/Singapore-City/: 12月が最高(平均S$845) ※SIN発往復・2026-10-17取得" }
       ]
     }
   ]
