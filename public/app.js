@@ -439,7 +439,7 @@
         fareSheetTitle: '旅行シーズン情報',
         fareSheetPrevMonth: '前の月',
         fareSheetNextMonth: '次の月',
-        fareSheetHint: '都市をタップすると、その月の詳細と、12か月の色帯が出ます。',
+        fareSheetHint: '都市をタップすると、その月の詳細が出ます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
