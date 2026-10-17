@@ -1496,20 +1496,36 @@
     .plan-modal.visible { display: flex; transform: translateY(0); }
     .plan-modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 20px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; min-height: 0; }
 
-    /* ─── 航空券シーズン表（設計書222→UI再設計3回目、確定版）: 月カード先頭の全幅トグル行をタップすると
-       通常のドキュメントフロー内でパネルがアコーディオン展開する方式（吹き出しポップオーバーは廃止）。
-       フロート要素ではないため位置計算・z-index調整が不要。 ─── */
-    .cal-fare-toggle {
-      display: flex; align-items: center; justify-content: flex-end; gap: 6px; width: 100%;
-      border: none; border-top: 1px solid var(--sand); background: none; border-radius: 0;
-      padding: 10px 0; margin-bottom: 10px; cursor: pointer;
-      font-family: inherit;
+    /* ─── 航空券シーズン表（設計書222→設計書231）: 月見出し右側の「✈ 旅行」ピルから、全高の専用画面(#fare-sheet)を
+       その月をセットして開く。z-indexはボトムナビ(9999)より上(.pin-sheetと同じ理由。bottom:0まで届くため) ─── */
+    .cal-fare-go {
+      flex-shrink: 0; border: none; border-radius: 50px; background: var(--caramel-pale); color: var(--caramel);
+      font-size: 14px; font-weight: 700; padding: 5px 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
     }
-    .cal-fare-toggle:active { opacity: 0.7; }
-    .cal-fare-toggle-label { font-size: 15px; font-weight: 700; color: var(--midnight); }
-    .cal-fare-toggle-caret { color: var(--warm-gray); font-size: 15px; transition: transform 0.2s ease; }
-    .cal-fare-toggle[aria-expanded="true"] .cal-fare-toggle-caret { transform: rotate(180deg); }
-    .cal-fare-panel { margin: -2px 0 12px; padding: 0 2px; }
+    .cal-fare-go:active { opacity: 0.7; }
+    .fare-sheet-overlay {
+      position: fixed; inset: 0; background: rgba(43,43,39,0.45); z-index: 10000;
+      opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+    }
+    .fare-sheet-overlay.visible { opacity: 1; pointer-events: auto; }
+    .fare-sheet {
+      position: fixed; inset: 0; z-index: 10001; background: var(--warm-white);
+      display: flex; flex-direction: column;
+      padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+      transform: translateY(100%); transition: transform 0.25s ease;
+    }
+    .fare-sheet-overlay.visible .fare-sheet { transform: translateY(0); }
+    .fare-sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 16px 8px 20px; flex-shrink: 0; }
+    .fare-sheet-title { font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--midnight); }
+    .fare-sheet-close { background: var(--sand); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: none; cursor: pointer; color: var(--warm-gray); }
+    .fare-sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 20px 24px; }
+    .fare-mon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 6px 0 14px; }
+    .fare-mon-chip {
+      border: 1px solid var(--sand-dark); background: var(--cream); color: var(--warm-gray); border-radius: 50px;
+      padding: 7px 0; font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer;
+    }
+    .fare-mon-chip-active { background: var(--caramel); color: #fff; border-color: var(--caramel); font-weight: 700; }
+    .cal-fare-hint, .cal-fare-state { color: var(--warm-gray); font-size: 14px; line-height: 1.6; padding: 12px 2px; }
 
     .cal-fare-legend { font-size: 11px; color: var(--warm-gray); margin-bottom: 8px; }
 
@@ -1538,7 +1554,10 @@
     .cal-fare-est { color: var(--warm-gray); font-weight: 700; }
     .cal-fare-row-v { flex: 1; min-width: 0; line-break: strict; font-size: 15px; line-height: 1.6; color: var(--midnight); }
     .cal-fare-month-strip { display: flex; gap: 2px; margin-bottom: 8px; }
-    .cal-fare-month-seg { flex: 1; height: 8px; border-radius: 3px; }
+    .cal-fare-month-col { flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: 3px; border: none; background: none; padding: 2px 0; font-family: inherit; cursor: pointer; }
+    .cal-fare-month-num { font-size: 12px; line-height: 1.2; text-align: center; color: var(--warm-gray); }
+    .cal-fare-month-col-current .cal-fare-month-num { font-weight: 800; color: var(--midnight); }
+    .cal-fare-month-seg { display: block; height: 8px; border-radius: 3px; }
     .cal-fare-month-seg-cheap { background: var(--fare-tier-cheap); }
     .cal-fare-month-seg-normal { background: var(--fare-tier-normal); }
     .cal-fare-month-seg-expensive { background: var(--fare-tier-expensive); }

@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20261014d">
+  <link rel="stylesheet" href="/app.css?v=20261017a">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -219,6 +219,19 @@
           <div style="font-size:15px;font-weight:700;color:var(--midnight);" data-i18n="pinsEmptyCombinedTitle">まだ何もピン留めしていません</div>
           <div style="font-size:13px;color:var(--warm-gray);line-height:1.7;" data-i18n="pinsEmptyCombinedDesc">気になるイベントやニュースの📌をタップすると<br>ここにまとめて表示されます</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── 旅行シーズン情報の専用画面(設計書231)。月見出しの「✈ 旅行」から、その月をセットして開く ─── -->
+  <div class="fare-sheet-overlay" id="fare-sheet-overlay" onclick="if(event.target===this) closeFareSheet()">
+    <div class="fare-sheet" id="fare-sheet">
+      <div class="fare-sheet-header">
+        <div class="fare-sheet-title" data-i18n="fareSheetTitle">旅行シーズン情報</div>
+        <button class="fare-sheet-close" aria-label="閉じる" onclick="closeFareSheet()">✕</button>
+      </div>
+      <div class="fare-sheet-scroll" id="fare-sheet-scroll">
+        <div id="fare-sheet-body"></div>
       </div>
     </div>
   </div>
@@ -556,7 +569,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20261014d"></script>
+  <script src="/app.js?v=20261017a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
