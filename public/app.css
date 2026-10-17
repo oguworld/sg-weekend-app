@@ -1503,11 +1503,13 @@
       font-size: 14px; font-weight: 700; padding: 5px 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
     }
     .cal-fare-go:active { opacity: 0.7; }
+    /* 全高の画面で背景が見えないため、暗幕は付けない。閉じた後にステータスバー部分が灰色に残る不具合の対策として、
+       閉じている間は visibility:hidden にする(2026-10-17) */
     .fare-sheet-overlay {
-      position: fixed; inset: 0; background: rgba(43,43,39,0.45); z-index: 10000;
-      opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+      position: fixed; inset: 0; background: transparent; z-index: 10000;
+      opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.25s ease, visibility 0s linear 0.25s;
     }
-    .fare-sheet-overlay.visible { opacity: 1; pointer-events: auto; }
+    .fare-sheet-overlay.visible { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
     .fare-sheet {
       position: fixed; inset: 0; z-index: 10001; background: var(--warm-white);
       display: flex; flex-direction: column;
