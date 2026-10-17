@@ -1496,12 +1496,14 @@
     .plan-modal.visible { display: flex; transform: translateY(0); }
     .plan-modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 20px calc(90px + env(safe-area-inset-bottom, 0px)); flex: 1; min-height: 0; }
 
-    /* ─── 航空券シーズン表（設計書222→設計書231）: 月見出し右側の「✈ 旅行」ピルから、全高の専用画面(#fare-sheet)を
+    /* ─── 航空券シーズン表（設計書222→設計書231）: 月見出し右側の飛行機アイコンから、全高の専用画面(#fare-sheet)を
        その月をセットして開く。z-indexはボトムナビ(9999)より上(.pin-sheetと同じ理由。bottom:0まで届くため) ─── */
     .cal-fare-go {
-      flex-shrink: 0; border: none; border-radius: 50px; background: var(--caramel-pale); color: var(--caramel);
-      font-size: 14px; font-weight: 700; padding: 5px 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
+      position: relative; flex-shrink: 0; width: 29px; height: 29px; padding: 0; border: none; border-radius: 50%;
+      background: var(--caramel-pale); color: var(--caramel); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
     }
+    .cal-fare-go::after { content: ''; position: absolute; inset: -8px; }   /* 見えない当たり判定を広げて、44px相当にする */
     .cal-fare-go:active { opacity: 0.7; }
     /* 全高の画面で背景が見えないため、暗幕は付けない。閉じた後にステータスバー部分が灰色に残る不具合の対策として、
        閉じている間は visibility:hidden にする(2026-10-17) */

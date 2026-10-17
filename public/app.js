@@ -435,7 +435,6 @@
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
         statDengue: 'デング熱',
-        fareGoLabel: '✈ 旅行',
         fareSheetTitle: '旅行シーズン情報',
         fareSheetPrevMonth: '前の月',
         fareSheetNextMonth: '次の月',
@@ -1787,7 +1786,7 @@
       }, { passive: false });
     }
 
-    // ─── カレンダー画面 月見出しの季節アイコン・「✈ 旅行」ピル
+    // ─── カレンダー画面 月見出しの季節アイコン・飛行機アイコン
     //     即時タップ対応（いずれも動的に再描画されるため#calendar-listへのイベント委譲） ───
     // filter-row-category等と同じパターン: touchstartで開始座標を記録し、touchendで移動量(dx/dy)が
     // 閾値を超えていればスクロール/ドラッグとみなしタップ処理をしない（ボタン上から指を離さず
@@ -3473,7 +3472,7 @@
     }, { passive: false });
 
     // ─── 航空券シーズン表（設計書222。SG発の航空券の月別の目安。実運賃は扱わない）───
-    // 月見出しの「✈ 旅行」ピルから専用画面(#fare-sheet、設計書231)を、その月をセットして開く。画面内で月を切り替えられ、
+    // 月見出しの飛行機アイコンから専用画面(#fare-sheet、設計書231)を、その月をセットして開く。画面内で月を切り替えられ、
     // 都市ピル(価格レベルで色分け)をタップするとその月の詳細を1つ表示する。選択中の都市は月を替えても保持する。
     const FARE_SEASONS_CACHE_KEY = 'sg_fare_seasons_cache';
     let FARE_SEASONS_DATA = null;      // /api/fare-seasons の応答をそのまま保持
@@ -3527,9 +3526,9 @@
       }
     }
 
-    // 「✈ 旅行」ピル(月見出し右側)。タップで専用画面をその月で開く
+    // 飛行機アイコンのボタン(月見出し右側)。タップで専用画面をその月で開く
     function _fareGoHtml(monthNum) {
-      return `<button class="cal-fare-go" data-tour="cal-fare-entry" data-month="${monthNum}" aria-label="${monthNum}月の旅行シーズン情報" onclick="if(!_touchCapableDetected) openFareSheet(${monthNum})">${t('fareGoLabel')}</button>`;
+      return `<button class="cal-fare-go" data-tour="cal-fare-entry" data-month="${monthNum}" aria-label="${monthNum}月の旅行シーズン情報" onclick="if(!_touchCapableDetected) openFareSheet(${monthNum})"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></button>`;
     }
 
     let _fareSheetMonth = 1;
