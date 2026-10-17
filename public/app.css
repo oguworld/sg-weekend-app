@@ -1497,7 +1497,7 @@
        その月をセットして開く。z-indexはボトムナビ(9999)より上(.pin-sheetと同じ理由。bottom:0まで届くため) ─── */
     .cal-fare-go {
       position: relative; flex-shrink: 0; width: 29px; height: 29px; padding: 0; border: none; border-radius: 50%;
-      background: var(--caramel-pale); color: var(--caramel); cursor: pointer;
+      background: var(--warm-white); box-shadow: var(--shadow-card); font-size: 14px; line-height: 1; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
     }
     .cal-fare-go::after { content: ''; position: absolute; inset: -8px; }   /* 見えない当たり判定を広げて、44px相当にする */

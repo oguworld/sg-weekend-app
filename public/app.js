@@ -3528,7 +3528,7 @@
 
     // 飛行機アイコンのボタン(月見出し右側)。タップで専用画面をその月で開く
     function _fareGoHtml(monthNum) {
-      return `<button class="cal-fare-go" data-tour="cal-fare-entry" data-month="${monthNum}" aria-label="${monthNum}月の旅行シーズン情報" onclick="if(!_touchCapableDetected) openFareSheet(${monthNum})"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg></button>`;
+      return `<button class="cal-fare-go" data-tour="cal-fare-entry" data-month="${monthNum}" aria-label="${monthNum}月の旅行シーズン情報" onclick="if(!_touchCapableDetected) openFareSheet(${monthNum})">✈️</button>`;
     }
 
     let _fareSheetMonth = 1;
