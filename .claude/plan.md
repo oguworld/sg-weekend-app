@@ -22317,3 +22317,11 @@ server {
 - 実装: `content/whats-new.json`に`1.8.14`(`cta`+`tours`)。`public/app.js`に`_whatsNewCta()`/`whatsNewPrimary()`/ツアー一式(`startTour`・`_tourShow`・`_tourReposition`・`_tourPlaceTip`・`tourNext`/`tourSkip`・`_tourEnd`)、`public/index.html`に`#whatsnew-later-btn`と`#tour-layer`、`data-tour`アンカー2種、`public/app.css`にスタイル。キャッシュは`app.js`/`app.css`=20261017i、`sw.js`=v1015。`server.js`は変更なし(entryをそのまま返すため)。
 - 検証: jsdomで、CTAあり/なしのフッター切り替え、許可外screenの倒れ込み、ツアーの表示・終了・記録、記録済みなら画面移動のみ、`persist:false`は記録しない、アンカー無しで飛ばす/全て無ければ出さない・記録しない、文言がHTMLにならない、`_tourPlaceTip`の上下選択と画面内収まり、を19項目確認(全てOK)。**jsdomは`getBoundingClientRect()`が0を返すため、寸法はスタブした値でのテスト。スポットライトの位置・吹き出しの向き・暗幕のタップの実際の見た目は未確認。実機で要確認**。
 - 反映: Web版はすぐ(`?whatsnew=1.8.14`で確認可、記録はしない)。アプリは1.8.14のリリースから。
+
+### 設計書222 追記(2026-10-17): 都市「ドバイ」を追加(ユーザー依頼)
+- 依頼: ドバイ(アラブ首長国連邦)を追加。最後のピル行を「セブ→シェムリアップ→モルディブ→ドバイ」にする。
+- データ(`content/fare-seasons.json`、20都市目、`id:dubai`): 直行あり・`haul:far`・「直行約7.5時間」。月別の`weather`/`local`は2026-10-17にWebで確認(気候データ: Wikipedia「Dubai」、climatestotravel.com、Kuoniのベストシーズン案内。イベント: dubaitravelplanner.com・Gulf News。直行便: Kayak・Cheapflights・Momondo・flightroutes系の検索要約。エミレーツ約3便+シンガポール航空1便/日、所要7時間10分〜7時間40分)。年により動く行事(ラマダン・イード)は月だけ。
+- 色(出典: SIN発、2026-10-17取得): 10月=2(Kayak S$596最安、Cheapflights平均S$595最安、Momondoも最安)、12月=5(Kayak S$844最高、Cheapflights S$845最高)、7月=4(**Kayakのみ**、S$700、最高は12月)。他の月は`levels`3(推察コメントなし)。`cheapestMonths:[10]`。10月が最安である点は、2026年の中東情勢(米イスラエル・イラン紛争)の影響を受けている可能性がある(出典のKayakは過去12か月の中央値で、紛争期間を含む)。
+- **安全上の注意(要ユーザー判断)**: 外務省の危険情報はUAE全土レベル2(不要不急の渡航は止めてください。2026-06-25にレベル3から引下げ。2026年10月も地域紛争が続く。Gulf News 2026-10-15、kaigaianzen.jp、外務省海外安全ホームページ)。ユーザーの依頼どおり追加したが、**ドバイの全12か月の`local`の末尾に「渡航前に外務省の海外安全情報を確認」を入れた**。ドバイを載せること自体の是非、文言の強さ、または削除は、ユーザーが判断する(`git revert`で戻せる)。
+- 画面: `FARE_COUNTRY_FLAG`に`'アラブ首長国連邦': '🇦🇪'`、`FARE_PILL_ROWS`の最後を`['フィリピン','カンボジア','モルディブ','アラブ首長国連邦']`、`loadFareSeasonsData()`の`&v=`を8→9、`app.js`/`app.css`のクエリ20261017k、`sw.js` v1017。
+- 検証: `validate-fare-seasons.js`合格(20都市)、jsdomで20都市×12か月の描画に例外・`undefined`・`NaN`なし、他の都市の並びは不変、APIとapp.jsの配信を確認。実機の目視は未実施。
