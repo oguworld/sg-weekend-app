@@ -1584,7 +1584,7 @@
     .cal-fare-month-seg-unknown { background: var(--fare-tier-unknown); }
     .cal-fare-month-seg-current { outline: 2px solid var(--midnight); outline-offset: 1px; }
 
-    .cal-fare-footnote { color: var(--warm-gray); font-size: 11px; margin-top: 8px; }
+    .cal-fare-footnote { color: var(--warm-gray); font-size: 11px; margin-top: 8px; text-align: center; }
 
     /* ─── PROMO MODAL（Web版→iOSアプリ誘導、中央モーダル、設計書206） ─── */
     /* ─── 新機能の紹介(What's New、設計書227)。Web版の誘導ポップアップ(3603/3604)より上に出す ─── */
