@@ -476,7 +476,7 @@
     const _isFreshInstall = (() => { try { return localStorage.getItem('sg_theme') === null; } catch (_) { return false; } })();
     // 起動処理(initWhatsNew)が同期で触るため、TDZを避けて早い位置で宣言する
     const _WHATSNEW_SEEN_KEY = 'app_whatsnew_seen';
-    let _whatsNewPending = null; // 表示中の紹介: { version, persist }
+    let _whatsNewPending = null; // 表示中の紹介: { version, persist, cta }
 
     // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
     // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
@@ -2086,7 +2086,10 @@
       ['qr-share-link-btn', () => doShare()],
       ['promo-modal-overlay', () => closePromoModal()],
       ['promo-modal-dismiss-link', () => closePromoModal()],
-      ['whatsnew-start-btn', () => closeWhatsNew()],
+      ['whatsnew-start-btn', () => whatsNewPrimary()],
+      ['whatsnew-later-btn', () => closeWhatsNew()],
+      ['tour-next', () => tourNext()],
+      ['tour-skip', () => tourSkip()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -3524,7 +3527,7 @@
 
     // 「✈ 旅行」ピル(月見出し右側)。タップで専用画面をその月で開く
     function _fareGoHtml(monthNum) {
-      return `<button class="cal-fare-go" data-month="${monthNum}" aria-label="${monthNum}月の旅行シーズン情報" onclick="if(!_touchCapableDetected) openFareSheet(${monthNum})">${t('fareGoLabel')}</button>`;
+      return `<button class="cal-fare-go" data-tour="cal-fare-entry" data-month="${monthNum}" aria-label="${monthNum}月の旅行シーズン情報" onclick="if(!_touchCapableDetected) openFareSheet(${monthNum})">${t('fareGoLabel')}</button>`;
     }
 
     let _fareSheetMonth = 1;
@@ -3809,10 +3812,171 @@
         <div class="whatsnew-items">${items}</div>
         ${image}`;
       body.scrollTop = 0;
-      _whatsNewPending = { version: decision.version, persist: decision.persist };
+      // CTA(「使ってみる」)がある版は、主ボタン=CTA・従ボタン=「あとで」。無い版・不正なCTAは従来どおり「はじめる」1つ
+      const cta = _whatsNewCta(entry);
+      const startBtn = document.getElementById('whatsnew-start-btn');
+      const laterBtn = document.getElementById('whatsnew-later-btn');
+      if (startBtn) startBtn.textContent = cta ? cta.label : 'はじめる';
+      if (laterBtn) laterBtn.hidden = !cta;
+      _whatsNewPending = { version: decision.version, persist: decision.persist, cta };
       lockScroll();
       overlay.classList.add('visible');
       modal.classList.add('visible');
+    }
+
+    // 紹介のCTA(設計書232)。screenは許可リストのみ。ツアーは、steps(anchor+text)が1つ以上ある時だけ有効
+    const _WHATSNEW_SCREENS = ['calendar', 'news', 'home', 'settings'];
+    function _whatsNewCta(entry) {
+      const c = entry && entry.cta;
+      if (!c || typeof c !== 'object' || !_WHATSNEW_SCREENS.includes(c.screen)) return null;
+      const label = (typeof c.label === 'string' && c.label.trim()) ? c.label.trim().slice(0, 12) : '使ってみる';
+      const tourId = (typeof c.tour === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(c.tour)) ? c.tour : '';
+      const tours = entry.tours && typeof entry.tours === 'object' ? entry.tours : null;
+      const tour = tourId && tours && Object.prototype.hasOwnProperty.call(tours, tourId) ? tours[tourId] : null;
+      const steps = tour && Array.isArray(tour.steps)
+        ? tour.steps.filter(st => st && typeof st.anchor === 'string' && typeof st.text === 'string' && st.text.trim())
+            .slice(0, 6).map(st => ({ anchor: st.anchor, text: st.text.trim().slice(0, 120) }))
+        : [];
+      return { label, screen: c.screen, tourId: steps.length ? tourId : '', steps };
+    }
+
+    // 主ボタン。CTAがあれば、カードを閉じてその画面へ移動し、(初回だけ)ツアーを始める
+    function whatsNewPrimary() {
+      const pending = _whatsNewPending;
+      const cta = pending && pending.cta;
+      const persist = !!(pending && pending.persist);
+      closeWhatsNew();
+      if (!cta) return;
+      switchNav(cta.screen);
+      if (!cta.tourId) return;
+      if (persist && _tourDone(cta.tourId)) return;   // 見終わっていれば画面移動だけ
+      // 画面の描画が落ち着いてから開始する(カレンダーの今月へのスクロール等が終わるのを待つ)
+      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+        startTour({ id: cta.tourId, steps: cta.steps, persist });
+      }, 350)));
+    }
+
+    // ─── ミニチュートリアル(スポットライト、設計書232) ───
+    // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry'];
+    const _TOUR_DONE_PREFIX = 'app_tour_done_';
+    let _tourState = null;   // { id, persist, steps, index, locked }
+
+    function _tourDone(id) {
+      try { return localStorage.getItem(_TOUR_DONE_PREFIX + id) === '1'; } catch (_) { return false; }
+    }
+    function _tourVisible(el) {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }
+    function _tourAnchorEl(name) {
+      if (!_TOUR_ANCHORS.includes(name)) return null;
+      const els = Array.from(document.querySelectorAll(`[data-tour="${name}"]`));
+      if (name === 'cal-fare-entry') {
+        const month = String(new Date().getMonth() + 1);
+        return els.find(e => e.dataset.month === month) || els[0] || null;
+      }
+      return els[0] || null;
+    }
+    // 画面の描画待ち(カレンダーの月見出しはデータ取得後に出る)。見つからなければnull
+    async function _tourWaitAnchor(name, timeoutMs = 2500) {
+      const t0 = Date.now();
+      for (;;) {
+        const el = _tourAnchorEl(name);
+        if (_tourVisible(el)) return el;
+        if (Date.now() - t0 >= timeoutMs) return null;
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+
+    // 吹き出しの位置(純関数)。対象の上下の広い側に置き、画面からはみ出さない。左右は対象の中心に合わせて画面内に収める
+    function _tourPlaceTip(rect, tipHeight, viewportH, viewportW, tipWidth) {
+      const margin = 12, gap = 14;
+      const width = tipWidth || Math.min(340, viewportW - margin * 2);
+      const placement = (viewportH - rect.bottom) >= rect.top ? 'below' : 'above';
+      let top = placement === 'below' ? rect.bottom + gap : rect.top - gap - tipHeight;
+      top = Math.max(margin, Math.min(top, viewportH - tipHeight - margin));
+      let left = rect.left + rect.width / 2 - width / 2;
+      left = Math.max(margin, Math.min(left, viewportW - width - margin));
+      return { top, left, width, placement };
+    }
+
+    async function startTour({ id, steps, persist }) {
+      if (_tourState || !id || !Array.isArray(steps)) return;
+      const layer = document.getElementById('tour-layer');
+      if (!layer) return;
+      _tourState = { id, persist: !!persist, steps: [], index: -1, locked: false };
+      const st = _tourState;
+      // 見つかるステップだけ残す(全部無ければ何も出さず、記録もしない)
+      const found = await Promise.all(steps.map(step => _tourWaitAnchor(step.anchor)));
+      if (_tourState !== st) return;
+      st.steps = steps.filter((_, i) => found[i]);
+      if (st.steps.length === 0) { _tourEnd(false); return; }
+      lockScroll();
+      st.locked = true;
+      window.addEventListener('resize', _tourReposition);
+      window.addEventListener('orientationchange', _tourReposition);
+      layer.classList.add('visible');
+      _tourShow(0);
+    }
+
+    function _tourShow(i) {
+      const st = _tourState;
+      if (!st) return;
+      if (i >= st.steps.length) { _tourEnd(true); return; }
+      const step = st.steps[i];
+      const el = _tourAnchorEl(step.anchor);
+      if (!_tourVisible(el)) { _tourShow(i + 1); return; }   // 途中で消えたステップは飛ばす
+      st.index = i;
+      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+      const isLast = i === st.steps.length - 1;
+      document.getElementById('tour-tip-count').textContent = `${i + 1} / ${st.steps.length}`;
+      document.getElementById('tour-tip-text').textContent = step.text;
+      document.getElementById('tour-next').textContent = isLast ? 'わかった' : '次へ';
+      document.getElementById('tour-skip').style.display = isLast ? 'none' : '';
+      requestAnimationFrame(_tourReposition);
+    }
+
+    function _tourReposition() {
+      const st = _tourState;
+      if (!st || st.index < 0) return;
+      const el = _tourAnchorEl(st.steps[st.index].anchor);
+      if (!_tourVisible(el)) return;
+      const r = el.getBoundingClientRect();
+      const pad = 6;
+      const hole = document.getElementById('tour-hole');
+      hole.style.top = `${r.top - pad}px`;
+      hole.style.left = `${r.left - pad}px`;
+      hole.style.width = `${r.width + pad * 2}px`;
+      hole.style.height = `${r.height + pad * 2}px`;
+      const tip = document.getElementById('tour-tip');
+      const vw = window.innerWidth, vh = window.innerHeight;
+      tip.style.width = `${Math.min(340, vw - 24)}px`;
+      const pos = _tourPlaceTip(r, tip.offsetHeight, vh, vw, Math.min(340, vw - 24));
+      tip.style.top = `${pos.top}px`;
+      tip.style.left = `${pos.left}px`;
+      tip.dataset.placement = pos.placement;
+      const arrowX = Math.max(20, Math.min(r.left + r.width / 2 - pos.left, pos.width - 20));
+      tip.style.setProperty('--tour-arrow-x', `${arrowX}px`);
+    }
+
+    function tourNext() {
+      if (!_tourState) return;
+      _tourShow(_tourState.index + 1);
+    }
+    function tourSkip() { _tourEnd(true); }
+
+    // 終了。record=trueかつpersistなら「見終わった」を記録する(Web確認のpersist=falseは記録しない)
+    function _tourEnd(record) {
+      const st = _tourState;
+      if (!st) return;
+      _tourState = null;
+      if (record && st.persist) { try { localStorage.setItem(_TOUR_DONE_PREFIX + st.id, '1'); } catch (_) {} }
+      window.removeEventListener('resize', _tourReposition);
+      window.removeEventListener('orientationchange', _tourReposition);
+      document.getElementById('tour-layer')?.classList.remove('visible');
+      if (st.locked) unlockScroll();
     }
 
     function closeWhatsNew() {

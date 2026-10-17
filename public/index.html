@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20261017h">
+  <link rel="stylesheet" href="/app.css?v=20261017i">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -240,7 +240,7 @@
   <div class="screen" id="screen-calendar">
     <div class="plan-title-header">
       <span class="screen-title">カレンダー</span>
-      <button class="cal-notes-switch" id="cal-notes-switch" role="switch" aria-checked="false" onclick="if(!_touchCapableDetected) toggleCalNotes()">
+      <button class="cal-notes-switch" id="cal-notes-switch" data-tour="cal-notes-switch" role="switch" aria-checked="false" onclick="if(!_touchCapableDetected) toggleCalNotes()">
         <span class="cal-notes-switch-label" data-i18n="calNotesSwitch">説明</span>
         <span class="cal-notes-switch-track"></span>
       </button>
@@ -557,8 +557,23 @@
   <div class="whatsnew-modal" id="whatsnew-modal" role="dialog" aria-modal="true" aria-labelledby="whatsnew-title">
     <div class="whatsnew-body" id="whatsnew-body"></div>
     <div class="whatsnew-footer">
-      <button class="whatsnew-start-btn" id="whatsnew-start-btn" onclick="if(!_touchCapableDetected) closeWhatsNew()">はじめる</button>
+      <button class="whatsnew-start-btn" id="whatsnew-start-btn" onclick="if(!_touchCapableDetected) whatsNewPrimary()">はじめる</button>
+      <button class="whatsnew-later-btn" id="whatsnew-later-btn" hidden onclick="if(!_touchCapableDetected) closeWhatsNew()">あとで</button>
       <div class="whatsnew-note">この画面は、更新後に1回だけ表示されます</div>
+    </div>
+  </div>
+
+  <!-- ミニチュートリアル(スポットライト、設計書232) -->
+  <div class="tour-layer" id="tour-layer" aria-live="polite">
+    <div class="tour-hole" id="tour-hole"></div>
+    <div class="tour-tip" id="tour-tip" role="dialog" aria-modal="true">
+      <span class="tour-tip-arrow" id="tour-tip-arrow"></span>
+      <div class="tour-tip-count" id="tour-tip-count"></div>
+      <div class="tour-tip-text" id="tour-tip-text"></div>
+      <div class="tour-tip-actions">
+        <button class="tour-btn tour-btn-skip" id="tour-skip" onclick="if(!_touchCapableDetected) tourSkip()">スキップ</button>
+        <button class="tour-btn tour-btn-primary" id="tour-next" onclick="if(!_touchCapableDetected) tourNext()">次へ</button>
+      </div>
     </div>
   </div>
 
@@ -569,7 +584,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20261017h"></script>
+  <script src="/app.js?v=20261017i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
