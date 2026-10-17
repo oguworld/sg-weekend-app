@@ -437,6 +437,8 @@
         statDengue: 'デング熱',
         fareGoLabel: '✈ 旅行',
         fareSheetTitle: '旅行シーズン情報',
+        fareSheetPrevMonth: '前の月',
+        fareSheetNextMonth: '次の月',
         fareSheetHint: '都市をタップすると、その月の詳細と、12か月の色帯が出ます。',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
@@ -3527,7 +3529,6 @@
 
     let _fareSheetMonth = 1;
     let _fareSheetCity = null;   // 選択中の都市ID。月を替えても保持し、開くたびに未選択から始める
-    let _fareSheetFirstRender = false;   // 開いた直後の最初の描画は、月チップを即座に中央へ。以降の切り替えはスムーズに
     function _isFareSheetOpen() {
       return !!document.getElementById('fare-sheet-overlay')?.classList.contains('visible');
     }
@@ -3540,7 +3541,6 @@
       if (_isFareSheetOpen()) return;
       _fareSheetMonth = month;
       _fareSheetCity = null;
-      _fareSheetFirstRender = true;
       const scrollEl = document.getElementById('fare-sheet-scroll');
       if (scrollEl) scrollEl.scrollTop = 0;
       document.getElementById('fare-sheet-overlay')?.classList.add('visible');
@@ -3558,7 +3558,7 @@
       unlockScroll();
     }
 
-    // 専用画面の本文: 1〜12月のチップ → 凡例 → 都市ピル → 詳細(都市選択時)/ヒント → 注記。
+    // 専用画面の本文: 「‹ 11月 ›」の月の切り替え → 凡例 → 都市ピル → 詳細(都市選択時)/ヒント → 注記。
     // 並び順: 国名(日本語ロケール)順+同国内は元データの順の固定(2026-10-17)。ピルの色は価格レベル(要確認はグレー)で付ける。
     function renderFareSheet() {
       if (!FARE_SEASONS_DATA) {
@@ -3567,9 +3567,6 @@
       }
       const scrollEl = document.getElementById('fare-sheet-scroll');
       const prevScroll = scrollEl ? scrollEl.scrollTop : 0;
-      const prevMonScroll = document.getElementById('fare-mon-scroll')?.scrollLeft || 0;
-      const firstRender = _fareSheetFirstRender;
-      _fareSheetFirstRender = false;
       const { cities } = FARE_SEASONS_DATA;
       const month = _fareSheetMonth;
       const idx = month - 1;
@@ -3579,11 +3576,6 @@
         .map((city, i) => ({ city, i }))
         .sort((a, b) => a.city.country.localeCompare(b.city.country, 'ja') || a.i - b.i)
         .map(x => x.city);
-
-      const monthChipsHtml = Array.from({ length: 12 }, (_, k) => {
-        const n = k + 1;
-        return `<button class="fare-mon-chip${n === month ? ' fare-mon-chip-active' : ''}" aria-pressed="${n === month}" onclick="setFareSheetMonth(${n})">${n}月</button>`;
-      }).join('');
 
       const pillsHtml = ordered.map(city => {
         const tier = _fareMonthTier(city, idx);
@@ -3598,32 +3590,28 @@
         : `<div class="cal-fare-hint">${escapeHtml(t('fareSheetHint'))}</div>`;
 
       _setFareSheetBody(`
-        <div class="fare-mon-scroll" id="fare-mon-scroll">${monthChipsHtml}</div>
+        <div class="fare-mon-step">
+          <button class="fare-mon-step-btn" aria-label="${escapeHtml(t('fareSheetPrevMonth'))}" onclick="stepFareSheetMonth(-1)">‹</button>
+          <span class="fare-mon-step-label">${month}月</span>
+          <button class="fare-mon-step-btn" aria-label="${escapeHtml(t('fareSheetNextMonth'))}" onclick="stepFareSheetMonth(1)">›</button>
+        </div>
         <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め${hasUnknown ? ' ⚪要確認' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         ${detailHtml}
         <div class="cal-fare-footnote">※目安です。実際の価格は予約前にご確認ください。</div>
       `);
       if (scrollEl) scrollEl.scrollTop = prevScroll;
-      // 選択中の月のチップを横スクロールの中央へ。再描画で作り直すため、直前のスクロール位置を戻してからスムーズに動かす
-      const monScroll = document.getElementById('fare-mon-scroll');
-      const activeChip = monScroll?.querySelector('.fare-mon-chip-active');
-      if (monScroll && activeChip) {
-        const left = Math.max(0, activeChip.offsetLeft - monScroll.clientWidth / 2 + activeChip.offsetWidth / 2);
-        if (firstRender) {
-          monScroll.scrollLeft = left;
-        } else {
-          monScroll.scrollLeft = prevMonScroll;
-          monScroll.scrollTo({ left, behavior: 'smooth' });
-        }
-      }
     }
 
-    // 月の切り替え(月チップ・12か月の色帯のタップ)。選択中の都市はそのまま、新しい月の内容に差し替わる
+    // 月の切り替え(前後ボタン・12か月の色帯のタップ)。選択中の都市はそのまま、新しい月の内容に差し替わる
     function setFareSheetMonth(month) {
       if (!(month >= 1 && month <= 12)) return;
       _fareSheetMonth = month;
       renderFareSheet();
+    }
+    // 前後ボタン(12月の次は1月、1月の前は12月に戻る)
+    function stepFareSheetMonth(delta) {
+      setFareSheetMonth(((_fareSheetMonth - 1 + delta + 12) % 12) + 1);
     }
     // 都市ピルのタップ。同じピルの再タップで閉じ(未選択に戻り)、別のピルなら差し替える
     function selectFareSheetCity(pillEl) {
