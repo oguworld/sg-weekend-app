@@ -30,9 +30,9 @@
       --fare-tier-cheap: #6FAE7C;
       --fare-tier-expensive: #E08A4F;
       --fare-tier-unknown: #9C9C94;
-      --fare-tier-cheap-pale: rgba(111,174,122,0.16);
-      --fare-tier-expensive-pale: rgba(224,138,79,0.16);
-      --fare-tier-unknown-pale: rgba(140,140,132,0.2);
+      --fare-tier-cheap-pale: rgba(111,174,122,0.32);
+      --fare-tier-expensive-pale: rgba(224,138,79,0.32);
+      --fare-tier-unknown-pale: rgba(140,140,132,0.28);
       --fare-tier-cheap-text: #2A5F36;
       --fare-tier-expensive-text: #94451C;
       --fare-tier-unknown-text: #5C5C56;
@@ -1533,12 +1533,10 @@
     .cal-fare-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--warm-gray); margin: 2px 0 10px; }
     .cal-fare-legend b { color: var(--midnight); font-weight: 700; }
     .cal-fare-legend span { display: inline-flex; align-items: center; }
-    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 2px; line-height: 1.5; }
+    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 5px; line-height: 1.5; }
     .cal-fare-city b { font-size: 17px; font-weight: 700; color: var(--midnight); }
     .cal-fare-city span { font-size: 13px; color: var(--warm-gray); }
-    .cal-fare-barrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--warm-gray); margin: 0 0 6px; line-height: 1.5; }
-    .cal-fare-lgs { display: flex; gap: 12px; flex-shrink: 0; }
-    .cal-fare-lgs span { display: inline-flex; align-items: center; }
+    .cal-fare-barrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--warm-gray); margin: 0 0 8px; line-height: 1.5; }
     .cal-fare-lg-bar { display: inline-block; width: 18px; height: 8px; border-radius: 3px; margin-right: 5px; }
     .cal-fare-lg-bar-cheap { background: var(--fare-tier-cheap); }
     .cal-fare-lg-bar-normal { background: var(--sand-dark); }
@@ -1565,7 +1563,7 @@
     }
 
     .cal-fare-detail {
-      margin-top: 10px; padding-top: 0; border-top: 1px solid var(--sand-dark);
+      margin-top: 12px; padding-top: 3px; border-top: 1px solid var(--sand-dark);
       font-size: 14px; line-height: 1.8; color: var(--midnight);
     }
     .cal-fare-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--sand); }
@@ -1768,8 +1766,8 @@
       --fare-tier-cheap: #3E8A54;
       --fare-tier-expensive: #B05A2E;
       --fare-tier-unknown: #77776F;
-      --fare-tier-cheap-pale: rgba(62,138,84,0.28);
-      --fare-tier-expensive-pale: rgba(176,90,46,0.28);
+      --fare-tier-cheap-pale: rgba(62,138,84,0.42);
+      --fare-tier-expensive-pale: rgba(176,90,46,0.42);
       --fare-tier-unknown-pale: rgba(150,150,142,0.24);
       --fare-tier-cheap-text: #6FC989;
       --fare-tier-expensive-text: #F0A268;
