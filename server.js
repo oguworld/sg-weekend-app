@@ -1614,9 +1614,8 @@ function getTodayCalendarNotification(cityKey = 'sg') {
   const candidates = items.filter(it => {
     if (it.category !== 'holiday-sg' && it.category !== 'festival') return false;
     if (it.confirmed === false) return false;
-    const start = it.date;
-    const end = it.endDate || it.date;
-    return start <= today && today <= end;
+    // 複数日にまたがる行事も、通知するのは初日だけ(期間中の毎日は送らない)
+    return it.date === today;
   });
   if (candidates.length === 0) return null;
   const holidaySg = candidates.find(it => it.category === 'holiday-sg');
