@@ -30,6 +30,12 @@
       --fare-tier-cheap: #6FAE7C;
       --fare-tier-expensive: #E08A4F;
       --fare-tier-unknown: #9C9C94;
+      --fare-tier-cheap-pale: rgba(111,174,122,0.16);
+      --fare-tier-expensive-pale: rgba(224,138,79,0.16);
+      --fare-tier-unknown-pale: rgba(140,140,132,0.2);
+      --fare-tier-cheap-text: #2A5F36;
+      --fare-tier-expensive-text: #94451C;
+      --fare-tier-unknown-text: #5C5C56;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
@@ -1527,20 +1533,18 @@
 
     .cal-fare-pills { display: flex; flex-direction: column; gap: 6px; }
     .cal-fare-pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
-    /* 都市ピル(2026-10-17ユーザー指定): 角を少し丸めた枠(塗りなし)+左端の太い色の線。普通は線なし(色なし)。
-       色は線だけで示す(安め=緑・高め=橙・要確認=灰) */
+    /* 都市ピル(2026-10-17ユーザー指定): 安め・高め・要確認は色付きの塗りつぶし、普通は色なし(塗りなしの枠だけ)。
+       普通まで塗ると、ほとんどの都市が同じ色で画面が目立ちすぎるため、色が付くのは色に意味のある月だけにする */
     .cal-fare-pill {
-      position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 4px;
-      border: none; border-radius: 10px; background: var(--cream); color: var(--midnight);
-      box-shadow: inset 0 0 0 1px var(--sand-dark);
-      padding: 6px 12px 6px 17px; font-size: 14px; font-weight: 500;
+      display: inline-flex; align-items: center; gap: 4px; border: none; border-radius: 50px;
+      background: transparent; color: var(--midnight); box-shadow: inset 0 0 0 1px var(--sand-dark);
+      padding: 6px 12px; font-size: 14px; font-weight: 500;
       cursor: pointer; font-family: inherit;
     }
-    .cal-fare-pill::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--bar, transparent); }
     .cal-fare-pill:active { opacity: 0.7; }
-    .cal-fare-pill-cheap { --bar: var(--fare-tier-cheap); }
-    .cal-fare-pill-expensive { --bar: var(--fare-tier-expensive); }
-    .cal-fare-pill-unknown { --bar: var(--fare-tier-unknown); }
+    .cal-fare-pill-cheap { background: var(--fare-tier-cheap-pale); color: var(--fare-tier-cheap-text); box-shadow: none; }
+    .cal-fare-pill-expensive { background: var(--fare-tier-expensive-pale); color: var(--fare-tier-expensive-text); box-shadow: none; }
+    .cal-fare-pill-unknown { background: var(--fare-tier-unknown-pale); color: var(--fare-tier-unknown-text); box-shadow: none; }
     .cal-fare-pill-active {
       box-shadow: 0 0 0 2px var(--midnight) inset;
       font-weight: 700;
@@ -1750,6 +1754,12 @@
       --fare-tier-cheap: #3E8A54;
       --fare-tier-expensive: #B05A2E;
       --fare-tier-unknown: #77776F;
+      --fare-tier-cheap-pale: rgba(62,138,84,0.28);
+      --fare-tier-expensive-pale: rgba(176,90,46,0.28);
+      --fare-tier-unknown-pale: rgba(150,150,142,0.24);
+      --fare-tier-cheap-text: #6FC989;
+      --fare-tier-expensive-text: #F0A268;
+      --fare-tier-unknown-text: #B8B8B0;
       color-scheme: dark;
     }
     html[data-theme="dark"] .screen-auth-gate {
