@@ -3571,10 +3571,14 @@
       const month = _fareSheetMonth;
       const idx = month - 1;
 
-      // 並びは国名(日本語ロケール)順+同国内は元データ(cities配列)の順の固定。ただしフィリピン(セブ)は最後(国ごとに1行に収まりやすくするため、2026-10-17ユーザー指定)。色では並べず、月を替えてもピルが動かない
+      // 並びは国の固定順(下のFARE_COUNTRY_ORDER)+同国内は元データ(cities配列)の順。色では並べず、月を替えてもピルが動かない
+      // 国の並びは固定: 3都市の国(インドネシア・タイ・ベトナム・マレーシア)を先に、1〜2都市の国を後ろにまとめる。
+      // 国ごとに1行に収まりやすくするため(2026-10-17ユーザー指定。セブ→シドニー・パースが最後)。リストに無い国は末尾(日本語ロケール順)
+      const FARE_COUNTRY_ORDER = ['インドネシア', 'タイ', 'ベトナム', 'マレーシア', 'カンボジア', 'モルディブ', '台湾', '日本', 'フィリピン', 'オーストラリア'];
+      const countryRank = country => { const k = FARE_COUNTRY_ORDER.indexOf(country); return k < 0 ? FARE_COUNTRY_ORDER.length : k; };
       const ordered = cities
         .map((city, i) => ({ city, i }))
-        .sort((a, b) => (a.city.country === 'フィリピン') - (b.city.country === 'フィリピン') || a.city.country.localeCompare(b.city.country, 'ja') || a.i - b.i)
+        .sort((a, b) => countryRank(a.city.country) - countryRank(b.city.country) || a.city.country.localeCompare(b.city.country, 'ja') || a.i - b.i)
         .map(x => x.city);
 
       const pillsHtml = ordered.map(city => {
