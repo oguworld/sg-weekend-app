@@ -1533,10 +1533,10 @@
     .cal-fare-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--warm-gray); margin: 2px 0 10px; }
     .cal-fare-legend b { color: var(--midnight); font-weight: 700; }
     .cal-fare-legend span { display: inline-flex; align-items: center; }
-    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 8px; }
+    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 2px; line-height: 1.5; }
     .cal-fare-city b { font-size: 17px; font-weight: 700; color: var(--midnight); }
     .cal-fare-city span { font-size: 13px; color: var(--warm-gray); }
-    .cal-fare-barrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--warm-gray); margin: 0 0 10px; }
+    .cal-fare-barrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--warm-gray); margin: 0 0 6px; line-height: 1.5; }
     .cal-fare-lgs { display: flex; gap: 12px; flex-shrink: 0; }
     .cal-fare-lgs span { display: inline-flex; align-items: center; }
     .cal-fare-lg-bar { display: inline-block; width: 18px; height: 8px; border-radius: 3px; margin-right: 5px; }
@@ -1565,7 +1565,7 @@
     }
 
     .cal-fare-detail {
-      margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--sand-dark);
+      margin-top: 10px; padding-top: 0; border-top: 1px solid var(--sand-dark);
       font-size: 14px; line-height: 1.8; color: var(--midnight);
     }
     .cal-fare-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--sand); }

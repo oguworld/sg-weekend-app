@@ -3662,14 +3662,15 @@
       // 推定の月(priceBasis==='demand')は色を付けず(levelsは3)、estLevelの見立てを「推察」コメントで示す
       const estLevel = monthly && monthly.priceBasis === 'demand' ? monthly.estLevel : null;
       const estWord = { 1: 'かなり安め', 2: '安め', 4: '高め', 5: 'かなり高め' }[estLevel];
-      const leadText = leadTime ? (reason ? `。予約は${leadTime}が目安` : `（予約は${leadTime}が目安）`) : '';
+      // 予約の目安は、折り返しがきれいになるよう、価格の文とは別の行に出す(2026-10-17)
+      const leadLine = leadTime ? `<br>${_noBreakJa(`予約は${leadTime}が目安`)}` : '';
       let priceHtml;
       if (isUnknown) {
         priceHtml = escapeHtml('要確認（運賃の出典と食い違う可能性）');
       } else if (estWord) {
-        priceHtml = `<span class="cal-fare-est">推察:</span> ${_noBreakJa(`${estWord}の可能性${reason ? `（${reason}）` : ''}${leadText}`)}`;
+        priceHtml = `<span class="cal-fare-est">推察:</span> ${_noBreakJa(`${estWord}の可能性${reason ? `（${reason}）` : ''}`)}${leadLine}`;
       } else {
-        priceHtml = _noBreakJa(`${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}${leadText}`);
+        priceHtml = `${_noBreakJa(`${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}`)}${leadLine}`;
       }
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sgText = moeHit ? 'ローカル校の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
