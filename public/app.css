@@ -1519,10 +1519,14 @@
     .fare-sheet-title { font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--midnight); }
     .fare-sheet-close { background: var(--sand); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: none; cursor: pointer; color: var(--warm-gray); }
     .fare-sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 20px 24px; }
-    .fare-mon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 6px 0 14px; }
+    .fare-mon-scroll {
+      position: relative; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+      margin: 6px -20px 14px; padding: 2px 20px;
+    }
+    .fare-mon-scroll::-webkit-scrollbar { display: none; }
     .fare-mon-chip {
-      border: 1px solid var(--sand-dark); background: var(--cream); color: var(--warm-gray); border-radius: 50px;
-      padding: 7px 0; font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer;
+      flex: 0 0 auto; border: 1px solid var(--sand-dark); background: var(--cream); color: var(--warm-gray); border-radius: 50px;
+      padding: 7px 16px; font-size: 14px; font-weight: 500; font-family: inherit; cursor: pointer;
     }
     .fare-mon-chip-active { background: var(--caramel); color: #fff; border-color: var(--caramel); font-weight: 700; }
     .cal-fare-hint, .cal-fare-state { color: var(--warm-gray); font-size: 14px; line-height: 1.6; padding: 12px 2px; }
@@ -1546,10 +1550,11 @@
     }
 
     .cal-fare-detail {
-      margin-top: 10px; padding: 10px 12px; background: var(--sand); border-radius: 10px;
+      margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--sand-dark);
       font-size: 14px; line-height: 1.8; color: var(--midnight);
     }
-    .cal-fare-row { display: flex; gap: 10px; align-items: baseline; margin-top: 6px; }
+    .cal-fare-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--sand); }
+    .cal-fare-row:last-child { border-bottom: none; }
     .cal-fare-row-k { flex: 0 0 48px; color: var(--warm-gray); font-size: 14px; font-weight: 700; }
     .cal-fare-est { color: var(--warm-gray); font-weight: 700; }
     .cal-fare-row-v { flex: 1; min-width: 0; line-break: strict; font-size: 15px; line-height: 1.6; color: var(--midnight); }

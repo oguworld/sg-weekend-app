@@ -3472,19 +3472,6 @@
     const FARE_SEASONS_CACHE_KEY = 'sg_fare_seasons_cache';
     let FARE_SEASONS_DATA = null;      // /api/fare-seasons の応答をそのまま保持
 
-    // climate文字列を good/neutral/bad に分類する。悪天候語を先に判定し、次に過ごしやすさ・イベント語(行く理由になる)を good とする。
-    // 並び順のタイブレークにだけ使う(ピルの色は価格レベルのみで決まる)。
-    function _fareClimateTier(climateStr) {
-      if (!climateStr) return 'neutral';
-      const BAD_WORDS = ['梅雨', '雨季', '台風'];
-      const GOOD_WORDS = ['乾季', '過ごしやすい', '涼しい', '初夏', '避暑', '観光シーズン'];
-      const EVENT_WORDS = ['ソンクラーン', '旧正月'];
-      if (BAD_WORDS.some(w => climateStr.includes(w))) return 'bad';
-      if (GOOD_WORDS.some(w => climateStr.includes(w))) return 'good';
-      if (EVENT_WORDS.some(w => climateStr.includes(w))) return 'good';
-      return 'neutral';
-    }
-
     // 国名(日本語)→国旗絵文字。city.country に対応。
     const FARE_COUNTRY_FLAG = {
       '日本': '🇯🇵',
@@ -3500,12 +3487,6 @@
     };
     function _fareCountryFlag(country) {
       return FARE_COUNTRY_FLAG[country] || '';
-    }
-
-    // 気候補正込みのおすすめ度スコア(小さいほど上位)。価格レベルに good→-0.5 / bad→+0.5 を加える。
-    function _fareRecommendScore(level, tier) {
-      const adjust = tier === 'good' ? -0.5 : (tier === 'bad' ? 0.5 : 0);
-      return level + adjust;
     }
 
     // 価格レベル(1〜5)をピル・色帯の3段階に分類する。1〜2→cheap、3→normal、4〜5→expensive(天候補正は入れない)。
@@ -3546,6 +3527,7 @@
 
     let _fareSheetMonth = 1;
     let _fareSheetCity = null;   // 選択中の都市ID。月を替えても保持し、開くたびに未選択から始める
+    let _fareSheetFirstRender = false;   // 開いた直後の最初の描画は、月チップを即座に中央へ。以降の切り替えはスムーズに
     function _isFareSheetOpen() {
       return !!document.getElementById('fare-sheet-overlay')?.classList.contains('visible');
     }
@@ -3558,6 +3540,7 @@
       if (_isFareSheetOpen()) return;
       _fareSheetMonth = month;
       _fareSheetCity = null;
+      _fareSheetFirstRender = true;
       const scrollEl = document.getElementById('fare-sheet-scroll');
       if (scrollEl) scrollEl.scrollTop = 0;
       document.getElementById('fare-sheet-overlay')?.classList.add('visible');
@@ -3576,7 +3559,7 @@
     }
 
     // 専用画面の本文: 1〜12月のチップ → 凡例 → 都市ピル → 詳細(都市選択時)/ヒント → 注記。
-    // 並び順: 色(安め→普通→高め→要確認) → 国名 → おすすめ度 → id。色は価格レベルのみで決め、おすすめ度は同色・同国内のタイブレークにだけ使う
+    // 並び順: 国名(日本語ロケール)順+同国内は元データの順の固定(2026-10-17)。ピルの色は価格レベル(要確認はグレー)で付ける。
     function renderFareSheet() {
       if (!FARE_SEASONS_DATA) {
         _setFareSheetBody(`<div class="cal-fare-state">${escapeHtml(t('fareSheetFailed'))}</div>`);
@@ -3584,22 +3567,18 @@
       }
       const scrollEl = document.getElementById('fare-sheet-scroll');
       const prevScroll = scrollEl ? scrollEl.scrollTop : 0;
+      const prevMonScroll = document.getElementById('fare-mon-scroll')?.scrollLeft || 0;
+      const firstRender = _fareSheetFirstRender;
+      _fareSheetFirstRender = false;
       const { cities } = FARE_SEASONS_DATA;
       const month = _fareSheetMonth;
       const idx = month - 1;
 
-      const TIER_ORDER = { cheap: 0, normal: 1, expensive: 2, unknown: 3 };
-      const scoreOf = city => _fareRecommendScore(city.levels[idx], _fareClimateTier(city.climate[idx]));
-      const tierOf = city => TIER_ORDER[_fareMonthTier(city, idx)];
-      const ordered = [...cities].sort((a, b) => {
-        const tierDiff = tierOf(a) - tierOf(b);
-        if (tierDiff !== 0) return tierDiff;
-        const countryDiff = a.country.localeCompare(b.country, 'ja');
-        if (countryDiff !== 0) return countryDiff;
-        const scoreDiff = scoreOf(a) - scoreOf(b);
-        if (scoreDiff !== 0) return scoreDiff;
-        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
-      });
+      // 並びは国名(日本語ロケール)順+同国内は元データ(cities配列)の順の固定。色では並べず、月を替えてもピルが動かない
+      const ordered = cities
+        .map((city, i) => ({ city, i }))
+        .sort((a, b) => a.city.country.localeCompare(b.city.country, 'ja') || a.i - b.i)
+        .map(x => x.city);
 
       const monthChipsHtml = Array.from({ length: 12 }, (_, k) => {
         const n = k + 1;
@@ -3619,13 +3598,25 @@
         : `<div class="cal-fare-hint">${escapeHtml(t('fareSheetHint'))}</div>`;
 
       _setFareSheetBody(`
-        <div class="fare-mon-grid">${monthChipsHtml}</div>
+        <div class="fare-mon-scroll" id="fare-mon-scroll">${monthChipsHtml}</div>
         <div class="cal-fare-legend">🟢安め 🟡普通 🟠高め${hasUnknown ? ' ⚪要確認' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         ${detailHtml}
         <div class="cal-fare-footnote">※目安です。実際の価格は予約前にご確認ください。</div>
       `);
       if (scrollEl) scrollEl.scrollTop = prevScroll;
+      // 選択中の月のチップを横スクロールの中央へ。再描画で作り直すため、直前のスクロール位置を戻してからスムーズに動かす
+      const monScroll = document.getElementById('fare-mon-scroll');
+      const activeChip = monScroll?.querySelector('.fare-mon-chip-active');
+      if (monScroll && activeChip) {
+        const left = Math.max(0, activeChip.offsetLeft - monScroll.clientWidth / 2 + activeChip.offsetWidth / 2);
+        if (firstRender) {
+          monScroll.scrollLeft = left;
+        } else {
+          monScroll.scrollLeft = prevMonScroll;
+          monScroll.scrollTo({ left, behavior: 'smooth' });
+        }
+      }
     }
 
     // 月の切り替え(月チップ・12か月の色帯のタップ)。選択中の都市はそのまま、新しい月の内容に差し替わる
