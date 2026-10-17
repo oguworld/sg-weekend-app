@@ -2087,7 +2087,7 @@
       ['promo-modal-overlay', () => closePromoModal()],
       ['promo-modal-dismiss-link', () => closePromoModal()],
       ['whatsnew-start-btn', () => whatsNewPrimary()],
-      ['whatsnew-later-btn', () => closeWhatsNew()],
+      ['whatsnew-later-btn', () => whatsNewLater()],
       ['tour-next', () => tourNext()],
       ['tour-skip', () => tourSkip()],
     ].forEach(([id, fn]) => {
@@ -3137,6 +3137,7 @@
           loadCalendarScreen(true);
         }
       }
+      _maybeStartPendingTour(screen);
     }
 
     // ─── ピン留めFAB＋ボトムシート（くらし・おでかけ画面のみ、ピンが1件以上ある時だけFAB表示） ───
@@ -3841,6 +3842,54 @@
       return { label, screen: c.screen, tourId: steps.length ? tourId : '', steps };
     }
 
+    // 「あとで」。カードは閉じるだけだが、ツアーが未実施なら「保留」を保存し、次にその画面(カレンダー)を開いた時に出す。
+    // 保留は自己完結のJSON(次回にentryを取り直さずに済ませるため)。Webの確認(persist=false)では保存しない
+    const _TOUR_PENDING_KEY = 'app_tour_pending';
+    function whatsNewLater() {
+      const pending = _whatsNewPending;
+      const cta = pending && pending.cta;
+      const persist = !!(pending && pending.persist);
+      closeWhatsNew();
+      if (!persist || !cta || !cta.tourId || _tourDone(cta.tourId)) return;
+      try {
+        localStorage.setItem(_TOUR_PENDING_KEY, JSON.stringify({ id: cta.tourId, screen: cta.screen, steps: cta.steps }));
+      } catch (_) {}
+    }
+    function _tourPendingClear() {
+      try { localStorage.removeItem(_TOUR_PENDING_KEY); } catch (_) {}
+    }
+    // 保存された保留を読む。壊れている・不正なものは削除してnullを返す
+    function _tourPendingRead() {
+      let raw = null;
+      try { raw = localStorage.getItem(_TOUR_PENDING_KEY); } catch (_) { return null; }
+      if (!raw) return null;
+      try {
+        const p = JSON.parse(raw);
+        const okId = p && typeof p.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(p.id);
+        const okScreen = p && _WHATSNEW_SCREENS.includes(p.screen);
+        const steps = p && Array.isArray(p.steps)
+          ? p.steps.filter(st => st && typeof st.anchor === 'string' && typeof st.text === 'string' && st.text.trim())
+              .slice(0, 6).map(st => ({ anchor: st.anchor, text: st.text.trim().slice(0, 120) }))
+          : [];
+        if (okId && okScreen && steps.length) return { id: p.id, screen: p.screen, steps };
+      } catch (_) {}
+      _tourPendingClear();
+      return null;
+    }
+    // 「あとで」を押した人が、その画面を初めて開いた時にツアーを出す。switchNav()の末尾から呼ぶ。
+    // 紹介カード・別のツアーの表示中は始めない。見終わっていれば保留を捨てる
+    function _maybeStartPendingTour(screen) {
+      if (_tourState || _whatsNewPending) return;
+      const p = _tourPendingRead();
+      if (!p || p.screen !== screen) return;
+      if (_tourDone(p.id)) { _tourPendingClear(); return; }
+      // 画面の描画が落ち着いてから開始する。待っている間に別の画面へ移っていたら始めない
+      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+        if (!document.getElementById('nav-' + screen)?.classList.contains('active')) return;
+        startTour({ id: p.id, steps: p.steps, persist: true });
+      }, 350)));
+    }
+
     // 主ボタン。CTAがあれば、カードを閉じてその画面へ移動し、(初回だけ)ツアーを始める
     function whatsNewPrimary() {
       const pending = _whatsNewPending;
@@ -3848,6 +3897,7 @@
       const persist = !!(pending && pending.persist);
       closeWhatsNew();
       if (!cta) return;
+      if (persist) _tourPendingClear();   // 「使ってみる」で始めるので、保留は不要
       switchNav(cta.screen);
       if (!cta.tourId) return;
       if (persist && _tourDone(cta.tourId)) return;   // 見終わっていれば画面移動だけ
@@ -3973,7 +4023,10 @@
       const st = _tourState;
       if (!st) return;
       _tourState = null;
-      if (record && st.persist) { try { localStorage.setItem(_TOUR_DONE_PREFIX + st.id, '1'); } catch (_) {} }
+      if (record && st.persist) {
+        try { localStorage.setItem(_TOUR_DONE_PREFIX + st.id, '1'); } catch (_) {}
+        _tourPendingClear();   // 見終わったので、「あとで」の保留も消す
+      }
       window.removeEventListener('resize', _tourReposition);
       window.removeEventListener('orientationchange', _tourReposition);
       document.getElementById('tour-layer')?.classList.remove('visible');
