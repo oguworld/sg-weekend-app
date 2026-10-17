@@ -438,7 +438,6 @@
         fareSheetTitle: '旅行シーズン情報',
         fareSheetPrevMonth: '前の月',
         fareSheetNextMonth: '次の月',
-        fareBarHint: 'バーをタップで月を切替',
         fareLegendMonth: '色の見方',
         fareLegendYear: '12か月の目安',
         fareSheetLoading: '読み込み中…',
@@ -3680,7 +3679,6 @@
 
       return `
         <div class="cal-fare-city"><b>${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</b><span>${escapeHtml(t('fareLegendYear'))}</span></div>
-        <div class="cal-fare-barrow"><span>${escapeHtml(t('fareBarHint'))}</span></div>
         <div class="cal-fare-month-strip">${stripHtml}</div>
         ${row('所要', city.flightHours || '')}
         ${row('価格', priceHtml, true)}

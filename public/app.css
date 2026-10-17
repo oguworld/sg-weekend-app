@@ -1533,10 +1533,9 @@
     .cal-fare-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--warm-gray); margin: 2px 0 10px; }
     .cal-fare-legend b { color: var(--midnight); font-weight: 700; }
     .cal-fare-legend span { display: inline-flex; align-items: center; }
-    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 5px; line-height: 1.5; }
+    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 8px; line-height: 1.5; }
     .cal-fare-city b { font-size: 17px; font-weight: 700; color: var(--midnight); }
     .cal-fare-city span { font-size: 13px; color: var(--warm-gray); }
-    .cal-fare-barrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--warm-gray); margin: 0 0 8px; line-height: 1.5; }
     .cal-fare-lg-bar { display: inline-block; width: 18px; height: 8px; border-radius: 3px; margin-right: 5px; }
     .cal-fare-lg-bar-cheap { background: var(--fare-tier-cheap); }
     .cal-fare-lg-bar-normal { background: var(--sand-dark); }
