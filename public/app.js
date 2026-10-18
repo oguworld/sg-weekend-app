@@ -3614,30 +3614,23 @@
       const month = _fareSheetMonth;
       const idx = month - 1;
 
-      // 並びは固定(下のFARE_PILL_ROWS)。色では並べず、月を替えてもピルが動かない
-      // 都市ピルは「行のグループ」ごとに改行する固定の並び(国ごとに1行に収まりやすくするため。2026-10-17ユーザー指定:
-      // 1行目=東京・台北・シドニー・パース、続いてインドネシア/タイ/ベトナム/マレーシア、最後に1都市の国をまとめた行(セブ→シェムリアップ→モルディブ→ドバイ))。
-      // グループ内の国の順はリストの順、同国内は元データ(cities配列)の順。リストに無い国は最後のグループの末尾(日本語ロケール順)
-      const FARE_PILL_ROWS = [
-        ['日本', '台湾', 'オーストラリア'],
-        ['インドネシア'],
-        ['タイ'],
-        ['ベトナム'],
-        ['マレーシア'],
-        ['フィリピン', 'モルディブ', 'アラブ首長国連邦'],
-      ];
-      const rowOf = country => { const g = FARE_PILL_ROWS.findIndex(r => r.includes(country)); return g < 0 ? FARE_PILL_ROWS.length - 1 : g; };
-      const posOf = country => { const g = FARE_PILL_ROWS.findIndex(r => r.includes(country)); return g < 0 ? 99 : FARE_PILL_ROWS[g].indexOf(country); };
-      const pillRows = FARE_PILL_ROWS.map(() => []);
-      cities.forEach((city, i) => pillRows[rowOf(city.country)].push({ city, i }));
-      pillRows.forEach(r => r.sort((a, b) => posOf(a.city.country) - posOf(b.city.country) || a.city.country.localeCompare(b.city.country, 'ja') || a.i - b.i));
+      // 並びは固定(下のFARE_PILL_COUNTRY_ORDER)。色では並べず、月を替えてもピルが動かない
+      // 都市ピルは、国の固定順で並べ、画面幅に合わせて自然に折り返す(2026-10-18ユーザー指定: 同じ国をなるべく隣にして、行数を減らす)。
+      // 430pt幅(iPhone Pro Max系)で6行になる並び(日本・台湾・オーストラリア / インドネシア / タイ / マレーシア / セブ+ベトナム / ベトナム+モルディブ+ドバイ)。
+      // 同国内は元データ(cities配列)の順。リストに無い国は末尾(日本語ロケール順)。都市や国を足したら、このリストに国を足す
+      const FARE_PILL_COUNTRY_ORDER = ['日本', '台湾', 'オーストラリア', 'インドネシア', 'タイ', 'マレーシア', 'フィリピン', 'ベトナム', 'モルディブ', 'アラブ首長国連邦'];
+      const countryRank = country => { const k = FARE_PILL_COUNTRY_ORDER.indexOf(country); return k < 0 ? FARE_PILL_COUNTRY_ORDER.length : k; };
+      const orderedCities = cities
+        .map((city, i) => ({ city, i }))
+        .sort((x, y) => countryRank(x.city.country) - countryRank(y.city.country) || x.city.country.localeCompare(y.city.country, 'ja') || x.i - y.i)
+        .map(x => x.city);
 
       const pillHtml = city => {
         const tier = _fareMonthTier(city, idx);
         const flag = _fareCountryFlag(city.country);
         return `<button class="cal-fare-pill cal-fare-pill-${tier}${city.id === _fareSheetCity ? ' cal-fare-pill-active' : ''}" data-fare-city="${escapeHtml(city.id)}" onclick="selectFareSheetCity(this)">${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</button>`;
       };
-      const pillsHtml = pillRows.filter(r => r.length).map(r => `<div class="cal-fare-pill-row">${r.map(x => pillHtml(x.city)).join('')}</div>`).join('');
+      const pillsHtml = `<div class="cal-fare-pill-row">${orderedCities.map(pillHtml).join('')}</div>`;
 
       const hasUnknown = cities.some(city => _fareMonthTier(city, idx) === 'unknown');
       const selected = cities.find(c => c.id === _fareSheetCity);
