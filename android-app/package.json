@@ -1,6 +1,6 @@
 {
   "name": "odenavi-android",
-  "version": "1.8.15",
+  "version": "1.8.16",
   "description": "SG在住Navi Android App (Capacitor)",
   "private": true,
   "scripts": {
