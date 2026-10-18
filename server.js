@@ -763,6 +763,92 @@ app.get('/api/widget-stats', async (req, res) => {
   res.json(result);
 });
 
+// GET /api/psi-detail?city=sg — PSIをタップした時の詳細(設計書234)。エリア別の現在値(PSI 24時間値・PM2.5 1時間値)と、
+// 直近24時間の毎時の推移(PSI・PM2.5)を返す。/api/widget-statsとは別ルートで、旧アプリには影響しない。
+// 4つの取得元(data.gov.sg)のうち失敗したものは、その項目だけ欠けて(null)残りを返す。全て失敗した時だけ502。
+// psiLevel()は/api/widget-statsと共通(しきい値・ラベルを必ず一致させる)。
+const PSI_DETAIL_REGIONS = [
+  { id: 'north', name: '北部' }, { id: 'west', name: '西部' }, { id: 'central', name: '中心部' },
+  { id: 'east', name: '東部' }, { id: 'south', name: '南部' },
+];
+const PSI_DETAIL_TTL_MS = { psiNow: 10 * 60 * 1000, pm25Now: 10 * 60 * 1000, psiHist: 30 * 60 * 1000, pm25Hist: 30 * 60 * 1000 };
+const psiDetailCache = {};   // key -> { value, cachedAt }。取得に失敗した時は、古い値があればそれを返す
+async function psiDetailCached(key, fetcher) {
+  const now = Date.now();
+  const c = psiDetailCache[key];
+  if (c && now - c.cachedAt < PSI_DETAIL_TTL_MS[key]) return c.value;
+  try {
+    const value = await fetcher();
+    psiDetailCache[key] = { value, cachedAt: now };
+    return value;
+  } catch (e) {
+    console.error(`psi-detail ${key} error:`, e.message);
+    return c ? c.value : null;
+  }
+}
+const sgtDateString = (offsetDays = 0) =>
+  new Date(Date.now() + offsetDays * 86400000).toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' }).slice(0, 10);
+async function fetchNeaItems(path, dates) {
+  const results = await Promise.allSettled(dates.map(d =>
+    axios.get(`https://api.data.gov.sg/v1/environment/${path}${d ? `?date=${d}` : ''}`, { timeout: 6000 })));
+  const items = [];
+  let ok = 0;
+  for (const r of results) {
+    if (r.status === 'fulfilled' && Array.isArray(r.value.data && r.value.data.items)) { ok++; items.push(...r.value.data.items); }
+  }
+  if (ok === 0) throw new Error(`${path} の取得に失敗しました`);
+  return items;
+}
+
+app.get('/api/psi-detail', async (req, res) => {
+  const city = resolveCity(req);
+  if (city !== 'sg') return res.status(404).json({ error: 'この都市は対象外です' });
+  try {
+    const [psiNow, pm25Now, psiHist, pm25Hist] = await Promise.all([
+      psiDetailCached('psiNow', () => fetchNeaItems('psi', [null])),
+      psiDetailCached('pm25Now', () => fetchNeaItems('pm25', [null])),
+      psiDetailCached('psiHist', () => fetchNeaItems('psi', [sgtDateString(0), sgtDateString(-1)])),
+      psiDetailCached('pm25Hist', () => fetchNeaItems('pm25', [sgtDateString(0), sgtDateString(-1)])),
+    ]);
+    if (!psiNow && !pm25Now && !psiHist && !pm25Hist) return res.status(502).json({ error: 'PSIのデータを取得できませんでした' });
+
+    const nowPsi = psiNow && psiNow[0] ? psiNow[0] : null;
+    const nowPm25 = pm25Now && pm25Now[0] ? pm25Now[0] : null;
+    const psiVals = nowPsi && nowPsi.readings ? nowPsi.readings.psi_twenty_four_hourly || {} : {};
+    const pm25Vals = nowPm25 && nowPm25.readings ? nowPm25.readings.pm25_one_hourly || {} : {};
+    const num = v => (Number.isFinite(v) ? v : null);
+    const regions = PSI_DETAIL_REGIONS.map(r => {
+      const psi = num(psiVals[r.id]);
+      return { id: r.id, name: r.name, psi, level: psi === null ? null : psiLevel(psi), pm25: num(pm25Vals[r.id]) };
+    });
+
+    // 毎時の推移: 今日と前日の毎時データ(+現在値)を時刻でまとめ、新しい順に最大24件
+    const byTime = new Map();
+    const put = (items, field, reading) => (items || []).forEach(it => {
+      if (!it || !it.timestamp) return;
+      const row = byTime.get(it.timestamp) || {};
+      row[field] = (it.readings && it.readings[reading]) || {};
+      byTime.set(it.timestamp, row);
+    });
+    put(psiHist, 'psi', 'psi_twenty_four_hourly');
+    put(pm25Hist, 'pm25', 'pm25_one_hourly');
+    put(psiNow, 'psi', 'psi_twenty_four_hourly');
+    put(pm25Now, 'pm25', 'pm25_one_hourly');
+    const times = Array.from(byTime.keys()).sort().reverse().slice(0, 24);
+    const history = { hours: times, psi: {}, pm25: {} };
+    for (const r of PSI_DETAIL_REGIONS) {
+      history.psi[r.id] = times.map(t => num((byTime.get(t).psi || {})[r.id]));
+      history.pm25[r.id] = times.map(t => num((byTime.get(t).pm25 || {})[r.id]));
+    }
+
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json({ updatedAt: nowPsi ? nowPsi.timestamp : (nowPm25 ? nowPm25.timestamp : null), regions, history });
+  } catch (e) {
+    console.error('psi-detail error:', e.message);
+    res.status(502).json({ error: 'PSIのデータを取得できませんでした' });
+  }
+});
+
 // GET /api/school-calendar — 長期休暇設定
 app.get('/api/school-calendar', (req, res) => {
   try {
