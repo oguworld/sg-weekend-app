@@ -1,5 +1,5 @@
 // ─── Service Worker for 今週末どこいく？SG ───
-const CACHE_NAME = 'sg-weekend-v1043';
+const CACHE_NAME = 'sg-weekend-v1045';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/app.css',
