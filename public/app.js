@@ -3707,7 +3707,11 @@
       } else if (estWord) {
         priceHtml = `<span class="cal-fare-est">推察:</span> ${_noBreakJa(`${estWord}の可能性${reason ? `（${reason}）` : ''}`)}${leadLine}`;
       } else {
-        priceHtml = `${_noBreakJa(`${(legend && legend[String(lv)]) || ''}${reason ? `（${reason}）` : ''}`)}${leadLine}`;
+        // 理由が無い(普通など)月は、予約の目安を同じ行の括弧に入れて1行にする。理由がある月は、予約の目安を別の行に出す
+        const word = (legend && legend[String(lv)]) || '';
+        priceHtml = reason
+          ? `${_noBreakJa(`${word}（${reason}）`)}${leadLine}`
+          : _noBreakJa(`${word}${leadTime ? `（予約は${leadTime}が目安）` : ''}`);
       }
       const moeHit = ((schoolHolidays && schoolHolidays.moe) || []).includes(month);
       const sgText = moeHit ? 'ローカル校の休暇と重なり、家族旅行で混みやすい' : '休暇なし';
