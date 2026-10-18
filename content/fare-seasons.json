@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-17",
+  "updatedAt": "2026-10-18",
   "note": "SG発の航空券が高い/安いおおよその傾向を示す目安表です。実際の価格は航空会社・予約タイミングにより変動します。予約前に実際の価格を確認してください。",
   "legend": {
     "1": "かなり安い",
@@ -121,6 +121,27 @@
         { "weather": "雨が少なく、日差しは強いが過ごしやすい", "local": "観光は落ち着き、宿や遊びも比較的取りやすい" },
         { "weather": "雨季入りで、午後のスコールが増えていく", "local": "オフシーズンで静か。年末に向けて徐々に混む" },
         { "weather": "雨季で、午後の雨と曇りの日が増える", "local": "クリスマス・年末年始の旅行客で混み合う", "priceReason": "クリスマス・年末年始の旅行ピーク", "priceBasis": "demand", "priceSource": "需要・天候からの推定(実運賃は未確認): climate: 雨季・年末 / MOE休暇月 / local記述", "estLevel": 5 }
+      ]
+    },
+    {
+      "id": "hanoi", "name": "ハノイ", "country": "ベトナム", "haul": "near", "direct": true, "flightHours": "直行約3.5時間",
+      "levels": [2, 4, 3, 3, 3, 3, 3, 3, 3, 2, 3, 5],
+      "climate": ["冬・肌寒い曇り", "冬・肌寒い", "春・過ごしやすい", "春・暖かい", "初夏・暑い", "雨季・猛暑", "雨季・猛暑", "雨季・台風シーズン", "雨季の終わり", "秋・過ごしやすい", "秋・過ごしやすい", "冬・乾燥して肌寒い"],
+      "cheapestMonths": [1, 10],
+      "notes": "10〜11月の秋と3〜4月の春が過ごしやすい時期です。12〜2月は冷え込むので、上着が必要です。",
+      "monthly": [
+        { "weather": "1年で最も寒い時期。日中は20℃前後、朝晩は15℃を下回る日も。曇りや霧雨が多い", "local": "テト(旧正月)が1月後半に入る年は、帰省で交通が混み、店が休むことも", "priceReason": "オフシーズンで運賃が安め", "priceBasis": "fare", "priceSource": "Cheapflights https://www.cheapflights.com.sg/flights-to-Hanoi/Singapore-City/: 1月が最安(平均S$271) / Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Hanoi-HAN: 1月が最安(S$278) / Momondo https://www.momondo.com/flights/singapore-city/hanoi: 1月が最安(約$212、オフシーズンのためと記載) ※SIN発往復・2026-10-18取得" },
+        { "weather": "日中は20℃前後で肌寒い。曇りや霧雨の日もある", "local": "テト(年により1月後半〜2月前半)の前後は、帰省で交通が混み、店が休むことも", "priceReason": "テトの時期の帰省・旅行需要", "priceBasis": "fare", "priceSource": "Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Hanoi-HAN: 2月が高い月(S$413、最高は12月S$437) ※SIN発往復・2026-10-18取得。Cheapflightsは2月に触れておらず、Kayakのみの出典" },
+        { "weather": "日中は23℃前後で過ごしやすい春。湿度が高め", "local": "春の花が咲く、観光に過ごしやすい時期" },
+        { "weather": "日中は27℃前後で暖かい。湿度は高く、雨が増え始める", "local": "月末の30日・5月1日は祝日(統一記念日・メーデー)で、連休になる年がある" },
+        { "weather": "日中は31℃前後で暑くなり、雨が増える。蒸し暑い", "local": "ハスの花の季節が始まる頃。日中の屋外観光は暑さに注意" },
+        { "weather": "日中は33℃前後の猛暑。蒸し暑く、スコールが増える", "local": "暑さと雨のため、観光には向かない時期" },
+        { "weather": "日中は33℃前後の猛暑で、蒸し暑い。スコールが多く、台風の影響を受けることもある", "local": "暑さとスコールのため、観光には向かない時期。道路が冠水することも" },
+        { "weather": "雨量が年間で最も多い時期。蒸し暑く、スコールで道路が冠水することも", "local": "月末は、9月2日の建国記念日の連休に入る年がある" },
+        { "weather": "まだ暑く雨も多いが、後半は雨が減ってしのぎやすくなる", "local": "2日は建国記念日(前後が連休になる年がある)。中秋節(年により9月〜10月)の頃は街が賑わう" },
+        { "weather": "日中は29℃前後に暑さが和らぎ、雨も減って晴れの日が増える", "local": "秋の観光シーズンの始まり。中秋節(年により9月〜10月)の頃は賑わう", "priceReason": "運賃は年間で2番目に安め", "priceBasis": "fare", "priceSource": "Momondo https://www.momondo.com/flights/singapore-city/hanoi: 10月が2番目に安い月(約$234、最安は1月) ※SIN発往復・2026-10-18取得。CheapflightsとKayakは10月に触れておらず、Momondoのみの出典。理由は出典の傾向をそのまま記載" },
+        { "weather": "日中は25℃前後で、湿度も低く、年間で最も過ごしやすい時期", "local": "秋の観光のベストシーズン。花の村で菊の催しがある時期" },
+        { "weather": "日中は22℃前後で乾燥し肌寒い。朝晩は15℃前後まで冷え込む", "local": "クリスマスの時期は聖ヨセフ教会の周辺が賑わう。年末年始は観光客が増える", "priceReason": "年末年始の旅行需要", "priceBasis": "fare", "priceSource": "Cheapflights https://www.cheapflights.com.sg/flights-to-Hanoi/Singapore-City/: 12月が最高(平均S$417) / Kayak https://www.kayak.sg/flight-routes/Singapore-Changi-SIN/Hanoi-HAN: 12月が最高(S$437、最安の1月より約57%高い) ※SIN発往復・2026-10-18取得" }
       ]
     },
     {
