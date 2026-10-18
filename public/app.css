@@ -1565,7 +1565,7 @@
       margin-top: 24px; padding-top: 0; border-top: 1px solid var(--sand-dark);
       font-size: 14px; line-height: 1.8; color: var(--midnight);
     }
-    .cal-fare-row { display: flex; gap: 10px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--sand); }
+    .cal-fare-row { display: flex; gap: 10px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--sand); }
     .cal-fare-row:last-child { border-bottom: none; }
     .cal-fare-row-k { flex: 0 0 48px; color: var(--warm-gray); font-size: 14px; font-weight: 700; }
     .cal-fare-est { color: var(--warm-gray); font-weight: 700; }
