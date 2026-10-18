@@ -440,6 +440,9 @@
         fareSheetNextMonth: '次の月',
         fareLegendMonth: '色の見方',
         fareLegendYear: '12か月の目安',
+        tourFareStep1: '前後のボタンで、月を切り替えられます',
+        tourFareStep2: '都市をタップすると、その月の詳細が出ます。緑は安め、橙は高めの目安です',
+        tourFareStep3: 'このバーの月をタップしても、月を切り替えられます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
@@ -3550,12 +3553,29 @@
       if (scrollEl) scrollEl.scrollTop = 0;
       document.getElementById('fare-sheet-overlay')?.classList.add('visible');
       lockScroll();
-      if (FARE_SEASONS_DATA) { renderFareSheet(); return; }
+      if (FARE_SEASONS_DATA) { renderFareSheet(); _maybeStartFareSheetTour(); return; }
       _setFareSheetBody(`<div class="cal-fare-state">${escapeHtml(t('fareSheetLoading'))}</div>`);
       (async () => {
         await loadFareSeasonsData();
-        if (_isFareSheetOpen()) renderFareSheet();
+        if (_isFareSheetOpen()) { renderFareSheet(); _maybeStartFareSheetTour(); }
       })();
+    }
+    // 旅行シーズン画面を初めて開いた時だけ、スポットライトで使い方を案内する(2026-10-18ユーザー指定。端末ごとに1回、app_tour_done_fare-sheet-1)
+    const _FARE_SHEET_TOUR_ID = 'fare-sheet-1';
+    function _maybeStartFareSheetTour() {
+      if (_tourDone(_FARE_SHEET_TOUR_ID) || _tourState || _whatsNewPending || !_isFareSheetOpen()) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (_tourState || !_isFareSheetOpen()) return;
+        startTour({
+          id: _FARE_SHEET_TOUR_ID,
+          persist: true,
+          steps: [
+            { anchor: 'fare-month-step', text: t('tourFareStep1') },
+            { anchor: 'fare-pills', text: t('tourFareStep2') },
+            { anchor: 'fare-strip', text: t('tourFareStep3') },
+          ],
+        });
+      }));
     }
     function closeFareSheet() {
       if (!_isFareSheetOpen()) return;
@@ -3607,13 +3627,13 @@
       const detailHtml = selected ? `<div class="cal-fare-detail">${_fareDetailHtml(selected, month)}</div>` : '';
 
       _setFareSheetBody(`
-        <div class="fare-mon-step">
+        <div class="fare-mon-step" data-tour="fare-month-step">
           <button class="fare-mon-step-btn" aria-label="${escapeHtml(t('fareSheetPrevMonth'))}" onclick="stepFareSheetMonth(-1)">‹</button>
           <span class="fare-mon-step-label">${month}月</span>
           <button class="fare-mon-step-btn" aria-label="${escapeHtml(t('fareSheetNextMonth'))}" onclick="stepFareSheetMonth(1)">›</button>
         </div>
         <div class="cal-fare-legend"><b>${escapeHtml(t('fareLegendMonth'))}</b><span><i class="cal-fare-lg-bar cal-fare-lg-bar-cheap"></i>安め</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-normal"></i>普通</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-expensive"></i>高め</span>${(hasUnknown || selectedHasUnknown) ? '<span><i class="cal-fare-lg-bar cal-fare-lg-bar-unknown"></i>要確認</span>' : ''}</div>
-        <div class="cal-fare-pills">${pillsHtml}</div>
+        <div class="cal-fare-pills" data-tour="fare-pills">${pillsHtml}</div>
         ${detailHtml}
         <div class="cal-fare-footnote">※表示は目安です。実際の価格は予約前にご確認ください。</div>
       `);
@@ -3679,7 +3699,7 @@
 
       return `
         <div class="cal-fare-city"><b>${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</b><span>${escapeHtml(t('fareLegendYear'))}</span></div>
-        <div class="cal-fare-month-strip">${stripHtml}</div>
+        <div class="cal-fare-month-strip" data-tour="fare-strip">${stripHtml}</div>
         ${row('所要', city.flightHours || '')}
         ${row('価格', priceHtml, true)}
         ${monthly && monthly.weather ? row('天候', monthly.weather) : ''}
@@ -3911,7 +3931,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-strip'];
     const _TOUR_DONE_PREFIX = 'app_tour_done_';
     let _tourState = null;   // { id, persist, steps, index, locked }
 
