@@ -434,6 +434,7 @@
         statNowcast: '2時間予報',
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
+        statPm25: 'PM2.5(1時間)',
         statDengue: 'デング熱',
         fareSheetTitle: '旅行シーズン情報',
         fareSheetPrevMonth: '前の月',
@@ -453,6 +454,8 @@
         psiMode24h: '24時間',
         psiLoading: '読み込み中…',
         psiDesc1h: 'PM2.5(微小粒子)の、直近1時間の値です。1時間ごとに更新されます',
+        psiDesc1hWidget: 'エリア別のPM2.5(微小粒子)の、直近1時間の値です。太枠の中心部が、上の指標の値です',
+        psiDesc24h: 'エリア別のPSI(過去24時間の平均的な汚染の程度)です。1時間ごとに更新されます',
         psiNote24h: 'NEA(シンガポール環境庁)のデータです。PSIは過去24時間の平均的な汚染の程度です',
         psiNote1h: 'NEA(シンガポール環境庁)のデータです。区分もNEAの基準(µg/m³)です',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
@@ -629,6 +632,8 @@
     // server.jsのpsiLevel()のレベル文字列と一致させること）
     const STAT_LEVEL_EMOJI = {
       psi: { '良好': '😊', '普通': '😐', '要注意': '😷', '健康に悪い': '😫', '危険': '☠️' },
+      // くらし画面の指標ウィジェットは、2026-10-19から中心部のPM2.5(1時間値)。区分はserver.jsのpm25Level()・_PM25_BANDSと一致させる
+      pm25: { '通常': '😊', 'やや高い': '😷', '高い': '😫', '非常に高い': '☠️' },
     };
     const _statCurrentLevel = { psi: null, dengue: null };
 
@@ -668,7 +673,10 @@
     const _PSI_MODE_KEY = 'sg_psi_mode';
     let _psiDetail = null;          // { data, fetchedAt }
     let _psiDetailPromise = null;
-    let _psiMode = (() => { try { return localStorage.getItem(_PSI_MODE_KEY) === '1h' ? '1h' : '24h'; } catch (_) { return '24h'; } })();
+    // 保存済みの選択(sg_psi_mode)があればそれを優先。無ければ、ウィジェットがPM2.5(1時間値)の時は'1h'、PSIの時は'24h'で開く
+    let _psiModeStored = (() => { try { return localStorage.getItem(_PSI_MODE_KEY); } catch (_) { return null; } })();
+    let _psiMode = _psiModeStored === '1h' ? '1h' : '24h';
+    let _psiWidgetKind = null;   // 上のウィジェットが何を表示しているか: 'pm25'(中心部のPM2.5 1時間値)/'psi'(従来の中心部PSI。pm25が無い時のフォールバック)/null(未取得)
 
     function _psiLevelOfValue(v) {
       if (!Number.isFinite(v)) return null;
@@ -731,17 +739,23 @@
         const tp = _psiTimeParts(d.updatedAt);
         const updated = tp ? `${escapeHtml(t('psiUpdated'))}: ${tp.mo}/${tp.d} ${tp.h}:${tp.mi}` : '';
         const btn = (mode, label) => `<button type="button" class="psi-mode-btn${_psiMode === mode ? ' active' : ''}" role="tab" aria-selected="${_psiMode === mode}" data-psi-mode="${mode}" onclick="if(!_touchCapableDetected) setPsiMode('${mode}')">${escapeHtml(label)}</button>`;
-        const desc = _psiMode === '1h' ? t('psiDesc1h') : STAT_CRITERIA_DESC.psi;
+        // 説明は、モードと、上のウィジェットが表示している指標(PM2.5/PSI)に合わせる。ウィジェットがPSIの時(pm25が無いフォールバック)だけ、従来の「中心部の過去24時間の値」
+        const desc = _psiMode === '1h'
+          ? (_psiWidgetKind === 'pm25' ? t('psiDesc1hWidget') : t('psiDesc1h'))
+          : (_psiWidgetKind === 'psi' ? STAT_CRITERIA_DESC.psi : t('psiDesc24h'));
         const note = _psiMode === '1h' ? t('psiNote1h') : t('psiNote24h');
+        // 並び: 説明+トグル → タイル → 注記(説明) → 基準のチップ(凡例)
         return `<div class="psi-bar"><span class="psi-updated">${updated}</span><div class="psi-mode" role="tablist">${btn('1h', t('psiMode1h'))}${btn('24h', t('psiMode24h'))}</div></div>`
           + `<div class="stat-criteria-desc psi-desc">${escapeHtml(desc)}</div>`
           + _psiTilesHtml(d)
-          + `<div class="psi-chips">${_psiChipsHtml(d)}</div>`
-          + `<div class="psi-note">${escapeHtml(note)}</div>`;
+          + `<div class="psi-note">${escapeHtml(note)}</div>`
+          + `<div class="psi-chips">${_psiChipsHtml(d)}</div>`;
       }
-      return `<div class="stat-criteria-desc psi-desc">${escapeHtml(STAT_CRITERIA_DESC.psi)}</div>`
+      // 読み込み中・失敗時: ウィジェットがPM2.5の時はPM2.5の基準、それ以外は従来のPSIの説明と基準
+      const fbPm25 = _psiWidgetKind === 'pm25';
+      return `<div class="stat-criteria-desc psi-desc">${escapeHtml(fbPm25 ? t('psiDesc1h') : STAT_CRITERIA_DESC.psi)}</div>`
         + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
-        + `<div class="psi-chips">${_psiChipsHtml(null, '24h')}</div>`;   // 失敗時は、説明(PSI)に合わせて、常にPSIの基準
+        + `<div class="psi-chips">${_psiChipsHtml(null, fbPm25 ? '1h' : '24h')}</div>`;
     }
     function _loadPsiDetail() {
       if (_psiDetail && Date.now() - _psiDetail.fetchedAt < _PSI_DETAIL_TTL_MS) return Promise.resolve(_psiDetail.data);
@@ -775,6 +789,7 @@
     // 「1時間 | 24時間」の切り替え。選んだ表示は端末に保存し、次回も同じにする
     function setPsiMode(mode) {
       _psiMode = mode === '1h' ? '1h' : '24h';
+      _psiModeStored = _psiMode;
       try { localStorage.setItem(_PSI_MODE_KEY, _psiMode); } catch (_) {}
       const popover = document.getElementById('stat-criteria-popover');
       if (!popover || popover.dataset.kind !== 'psi' || !_psiDetailValid(_psiDetail && _psiDetail.data)) return;
@@ -806,10 +821,16 @@
         const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
         const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
         if (data.exchangeRate) setText('stat-fx', data.exchangeRate.toFixed(1) + '円');
-        if (data.psi) {
-          const psiEmoji = STAT_LEVEL_EMOJI.psi[data.psi.level] || '';
-          setHTML('stat-psi', `${psiEmoji ? `<span class="stat-val-emoji">${psiEmoji}</span> ` : ''}${data.psi.value}<span class="stat-val-level">(${data.psi.level})</span>`);
-          _statCurrentLevel.psi = data.psi.level;
+        if (data.psi) _statCurrentLevel.psi = data.psi.level;   // PSIの基準のチップの強調用(ポップアップの24時間モード)
+        // 指標の値: 新しいサーバー応答(pm25あり)=中心部のPM2.5(1時間値)、無ければ従来の中心部のPSI(24時間値)にフォールバック
+        const stat = data.pm25 ? { key: 'pm25', label: 'statPm25', v: data.pm25 } : (data.psi ? { key: 'psi', label: 'statPsi', v: data.psi } : null);
+        if (stat) {
+          const emoji = STAT_LEVEL_EMOJI[stat.key][stat.v.level] || '';
+          setHTML('stat-psi', `${emoji ? `<span class="stat-val-emoji">${emoji}</span> ` : ''}${stat.v.value}<span class="stat-val-level">(${stat.v.level})</span>`);
+          const lbl = document.getElementById('stat-psi-label');
+          if (lbl) { lbl.dataset.i18n = stat.label; lbl.textContent = t(stat.label); }
+          _psiWidgetKind = stat.key;
+          if (stat.key === 'pm25' && _psiModeStored === null && _psiMode !== '1h') _psiMode = '1h';   // 選択を保存していない人は、ウィジェットと同じ1時間で開く
         }
         if (data.dengue) { setHTML('stat-dengue', `${data.dengue.clusterCount}区<span class="stat-val-level">(${data.dengue.level})</span>`); _statCurrentLevel.dengue = data.dengue.level; }
         if (data.weather) {
