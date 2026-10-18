@@ -449,11 +449,12 @@
         tourWelcomeStep3: '為替・PSI(大気汚染)・デング熱の今の値です。PSIとデング熱は、タップすると基準が見られます',
         tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
         psiUpdated: '更新',
-        psiTabPsi: 'PSI(24時間)',
-        psiTabPm25: 'PM2.5(1時間)',
-        psiColTime: '時刻',
+        psiMode1h: '1時間',
+        psiMode24h: '24時間',
         psiLoading: '読み込み中…',
-        psiNote: 'NEA(シンガポール環境庁)のデータです。PSIは過去24時間の平均的な汚染の程度、PM2.5は直近1時間の値です',
+        psiDesc1h: 'PM2.5(微小粒子)の、直近1時間の値です。1時間ごとに更新されます',
+        psiNote24h: 'NEA(シンガポール環境庁)のデータです。PSIは過去24時間の平均的な汚染の程度です',
+        psiNote1h: 'NEA(シンガポール環境庁)のデータです。区分もNEAの基準(µg/m³)です',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
@@ -648,16 +649,26 @@
       popover.dataset.kind = kind;
       popover.classList.add('visible');
     }
-    // ─── PSIタップの詳細(設計書234、2026-10-19): エリア別タイル(地図配置)+PSI/PM2.5の過去24時間の表 ───
-    // データは GET /api/psi-detail(サーバーが10分/30分キャッシュ)。端末側でも5分キャッシュする。
-    // 失敗時・データ無しの時は、今までの「説明+基準のチップ」だけを出す。区分のしきい値は server.js の psiLevel() と一致させること。
+    // ─── PSIタップの詳細(設計書234、2026-10-19): エリア別タイル(地図配置)。右上の「1時間 | 24時間」で表示を切り替える ───
+    // 24時間=各エリアのPSI(24時間値)+PSIの基準。1時間=各エリアのPM2.5(1時間値、µg/m³)+NEAのPM2.5の基準。
+    // データは GET /api/psi-detail(サーバーが10分キャッシュ)。端末側でも5分キャッシュする。選んだ表示は localStorage の sg_psi_mode に保存する。
+    // 失敗時・データ無しの時は、今までの「説明+基準のチップ」だけを出す。PSIの区分のしきい値は server.js の psiLevel() と一致させること。
     const _PSI_LEVEL_CLASS = { '良好': 'good', '普通': 'normal', '要注意': 'caution', '健康に悪い': 'unhealthy', '危険': 'hazard' };
-    const _PSI_TABLE_ORDER = ['north', 'west', 'central', 'east', 'south'];
+    // NEAのPM2.5(1時間値)の区分。出典: NEAのヘイズ情報ポータル https://www.haze.gov.sg/resources/1-hr-pm2.5-readings(2026-10-19確認)
+    // Band1 0-55 Normal / Band2 56-150 Elevated / Band3 151-250 High / Band4 251以上 Very High
+    const _PM25_BANDS = [
+      { cls: 'normal', label: '通常', range: '0-55', max: 55 },
+      { cls: 'elevated', label: 'やや高い', range: '56-150', max: 150 },
+      { cls: 'high', label: '高い', range: '151-250', max: 250 },
+      { cls: 'veryhigh', label: '非常に高い', range: '251+', max: Infinity },
+    ];
+    const _PSI_MAP_ORDER = ['north', 'west', 'central', 'east', 'south'];
     const _PSI_REGION_NAMES = { north: '北部', west: '西部', central: '中心部', east: '東部', south: '南部' };
     const _PSI_DETAIL_TTL_MS = 5 * 60 * 1000;
+    const _PSI_MODE_KEY = 'sg_psi_mode';
     let _psiDetail = null;          // { data, fetchedAt }
     let _psiDetailPromise = null;
-    let _psiDetailTab = 'psi';      // 'psi' | 'pm25'
+    let _psiMode = (() => { try { return localStorage.getItem(_PSI_MODE_KEY) === '1h' ? '1h' : '24h'; } catch (_) { return '24h'; } })();
 
     function _psiLevelOfValue(v) {
       if (!Number.isFinite(v)) return null;
@@ -667,74 +678,70 @@
       if (v <= 300) return '健康に悪い';
       return '危険';
     }
-    function _psiLvClass(v) { const c = _PSI_LEVEL_CLASS[_psiLevelOfValue(v)]; return c ? ` psi-lv-${c}` : ''; }
+    function _pm25BandOfValue(v) {
+      if (!Number.isFinite(v)) return null;
+      return _PM25_BANDS.find(b => v <= b.max) || null;
+    }
     function _psiTimeParts(iso) {
       const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
       return m ? { mo: Number(m[2]), d: Number(m[3]), h: Number(m[4]), mi: m[5] } : null;
     }
     function _psiCell(v) { return Number.isFinite(v) ? String(v) : '–'; }
     function _psiDetailValid(d) {
-      return !!(d && Array.isArray(d.regions) && d.regions.some(r => r && Number.isFinite(r.psi))
-        && d.history && Array.isArray(d.history.hours));
+      return !!(d && Array.isArray(d.regions) && d.regions.some(r => r && (Number.isFinite(r.psi) || Number.isFinite(r.pm25))));
     }
-    function _psiChipsHtml() {
-      const currentLevel = _statCurrentLevel.psi;
+    // 現在モードの、値と区分(クラス・ラベル)の取り出し
+    function _psiModeInfo(r) {
+      if (_psiMode === '1h') {
+        const band = _pm25BandOfValue(r && r.pm25);
+        return { value: r ? r.pm25 : null, cls: band ? `pm25-lv-${band.cls}` : '', label: band ? band.label : '' };
+      }
+      const lv = _psiLevelOfValue(r && r.psi);
+      return { value: r ? r.psi : null, cls: lv ? `psi-lv-${_PSI_LEVEL_CLASS[lv]}` : '', label: lv || '' };
+    }
+    function _psiChipsHtml(d, mode) {
+      const central = d && Array.isArray(d.regions) ? d.regions.find(r => r && r.id === 'central') : null;
+      if ((mode || _psiMode) === '1h') {
+        const cur = _pm25BandOfValue(central && central.pm25);
+        return _PM25_BANDS.map(b =>
+          `<span class="psi-chip pm25-lv-${b.cls}${cur && cur.cls === b.cls ? ' psi-chip-cur' : ''}">${b.label} ${b.range}</span>`
+        ).join('');
+      }
+      const currentLevel = (central && _psiLevelOfValue(central.psi)) || _statCurrentLevel.psi;
       return STAT_CRITERIA.psi.map(it =>
-        `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
+        `<span class="psi-chip psi-lv-${_PSI_LEVEL_CLASS[it.label] || 'normal'}${it.label === currentLevel ? ' psi-chip-cur' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
       ).join('');
     }
     function _psiTilesHtml(d) {
       const by = {};
       d.regions.forEach(r => { if (r && r.id) by[r.id] = r; });
-      const tile = (id, cls) => {
+      const tile = (id, pos) => {
         const r = by[id] || { id, name: _PSI_REGION_NAMES[id] };
-        return `<div class="psi-tile ${cls}${_psiLvClass(r.psi)}${id === 'central' ? ' psi-tile-main' : ''}">`
+        const info = _psiModeInfo(r);
+        return `<div class="psi-tile psi-pos-${pos} ${info.cls}${id === 'central' ? ' psi-tile-main' : ''}">`
           + `<div class="psi-tile-name">${escapeHtml(r.name || _PSI_REGION_NAMES[id])}</div>`
-          + `<div class="psi-tile-val">${escapeHtml(_psiCell(r.psi))}</div>`
-          + `<div class="psi-tile-sub">PM2.5 ${escapeHtml(_psiCell(r.pm25))}</div></div>`;
+          + `<div class="psi-tile-val">${escapeHtml(_psiCell(info.value))}</div>`
+          + `<div class="psi-tile-sub">${escapeHtml(info.label || (_psiMode === '1h' ? 'µg/m³' : ''))}</div></div>`;
       };
-      return `<div class="psi-map">${tile('north', 'psi-pos-n')}${tile('west', 'psi-pos-w')}${tile('central', 'psi-pos-c')}${tile('east', 'psi-pos-e')}${tile('south', 'psi-pos-s')}</div>`;
-    }
-    function _psiTableHtml(d) {
-      const h = d.history || {};
-      const hours = Array.isArray(h.hours) ? h.hours : [];
-      const series = (h[_psiDetailTab] || {});
-      const nameOf = id => ((d.regions || []).find(r => r && r.id === id) || {}).name || _PSI_REGION_NAMES[id];
-      const head = `<tr><th>${escapeHtml(t('psiColTime'))}</th>${_PSI_TABLE_ORDER.map(id => `<th>${escapeHtml(nameOf(id))}</th>`).join('')}</tr>`;
-      let prevDay = null;
-      const rows = hours.map((iso, i) => {
-        const tp = _psiTimeParts(iso);
-        let label = tp ? `${tp.h}時` : '–';
-        if (tp) {
-          const day = `${tp.mo}/${tp.d}`;
-          if (i > 0 && prevDay !== null && day !== prevDay) label = `${day} ${label}`;
-          prevDay = day;
-        }
-        const cells = _PSI_TABLE_ORDER.map(id => {
-          const v = Array.isArray(series[id]) ? series[id][i] : null;
-          return `<td class="${_psiDetailTab === 'psi' ? _psiLvClass(v).trim() : ''}">${escapeHtml(_psiCell(v))}</td>`;
-        }).join('');
-        return `<tr><th scope="row">${escapeHtml(label)}</th>${cells}</tr>`;
-      }).join('');
-      return `<table class="psi-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+      return `<div class="psi-map">${tile('north', 'n')}${tile('west', 'w')}${tile('central', 'c')}${tile('east', 'e')}${tile('south', 's')}</div>`;
     }
     function _psiPopoverHtml(loading) {
-      const desc = STAT_CRITERIA_DESC.psi;
       const d = _psiDetail && _psiDetail.data;
       if (!loading && _psiDetailValid(d)) {
         const tp = _psiTimeParts(d.updatedAt);
-        const updated = tp ? `<span class="psi-updated">${escapeHtml(t('psiUpdated'))}: ${tp.mo}/${tp.d} ${tp.h}:${tp.mi}</span>` : '';
-        const tab = (key, label) => `<button type="button" class="psi-tab${_psiDetailTab === key ? ' active' : ''}" role="tab" aria-selected="${_psiDetailTab === key}" data-psi-tab="${key}" onclick="if(!_touchCapableDetected) setPsiDetailTab('${key}')">${escapeHtml(label)}</button>`;
-        return `<div class="stat-criteria-desc">${escapeHtml(desc)}${updated}</div>`
+        const updated = tp ? `${escapeHtml(t('psiUpdated'))}: ${tp.mo}/${tp.d} ${tp.h}:${tp.mi}` : '';
+        const btn = (mode, label) => `<button type="button" class="psi-mode-btn${_psiMode === mode ? ' active' : ''}" role="tab" aria-selected="${_psiMode === mode}" data-psi-mode="${mode}" onclick="if(!_touchCapableDetected) setPsiMode('${mode}')">${escapeHtml(label)}</button>`;
+        const desc = _psiMode === '1h' ? t('psiDesc1h') : STAT_CRITERIA_DESC.psi;
+        const note = _psiMode === '1h' ? t('psiNote1h') : t('psiNote24h');
+        return `<div class="psi-bar"><span class="psi-updated">${updated}</span><div class="psi-mode" role="tablist">${btn('1h', t('psiMode1h'))}${btn('24h', t('psiMode24h'))}</div></div>`
+          + `<div class="stat-criteria-desc psi-desc">${escapeHtml(desc)}</div>`
           + _psiTilesHtml(d)
-          + `<div class="psi-tabs" role="tablist">${tab('psi', t('psiTabPsi'))}${tab('pm25', t('psiTabPm25'))}</div>`
-          + `<div class="psi-table-wrap">${_psiTableHtml(d)}</div>`
-          + `<div class="stat-criteria-chips">${_psiChipsHtml()}</div>`
-          + `<div class="psi-note">${escapeHtml(t('psiNote'))}</div>`;
+          + `<div class="psi-chips">${_psiChipsHtml(d)}</div>`
+          + `<div class="psi-note">${escapeHtml(note)}</div>`;
       }
-      return `<div class="stat-criteria-desc">${escapeHtml(desc)}</div>`
+      return `<div class="stat-criteria-desc psi-desc">${escapeHtml(STAT_CRITERIA_DESC.psi)}</div>`
         + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
-        + `<div class="stat-criteria-chips">${_psiChipsHtml()}</div>`;
+        + `<div class="psi-chips">${_psiChipsHtml(null, '24h')}</div>`;   // 失敗時は、説明(PSI)に合わせて、常にPSIの基準
     }
     function _loadPsiDetail() {
       if (_psiDetail && Date.now() - _psiDetail.fetchedAt < _PSI_DETAIL_TTL_MS) return Promise.resolve(_psiDetail.data);
@@ -765,26 +772,20 @@
         popover.innerHTML = _psiPopoverHtml(false);
       });
     }
-    // PSI(24時間)/PM2.5(1時間)の表の切り替え
-    function setPsiDetailTab(tab) {
-      _psiDetailTab = tab === 'pm25' ? 'pm25' : 'psi';
+    // 「1時間 | 24時間」の切り替え。選んだ表示は端末に保存し、次回も同じにする
+    function setPsiMode(mode) {
+      _psiMode = mode === '1h' ? '1h' : '24h';
+      try { localStorage.setItem(_PSI_MODE_KEY, _psiMode); } catch (_) {}
       const popover = document.getElementById('stat-criteria-popover');
-      const d = _psiDetail && _psiDetail.data;
-      if (!popover || popover.dataset.kind !== 'psi' || !_psiDetailValid(d)) return;
-      popover.querySelectorAll('[data-psi-tab]').forEach(b => {
-        const on = b.dataset.psiTab === _psiDetailTab;
-        b.classList.toggle('active', on);
-        b.setAttribute('aria-selected', String(on));
-      });
-      const wrap = popover.querySelector('.psi-table-wrap');
-      if (wrap) wrap.innerHTML = _psiTableHtml(d);
+      if (!popover || popover.dataset.kind !== 'psi' || !_psiDetailValid(_psiDetail && _psiDetail.data)) return;
+      popover.innerHTML = _psiPopoverHtml(false);
     }
-    // 表の切り替えボタン 即時タップ対応(ポップアップ内。ゴーストクリックはonclickのガードで抑える)
+    // 切り替えボタンの即時タップ対応(ポップアップ内。ゴーストクリックはonclickのガードで抑える)
     document.getElementById('stat-criteria-popover')?.addEventListener('touchend', e => {
-      const b = e.target.closest('[data-psi-tab]');
+      const b = e.target.closest('[data-psi-mode]');
       if (!b) return;
       e.preventDefault();
-      setPsiDetailTab(b.dataset.psiTab);
+      setPsiMode(b.dataset.psiMode);
     }, { passive: false });
     // クライテリア表示中に他の場所をタップしたら閉じる
     document.addEventListener('touchend', e => {

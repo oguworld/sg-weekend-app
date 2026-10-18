@@ -42,6 +42,10 @@
       --psi-caution-bg: rgba(232,180,40,0.32); --psi-caution-text: #7A5A00;
       --psi-unhealthy-bg: rgba(224,120,50,0.30); --psi-unhealthy-text: #8F3F0C;
       --psi-hazard-bg: rgba(192,57,43,0.26); --psi-hazard-text: #8E2218;
+      --pm25-normal-bg: rgba(76,175,110,0.24); --pm25-normal-text: #1F6B3A;
+      --pm25-elevated-bg: rgba(232,180,40,0.32); --pm25-elevated-text: #7A5A00;
+      --pm25-high-bg: rgba(224,120,50,0.30); --pm25-high-text: #8F3F0C;
+      --pm25-veryhigh-bg: rgba(192,57,43,0.26); --pm25-veryhigh-text: #8E2218;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
@@ -1219,34 +1223,40 @@
       font-weight: 700;
     }
 
-    /* PSIタップの詳細(設計書234): ポップアップ全体は画面に収め、表だけ内部スクロールする */
-    #stat-criteria-popover.psi-detail { max-height: calc(100dvh - 330px); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    /* PSIタップの詳細(設計書234): 右上の「1時間 | 24時間」で、PSI(24時間値)とPM2.5(1時間値)の表示を切り替える。
+       ポップアップは画面に収まる高さで、通常は内部スクロールしない(念のためmax-heightとoverflow-yを残す) */
+    #stat-criteria-popover.psi-detail { gap: 10px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     #stat-criteria-popover.psi-detail > * { flex-shrink: 0; }
-    .psi-updated { display: block; margin-top: 2px; color: var(--warm-gray); font-weight: 600; }
+    .psi-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .psi-updated { font-size: 13px; color: var(--warm-gray); font-weight: 600; }
+    .psi-desc { font-size: 15px; }
     .psi-loading { font-size: 14px; color: var(--warm-gray); padding: 4px 0; }
-    .psi-note { font-size: 12px; color: var(--warm-gray); line-height: 1.5; }
+    .psi-note { font-size: 13px; color: var(--warm-gray); line-height: 1.5; }
+    /* 右上の2択トグル(ラベル必須。選択中は塗り、非選択は枠) */
+    .psi-mode { display: inline-flex; flex-shrink: 0; border: 1.5px solid var(--sand-dark); border-radius: 22px; overflow: hidden; }
+    .psi-mode-btn { min-height: 40px; min-width: 64px; padding: 0 14px; border: none; background: transparent; color: var(--warm-gray); font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .psi-mode-btn.active { background: var(--caramel); color: #fff; font-weight: 700; }
     /* エリアのタイル: 地図に近い配置(上=北、中=西・中心部・東、下=南) */
-    .psi-map { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: ". n ." "w c e" ". s ."; gap: 6px; }
+    .psi-map { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: ". n ." "w c e" ". s ."; gap: 8px; }
     .psi-pos-n { grid-area: n; } .psi-pos-w { grid-area: w; } .psi-pos-c { grid-area: c; } .psi-pos-e { grid-area: e; } .psi-pos-s { grid-area: s; }
-    .psi-tile { border-radius: 10px; padding: 6px 4px; text-align: center; background: var(--sand); color: var(--midnight); }
+    .psi-tile { border-radius: 12px; padding: 7px 4px; text-align: center; background: var(--sand); color: var(--midnight); }
     .psi-tile-main { box-shadow: inset 0 0 0 2px var(--midnight); }
-    .psi-tile-name { font-size: 13px; font-weight: 600; }
-    .psi-tile-val { font-size: 22px; font-weight: 800; line-height: 1.2; }
-    .psi-tile-sub { font-size: 12px; opacity: 0.85; }
+    .psi-tile-name { font-size: 15px; font-weight: 600; line-height: 1.3; }
+    .psi-tile-val { font-size: 24px; font-weight: 800; line-height: 1.2; }
+    .psi-tile-sub { font-size: 13px; line-height: 1.3; opacity: 0.9; min-height: 1.3em; }
+    /* 区分の色(タイル・基準のチップで共通)。PSIとPM2.5は別の変数 */
     .psi-lv-good { background: var(--psi-good-bg); color: var(--psi-good-text); }
     .psi-lv-normal { background: var(--psi-normal-bg); color: var(--psi-normal-text); }
     .psi-lv-caution { background: var(--psi-caution-bg); color: var(--psi-caution-text); }
     .psi-lv-unhealthy { background: var(--psi-unhealthy-bg); color: var(--psi-unhealthy-text); }
     .psi-lv-hazard { background: var(--psi-hazard-bg); color: var(--psi-hazard-text); }
-    /* PSI(24時間)/PM2.5(1時間)の切り替え(2択のセグメント) */
-    .psi-tabs { display: flex; gap: 0; border: 1.5px solid var(--sand-dark); border-radius: 20px; overflow: hidden; }
-    .psi-tab { flex: 1; padding: 7px 4px; border: none; background: transparent; color: var(--warm-gray); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .psi-tab.active { background: var(--caramel); color: #fff; font-weight: 700; }
-    .psi-table-wrap { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: 8px; }
-    .psi-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: center; font-variant-numeric: tabular-nums; }
-    .psi-table th, .psi-table td { padding: 5px 2px; border-bottom: 1px solid var(--sand); }
-    .psi-table thead th { position: sticky; top: 0; z-index: 1; background: var(--warm-white); color: var(--warm-gray); font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--sand-dark); }
-    .psi-table tbody th { text-align: left; padding-left: 4px; color: var(--warm-gray); font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .pm25-lv-normal { background: var(--pm25-normal-bg); color: var(--pm25-normal-text); }
+    .pm25-lv-elevated { background: var(--pm25-elevated-bg); color: var(--pm25-elevated-text); }
+    .pm25-lv-high { background: var(--pm25-high-bg); color: var(--pm25-high-text); }
+    .pm25-lv-veryhigh { background: var(--pm25-veryhigh-bg); color: var(--pm25-veryhigh-text); }
+    .psi-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .psi-chip { flex-shrink: 0; padding: 5px 11px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 14px; font-weight: 600; white-space: nowrap; }
+    .psi-chip-cur { box-shadow: inset 0 0 0 2px var(--midnight); font-weight: 800; }
 
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -1815,6 +1825,10 @@
       --psi-caution-bg: rgba(232,180,40,0.34); --psi-caution-text: #F2CF6A;
       --psi-unhealthy-bg: rgba(224,120,50,0.38); --psi-unhealthy-text: #F4A672;
       --psi-hazard-bg: rgba(192,57,43,0.42); --psi-hazard-text: #F08A7E;
+      --pm25-normal-bg: rgba(76,175,110,0.36); --pm25-normal-text: #7FD69A;
+      --pm25-elevated-bg: rgba(232,180,40,0.34); --pm25-elevated-text: #F2CF6A;
+      --pm25-high-bg: rgba(224,120,50,0.38); --pm25-high-text: #F4A672;
+      --pm25-veryhigh-bg: rgba(192,57,43,0.42); --pm25-veryhigh-text: #F08A7E;
       color-scheme: dark;
     }
     html[data-theme="dark"] .screen-auth-gate {
