@@ -183,6 +183,7 @@ VPS(Ubuntu 22.04 LTS)上でAndroid Studio等のGUIを使わず、コマンドラ
 日本語UI / スマホファースト / Tailwind CSSを使う / 既存のデザインパターンを踏襲する
 
 ## UIスタイル規約
+- **カテゴリのピル(`.filter-chip`、くらし/おでかけ/カレンダー共通)は4辺とも枠線あり**(2026-10-18: 昔のタブ風の名残の`border-bottom:none`を削除。下の枠線だけ見えない不具合だった)
 - **カラー**: inline styleで生の色値を書かない。必ず`:root`のCSS変数(`var(--caramel)`等)を使う
 - **閉じる✕ボタン**: `background:var(--sand); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-size:16px; border:none; cursor:pointer`を標準スタイルとする
 - **CSSクラスの二重定義禁止**: 既存クラスを再定義する場合は古い定義をその場で削除する
