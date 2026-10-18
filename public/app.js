@@ -448,6 +448,12 @@
         tourWelcomeStep2: '下のボタンで、くらし・おでかけ・カレンダー・設定を切り替えられます。カレンダーでは、祝日や行事、旅行シーズン情報が見られます',
         tourWelcomeStep3: '為替・PSI(大気汚染)・デング熱の今の値です。PSIとデング熱は、タップすると基準が見られます',
         tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
+        psiUpdated: '更新',
+        psiTabPsi: 'PSI(24時間)',
+        psiTabPm25: 'PM2.5(1時間)',
+        psiColTime: '時刻',
+        psiLoading: '読み込み中…',
+        psiNote: 'NEA(シンガポール環境庁)のデータです。PSIは過去24時間の平均的な汚染の程度、PM2.5は直近1時間の値です',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
@@ -632,6 +638,8 @@
         popover.classList.remove('visible');
         return;
       }
+      if (kind === 'psi') { _openPsiPopover(popover); return; }
+      popover.classList.remove('psi-detail');
       const currentLevel = _statCurrentLevel[kind];
       const chips = STAT_CRITERIA[kind].map(it =>
         `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
@@ -640,6 +648,144 @@
       popover.dataset.kind = kind;
       popover.classList.add('visible');
     }
+    // ─── PSIタップの詳細(設計書234、2026-10-19): エリア別タイル(地図配置)+PSI/PM2.5の過去24時間の表 ───
+    // データは GET /api/psi-detail(サーバーが10分/30分キャッシュ)。端末側でも5分キャッシュする。
+    // 失敗時・データ無しの時は、今までの「説明+基準のチップ」だけを出す。区分のしきい値は server.js の psiLevel() と一致させること。
+    const _PSI_LEVEL_CLASS = { '良好': 'good', '普通': 'normal', '要注意': 'caution', '健康に悪い': 'unhealthy', '危険': 'hazard' };
+    const _PSI_TABLE_ORDER = ['north', 'west', 'central', 'east', 'south'];
+    const _PSI_REGION_NAMES = { north: '北部', west: '西部', central: '中心部', east: '東部', south: '南部' };
+    const _PSI_DETAIL_TTL_MS = 5 * 60 * 1000;
+    let _psiDetail = null;          // { data, fetchedAt }
+    let _psiDetailPromise = null;
+    let _psiDetailTab = 'psi';      // 'psi' | 'pm25'
+
+    function _psiLevelOfValue(v) {
+      if (!Number.isFinite(v)) return null;
+      if (v <= 50) return '良好';
+      if (v <= 100) return '普通';
+      if (v <= 200) return '要注意';
+      if (v <= 300) return '健康に悪い';
+      return '危険';
+    }
+    function _psiLvClass(v) { const c = _PSI_LEVEL_CLASS[_psiLevelOfValue(v)]; return c ? ` psi-lv-${c}` : ''; }
+    function _psiTimeParts(iso) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || '');
+      return m ? { mo: Number(m[2]), d: Number(m[3]), h: Number(m[4]), mi: m[5] } : null;
+    }
+    function _psiCell(v) { return Number.isFinite(v) ? String(v) : '–'; }
+    function _psiDetailValid(d) {
+      return !!(d && Array.isArray(d.regions) && d.regions.some(r => r && Number.isFinite(r.psi))
+        && d.history && Array.isArray(d.history.hours));
+    }
+    function _psiChipsHtml() {
+      const currentLevel = _statCurrentLevel.psi;
+      return STAT_CRITERIA.psi.map(it =>
+        `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
+      ).join('');
+    }
+    function _psiTilesHtml(d) {
+      const by = {};
+      d.regions.forEach(r => { if (r && r.id) by[r.id] = r; });
+      const tile = (id, cls) => {
+        const r = by[id] || { id, name: _PSI_REGION_NAMES[id] };
+        return `<div class="psi-tile ${cls}${_psiLvClass(r.psi)}${id === 'central' ? ' psi-tile-main' : ''}">`
+          + `<div class="psi-tile-name">${escapeHtml(r.name || _PSI_REGION_NAMES[id])}</div>`
+          + `<div class="psi-tile-val">${escapeHtml(_psiCell(r.psi))}</div>`
+          + `<div class="psi-tile-sub">PM2.5 ${escapeHtml(_psiCell(r.pm25))}</div></div>`;
+      };
+      return `<div class="psi-map">${tile('north', 'psi-pos-n')}${tile('west', 'psi-pos-w')}${tile('central', 'psi-pos-c')}${tile('east', 'psi-pos-e')}${tile('south', 'psi-pos-s')}</div>`;
+    }
+    function _psiTableHtml(d) {
+      const h = d.history || {};
+      const hours = Array.isArray(h.hours) ? h.hours : [];
+      const series = (h[_psiDetailTab] || {});
+      const nameOf = id => ((d.regions || []).find(r => r && r.id === id) || {}).name || _PSI_REGION_NAMES[id];
+      const head = `<tr><th>${escapeHtml(t('psiColTime'))}</th>${_PSI_TABLE_ORDER.map(id => `<th>${escapeHtml(nameOf(id))}</th>`).join('')}</tr>`;
+      let prevDay = null;
+      const rows = hours.map((iso, i) => {
+        const tp = _psiTimeParts(iso);
+        let label = tp ? `${tp.h}時` : '–';
+        if (tp) {
+          const day = `${tp.mo}/${tp.d}`;
+          if (i > 0 && prevDay !== null && day !== prevDay) label = `${day} ${label}`;
+          prevDay = day;
+        }
+        const cells = _PSI_TABLE_ORDER.map(id => {
+          const v = Array.isArray(series[id]) ? series[id][i] : null;
+          return `<td class="${_psiDetailTab === 'psi' ? _psiLvClass(v).trim() : ''}">${escapeHtml(_psiCell(v))}</td>`;
+        }).join('');
+        return `<tr><th scope="row">${escapeHtml(label)}</th>${cells}</tr>`;
+      }).join('');
+      return `<table class="psi-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+    }
+    function _psiPopoverHtml(loading) {
+      const desc = STAT_CRITERIA_DESC.psi;
+      const d = _psiDetail && _psiDetail.data;
+      if (!loading && _psiDetailValid(d)) {
+        const tp = _psiTimeParts(d.updatedAt);
+        const updated = tp ? `<span class="psi-updated">${escapeHtml(t('psiUpdated'))}: ${tp.mo}/${tp.d} ${tp.h}:${tp.mi}</span>` : '';
+        const tab = (key, label) => `<button type="button" class="psi-tab${_psiDetailTab === key ? ' active' : ''}" role="tab" aria-selected="${_psiDetailTab === key}" data-psi-tab="${key}" onclick="if(!_touchCapableDetected) setPsiDetailTab('${key}')">${escapeHtml(label)}</button>`;
+        return `<div class="stat-criteria-desc">${escapeHtml(desc)}${updated}</div>`
+          + _psiTilesHtml(d)
+          + `<div class="psi-tabs" role="tablist">${tab('psi', t('psiTabPsi'))}${tab('pm25', t('psiTabPm25'))}</div>`
+          + `<div class="psi-table-wrap">${_psiTableHtml(d)}</div>`
+          + `<div class="stat-criteria-chips">${_psiChipsHtml()}</div>`
+          + `<div class="psi-note">${escapeHtml(t('psiNote'))}</div>`;
+      }
+      return `<div class="stat-criteria-desc">${escapeHtml(desc)}</div>`
+        + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
+        + `<div class="stat-criteria-chips">${_psiChipsHtml()}</div>`;
+    }
+    function _loadPsiDetail() {
+      if (_psiDetail && Date.now() - _psiDetail.fetchedAt < _PSI_DETAIL_TTL_MS) return Promise.resolve(_psiDetail.data);
+      if (_psiDetailPromise) return _psiDetailPromise;
+      _psiDetailPromise = (async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/psi-detail?city=${getCity()}`);
+          if (!res.ok) throw new Error('psi-detail failed');
+          const data = await res.json();
+          _psiDetail = { data, fetchedAt: Date.now() };
+          return data;
+        } catch (_) {
+          return null;
+        } finally {
+          _psiDetailPromise = null;
+        }
+      })();
+      return _psiDetailPromise;
+    }
+    function _openPsiPopover(popover) {
+      popover.dataset.kind = 'psi';
+      popover.classList.add('visible', 'psi-detail');
+      const fresh = _psiDetail && Date.now() - _psiDetail.fetchedAt < _PSI_DETAIL_TTL_MS;
+      popover.innerHTML = _psiPopoverHtml(!fresh);
+      if (fresh) return;
+      _loadPsiDetail().then(() => {
+        if (popover.dataset.kind !== 'psi' || !popover.classList.contains('visible')) return;
+        popover.innerHTML = _psiPopoverHtml(false);
+      });
+    }
+    // PSI(24時間)/PM2.5(1時間)の表の切り替え
+    function setPsiDetailTab(tab) {
+      _psiDetailTab = tab === 'pm25' ? 'pm25' : 'psi';
+      const popover = document.getElementById('stat-criteria-popover');
+      const d = _psiDetail && _psiDetail.data;
+      if (!popover || popover.dataset.kind !== 'psi' || !_psiDetailValid(d)) return;
+      popover.querySelectorAll('[data-psi-tab]').forEach(b => {
+        const on = b.dataset.psiTab === _psiDetailTab;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', String(on));
+      });
+      const wrap = popover.querySelector('.psi-table-wrap');
+      if (wrap) wrap.innerHTML = _psiTableHtml(d);
+    }
+    // 表の切り替えボタン 即時タップ対応(ポップアップ内。ゴーストクリックはonclickのガードで抑える)
+    document.getElementById('stat-criteria-popover')?.addEventListener('touchend', e => {
+      const b = e.target.closest('[data-psi-tab]');
+      if (!b) return;
+      e.preventDefault();
+      setPsiDetailTab(b.dataset.psiTab);
+    }, { passive: false });
     // クライテリア表示中に他の場所をタップしたら閉じる
     document.addEventListener('touchend', e => {
       if (e.target.closest('[data-stat-crit]') || e.target.closest('#stat-criteria-popover')) return;

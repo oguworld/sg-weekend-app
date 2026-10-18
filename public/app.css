@@ -36,6 +36,12 @@
       --fare-tier-cheap-text: #2A5F36;
       --fare-tier-expensive-text: #94451C;
       --fare-tier-unknown-text: #5C5C56;
+      /* PSIの区分(良好/普通/要注意/健康に悪い/危険)。--fare-tier-*とは別。PSIの詳細(エリア別タイル・表)の背景と文字 */
+      --psi-good-bg: rgba(76,175,110,0.24); --psi-good-text: #1F6B3A;
+      --psi-normal-bg: rgba(70,130,200,0.20); --psi-normal-text: #24558F;
+      --psi-caution-bg: rgba(232,180,40,0.32); --psi-caution-text: #7A5A00;
+      --psi-unhealthy-bg: rgba(224,120,50,0.30); --psi-unhealthy-text: #8F3F0C;
+      --psi-hazard-bg: rgba(192,57,43,0.26); --psi-hazard-text: #8E2218;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
@@ -1213,6 +1219,35 @@
       font-weight: 700;
     }
 
+    /* PSIタップの詳細(設計書234): ポップアップ全体は画面に収め、表だけ内部スクロールする */
+    #stat-criteria-popover.psi-detail { max-height: calc(100dvh - 330px); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    #stat-criteria-popover.psi-detail > * { flex-shrink: 0; }
+    .psi-updated { display: block; margin-top: 2px; color: var(--warm-gray); font-weight: 600; }
+    .psi-loading { font-size: 14px; color: var(--warm-gray); padding: 4px 0; }
+    .psi-note { font-size: 12px; color: var(--warm-gray); line-height: 1.5; }
+    /* エリアのタイル: 地図に近い配置(上=北、中=西・中心部・東、下=南) */
+    .psi-map { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: ". n ." "w c e" ". s ."; gap: 6px; }
+    .psi-pos-n { grid-area: n; } .psi-pos-w { grid-area: w; } .psi-pos-c { grid-area: c; } .psi-pos-e { grid-area: e; } .psi-pos-s { grid-area: s; }
+    .psi-tile { border-radius: 10px; padding: 6px 4px; text-align: center; background: var(--sand); color: var(--midnight); }
+    .psi-tile-main { box-shadow: inset 0 0 0 2px var(--midnight); }
+    .psi-tile-name { font-size: 13px; font-weight: 600; }
+    .psi-tile-val { font-size: 22px; font-weight: 800; line-height: 1.2; }
+    .psi-tile-sub { font-size: 12px; opacity: 0.85; }
+    .psi-lv-good { background: var(--psi-good-bg); color: var(--psi-good-text); }
+    .psi-lv-normal { background: var(--psi-normal-bg); color: var(--psi-normal-text); }
+    .psi-lv-caution { background: var(--psi-caution-bg); color: var(--psi-caution-text); }
+    .psi-lv-unhealthy { background: var(--psi-unhealthy-bg); color: var(--psi-unhealthy-text); }
+    .psi-lv-hazard { background: var(--psi-hazard-bg); color: var(--psi-hazard-text); }
+    /* PSI(24時間)/PM2.5(1時間)の切り替え(2択のセグメント) */
+    .psi-tabs { display: flex; gap: 0; border: 1.5px solid var(--sand-dark); border-radius: 20px; overflow: hidden; }
+    .psi-tab { flex: 1; padding: 7px 4px; border: none; background: transparent; color: var(--warm-gray); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .psi-tab.active { background: var(--caramel); color: #fff; font-weight: 700; }
+    .psi-table-wrap { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: 8px; }
+    .psi-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: center; font-variant-numeric: tabular-nums; }
+    .psi-table th, .psi-table td { padding: 5px 2px; border-bottom: 1px solid var(--sand); }
+    .psi-table thead th { position: sticky; top: 0; z-index: 1; background: var(--warm-white); color: var(--warm-gray); font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--sand-dark); }
+    .psi-table tbody th { text-align: left; padding-left: 4px; color: var(--warm-gray); font-size: 13px; font-weight: 600; white-space: nowrap; }
+
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     #calendar-filter-row::-webkit-scrollbar { display: none; }
@@ -1775,6 +1810,11 @@
       --fare-tier-cheap-text: #6FC989;
       --fare-tier-expensive-text: #F0A268;
       --fare-tier-unknown-text: #B8B8B0;
+      --psi-good-bg: rgba(76,175,110,0.36); --psi-good-text: #7FD69A;
+      --psi-normal-bg: rgba(70,130,200,0.36); --psi-normal-text: #8DB8EC;
+      --psi-caution-bg: rgba(232,180,40,0.34); --psi-caution-text: #F2CF6A;
+      --psi-unhealthy-bg: rgba(224,120,50,0.38); --psi-unhealthy-text: #F4A672;
+      --psi-hazard-bg: rgba(192,57,43,0.42); --psi-hazard-text: #F08A7E;
       color-scheme: dark;
     }
     html[data-theme="dark"] .screen-auth-gate {
