@@ -3615,7 +3615,7 @@
         <div class="cal-fare-legend"><b>${escapeHtml(t('fareLegendMonth'))}</b><span><i class="cal-fare-lg-bar cal-fare-lg-bar-cheap"></i>安め</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-normal"></i>普通</span><span><i class="cal-fare-lg-bar cal-fare-lg-bar-expensive"></i>高め</span>${(hasUnknown || selectedHasUnknown) ? '<span><i class="cal-fare-lg-bar cal-fare-lg-bar-unknown"></i>要確認</span>' : ''}</div>
         <div class="cal-fare-pills">${pillsHtml}</div>
         ${detailHtml}
-        <div class="cal-fare-footnote">表示は目安です。実際の価格は予約前にご確認ください。</div>
+        <div class="cal-fare-footnote">※表示は目安です。実際の価格は予約前にご確認ください。</div>
       `);
       if (scrollEl) scrollEl.scrollTop = prevScroll;
     }
