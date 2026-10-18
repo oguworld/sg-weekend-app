@@ -1520,13 +1520,15 @@
     .fare-sheet-title { font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--midnight); }
     .fare-sheet-close { background: var(--sand); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: none; cursor: pointer; color: var(--warm-gray); }
     .fare-sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 20px 24px; }
-    .fare-mon-step { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 6px 0 18px; }
+    .fare-mon-step { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 2px 0 12px; }
     .fare-mon-step-btn {
-      width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--sand); color: var(--warm-gray);
-      font-size: 22px; line-height: 1; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      position: relative; width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--sand); color: var(--warm-gray);
+      font-size: 18px; line-height: 1; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
+    .fare-mon-step-btn::after { content: ''; position: absolute; inset: -5px; }   /* 見えない当たり判定を広げて、44px相当にする */
     .fare-mon-step-btn:active { opacity: 0.6; }
-    .fare-mon-step-label { min-width: 72px; text-align: center; font-size: 22px; font-weight: 800; color: var(--caramel); }
+    /* 月の文字はカレンダーの月見出し(.cal-month-head-label、18px・800)と同じ大きさ */
+    .fare-mon-step-label { min-width: 64px; text-align: center; font-size: 18px; font-weight: 800; color: var(--caramel); }
     .cal-fare-state { color: var(--warm-gray); font-size: 14px; line-height: 1.6; padding: 12px 2px; }
 
     /* 凡例は2か所(都市ピルの上=「この月の目安」、色帯の上=「12か月の目安」)で同じスタイル: ラベル太字+見本、13px、右寄せ(2026-10-17ユーザー指定) */
