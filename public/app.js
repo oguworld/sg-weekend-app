@@ -442,7 +442,7 @@
         fareLegendYear: '12か月の目安',
         tourFareStep1: '前後のボタンで、月を切り替えられます',
         tourFareStep2: '都市をタップすると、その月の詳細が出ます。緑は安め、橙は高めの目安です',
-        tourFareStep3: 'このバーの月をタップしても、月を切り替えられます',
+        tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
@@ -3572,7 +3572,7 @@
           steps: [
             { anchor: 'fare-month-step', text: t('tourFareStep1') },
             { anchor: 'fare-pills', text: t('tourFareStep2') },
-            { anchor: 'fare-strip', text: t('tourFareStep3') },
+            { anchor: 'fare-detail', text: t('tourFareStep3') },
           ],
         });
       }));
@@ -3624,7 +3624,7 @@
       const hasUnknown = cities.some(city => _fareMonthTier(city, idx) === 'unknown');
       const selected = cities.find(c => c.id === _fareSheetCity);
       const selectedHasUnknown = !!selected && selected.levels.some((_, i) => _fareMonthTier(selected, i) === 'unknown');
-      const detailHtml = selected ? `<div class="cal-fare-detail">${_fareDetailHtml(selected, month)}</div>` : '';
+      const detailHtml = selected ? `<div class="cal-fare-detail" data-tour="fare-detail">${_fareDetailHtml(selected, month)}</div>` : '';
 
       _setFareSheetBody(`
         <div class="fare-mon-step" data-tour="fare-month-step">
@@ -3699,7 +3699,7 @@
 
       return `
         <div class="cal-fare-city"><b>${flag ? flag + ' ' : ''}${escapeHtml(city.name)}</b><span>${escapeHtml(t('fareLegendYear'))}</span></div>
-        <div class="cal-fare-month-strip" data-tour="fare-strip">${stripHtml}</div>
+        <div class="cal-fare-month-strip">${stripHtml}</div>
         ${row('所要', city.flightHours || '')}
         ${row('価格', priceHtml, true)}
         ${monthly && monthly.weather ? row('天候', monthly.weather) : ''}
@@ -3931,7 +3931,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-strip'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail'];
     const _TOUR_DONE_PREFIX = 'app_tour_done_';
     let _tourState = null;   // { id, persist, steps, index, locked }
 
