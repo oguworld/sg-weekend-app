@@ -619,6 +619,7 @@ const WIDGET_STATS_TTL_MS = {
   exchangeRate: 30 * 60 * 1000,  // 30分（元データが平日1日1回更新のため現状維持）
   weather:      20 * 60 * 1000,  // 20分（OpenWeatherMap無料プランは3時間おき予報のため大幅短縮は無意味）
   psi:          10 * 60 * 1000,  // 10分（NEA側は概ね1時間更新と推測、待たせすぎない範囲で短縮）
+  pm25:         10 * 60 * 1000,  // 10分（中心部のPM2.5 1時間値。2026-10-19にくらし画面の指標をPSIからPM2.5に変更したため追加）
   nowcast:      10 * 60 * 1000,  // 10分（NEA側は概ね30分更新と推測、スコール検知の機能目的から短縮の意義大）
   dengue:       60 * 60 * 1000,  // 60分（元データが日次更新のため延長。新API方式で2段階リクエストのためコストもやや高い）
 };
@@ -629,6 +630,16 @@ function psiLevel(value) {
   if (value <= 200) return '要注意';
   if (value <= 300) return '健康に悪い';
   return '危険';
+}
+
+// NEAのPM2.5(1時間値)の区分。出典: https://www.haze.gov.sg/resources/1-hr-pm2.5-readings(2026-10-19確認)
+// Band1 0-55 通常 / Band2 56-150 やや高い / Band3 151-250 高い / Band4 251以上 非常に高い。
+// public/app.js の _PM25_BANDS と、しきい値・ラベルを必ず一致させること
+function pm25Level(value) {
+  if (value <= 55) return '通常';
+  if (value <= 150) return 'やや高い';
+  if (value <= 250) return '高い';
+  return '非常に高い';
 }
 
 // NEA(シンガポール気象庁)の2時間先ナウキャスト予報の日本語訳＋深刻度（スコール等の急変を検知するため）
@@ -684,7 +695,7 @@ app.get('/api/widget-stats', async (req, res) => {
   const now = Date.now();
   const isFresh = (field) => cityCache[field] && now - cityCache[field].cachedAt < WIDGET_STATS_TTL_MS[field];
 
-  const [fxSettled, weatherSettled, psiSettled, nowcastSettled, dengueSettled] = await Promise.allSettled([
+  const [fxSettled, weatherSettled, psiSettled, nowcastSettled, dengueSettled, pm25Settled] = await Promise.allSettled([
     isFresh('exchangeRate') ? Promise.resolve(null) : axios.get(`https://api.frankfurter.dev/v1/latest?base=${currency}&symbols=JPY`, { timeout: 6000 }),
     isFresh('weather') || !process.env.OPENWEATHER_API_KEY
       ? Promise.resolve(null)
@@ -698,6 +709,9 @@ app.get('/api/widget-stats', async (req, res) => {
     isFresh('dengue') || city !== 'sg'
       ? Promise.resolve(null)
       : fetchDataGovSgDataset('d_dbfabf16158d1b0e1c420627c0819168'),
+    isFresh('pm25') || city !== 'sg'
+      ? Promise.resolve(null)
+      : axios.get('https://api.data.gov.sg/v1/environment/pm25', { timeout: 6000 }),
   ]);
 
   if (fxSettled.status === 'fulfilled' && fxSettled.value) {
@@ -731,6 +745,18 @@ app.get('/api/widget-stats', async (req, res) => {
     console.error('widget-stats psi error:', psiSettled.reason.message);
   }
 
+  // 中心部のPM2.5(1時間値)。くらし画面の指標ウィジェットの値(2026-10-19)。取得に失敗しても、他のフィールド(psiを含む)には影響しない
+  if (pm25Settled.status === 'fulfilled' && pm25Settled.value) {
+    try {
+      const central = pm25Settled.value.data.items[0].readings.pm25_one_hourly.central;
+      if (Number.isFinite(central)) cityCache.pm25 = { value: { value: central, level: pm25Level(central) }, cachedAt: now };
+    } catch (e) {
+      console.error('widget-stats pm25 parse error:', e.message);
+    }
+  } else if (pm25Settled.status === 'rejected') {
+    console.error('widget-stats pm25 error:', pm25Settled.reason.message);
+  }
+
   if (nowcastSettled.status === 'fulfilled' && nowcastSettled.value) {
     const forecasts = nowcastSettled.value.data.items[0].forecasts;
     let worst = { severity: -1, ja: '晴れ' };
@@ -758,6 +784,7 @@ app.get('/api/widget-stats', async (req, res) => {
   if (cityCache.exchangeRate) result.exchangeRate = cityCache.exchangeRate.value;
   if (cityCache.weather) result.weather = cityCache.weather.value;
   if (cityCache.psi) result.psi = cityCache.psi.value;
+  if (cityCache.pm25) result.pm25 = cityCache.pm25.value;   // 新アプリ(1.8.16以降)はこれを指標に使う。旧アプリは従来のpsiを使い続ける
   if (cityCache.nowcast) result.nowcast = cityCache.nowcast.value;
   if (cityCache.dengue) result.dengue = cityCache.dengue.value;
   res.json(result);
