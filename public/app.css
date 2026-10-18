@@ -1520,7 +1520,7 @@
     .fare-sheet-title { font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--midnight); }
     .fare-sheet-close { background: var(--sand); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: none; cursor: pointer; color: var(--warm-gray); }
     .fare-sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 20px 24px; }
-    .fare-mon-step { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 4px 0 14px; }
+    .fare-mon-step { display: flex; align-items: center; justify-content: center; gap: 24px; margin: 6px 0 18px; }
     .fare-mon-step-btn {
       width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--sand); color: var(--warm-gray);
       font-size: 22px; line-height: 1; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -1530,10 +1530,10 @@
     .cal-fare-state { color: var(--warm-gray); font-size: 14px; line-height: 1.6; padding: 12px 2px; }
 
     /* 凡例は2か所(都市ピルの上=「この月の目安」、色帯の上=「12か月の目安」)で同じスタイル: ラベル太字+見本、13px、右寄せ(2026-10-17ユーザー指定) */
-    .cal-fare-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--warm-gray); margin: 2px 0 10px; }
+    .cal-fare-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--warm-gray); margin: 4px 0 14px; }
     .cal-fare-legend b { color: var(--midnight); font-weight: 700; }
     .cal-fare-legend span { display: inline-flex; align-items: center; }
-    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 8px; line-height: 1.5; }
+    .cal-fare-city { display: flex; align-items: baseline; gap: 10px; margin: 18px 0 12px; line-height: 1.5; }
     .cal-fare-city b { font-size: 17px; font-weight: 700; color: var(--midnight); }
     .cal-fare-city span { font-size: 13px; color: var(--warm-gray); }
     .cal-fare-lg-bar { display: inline-block; width: 18px; height: 8px; border-radius: 3px; margin-right: 5px; }
@@ -1542,8 +1542,8 @@
     .cal-fare-lg-bar-expensive { background: var(--fare-tier-expensive); }
     .cal-fare-lg-bar-unknown { background: var(--fare-tier-unknown); }
 
-    .cal-fare-pills { display: flex; flex-direction: column; gap: 6px; }
-    .cal-fare-pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cal-fare-pills { display: flex; flex-direction: column; gap: 9px; }
+    .cal-fare-pill-row { display: flex; flex-wrap: wrap; gap: 8px; }
     /* 都市ピル(2026-10-17ユーザー指定): 安め・高め・要確認は色付きの塗りつぶし、普通は色なし(塗りなしの枠だけ)。
        普通まで塗ると、ほとんどの都市が同じ色で画面が目立ちすぎるため、色が付くのは色に意味のある月だけにする */
     .cal-fare-pill {
@@ -1562,15 +1562,15 @@
     }
 
     .cal-fare-detail {
-      margin-top: 12px; padding-top: 3px; border-top: 1px solid var(--sand-dark);
+      margin-top: 24px; padding-top: 0; border-top: 1px solid var(--sand-dark);
       font-size: 14px; line-height: 1.8; color: var(--midnight);
     }
-    .cal-fare-row { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--sand); }
+    .cal-fare-row { display: flex; gap: 10px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--sand); }
     .cal-fare-row:last-child { border-bottom: none; }
     .cal-fare-row-k { flex: 0 0 48px; color: var(--warm-gray); font-size: 14px; font-weight: 700; }
     .cal-fare-est { color: var(--warm-gray); font-weight: 700; }
     .cal-fare-row-v { flex: 1; min-width: 0; line-break: strict; font-size: 15px; line-height: 1.6; color: var(--midnight); }
-    .cal-fare-month-strip { display: flex; gap: 2px; margin-bottom: 8px; }
+    .cal-fare-month-strip { display: flex; gap: 2px; margin-bottom: 14px; }
     .cal-fare-month-col { flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: 3px; border: none; background: none; padding: 2px 0; font-family: inherit; cursor: pointer; }
     .cal-fare-month-num { font-size: 12px; line-height: 1.2; text-align: center; color: var(--warm-gray); }
     .cal-fare-month-col-current .cal-fare-month-num { font-weight: 800; color: var(--midnight); }
@@ -1581,7 +1581,7 @@
     .cal-fare-month-seg-unknown { background: var(--fare-tier-unknown); }
     .cal-fare-month-seg-current { outline: 2px solid var(--midnight); outline-offset: 1px; }
 
-    .cal-fare-footnote { color: var(--warm-gray); font-size: 11px; margin-top: 8px; text-align: center; }
+    .cal-fare-footnote { color: var(--warm-gray); font-size: 11px; margin-top: 20px; text-align: center; }
 
     /* ─── PROMO MODAL（Web版→iOSアプリ誘導、中央モーダル、設計書206） ─── */
     /* ─── 新機能の紹介(What's New、設計書227)。Web版の誘導ポップアップ(3603/3604)より上に出す ─── */
