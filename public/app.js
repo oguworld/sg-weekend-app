@@ -3661,11 +3661,12 @@
     function stepFareSheetMonth(delta) {
       setFareSheetMonth(((_fareSheetMonth - 1 + delta + 12) % 12) + 1);
     }
-    // 都市ピルのタップ。同じピルの再タップで閉じ(未選択に戻り)、別のピルなら差し替える
+    // 都市ピルのタップ。別のピルなら差し替える。選択中のピルの再タップは何もしない(2026-10-18ユーザー指定)
     function selectFareSheetCity(pillEl) {
       const id = pillEl?.dataset?.fareCity;
       if (!id) return;
-      _fareSheetCity = _fareSheetCity === id ? null : id;
+      if (_fareSheetCity === id) return;   // 選択中の都市の再タップでは、何も変えない(詳細は消さない)
+      _fareSheetCity = id;
       renderFareSheet();
     }
 
