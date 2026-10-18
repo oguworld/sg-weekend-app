@@ -3705,7 +3705,7 @@
       if (isUnknown) {
         priceHtml = escapeHtml('要確認（運賃の出典と食い違う可能性）');
       } else if (estWord) {
-        priceHtml = `<span class="cal-fare-est">推察:</span> ${_noBreakJa(`${estWord}の可能性${reason ? `（${reason}）` : ''}`)}${leadLine}`;
+        priceHtml = `${_noBreakJa(`${estWord}の可能性${reason ? `（${reason}）` : ''}`)}${leadLine}`;
       } else {
         // 理由が無い(普通など)月は、予約の目安を同じ行の括弧に入れて1行にする。理由がある月は、予約の目安を別の行に出す
         const word = (legend && legend[String(lv)]) || '';
