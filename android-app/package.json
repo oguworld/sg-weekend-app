@@ -22,5 +22,5 @@
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.0.0"
   },
-  "androidVersionCode": 9
+  "androidVersionCode": 10
 }
