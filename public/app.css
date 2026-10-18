@@ -1520,7 +1520,7 @@
     .fare-sheet-title { font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--midnight); }
     .fare-sheet-close { background: var(--sand); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-size: 16px; border: none; cursor: pointer; color: var(--warm-gray); }
     .fare-sheet-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 20px 24px; }
-    .fare-mon-step { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 2px 0 20px; }
+    .fare-mon-step { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 2px 0 12px; }
     .fare-mon-step-btn {
       position: relative; width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--sand); color: var(--warm-gray);
       font-size: 18px; line-height: 1; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center;
