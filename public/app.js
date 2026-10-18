@@ -789,8 +789,12 @@
     }, { passive: false });
     // クライテリア表示中に他の場所をタップしたら閉じる
     document.addEventListener('touchend', e => {
-      if (e.target.closest('[data-stat-crit]') || e.target.closest('#stat-criteria-popover')) return;
-      document.getElementById('stat-criteria-popover')?.classList.remove('visible');
+      // ポップアップ内のボタン(トグル等)は、押すと中身を作り直してタップ元の要素がDOMから外れるため、e.target.closest()では
+      // 「ポップアップの外」と誤判定して閉じてしまう(2026-10-19に実機で発生)。タップ開始時点の経路(composedPath)で判定する
+      const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+      const popover = document.getElementById('stat-criteria-popover');
+      if (e.target.closest('[data-stat-crit]') || e.target.closest('#stat-criteria-popover') || (popover && path.includes(popover))) return;
+      popover?.classList.remove('visible');
     }, { passive: true });
 
     // 指標ウィジェットの前回取得時刻（設計書213: 画面遷移時の再取得判定に使用。成功時のみ更新）
