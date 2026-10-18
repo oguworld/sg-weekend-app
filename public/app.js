@@ -442,6 +442,12 @@
         fareLegendYear: '12か月の目安',
         tourFareStep1: '前後のボタンで、月を切り替えられます',
         tourFareStep2: '都市をタップすると、その月の詳細が出ます。グリーンは安め、オレンジは高めの目安です',
+        tourWelcomeStart: '始める',
+        tourWelcomeTitle1: 'SG在住Naviへようこそ',
+        tourWelcomeStep1: 'シンガポール在住の方向けの、くらしとおでかけの情報アプリです。主な使い方を、30秒でご案内します',
+        tourWelcomeStep2: '下のボタンで、くらし・おでかけ・カレンダー・設定を切り替えられます。カレンダーでは、祝日や行事、旅行シーズン情報が見られます',
+        tourWelcomeStep3: '為替・PSI(大気汚染)・デング熱の今の値です。PSIとデング熱は、タップすると基準が見られます',
+        tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
@@ -477,6 +483,10 @@
     // 新規インストールか(新機能の紹介を出さない判定、設計書227)。sg_themeは下のテーマ移行が初回起動で書くため、
     // 移行より前に評価する。2026-07以降の版を一度でも起動した既存ユーザーは必ず持ち、まっさらな新規だけが持たない
     const _isFreshInstall = (() => { try { return localStorage.getItem('sg_theme') === null; } catch (_) { return false; } })();
+    // 新規インストール向けのウェルカムツアー(設計書233)の対象フラグ。新規の最初の起動で立て、見終わる/スキップで消す。
+    // 途中でアプリが終了された場合は、次の起動でもう一度出す(sg_themeは2回目以降の起動で存在するため、_isFreshInstallでは判定できない)
+    const _WELCOME_PENDING_KEY = 'app_welcome_pending';
+    (() => { try { if (_isFreshInstall && _isCapacitorApp) localStorage.setItem(_WELCOME_PENDING_KEY, '1'); } catch (_) {} })();
     // 起動処理(initWhatsNew)が同期で触るため、TDZを避けて早い位置で宣言する
     const _WHATSNEW_SEEN_KEY = 'app_whatsnew_seen';
     let _whatsNewPending = null; // 表示中の紹介: { version, persist, cta }
@@ -2127,7 +2137,8 @@
     // loadLifeInfoPreview(); // イベント画面のプレビューは非表示化（ニュースタブに一本化、2026-08-28）
     loadLifeInfoNewsScreen(); // ニュースタブを初期表示画面にしたため起動時に直接読み込む（2026-08-28）
     setTimeout(() => _debugLogScreenMetrics('news'), 500); // 診断: 初期表示時点のメトリクス（使い捨て）
-    initPushState().then(() => _maybePromptPushOnboarding());
+    // 新規インストールでウェルカムツアーを出す時は、通知の許可(OSダイアログ)をツアーの終了後に尋ねる(暗幕の上にダイアログが出て混乱するのを避ける)
+    initPushState().then(() => { if (!_maybeStartWelcomeTour()) _maybePromptPushOnboarding(); });
     initWhatsNew();
     initSettingsProfile();
     initSettingsGenres();
@@ -2171,6 +2182,7 @@
           localStorage.removeItem(_WHATSNEW_SEEN_KEY);
           localStorage.removeItem('app_tour_pending');
           Object.keys(localStorage).filter(k => k.startsWith(_TOUR_DONE_PREFIX)).forEach(k => localStorage.removeItem(k));
+          localStorage.setItem(_WELCOME_PENDING_KEY, '1');   // 新規インストール向けのウェルカムツアーも、もう一度出す(通知の許可は触らない)
         } catch (_) {}
         showToast('紹介と案内をリセットしました。再読み込みします');
         setTimeout(() => location.reload(), 900);
@@ -3951,7 +3963,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-filters'];
     const _TOUR_DONE_PREFIX = 'app_tour_done_';
     let _tourState = null;   // { id, persist, steps, index, locked }
 
@@ -3995,17 +4007,24 @@
       return { top, left, width, placement };
     }
 
-    async function startTour({ id, steps, persist }) {
+    // 対象の無い(中央に出す)ステップ用。画面の中央に置く純関数
+    function _tourPlaceCenter(tipHeight, viewportH, viewportW, tipWidth) {
+      const width = tipWidth || Math.min(340, viewportW - 24);
+      return { top: Math.max(12, (viewportH - tipHeight) / 2), left: Math.max(12, (viewportW - width) / 2), width, placement: 'center' };
+    }
+
+    // onEnd: 終了時に呼ぶ(任意。{ shown, record })。shown=falseは、出せるステップが無くて何も出さなかった時
+    async function startTour({ id, steps, persist, onEnd }) {
       if (_tourState || !id || !Array.isArray(steps)) return;
       const layer = document.getElementById('tour-layer');
       if (!layer) return;
-      _tourState = { id, persist: !!persist, steps: [], index: -1, locked: false };
+      _tourState = { id, persist: !!persist, steps: [], index: -1, locked: false, onEnd };
       const st = _tourState;
-      // 見つかるステップだけ残す(全部無ければ何も出さず、記録もしない)
-      const found = await Promise.all(steps.map(step => _tourWaitAnchor(step.anchor)));
+      // 見つかるステップだけ残す(全部無ければ何も出さず、記録もしない)。anchorがnullのステップは、中央に出すカードで、常に残す
+      const found = await Promise.all(steps.map(step => step.anchor ? _tourWaitAnchor(step.anchor) : Promise.resolve(true)));
       if (_tourState !== st) return;
       st.steps = steps.filter((_, i) => found[i]);
-      if (st.steps.length === 0) { _tourEnd(false); return; }
+      if (!st.steps.some(step => step.anchor)) { st.steps = []; _tourEnd(false); return; }
       lockScroll();
       st.locked = true;
       window.addEventListener('resize', _tourReposition);
@@ -4019,14 +4038,18 @@
       if (!st) return;
       if (i >= st.steps.length) { _tourEnd(true); return; }
       const step = st.steps[i];
-      const el = _tourAnchorEl(step.anchor);
-      if (!_tourVisible(el)) { _tourShow(i + 1); return; }   // 途中で消えたステップは飛ばす
+      const center = !step.anchor;
+      const el = center ? null : _tourAnchorEl(step.anchor);
+      if (!center && !_tourVisible(el)) { _tourShow(i + 1); return; }   // 途中で消えたステップは飛ばす
       st.index = i;
-      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+      if (el && !step.noScroll) el.scrollIntoView({ block: 'center', inline: 'nearest' });   // noScroll: 画面下端に固定の要素(ボトムナビ)など
       const isLast = i === st.steps.length - 1;
+      document.getElementById('tour-layer')?.classList.toggle('tour-center', center);
+      const titleEl = document.getElementById('tour-tip-title');
+      if (titleEl) { titleEl.textContent = step.title || ''; titleEl.hidden = !step.title; }
       document.getElementById('tour-tip-count').textContent = `${i + 1} / ${st.steps.length}`;
       document.getElementById('tour-tip-text').textContent = step.text;
-      document.getElementById('tour-next').textContent = isLast ? 'わかった' : '次へ';
+      document.getElementById('tour-next').textContent = step.nextLabel || (isLast ? 'わかった' : '次へ');
       document.getElementById('tour-skip').style.display = isLast ? 'none' : '';
       requestAnimationFrame(_tourReposition);
     }
@@ -4034,11 +4057,24 @@
     function _tourReposition() {
       const st = _tourState;
       if (!st || st.index < 0) return;
+      const hole = document.getElementById('tour-hole');
+      if (!st.steps[st.index].anchor) {   // 中央に出すカード(対象なし)。穴は出さず、暗幕だけ(.tour-center)
+        hole.style.display = 'none';
+        const ctip = document.getElementById('tour-tip');
+        const cvw = window.innerWidth, cvh = window.innerHeight;
+        const cw = Math.min(340, cvw - 24);
+        ctip.style.width = `${cw}px`;
+        const cpos = _tourPlaceCenter(ctip.offsetHeight, cvh, cvw, cw);
+        ctip.style.top = `${cpos.top}px`;
+        ctip.style.left = `${cpos.left}px`;
+        ctip.dataset.placement = cpos.placement;
+        return;
+      }
+      hole.style.display = '';
       const el = _tourAnchorEl(st.steps[st.index].anchor);
       if (!_tourVisible(el)) return;
       const r = el.getBoundingClientRect();
       const pad = 6;
-      const hole = document.getElementById('tour-hole');
       hole.style.top = `${r.top - pad}px`;
       hole.style.left = `${r.left - pad}px`;
       hole.style.width = `${r.width + pad * 2}px`;
@@ -4071,8 +4107,44 @@
       }
       window.removeEventListener('resize', _tourReposition);
       window.removeEventListener('orientationchange', _tourReposition);
-      document.getElementById('tour-layer')?.classList.remove('visible');
+      document.getElementById('tour-layer')?.classList.remove('visible', 'tour-center');
       if (st.locked) unlockScroll();
+      if (typeof st.onEnd === 'function') {
+        try { st.onEnd({ shown: st.steps.length > 0, record: !!record }); } catch (_) {}
+      }
+    }
+
+    // ─── ウェルカムツアー(新規インストール向け、設計書233) ───
+    // くらし画面だけで完結する4ステップ(ようこそ→ボトムナビ→指標→カテゴリ)。文言はアプリ内の固定文言。
+    // 対象: ネイティブアプリで、新規インストール(app_welcome_pending)の人。Webは ?tour=welcome の確認用だけ(記録しない)
+    const _WELCOME_TOUR_ID = 'welcome-1';
+    function _welcomeTourSteps() {
+      return [
+        { anchor: null, title: t('tourWelcomeTitle1'), text: t('tourWelcomeStep1'), nextLabel: t('tourWelcomeStart') },
+        { anchor: 'nav-bar', text: t('tourWelcomeStep2'), noScroll: true },
+        { anchor: 'news-stats', text: t('tourWelcomeStep3') },
+        { anchor: 'news-filters', text: t('tourWelcomeStep4') },
+      ];
+    }
+    // 終了(最後まで見る/スキップ)で、対象フラグを消し、そのあとで通知の許可を尋ねる
+    function _welcomeTourEnd(info) {
+      if (info && info.record) { try { localStorage.removeItem(_WELCOME_PENDING_KEY); } catch (_) {} }
+      _maybePromptPushOnboarding();
+    }
+    // 出す条件が揃っていれば、開始を予約してtrueを返す(呼び出し元は、その場合、通知の許可を尋ねない=ツアー終了後に尋ねる)。
+    // 条件が揃わなければfalse(従来どおり、呼び出し元が通知の許可を尋ねる)
+    function _maybeStartWelcomeTour() {
+      const preview = !_isCapacitorApp && new URLSearchParams(location.search).get('tour') === 'welcome';
+      let want = false;
+      try { want = preview || (_isCapacitorApp && localStorage.getItem(_WELCOME_PENDING_KEY) === '1' && !_tourDone(_WELCOME_TOUR_ID)); } catch (_) {}
+      if (!want || _tourState || _whatsNewPending) return false;
+      // 画面の描画が落ち着いてから開始する。開始できなかった(別の表示が出た・くらし画面でない・アンカーが無い)時は、通知の許可を従来どおり尋ねる
+      setTimeout(() => {
+        const ready = !_tourState && !_whatsNewPending && document.getElementById('nav-news')?.classList.contains('active');
+        if (!ready) { if (!preview) _maybePromptPushOnboarding(); return; }
+        startTour({ id: _WELCOME_TOUR_ID, steps: _welcomeTourSteps(), persist: !preview, onEnd: preview ? null : _welcomeTourEnd });
+      }, 900);
+      return true;
     }
 
     function closeWhatsNew() {

@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20261018s">
+  <link rel="stylesheet" href="/app.css?v=20261019a">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -153,7 +153,7 @@
       <span class="screen-title" data-i18n="newsScreenTitle">くらし情報</span>
     </div>
     <!-- 指標ウィジェット: 為替・PSI・デング熱警戒 -->
-    <div class="stat-widget" id="stat-widget-info">
+    <div class="stat-widget" id="stat-widget-info" data-tour="news-stats">
       <div class="stat-col">
         <div class="stat-row"><span class="stat-val" id="stat-fx">--</span></div>
         <div class="stat-sub" data-i18n="statFx">SGD→JPY</div>
@@ -177,7 +177,7 @@
         <div id="news-result-count" style="font-family:var(--font-heading);font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;font-variant-numeric:tabular-nums;"></div>
       </div>
     </div>
-    <div id="news-filter-row" style="display:flex;gap:8px;overflow-x:auto;padding:8px 20px 12px;flex-shrink:0;">
+    <div id="news-filter-row" data-tour="news-filters" style="display:flex;gap:8px;overflow-x:auto;padding:8px 20px 12px;flex-shrink:0;">
       <button class="filter-chip active" data-news-cat="" onclick="if(!_touchCapableDetected) setNewsCategory('')" data-i18n="newsCatAll">新着</button>
       <button class="filter-chip" data-news-cat="admin" onclick="if(!_touchCapableDetected) setNewsCategory('admin')" data-i18n="newsCatAdmin">SG政府</button>
       <button class="filter-chip" data-news-cat="transport" onclick="if(!_touchCapableDetected) setNewsCategory('transport')" data-i18n="newsCatTransport">都市開発・交通</button>
@@ -472,7 +472,7 @@
   </div>
 
   <!-- ─── BOTTOM NAV ─── -->
-  <nav class="bottom-nav">
+  <nav class="bottom-nav" data-tour="nav-bar">
     <button class="nav-item active" id="nav-news" onclick="if(!_touchCapableDetected) switchNav('news')">
       <span class="nav-icon"><svg class="nav-icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 L4 10 V20 H9 V14 H15 V20 H20 V10 Z"/></svg></span>
       <span class="nav-label" data-i18n="navNews">くらし</span>
@@ -569,6 +569,7 @@
     <div class="tour-tip" id="tour-tip" role="dialog" aria-modal="true">
       <span class="tour-tip-arrow" id="tour-tip-arrow"></span>
       <div class="tour-tip-count" id="tour-tip-count"></div>
+      <div class="tour-tip-title" id="tour-tip-title" hidden></div>
       <div class="tour-tip-text" id="tour-tip-text"></div>
       <div class="tour-tip-actions">
         <button class="tour-btn tour-btn-skip" id="tour-skip" onclick="if(!_touchCapableDetected) tourSkip()">スキップ</button>
@@ -584,7 +585,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20261018s"></script>
+  <script src="/app.js?v=20261019a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
