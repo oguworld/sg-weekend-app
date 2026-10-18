@@ -441,7 +441,7 @@
         fareLegendMonth: '色の見方',
         fareLegendYear: '12か月の目安',
         tourFareStep1: '前後のボタンで、月を切り替えられます',
-        tourFareStep2: '都市をタップすると、その月の詳細が出ます。緑は安め、橙は高めの目安です',
+        tourFareStep2: '都市をタップすると、その月の詳細が出ます。グリーンは安め、オレンジは高めの目安です',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
@@ -2158,6 +2158,23 @@
           el.textContent = `v${d.version}`;
         }
       } catch(e) { el.textContent = '-'; }
+      // 隠し操作(実機で新機能の紹介・案内を何度も確認するため): バージョン表示を3秒以内に5回タップすると、
+      // 「見た版」と「案内済み」の記録を消して再読み込みする(2026-10-18)
+      let _taps = 0, _tapTimer = null;
+      el.addEventListener('click', () => {
+        _taps++;
+        clearTimeout(_tapTimer);
+        _tapTimer = setTimeout(() => { _taps = 0; }, 3000);
+        if (_taps < 5) return;
+        _taps = 0;
+        try {
+          localStorage.removeItem(_WHATSNEW_SEEN_KEY);
+          localStorage.removeItem('app_tour_pending');
+          Object.keys(localStorage).filter(k => k.startsWith(_TOUR_DONE_PREFIX)).forEach(k => localStorage.removeItem(k));
+        } catch (_) {}
+        showToast('紹介と案内をリセットしました。再読み込みします');
+        setTimeout(() => location.reload(), 900);
+      });
     })();
 
     _recommendModeActive = false;
@@ -3564,7 +3581,8 @@
     const _FARE_SHEET_TOUR_ID = 'fare-sheet-1';
     function _maybeStartFareSheetTour() {
       if (_tourDone(_FARE_SHEET_TOUR_ID) || _tourState || _whatsNewPending || !_isFareSheetOpen()) return;
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+      // 画面が下からせり上がる動き(0.25秒)が終わってから始める。途中で測ると、スポットライトの位置がずれる(2026-10-18に実機で発生)
+      setTimeout(() => {
         if (_tourState || !_isFareSheetOpen()) return;
         startTour({
           id: _FARE_SHEET_TOUR_ID,
@@ -3575,7 +3593,7 @@
             { anchor: 'fare-detail', text: t('tourFareStep3') },
           ],
         });
-      }));
+      }, 400);
     }
     function closeFareSheet() {
       if (!_isFareSheetOpen()) return;
@@ -3781,18 +3799,24 @@
     }
 
     async function initWhatsNew() {
+      // 実機で「紹介が出ない」原因を特定するための記録(logs/debug-nav.logに wn_* として残る)
+      const wnLog = (e, d) => _sendDebugLog('wn_' + e, d || {});
       try {
         const previewVersion = new URLSearchParams(location.search).get('whatsnew') || '';
         let current = '';
+        let hasPlugin = false;
         if (_isCapacitorApp) {
           const appPlugin = window.Capacitor?.Plugins?.App;
+          hasPlugin = !!appPlugin;
           if (appPlugin) current = (await appPlugin.getInfo()).version || '';
         }
+        const seenNow = localStorage.getItem(_WHATSNEW_SEEN_KEY);
         const decision = _decideWhatsNew({
           isFresh: _isFreshInstall,
-          seen: localStorage.getItem(_WHATSNEW_SEEN_KEY),
+          seen: seenNow,
           current, previewVersion, isNative: _isCapacitorApp,
         });
+        wnLog('decide', { action: decision.action, current, seen: seenNow, isFresh: _isFreshInstall, hasPlugin });
         if (decision.action === 'markSeen') {
           localStorage.setItem(_WHATSNEW_SEEN_KEY, decision.version);
           return;
@@ -3803,14 +3827,15 @@
           `${API_BASE}/api/whats-new?version=${encodeURIComponent(decision.version)}`,
           decision.persist ? undefined : { cache: 'no-cache' }
         );
-        if (!res.ok) return;
+        if (!res.ok) { wnLog('fetch_failed', { status: res.status }); return; }
         const data = await res.json();
+        wnLog('fetched', { hasEntry: !!(data && data.entry), version: decision.version });
         if (data && data.entry) {
           openWhatsNew(data.entry, decision);
         } else if (decision.persist) {
           localStorage.setItem(_WHATSNEW_SEEN_KEY, decision.version); // 紹介の無い版は、毎回取りに行かない
         }
-      } catch (_) { /* 通信に失敗した時は何も保存しない(次回の起動で再試行) */ }
+      } catch (e) { wnLog('error', { message: String(e && e.message || e) }); /* 通信に失敗した時は何も保存しない(次回の起動で再試行) */ }
     }
 
     function openWhatsNew(entry, decision) {
@@ -3842,6 +3867,7 @@
       const laterBtn = document.getElementById('whatsnew-later-btn');
       if (startBtn) startBtn.textContent = cta ? cta.label : 'はじめる';
       if (laterBtn) laterBtn.hidden = !cta;
+      _sendDebugLog('wn_opened', { version: decision.version });
       _whatsNewPending = { version: decision.version, persist: decision.persist, cta };
       lockScroll();
       overlay.classList.add('visible');
