@@ -1678,6 +1678,24 @@
     .whatsnew-later-btn:active { opacity: 0.7; }
     .whatsnew-note { font-size: 11px; color: var(--warm-gray); margin-top: 10px; }
 
+    /* 設定の「チュートリアル」一覧(設計書235)。シート本体はピン留めシート(.pin-sheet*)を流用 */
+    .tutorial-all-btn {
+      display: block; width: 100%; margin: 2px 0 14px; padding: 14px; border: none; border-radius: var(--radius-btn);
+      background: var(--caramel); color: #fff; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .tutorial-all-btn:active { opacity: 0.85; }
+    .tutorial-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--sand); }
+    .tutorial-item:last-child { border-bottom: none; }
+    .tutorial-item-main { flex: 1; min-width: 0; }
+    .tutorial-item-name { font-size: 15px; font-weight: 700; color: var(--midnight); }
+    .tutorial-seen { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--caramel); white-space: nowrap; }
+    .tutorial-item-desc { margin-top: 2px; font-size: 13px; line-height: 1.5; color: var(--warm-gray); }
+    .tutorial-item-btn {
+      flex-shrink: 0; min-height: 40px; padding: 0 18px; border-radius: 50px; border: 1.5px solid var(--sand-dark);
+      background: var(--warm-white); color: var(--midnight); font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    .tutorial-item-btn:active { opacity: 0.7; }
+
     /* ミニチュートリアル(スポットライト、設計書232)。z-indexはボトムナビ・専用画面(10000/10001)より上 */
     .tour-layer { position: fixed; inset: 0; z-index: 10100; display: none; }
     .tour-layer.visible { display: block; }

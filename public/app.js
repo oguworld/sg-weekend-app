@@ -459,6 +459,20 @@
         psiNote24h: 'NEA(シンガポール環境庁)データ。PSIは24時間平均',
         psiNote1h: 'NEA(シンガポール環境庁)データ。基準もNEAの値',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
+        tourCalStep1: 'オンにすると、予定の期間と説明がまとめて表示されます',
+        tourCalStep2: 'この飛行機のアイコンをタップすると、旅行先ごとの高い・安いの目安を、月を切り替えながら見られます',
+        labelTutorial: 'チュートリアル',
+        tutorialSheetTitle: 'チュートリアル',
+        tutorialAll: '最初から全部見る',
+        tutorialSee: '見る',
+        tutorialSeen: '✓ 見た',
+        tutorialClose: '閉じる',
+        tutorialName1: '基本の使い方',
+        tutorialDesc1: '画面の見方と、くらしの指標・カテゴリ',
+        tutorialName2: 'カレンダー',
+        tutorialDesc2: '予定の説明と、旅行シーズン情報の入口',
+        tutorialName3: '旅行シーズン情報',
+        tutorialDesc3: '月の切り替えと、都市ごとの詳細',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
@@ -500,6 +514,7 @@
     // 起動処理(initWhatsNew)が同期で触るため、TDZを避けて早い位置で宣言する
     const _WHATSNEW_SEEN_KEY = 'app_whatsnew_seen';
     let _whatsNewPending = null; // 表示中の紹介: { version, persist, cta }
+    let _tutorialRun = null;   // 設定のチュートリアルの見直しの実行中: { queue: [id…] }。nullなら実行していない(再入ガード兼、案内の自動表示の抑止)。switchNav()が早く呼ばれても参照できるよう、ここで宣言する
 
     // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
     // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
@@ -3759,20 +3774,20 @@
     // 旅行シーズン画面を初めて開いた時だけ、スポットライトで使い方を案内する(2026-10-18ユーザー指定。端末ごとに1回、app_tour_done_fare-sheet-1)
     const _FARE_SHEET_TOUR_ID = 'fare-sheet-1';
     function _maybeStartFareSheetTour() {
-      if (_tourDone(_FARE_SHEET_TOUR_ID) || _tourState || _whatsNewPending || !_isFareSheetOpen()) return;
+      if (_tutorialRun || _tourDone(_FARE_SHEET_TOUR_ID) || _tourState || _whatsNewPending || !_isFareSheetOpen()) return;   // 設定のチュートリアルの見直し中は始めない(見直し側が開始する)
       // 画面が下からせり上がる動き(0.25秒)が終わってから始める。途中で測ると、スポットライトの位置がずれる(2026-10-18に実機で発生)
       setTimeout(() => {
         if (_tourState || !_isFareSheetOpen()) return;
-        startTour({
-          id: _FARE_SHEET_TOUR_ID,
-          persist: true,
-          steps: [
-            { anchor: 'fare-month-step', text: t('tourFareStep1') },
-            { anchor: 'fare-pills', text: t('tourFareStep2') },
-            { anchor: 'fare-detail', text: t('tourFareStep3') },
-          ],
-        });
+        startTour({ id: _FARE_SHEET_TOUR_ID, persist: true, steps: _fareSheetTourSteps() });
       }, 400);
+    }
+    // 旅行シーズン画面の案内のステップ(自動表示と、設定のチュートリアルの見直しで共通)
+    function _fareSheetTourSteps() {
+      return [
+        { anchor: 'fare-month-step', text: t('tourFareStep1') },
+        { anchor: 'fare-pills', text: t('tourFareStep2') },
+        { anchor: 'fare-detail', text: t('tourFareStep3') },
+      ];
     }
     function closeFareSheet() {
       if (!_isFareSheetOpen()) return;
@@ -4100,7 +4115,7 @@
     // 「あとで」を押した人が、その画面を初めて開いた時にツアーを出す。switchNav()の末尾から呼ぶ。
     // 紹介カード・別のツアーの表示中は始めない。見終わっていれば保留を捨てる
     function _maybeStartPendingTour(screen) {
-      if (_tourState || _whatsNewPending) return;
+      if (_tourState || _whatsNewPending || _tutorialRun) return;   // 設定のチュートリアルの見直し中は始めない
       const p = _tourPendingRead();
       if (!p || p.screen !== screen) return;
       if (_tourDone(p.id)) { _tourPendingClear(); return; }
@@ -4312,6 +4327,107 @@
         startTour({ id: _WELCOME_TOUR_ID, steps: _welcomeTourSteps(), persist: !preview, onEnd: preview ? null : _welcomeTourEnd });
       }, 900);
       return true;
+    }
+
+    // ─── 設定の「チュートリアル」(これまでのハイライト付きの案内を、いつでも見直せる。設計書235) ───
+    // 案内は TUTORIALS に登録する。新しい案内を足す時は、ここに1件足す(必要なら、対象の要素に data-tour を付けて _TOUR_ANCHORS に追加)。
+    // 見直しは persist:false で動かし、「見た」の記録(app_tour_done_*)・新規の対象フラグ・「あとで」の保留は、一切更新しない。
+    // calendar-1 の文言は、自動表示ではサーバー(content/whats-new.json)のentryが使われ、見直しではアプリ内(tourCalStep1/2)が使われる。
+    // 変える時は、whats-new.json とアプリ内 STRINGS.ja の2か所を直す。
+    function _calendarTourSteps() {
+      return [
+        { anchor: 'cal-notes-switch', text: t('tourCalStep1') },
+        { anchor: 'cal-fare-entry', text: t('tourCalStep2') },
+      ];
+    }
+    const _tutorialWait = ms => new Promise(r => setTimeout(r, ms));
+    const TUTORIALS = [
+      {
+        id: _WELCOME_TOUR_ID, nameKey: 'tutorialName1', descKey: 'tutorialDesc1', steps: _welcomeTourSteps,
+        prepare: async () => { switchNav('news'); await _tutorialWait(600); },
+      },
+      {
+        id: 'calendar-1', nameKey: 'tutorialName2', descKey: 'tutorialDesc2', steps: _calendarTourSteps,
+        prepare: async () => { switchNav('calendar'); await _tutorialWait(700); },
+      },
+      {
+        id: _FARE_SHEET_TOUR_ID, nameKey: 'tutorialName3', descKey: 'tutorialDesc3', steps: _fareSheetTourSteps,
+        prepare: async () => {
+          switchNav('calendar');
+          await _tutorialWait(500);
+          openFareSheet(new Date().getMonth() + 1);
+          await _tutorialWait(450);   // 画面が下からせり上がる動き(0.25秒)が終わってから測る
+        },
+        cleanup: () => closeFareSheet(),
+      },
+    ];
+
+    function _isTutorialSheetOpen() {
+      return !!document.getElementById('tutorial-sheet-overlay')?.classList.contains('visible');
+    }
+    function renderTutorialSheet() {
+      const body = document.getElementById('tutorial-sheet-body');
+      if (!body) return;
+      const items = TUTORIALS.map(tu => {
+        const seen = _tourDone(tu.id);
+        return `<div class="tutorial-item">
+          <div class="tutorial-item-main">
+            <div class="tutorial-item-name">${escapeHtml(t(tu.nameKey))}${seen ? `<span class="tutorial-seen">${escapeHtml(t('tutorialSeen'))}</span>` : ''}</div>
+            <div class="tutorial-item-desc">${escapeHtml(t(tu.descKey))}</div>
+          </div>
+          <button type="button" class="tutorial-item-btn" onclick="startTutorial('${escapeHtml(tu.id)}')">${escapeHtml(t('tutorialSee'))}</button>
+        </div>`;
+      }).join('');
+      body.innerHTML = `<button type="button" class="tutorial-all-btn" onclick="startTutorialAll()">${escapeHtml(t('tutorialAll'))}</button>${items}`;
+    }
+    function openTutorialSheet() {
+      if (_isTutorialSheetOpen()) return;
+      renderTutorialSheet();
+      document.getElementById('tutorial-sheet-overlay')?.classList.add('visible');
+      lockScroll();
+    }
+    function closeTutorialSheet() {
+      if (!_isTutorialSheetOpen()) return;
+      document.getElementById('tutorial-sheet-overlay')?.classList.remove('visible');
+      unlockScroll();
+    }
+    // 見直しを始める。紹介カード・別の案内・実行中の見直しがある時は始めない
+    function _startTutorialRun(ids) {
+      if (_tutorialRun || _tourState || _whatsNewPending) return;
+      const queue = ids.filter(id => TUTORIALS.some(tu => tu.id === id));
+      if (!queue.length) return;
+      closeTutorialSheet();
+      _tutorialRun = { queue };
+      _runNextTutorial();
+    }
+    function startTutorial(id) { _startTutorialRun([id]); }
+    function startTutorialAll() { _startTutorialRun(TUTORIALS.map(tu => tu.id)); }
+    async function _runNextTutorial() {
+      const run = _tutorialRun;
+      if (!run) return;
+      const id = run.queue.shift();
+      if (!id) { _tutorialFinish(run); return; }
+      const tu = TUTORIALS.find(x => x.id === id);
+      if (!tu) { _runNextTutorial(); return; }
+      try { await tu.prepare(); } catch (_) {}
+      if (_tutorialRun !== run) return;
+      let ended = false;
+      const onEnd = () => {
+        if (ended) return;
+        ended = true;
+        try { if (tu.cleanup) tu.cleanup(); } catch (_) {}
+        if (_tutorialRun !== run) return;
+        setTimeout(() => _runNextTutorial(), 300);
+      };
+      await startTour({ id: tu.id, steps: tu.steps(), persist: false, onEnd });
+      // startTour が何も始めなかった(別の案内が出ていた等)場合は、終わったものとして次へ進む(止まらないように)
+      if (!ended && !(_tourState && _tourState.id === tu.id)) onEnd();
+    }
+    // 見直しの最後。設定画面に戻る
+    function _tutorialFinish(run) {
+      if (_tutorialRun !== run) return;
+      _tutorialRun = null;
+      switchNav('settings');
     }
 
     function closeWhatsNew() {
