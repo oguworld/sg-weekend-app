@@ -447,7 +447,7 @@
         tourWelcomeTitle1: 'SG在住Naviへようこそ',
         tourWelcomeStep1: 'シンガポール在住の方向けの、くらしとおでかけの情報アプリです。主な使い方を、30秒でご案内します',
         tourWelcomeStep2: '下のボタンで、くらし・おでかけ・カレンダー・設定を切り替えられます。カレンダーでは、祝日や行事、旅行シーズン情報が見られます',
-        tourWelcomeStep3: '為替・PSI(大気汚染)・デング熱の今の値です。PSIとデング熱は、タップすると基準が見られます',
+        tourWelcomeStep3: '為替・PM2.5(大気汚染)・デング熱の今の値です。PM2.5はタップするとエリア別の詳細が、デング熱は基準が見られます',
         tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
         psiUpdated: '更新',
         psiMode1h: 'PM2.5',
