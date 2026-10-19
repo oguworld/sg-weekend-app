@@ -159,7 +159,7 @@
         <div class="stat-sub" data-i18n="statFx">SGD→JPY</div>
       </div>
       <div class="stat-div"></div>
-      <div class="stat-col" data-stat-crit="psi" onclick="if(!_touchCapableDetected) toggleStatCriteria('psi')">
+      <div class="stat-col" data-stat-crit="psi" data-tour="news-stat-pm25" onclick="if(!_touchCapableDetected) toggleStatCriteria('psi')">
         <div class="stat-row"><span class="stat-val" id="stat-psi">--</span></div>
         <div class="stat-sub" id="stat-psi-label" data-i18n="statPsi">PSI</div>
       </div>
@@ -600,7 +600,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20261019s"></script>
+  <script src="/app.js?v=20261019t"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>

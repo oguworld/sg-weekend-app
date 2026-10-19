@@ -106,7 +106,7 @@
         "pm25-1": {
           "steps": [
             {
-              "anchor": "news-stats",
+              "anchor": "news-stat-pm25",
               "text": "真ん中は、空気の汚れ具合(PM2.5)です。顔の絵文字と色で、今の状態が分かります"
             },
             {

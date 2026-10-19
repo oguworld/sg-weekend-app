@@ -4159,7 +4159,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips'];
     // PSI詳細のポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4398,7 +4398,7 @@
     // 文言は、サーバーの1.8.16のentryとアプリ内`tourPm25Step1`の2か所(変える時は両方)
     function _pm25TourSteps() {
       return [
-        { anchor: 'news-stats', text: t('tourPm25Step1') },
+        { anchor: 'news-stat-pm25', text: t('tourPm25Step1') },
         { anchor: 'psi-toggle', before: 'open-psi', text: t('tourPm25Step2') },
         { anchor: 'psi-map', text: t('tourPm25Step3') },
         { anchor: 'psi-chips', text: t('tourPm25Step4') },
