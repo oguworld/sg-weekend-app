@@ -1228,9 +1228,9 @@
     }
     /* デング熱の凡例チップも3色(緑/黄/赤)で色分け(2026-10-19ユーザー指定)。.stat-criteria-chipより詳細度は同じだが後方で上書きするため有効。
        .active(2クラス=詳細度が高い)は変更不要でそのまま優先される */
-    .dengue-lv-safe { background: var(--dengue-safe-bg); color: var(--dengue-safe-text); }
-    .dengue-lv-caution { background: var(--dengue-caution-bg); color: var(--dengue-caution-text); }
-    .dengue-lv-danger { background: var(--dengue-danger-bg); color: var(--dengue-danger-text); }
+    .dengue-lv-safe { color: var(--dengue-safe-text); }
+    .dengue-lv-caution { color: var(--dengue-caution-text); }
+    .dengue-lv-danger { color: var(--dengue-danger-text); }
 
     /* PSIタップの詳細(設計書234): 右上の「1時間 | 24時間」で、PSI(24時間値)とPM2.5(1時間値)の表示を切り替える。
        ポップアップは画面に収まる高さで、通常は内部スクロールしない(念のためmax-heightとoverflow-yを残す) */
@@ -1255,15 +1255,15 @@
     .psi-chips { display: flex; flex-wrap: wrap; gap: 8px 8px; }
     .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
     /* 区分の色(タイル・基準のチップで共通)。PSIとPM2.5は別の変数 */
-    .psi-lv-good { background: var(--psi-good-bg); color: var(--psi-good-text); }
-    .psi-lv-normal { background: var(--psi-normal-bg); color: var(--psi-normal-text); }
-    .psi-lv-caution { background: var(--psi-caution-bg); color: var(--psi-caution-text); }
-    .psi-lv-unhealthy { background: var(--psi-unhealthy-bg); color: var(--psi-unhealthy-text); }
-    .psi-lv-hazard { background: var(--psi-hazard-bg); color: var(--psi-hazard-text); }
-    .pm25-lv-normal { background: var(--pm25-normal-bg); color: var(--pm25-normal-text); }
-    .pm25-lv-elevated { background: var(--pm25-elevated-bg); color: var(--pm25-elevated-text); }
-    .pm25-lv-high { background: var(--pm25-high-bg); color: var(--pm25-high-text); }
-    .pm25-lv-veryhigh { background: var(--pm25-veryhigh-bg); color: var(--pm25-veryhigh-text); }
+    .psi-lv-good { color: var(--psi-good-text); }
+    .psi-lv-normal { color: var(--psi-normal-text); }
+    .psi-lv-caution { color: var(--psi-caution-text); }
+    .psi-lv-unhealthy { color: var(--psi-unhealthy-text); }
+    .psi-lv-hazard { color: var(--psi-hazard-text); }
+    .pm25-lv-normal { color: var(--pm25-normal-text); }
+    .pm25-lv-elevated { color: var(--pm25-elevated-text); }
+    .pm25-lv-high { color: var(--pm25-high-text); }
+    .pm25-lv-veryhigh { color: var(--pm25-veryhigh-text); }
 
     /* 為替「かんたん換算」(設計書236): 100 SGDが主要12通貨でいくらかの早見表。12行は縦長になるため内部スクロール付き */
     #stat-criteria-popover.fx-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
