@@ -474,8 +474,11 @@
         tutorialName3: '旅行シーズン情報',
         tutorialDesc3: '月の切り替えと、都市ごとの詳細',
         tutorialName4: 'くらしの指標(PM2.5)',
-        tutorialDesc4: 'PM2.5のタップと、エリア別の詳細',
-        tourPm25Step1: 'PM2.5(中心部の1時間値)をタップすると、エリア別の詳細が見られます',
+        tutorialDesc4: 'PM2.5の見方と、タップで見える詳細',
+        tourPm25Step1: '上の指標は、中心部の直近1時間のPM2.5です。PM2.5は空気中の微小な粒子で、ヘイズのときに上がります。顔の絵文字と色で、空気の状態が分かります',
+        tourPm25Step2: 'ここで、PM2.5とPSIを切り替えられます。PSIは、複数の汚染物質を1つの点数にした指標で、過去24時間の平均をもとにしています',
+        tourPm25Step3: '北・西・中心部・東・南の、エリアごとの値です。緑は安全、黄色はちょっと危険、赤は危険です',
+        tourPm25Step4: '色と顔の絵文字の見方です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
@@ -746,7 +749,7 @@
           + `<div class="psi-tile-val">${escapeHtml(_psiCell(info.value))}</div>`
           + `<div class="psi-tile-sub">${escapeHtml(info.label || (_psiMode === '1h' ? 'µg/m³' : ''))}</div></div>`;
       };
-      return `<div class="psi-map">${tile('north', 'n')}${tile('west', 'w')}${tile('central', 'c')}${tile('east', 'e')}${tile('south', 's')}</div>`;
+      return `<div class="psi-map" data-tour="psi-map">${tile('north', 'n')}${tile('west', 'w')}${tile('central', 'c')}${tile('east', 'e')}${tile('south', 's')}</div>`;
     }
     function _psiPopoverHtml(loading) {
       const d = _psiDetail && _psiDetail.data;
@@ -760,10 +763,10 @@
           : (_psiWidgetKind === 'psi' ? STAT_CRITERIA_DESC.psi : t('psiDesc24h'));
         const note = _psiMode === '1h' ? t('psiNote1h') : t('psiNote24h');
         // 並び: 説明+トグル → タイル → 基準のチップ(凡例) → 注記(NEAのデータです…)
-        return `<div class="psi-bar"><span class="psi-updated">${updated}</span><div class="psi-mode" role="tablist">${btn('1h', t('psiMode1h'))}${btn('24h', t('psiMode24h'))}</div></div>`
+        return `<div class="psi-bar"><span class="psi-updated">${updated}</span><div class="psi-mode" role="tablist" data-tour="psi-toggle">${btn('1h', t('psiMode1h'))}${btn('24h', t('psiMode24h'))}</div></div>`
           + `<div class="stat-criteria-desc psi-desc">${escapeHtml(desc)}</div>`
           + _psiTilesHtml(d)
-          + `<div class="psi-chips">${_psiChipsHtml(d)}</div>`
+          + `<div class="psi-chips" data-tour="psi-chips">${_psiChipsHtml(d)}</div>`
           + `<div class="psi-note">${escapeHtml(note)}</div>`;
       }
       // 読み込み中・失敗時: ウィジェットがPM2.5の時はPM2.5の基準、それ以外は従来のPSIの説明と基準
@@ -820,6 +823,8 @@
     document.addEventListener('touchend', e => {
       // ポップアップ内のボタン(トグル等)は、押すと中身を作り直してタップ元の要素がDOMから外れるため、e.target.closest()では
       // 「ポップアップの外」と誤判定して閉じてしまう(2026-10-19に実機で発生)。タップ開始時点の経路(composedPath)で判定する
+      // 案内(スポットライト)の表示中は、「次へ」「スキップ」のタップ(案内のレイヤー上=ポップアップの外)で閉じない(2026-10-19)
+      if (_tourState) return;
       const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
       const popover = document.getElementById('stat-criteria-popover');
       if (e.target.closest('[data-stat-crit]') || e.target.closest('#stat-criteria-popover') || (popover && path.includes(popover))) return;
@@ -4065,6 +4070,18 @@
       modal.classList.add('visible');
     }
 
+    // サーバーのentry・保存した保留のツアーのステップを検証する。anchor・textは必須(textは120字まで)。
+    // beforeは、アプリ側の許可リスト(_TOUR_BEFORE)にある名前だけ通す(未知・文字列以外は捨てる。そのステップ自体は残る)
+    function _tourSanitizeSteps(arr) {
+      return arr.filter(st => st && typeof st.anchor === 'string' && typeof st.text === 'string' && st.text.trim())
+        .slice(0, 6)
+        .map(st => {
+          const o = { anchor: st.anchor, text: st.text.trim().slice(0, 120) };
+          if (typeof st.before === 'string' && Object.prototype.hasOwnProperty.call(_TOUR_BEFORE, st.before)) o.before = st.before;
+          return o;
+        });
+    }
+
     // 紹介のCTA(設計書232)。screenは許可リストのみ。ツアーは、steps(anchor+text)が1つ以上ある時だけ有効
     const _WHATSNEW_SCREENS = ['calendar', 'news', 'home', 'settings'];
     function _whatsNewCta(entry) {
@@ -4074,10 +4091,7 @@
       const tourId = (typeof c.tour === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(c.tour)) ? c.tour : '';
       const tours = entry.tours && typeof entry.tours === 'object' ? entry.tours : null;
       const tour = tourId && tours && Object.prototype.hasOwnProperty.call(tours, tourId) ? tours[tourId] : null;
-      const steps = tour && Array.isArray(tour.steps)
-        ? tour.steps.filter(st => st && typeof st.anchor === 'string' && typeof st.text === 'string' && st.text.trim())
-            .slice(0, 6).map(st => ({ anchor: st.anchor, text: st.text.trim().slice(0, 120) }))
-        : [];
+      const steps = tour && Array.isArray(tour.steps) ? _tourSanitizeSteps(tour.steps) : [];
       return { label, screen: c.screen, tourId: steps.length ? tourId : '', steps };
     }
 
@@ -4106,10 +4120,7 @@
         const p = JSON.parse(raw);
         const okId = p && typeof p.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(p.id);
         const okScreen = p && _WHATSNEW_SCREENS.includes(p.screen);
-        const steps = p && Array.isArray(p.steps)
-          ? p.steps.filter(st => st && typeof st.anchor === 'string' && typeof st.text === 'string' && st.text.trim())
-              .slice(0, 6).map(st => ({ anchor: st.anchor, text: st.text.trim().slice(0, 120) }))
-          : [];
+        const steps = p && Array.isArray(p.steps) ? _tourSanitizeSteps(p.steps) : [];
         if (okId && okScreen && steps.length) return { id: p.id, screen: p.screen, steps };
       } catch (_) {}
       _tourPendingClear();
@@ -4148,7 +4159,28 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-filters'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips'];
+    // PSI詳細のポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
+    const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips'];
+    // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
+    const _TOUR_BEFORE = {
+      // くらしの指標のウィジェットをタップした時のPSI詳細ポップアップを開く(すでに開いていれば何もしない)。中身が描画されるまで最大約3秒待つ
+      'open-psi': async () => {
+        const pop = document.getElementById('stat-criteria-popover');
+        if (!pop) return false;
+        if (!(pop.classList.contains('visible') && pop.dataset.kind === 'psi')) toggleStatCriteria('psi');
+        const t0 = Date.now();
+        for (;;) {
+          if (pop.querySelector('.psi-map') && _tourVisible(pop.querySelector('.psi-mode'))) {
+            if (_tourState) _tourState.psiOpened = true;
+            return true;
+          }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
+    };
+    function _closeStatPopover() { document.getElementById('stat-criteria-popover')?.classList.remove('visible'); }
     const _TOUR_DONE_PREFIX = 'app_tour_done_';
     let _tourState = null;   // { id, persist, steps, index, locked }
 
@@ -4206,7 +4238,10 @@
       _tourState = { id, persist: !!persist, steps: [], index: -1, locked: false, onEnd };
       const st = _tourState;
       // 見つかるステップだけ残す(全部無ければ何も出さず、記録もしない)。anchorがnullのステップは、中央に出すカードで、常に残す
-      const found = await Promise.all(steps.map(step => step.anchor ? _tourWaitAnchor(step.anchor) : Promise.resolve(true)));
+      // beforeを持つステップと、それ以降のステップは、beforeの実行(ポップアップを開く等)の後に初めて出現するため、最初の存在確認から外す
+      const firstBefore = steps.findIndex(step => step.before);
+      const found = await Promise.all(steps.map((step, i) =>
+        (!step.anchor || (firstBefore >= 0 && i >= firstBefore)) ? Promise.resolve(true) : _tourWaitAnchor(step.anchor)));
       if (_tourState !== st) return;
       st.steps = steps.filter((_, i) => found[i]);
       if (!st.steps.some(step => step.anchor)) { st.steps = []; _tourEnd(false); return; }
@@ -4218,16 +4253,30 @@
       _tourShow(0);
     }
 
-    function _tourShow(i) {
+    async function _tourShow(i) {
       const st = _tourState;
       if (!st) return;
       if (i >= st.steps.length) { _tourEnd(true); return; }
       const step = st.steps[i];
       const center = !step.anchor;
+      // beforeがあれば、先に実行する(失敗したら、そのステップ以降は出さずに終了。ウィジェットの案内だけで終わる)。実行中は「次へ」を受け付けない
+      if (step.before) {
+        const fn = _TOUR_BEFORE[step.before];
+        st.busy = true;
+        let ok = false;
+        try { ok = !!(fn && await fn()); } catch (_) { ok = false; }
+        st.busy = false;
+        if (_tourState !== st) return;
+        if (!ok) { _tourEnd(true); return; }
+        const first = await _tourWaitAnchor(step.anchor, 2500);
+        if (_tourState !== st) return;
+        if (!first) { _tourEnd(true); return; }
+      }
       const el = center ? null : _tourAnchorEl(step.anchor);
       if (!center && !_tourVisible(el)) { _tourShow(i + 1); return; }   // 途中で消えたステップは飛ばす
       st.index = i;
-      if (el && !step.noScroll) el.scrollIntoView({ block: 'center', inline: 'nearest' });   // noScroll: 画面下端に固定の要素(ボトムナビ)など
+      const inPopover = !!step.anchor && _TOUR_POPOVER_ANCHORS.includes(step.anchor);
+      if (el && !step.noScroll) el.scrollIntoView({ block: inPopover ? 'nearest' : 'center', inline: 'nearest' });   // noScroll: 画面下端に固定の要素(ボトムナビ)など
       const isLast = i === st.steps.length - 1;
       document.getElementById('tour-layer')?.classList.toggle('tour-center', center);
       const titleEl = document.getElementById('tour-tip-title');
@@ -4237,6 +4286,7 @@
       document.getElementById('tour-next').textContent = step.nextLabel || (isLast ? 'わかった' : '次へ');
       document.getElementById('tour-skip').style.display = isLast ? 'none' : '';
       requestAnimationFrame(_tourReposition);
+      if (inPopover) setTimeout(_tourReposition, 250);   // ポップアップの描画・スクロールが落ち着いた後に、位置を測り直す
     }
 
     function _tourReposition() {
@@ -4276,7 +4326,7 @@
     }
 
     function tourNext() {
-      if (!_tourState) return;
+      if (!_tourState || _tourState.busy) return;
       _tourShow(_tourState.index + 1);
     }
     function tourSkip() { _tourEnd(true); }
@@ -4294,6 +4344,7 @@
       window.removeEventListener('orientationchange', _tourReposition);
       document.getElementById('tour-layer')?.classList.remove('visible', 'tour-center');
       if (st.locked) unlockScroll();
+      if (st.psiOpened) _closeStatPopover();   // 案内が開いたPSI詳細のポップアップは、終了で閉じる
       if (typeof st.onEnd === 'function') {
         try { st.onEnd({ shown: st.steps.length > 0, record: !!record }); } catch (_) {}
       }
@@ -4346,7 +4397,12 @@
     // くらしの指標(PM2.5)の案内。1.8.16の紹介カードの「使ってみる」(ツアーID pm25-1、文言はサーバー側`content/whats-new.json`)と同じ内容。
     // 文言は、サーバーの1.8.16のentryとアプリ内`tourPm25Step1`の2か所(変える時は両方)
     function _pm25TourSteps() {
-      return [{ anchor: 'news-stats', text: t('tourPm25Step1') }];
+      return [
+        { anchor: 'news-stats', text: t('tourPm25Step1') },
+        { anchor: 'psi-toggle', before: 'open-psi', text: t('tourPm25Step2') },
+        { anchor: 'psi-map', text: t('tourPm25Step3') },
+        { anchor: 'psi-chips', text: t('tourPm25Step4') },
+      ];
     }
     const _tutorialWait = ms => new Promise(r => setTimeout(r, ms));
     const TUTORIALS = [
@@ -4357,6 +4413,7 @@
       {
         id: 'pm25-1', nameKey: 'tutorialName4', descKey: 'tutorialDesc4', steps: _pm25TourSteps,
         prepare: async () => { switchNav('news'); await _tutorialWait(600); },
+        cleanup: () => _closeStatPopover(),
       },
       {
         id: 'calendar-1', nameKey: 'tutorialName2', descKey: 'tutorialDesc2', steps: _calendarTourSteps,
