@@ -1225,7 +1225,7 @@
 
     /* PSIタップの詳細(設計書234): 右上の「1時間 | 24時間」で、PSI(24時間値)とPM2.5(1時間値)の表示を切り替える。
        ポップアップは画面に収まる高さで、通常は内部スクロールしない(念のためmax-heightとoverflow-yを残す) */
-    #stat-criteria-popover.psi-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    #stat-criteria-popover.psi-detail { gap: 12px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     #stat-criteria-popover.psi-detail > * { flex-shrink: 0; }
     .psi-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .psi-updated { font-size: 12px; color: var(--warm-gray); font-weight: 600; }
@@ -1237,7 +1237,7 @@
     .psi-mode-btn { min-height: 32px; min-width: 52px; padding: 0 11px; border: none; background: transparent; color: var(--warm-gray); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .psi-mode-btn.active { background: var(--caramel); color: #fff; font-weight: 700; }
     /* エリアのタイル: 地図に近い配置(上=北、中=西・中心部・東、下=南) */
-    .psi-map { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: ". n ." "w c e" ". s ."; gap: 6px; }
+    .psi-map { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: ". n ." "w c e" ". s ."; gap: 8px; }
     .psi-pos-n { grid-area: n; } .psi-pos-w { grid-area: w; } .psi-pos-c { grid-area: c; } .psi-pos-e { grid-area: e; } .psi-pos-s { grid-area: s; }
     .psi-tile { border-radius: 10px; padding: 5px 4px; text-align: center; background: var(--sand); color: var(--midnight); }
     .psi-tile-main { box-shadow: inset 0 0 0 2px var(--midnight); }
@@ -1254,7 +1254,7 @@
     .pm25-lv-elevated { background: var(--pm25-elevated-bg); color: var(--pm25-elevated-text); }
     .pm25-lv-high { background: var(--pm25-high-bg); color: var(--pm25-high-text); }
     .pm25-lv-veryhigh { background: var(--pm25-veryhigh-bg); color: var(--pm25-veryhigh-text); }
-    .psi-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .psi-chips { display: flex; flex-wrap: wrap; gap: 8px 8px; }
     .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
     .psi-chip-cur { box-shadow: inset 0 0 0 2px var(--midnight); font-weight: 800; }
 
