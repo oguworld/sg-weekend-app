@@ -456,8 +456,8 @@
         psiDesc1h: 'PM2.5(微小粒子)の、直近1時間の値です。1時間ごとに更新されます',
         psiDesc1hWidget: 'エリア別のPM2.5(微小粒子)の、直近1時間の値です。太枠の中心部が、上の指標の値です',
         psiDesc24h: 'エリア別のPSI(過去24時間の平均値)です。1時間ごとに更新されます',
-        psiNote24h: 'NEA(シンガポール環境庁)のデータです。PSIは過去24時間の平均値をもとにした指標です',
-        psiNote1h: 'NEA(シンガポール環境庁)のデータです。区分もNEAの基準(µg/m³)です',
+        psiNote24h: 'NEA(シンガポール環境庁)データ。PSIは24時間平均',
+        psiNote1h: 'NEA(シンガポール環境庁)データ。基準もNEAの値',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
@@ -711,7 +711,7 @@
       if ((mode || _psiMode) === '1h') {
         const cur = _pm25BandOfValue(central && central.pm25);
         return _PM25_BANDS.map(b =>
-          `<span class="psi-chip pm25-lv-${b.cls}${cur && cur.cls === b.cls ? ' psi-chip-cur' : ''}">${b.label} ${b.range}</span>`
+          `<span class="psi-chip pm25-lv-${b.cls}${cur && cur.cls === b.cls ? ' psi-chip-cur' : ''}">${STAT_LEVEL_EMOJI.pm25[b.label] ? STAT_LEVEL_EMOJI.pm25[b.label] + ' ' : ''}${b.label} ${b.range}</span>`
         ).join('');
       }
       const currentLevel = (central && _psiLevelOfValue(central.psi)) || _statCurrentLevel.psi;
@@ -743,12 +743,12 @@
           ? (_psiWidgetKind === 'pm25' ? t('psiDesc1hWidget') : t('psiDesc1h'))
           : (_psiWidgetKind === 'psi' ? STAT_CRITERIA_DESC.psi : t('psiDesc24h'));
         const note = _psiMode === '1h' ? t('psiNote1h') : t('psiNote24h');
-        // 並び: 説明+トグル → タイル → 注記(説明) → 基準のチップ(凡例)
+        // 並び: 説明+トグル → タイル → 基準のチップ(凡例) → 注記(NEAのデータです…)
         return `<div class="psi-bar"><span class="psi-updated">${updated}</span><div class="psi-mode" role="tablist">${btn('1h', t('psiMode1h'))}${btn('24h', t('psiMode24h'))}</div></div>`
           + `<div class="stat-criteria-desc psi-desc">${escapeHtml(desc)}</div>`
           + _psiTilesHtml(d)
-          + `<div class="psi-note">${escapeHtml(note)}</div>`
-          + `<div class="psi-chips">${_psiChipsHtml(d)}</div>`;
+          + `<div class="psi-chips">${_psiChipsHtml(d)}</div>`
+          + `<div class="psi-note">${escapeHtml(note)}</div>`;
       }
       // 読み込み中・失敗時: ウィジェットがPM2.5の時はPM2.5の基準、それ以外は従来のPSIの説明と基準
       const fbPm25 = _psiWidgetKind === 'pm25';
