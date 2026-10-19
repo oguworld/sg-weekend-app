@@ -818,10 +818,13 @@
       { code: 'AUD', flag: '🇦🇺' }, { code: 'PHP', flag: '🇵🇭' }, { code: 'TWD', flag: '🇹🇼' },
       { code: 'HKD', flag: '🇭🇰' }, { code: 'USD', flag: '🇺🇸' }, { code: 'EUR', flag: '🇪🇺' },
     ];
-    // 通貨ごとの読みやすさ優先の整形（整数桁区切りが大きすぎる通貨は小数桁、桁数が大きいIDR/VNDは整数桁区切り）
+    // 通貨ごとの読みやすさ優先の整形（JPYは整数桁区切り、桁数が突出するIDR/VNDは「万」単位に短縮、他は小数1桁）
     function _fxFormatAmount(code, amount) {
-      if (code === 'JPY' || code === 'IDR' || code === 'VND') {
+      if (code === 'JPY') {
         return Math.round(amount).toLocaleString('ja-JP');
+      }
+      if (code === 'IDR' || code === 'VND') {
+        return (amount / 10000).toFixed(1) + '万';
       }
       return amount.toLocaleString('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     }
