@@ -1304,8 +1304,8 @@
     .cal-day-group { display: grid; grid-template-columns: 30px 1fr; gap: 8px; padding: 13px 0; }
     .cal-day-group:first-child { padding-top: 0; }
     .cal-day-date { text-align: center; line-height: 1.15; padding-top: 1px; }
-    .cal-day-num { display: block; font-size: 18px; font-weight: 700; color: var(--warm-gray); }
-    .cal-day-wd { display: block; font-size: 13px; color: var(--warm-gray); opacity: 0.7; }
+    .cal-day-num { display: block; font-size: 14px; font-weight: 700; color: var(--warm-gray); }
+    .cal-day-wd { display: none; font-size: 13px; color: var(--warm-gray); opacity: 0.7; }
     .cal-day-holiday .cal-day-num { color: var(--holiday-red); }
     .cal-day-holiday .cal-day-wd { color: var(--holiday-red); opacity: 0.75; }
     .cal-day-events { min-width: 0; }
