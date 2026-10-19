@@ -1240,7 +1240,6 @@
     .psi-map { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: ". n ." "w c e" ". s ."; gap: 8px; }
     .psi-pos-n { grid-area: n; } .psi-pos-w { grid-area: w; } .psi-pos-c { grid-area: c; } .psi-pos-e { grid-area: e; } .psi-pos-s { grid-area: s; }
     .psi-tile { border-radius: 10px; padding: 5px 4px; text-align: center; background: var(--sand); color: var(--midnight); }
-    .psi-tile-main { box-shadow: inset 0 0 0 2px var(--midnight); }
     .psi-tile-name { font-size: 12px; font-weight: 600; line-height: 1.3; }
     .psi-tile-val { font-size: 19px; font-weight: 800; line-height: 1.2; }
     .psi-tile-sub { font-size: 11px; line-height: 1.3; opacity: 0.9; min-height: 1.3em; }
@@ -1256,7 +1255,6 @@
     .pm25-lv-veryhigh { background: var(--pm25-veryhigh-bg); color: var(--pm25-veryhigh-text); }
     .psi-chips { display: flex; flex-wrap: wrap; gap: 8px 8px; }
     .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
-    .psi-chip-cur { box-shadow: inset 0 0 0 2px var(--midnight); font-weight: 800; }
 
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }

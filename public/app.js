@@ -454,7 +454,7 @@
         psiMode24h: 'PSI',
         psiLoading: '読み込み中…',
         psiDesc1h: 'PM2.5(微小粒子)の、直近1時間の値です。1時間ごとに更新されます',
-        psiDesc1hWidget: 'エリア別のPM2.5(微小粒子)の、直近1時間の値です。太枠の中心部が、上の指標の値です',
+        psiDesc1hWidget: 'エリア別のPM2.5(微小粒子)の、直近1時間の値です。上の指標は、中心部の値です',
         psiDesc24h: 'エリア別のPSI(過去24時間の平均値)です。1時間ごとに更新されます',
         psiNote24h: 'NEA(シンガポール環境庁)データ。PSIは24時間平均',
         psiNote1h: 'NEA(シンガポール環境庁)データ。基準もNEAの値',
@@ -706,17 +706,15 @@
       const lv = _psiLevelOfValue(r && r.psi);
       return { value: r ? r.psi : null, cls: lv ? `psi-lv-${_PSI_LEVEL_CLASS[lv]}` : '', label: lv || '' };
     }
+    // 凡例のチップ。どのエリアも「選ばれた状態」にしないため、現在の区分の強調は付けない(2026-10-19ユーザー指定)
     function _psiChipsHtml(d, mode) {
-      const central = d && Array.isArray(d.regions) ? d.regions.find(r => r && r.id === 'central') : null;
       if ((mode || _psiMode) === '1h') {
-        const cur = _pm25BandOfValue(central && central.pm25);
         return _PM25_BANDS.map(b =>
-          `<span class="psi-chip pm25-lv-${b.cls}${cur && cur.cls === b.cls ? ' psi-chip-cur' : ''}">${STAT_LEVEL_EMOJI.pm25[b.label] ? STAT_LEVEL_EMOJI.pm25[b.label] + ' ' : ''}${b.label} ${b.range}</span>`
+          `<span class="psi-chip pm25-lv-${b.cls}">${STAT_LEVEL_EMOJI.pm25[b.label] ? STAT_LEVEL_EMOJI.pm25[b.label] + ' ' : ''}${b.label} ${b.range}</span>`
         ).join('');
       }
-      const currentLevel = (central && _psiLevelOfValue(central.psi)) || _statCurrentLevel.psi;
       return STAT_CRITERIA.psi.map(it =>
-        `<span class="psi-chip psi-lv-${_PSI_LEVEL_CLASS[it.label] || 'normal'}${it.label === currentLevel ? ' psi-chip-cur' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
+        `<span class="psi-chip psi-lv-${_PSI_LEVEL_CLASS[it.label] || 'normal'}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
       ).join('');
     }
     function _psiTilesHtml(d) {
@@ -725,7 +723,7 @@
       const tile = (id, pos) => {
         const r = by[id] || { id, name: _PSI_REGION_NAMES[id] };
         const info = _psiModeInfo(r);
-        return `<div class="psi-tile psi-pos-${pos} ${info.cls}${id === 'central' ? ' psi-tile-main' : ''}">`
+        return `<div class="psi-tile psi-pos-${pos} ${info.cls}">`
           + `<div class="psi-tile-name">${escapeHtml(r.name || _PSI_REGION_NAMES[id])}</div>`
           + `<div class="psi-tile-val">${escapeHtml(_psiCell(info.value))}</div>`
           + `<div class="psi-tile-sub">${escapeHtml(info.label || (_psiMode === '1h' ? 'µg/m³' : ''))}</div></div>`;
