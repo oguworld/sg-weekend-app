@@ -473,6 +473,9 @@
         tutorialDesc2: '予定の説明と、旅行シーズン情報の入口',
         tutorialName3: '旅行シーズン情報',
         tutorialDesc3: '月の切り替えと、都市ごとの詳細',
+        tutorialName4: 'くらしの指標(PM2.5)',
+        tutorialDesc4: 'PM2.5のタップと、エリア別の詳細',
+        tourPm25Step1: 'PM2.5(中心部の1時間値)をタップすると、エリア別の詳細が見られます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
@@ -4340,10 +4343,19 @@
         { anchor: 'cal-fare-entry', text: t('tourCalStep2') },
       ];
     }
+    // くらしの指標(PM2.5)の案内。1.8.16の紹介カードの「使ってみる」(ツアーID pm25-1、文言はサーバー側`content/whats-new.json`)と同じ内容。
+    // 文言は、サーバーの1.8.16のentryとアプリ内`tourPm25Step1`の2か所(変える時は両方)
+    function _pm25TourSteps() {
+      return [{ anchor: 'news-stats', text: t('tourPm25Step1') }];
+    }
     const _tutorialWait = ms => new Promise(r => setTimeout(r, ms));
     const TUTORIALS = [
       {
         id: _WELCOME_TOUR_ID, nameKey: 'tutorialName1', descKey: 'tutorialDesc1', steps: _welcomeTourSteps,
+        prepare: async () => { switchNav('news'); await _tutorialWait(600); },
+      },
+      {
+        id: 'pm25-1', nameKey: 'tutorialName4', descKey: 'tutorialDesc4', steps: _pm25TourSteps,
         prepare: async () => { switchNav('news'); await _tutorialWait(600); },
       },
       {
