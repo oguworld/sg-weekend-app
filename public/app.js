@@ -450,13 +450,13 @@
         tourWelcomeStep3: '為替・PSI(大気汚染)・デング熱の今の値です。PSIとデング熱は、タップすると基準が見られます',
         tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
         psiUpdated: '更新',
-        psiMode1h: '1時間',
-        psiMode24h: '24時間',
+        psiMode1h: 'PM2.5',
+        psiMode24h: 'PSI',
         psiLoading: '読み込み中…',
         psiDesc1h: 'PM2.5(微小粒子)の、直近1時間の値です。1時間ごとに更新されます',
         psiDesc1hWidget: 'エリア別のPM2.5(微小粒子)の、直近1時間の値です。太枠の中心部が、上の指標の値です',
-        psiDesc24h: 'エリア別のPSI(過去24時間の平均的な汚染の程度)です。1時間ごとに更新されます',
-        psiNote24h: 'NEA(シンガポール環境庁)のデータです。PSIは過去24時間の平均的な汚染の程度です',
+        psiDesc24h: 'エリア別のPSI(過去24時間の平均値)です。1時間ごとに更新されます',
+        psiNote24h: 'NEA(シンガポール環境庁)のデータです。PSIは過去24時間の平均値をもとにした指標です',
         psiNote1h: 'NEA(シンガポール環境庁)のデータです。区分もNEAの基準(µg/m³)です',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         fareSheetLoading: '読み込み中…',
@@ -670,12 +670,11 @@
     const _PSI_MAP_ORDER = ['north', 'west', 'central', 'east', 'south'];
     const _PSI_REGION_NAMES = { north: '北部', west: '西部', central: '中心部', east: '東部', south: '南部' };
     const _PSI_DETAIL_TTL_MS = 5 * 60 * 1000;
-    const _PSI_MODE_KEY = 'sg_psi_mode';
     let _psiDetail = null;          // { data, fetchedAt }
     let _psiDetailPromise = null;
-    // 保存済みの選択(sg_psi_mode)があればそれを優先。無ければ、ウィジェットがPM2.5(1時間値)の時は'1h'、PSIの時は'24h'で開く
-    let _psiModeStored = (() => { try { return localStorage.getItem(_PSI_MODE_KEY); } catch (_) { return null; } })();
-    let _psiMode = _psiModeStored === '1h' ? '1h' : '24h';
+    // 開くたびに、上のウィジェットと同じ指標で始める(PM2.5(1時間値)の時は'1h'=PM2.5、PSIのフォールバック時は'24h'=PSI)。
+    // 右上の「PM2.5 | PSI」の切り替えは、そのポップアップを開いている間だけ有効で、保存しない(2026-10-19ユーザー指定『まず1時間毎のPM2.5』)
+    let _psiMode = '1h';
     let _psiWidgetKind = null;   // 上のウィジェットが何を表示しているか: 'pm25'(中心部のPM2.5 1時間値)/'psi'(従来の中心部PSI。pm25が無い時のフォールバック)/null(未取得)
 
     function _psiLevelOfValue(v) {
@@ -776,6 +775,7 @@
       return _psiDetailPromise;
     }
     function _openPsiPopover(popover) {
+      _psiMode = _psiWidgetKind === 'psi' ? '24h' : '1h';   // 開くたびに、ウィジェットと同じ指標(通常はPM2.5)で始める
       popover.dataset.kind = 'psi';
       popover.classList.add('visible', 'psi-detail');
       const fresh = _psiDetail && Date.now() - _psiDetail.fetchedAt < _PSI_DETAIL_TTL_MS;
@@ -786,11 +786,9 @@
         popover.innerHTML = _psiPopoverHtml(false);
       });
     }
-    // 「1時間 | 24時間」の切り替え。選んだ表示は端末に保存し、次回も同じにする
+    // 「PM2.5 | PSI」の切り替え(開いている間だけ有効。保存しない)
     function setPsiMode(mode) {
       _psiMode = mode === '1h' ? '1h' : '24h';
-      _psiModeStored = _psiMode;
-      try { localStorage.setItem(_PSI_MODE_KEY, _psiMode); } catch (_) {}
       const popover = document.getElementById('stat-criteria-popover');
       if (!popover || popover.dataset.kind !== 'psi' || !_psiDetailValid(_psiDetail && _psiDetail.data)) return;
       popover.innerHTML = _psiPopoverHtml(false);
@@ -830,7 +828,6 @@
           const lbl = document.getElementById('stat-psi-label');
           if (lbl) { lbl.dataset.i18n = stat.label; lbl.textContent = t(stat.label); }
           _psiWidgetKind = stat.key;
-          if (stat.key === 'pm25' && _psiModeStored === null && _psiMode !== '1h') _psiMode = '1h';   // 選択を保存していない人は、ウィジェットと同じ1時間で開く
         }
         if (data.dengue) { setHTML('stat-dengue', `${data.dengue.clusterCount}区<span class="stat-val-level">(${data.dengue.level})</span>`); _statCurrentLevel.dengue = data.dengue.level; }
         if (data.weather) {
