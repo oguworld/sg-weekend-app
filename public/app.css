@@ -1189,7 +1189,7 @@
     #stat-criteria-popover {
       display: none;
       flex-direction: column;
-      gap: 8px;
+      gap: 14px;
       position: absolute;
       top: 100%;
       left: 8px;
@@ -1203,7 +1203,7 @@
       box-shadow: var(--shadow-card);
     }
     #stat-criteria-popover.visible { display: flex; }
-    .stat-criteria-desc { font-size: 12px; color: var(--warm-gray); line-height: 1.5; }
+    .stat-criteria-desc { font-size: 13px; color: var(--warm-gray); line-height: 1.5; }
     .stat-criteria-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .stat-criteria-chip {
       flex-shrink: 0;
@@ -1212,7 +1212,7 @@
       background: transparent;
       border: 1.5px solid var(--sand-dark);
       color: var(--warm-gray);
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       white-space: nowrap;
     }
@@ -1228,19 +1228,19 @@
     #stat-criteria-popover.psi-detail { gap: 12px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     #stat-criteria-popover.psi-detail > * { flex-shrink: 0; }
     .psi-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .psi-updated { font-size: 12px; color: var(--warm-gray); font-weight: 600; }
+    .psi-updated { font-size: 13px; color: var(--warm-gray); font-weight: 600; }
     .psi-desc { font-size: 13px; }
     .psi-loading { font-size: 14px; color: var(--warm-gray); padding: 4px 0; }
     .psi-note { white-space: nowrap; font-size: 11px; color: var(--warm-gray); line-height: 1.5; }
     /* 右上の2択トグル(ラベル必須。選択中は塗り、非選択は枠) */
     .psi-mode { display: inline-flex; flex-shrink: 0; border: 1.5px solid var(--sand-dark); border-radius: 22px; overflow: hidden; }
-    .psi-mode-btn { min-height: 32px; min-width: 52px; padding: 0 11px; border: none; background: transparent; color: var(--warm-gray); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .psi-mode-btn { min-height: 32px; min-width: 52px; padding: 0 11px; border: none; background: transparent; color: var(--warm-gray); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .psi-mode-btn.active { background: var(--caramel); color: #fff; font-weight: 700; }
     /* エリアのタイル: 地図に近い配置(上=北、中=西・中心部・東、下=南) */
     .psi-map { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-areas: ". n ." "w c e" ". s ."; gap: 8px; }
     .psi-pos-n { grid-area: n; } .psi-pos-w { grid-area: w; } .psi-pos-c { grid-area: c; } .psi-pos-e { grid-area: e; } .psi-pos-s { grid-area: s; }
     .psi-tile { border-radius: 10px; padding: 5px 4px; text-align: center; background: var(--sand); color: var(--midnight); }
-    .psi-tile-name { font-size: 12px; font-weight: 600; line-height: 1.3; }
+    .psi-tile-name { font-size: 13px; font-weight: 600; line-height: 1.3; }
     .psi-tile-val { font-size: 19px; font-weight: 800; line-height: 1.2; }
     .psi-tile-sub { font-size: 11px; line-height: 1.3; opacity: 0.9; min-height: 1.3em; }
     /* 区分の色(タイル・基準のチップで共通)。PSIとPM2.5は別の変数 */
@@ -1254,17 +1254,17 @@
     .pm25-lv-high { background: var(--pm25-high-bg); color: var(--pm25-high-text); }
     .pm25-lv-veryhigh { background: var(--pm25-veryhigh-bg); color: var(--pm25-veryhigh-text); }
     .psi-chips { display: flex; flex-wrap: wrap; gap: 8px 8px; }
-    .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 13px; font-weight: 600; white-space: nowrap; }
 
     /* 為替「かんたん換算」(設計書236): 100 SGDが主要12通貨でいくらかの早見表。12行は縦長になるため内部スクロール付き */
     #stat-criteria-popover.fx-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     #stat-criteria-popover.fx-detail > * { flex-shrink: 0; }
-    .fx-base { font-size: 15px; font-weight: 700; color: var(--midnight); }
+    .fx-base { font-size: 14px; font-weight: 700; color: var(--midnight); }
     .fx-rows { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(6, auto); gap: 2px 10px; }
     .fx-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 4px; border-bottom: 1px solid var(--sand); }
     .fx-row:nth-last-child(-n+2) { border-bottom: none; }
-    .fx-row-cur { font-size: 14px; font-weight: 600; color: var(--warm-gray); white-space: nowrap; }
-    .fx-row-val { font-size: 16px; font-weight: 700; color: var(--midnight); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .fx-row-cur { font-size: 13px; font-weight: 600; color: var(--warm-gray); white-space: nowrap; }
+    .fx-row-val { font-size: 15px; font-weight: 700; color: var(--midnight); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
