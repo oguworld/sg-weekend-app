@@ -676,7 +676,10 @@
       const currentLevel = _statCurrentLevel[kind];
       const chips = STAT_CRITERIA[kind].map(it => {
         const tierCls = _DENGUE_LEVEL_CLASS[it.label] ? ` dengue-lv-${_DENGUE_LEVEL_CLASS[it.label]}` : '';
-        return `<span class="stat-criteria-chip${tierCls}${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`;
+        // デング熱は凡例の3色文字色分けのみとし、現在値の塗りつぶしハイライトは行わない(2026-10-19ユーザー指定)。
+        // kind==='dengue'以外(将来の拡張用)は従来どおりactiveクラスで現在値を強調する。
+        const activeCls = (kind !== 'dengue' && it.label === currentLevel) ? ' active' : '';
+        return `<span class="stat-criteria-chip${tierCls}${activeCls}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`;
       }).join('');
       popover.innerHTML = `<div class="stat-criteria-desc">${STAT_CRITERIA_DESC[kind]}</div><div class="stat-criteria-chips">${chips}</div>`;
       popover.dataset.kind = kind;
