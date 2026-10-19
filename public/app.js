@@ -481,6 +481,9 @@
         tourPm25Step4: '色と顔の絵文字の見方です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
+        fxConverterTitle: 'かんたん換算',
+        fxConverterBase: '100 SGD は:',
+        fxConverterUnavailable: 'レートを取得できませんでした。しばらくしてから開き直してください。',
         labelWhoWith: '一緒に行く人',
         labelWhoSolo: '🚶 ひとりで',
         labelWhoCouple: '💑 夫婦・カップル',
@@ -666,7 +669,8 @@
         return;
       }
       if (kind === 'psi') { _openPsiPopover(popover); return; }
-      popover.classList.remove('psi-detail');
+      if (kind === 'fx') { _openFxPopover(popover); return; }
+      popover.classList.remove('psi-detail', 'fx-detail');
       const currentLevel = _statCurrentLevel[kind];
       const chips = STAT_CRITERIA[kind].map(it =>
         `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
@@ -796,6 +800,7 @@
     function _openPsiPopover(popover) {
       _psiMode = _psiWidgetKind === 'psi' ? '24h' : '1h';   // 開くたびに、ウィジェットと同じ指標(通常はPM2.5)で始める
       popover.dataset.kind = 'psi';
+      popover.classList.remove('fx-detail');
       popover.classList.add('visible', 'psi-detail');
       const fresh = _psiDetail && Date.now() - _psiDetail.fetchedAt < _PSI_DETAIL_TTL_MS;
       popover.innerHTML = _psiPopoverHtml(!fresh);
@@ -804,6 +809,41 @@
         if (popover.dataset.kind !== 'psi' || !popover.classList.contains('visible')) return;
         popover.innerHTML = _psiPopoverHtml(false);
       });
+    }
+    // ─── 為替「かんたん換算」(設計書236、2026-10-19): 100 SGDが主要12通貨でいくらかの早見表 ───
+    // 入力欄・通貨選択・⇄切替は無し(速さ優先)。loadWidgetStats()が保持した_fxRatesを使い、新規通信せず同期的に描画する
+    const FX_QUICK_CURRENCIES = [
+      { code: 'JPY', flag: '🇯🇵' }, { code: 'IDR', flag: '🇮🇩' }, { code: 'MYR', flag: '🇲🇾' },
+      { code: 'THB', flag: '🇹🇭' }, { code: 'VND', flag: '🇻🇳' }, { code: 'INR', flag: '🇮🇳' },
+      { code: 'AUD', flag: '🇦🇺' }, { code: 'PHP', flag: '🇵🇭' }, { code: 'TWD', flag: '🇹🇼' },
+      { code: 'HKD', flag: '🇭🇰' }, { code: 'USD', flag: '🇺🇸' }, { code: 'EUR', flag: '🇪🇺' },
+    ];
+    // 通貨ごとの読みやすさ優先の整形（整数桁区切りが大きすぎる通貨は小数桁、桁数が大きいIDR/VNDは整数桁区切り）
+    function _fxFormatAmount(code, amount) {
+      if (code === 'JPY' || code === 'IDR' || code === 'VND') {
+        return Math.round(amount).toLocaleString('ja-JP');
+      }
+      return amount.toLocaleString('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    }
+    function _fxPopoverHtml() {
+      if (!_fxRates) {
+        return `<div class="stat-criteria-desc">${escapeHtml(t('fxConverterUnavailable'))}</div>`;
+      }
+      const rows = FX_QUICK_CURRENCIES.map(({ code, flag }) => {
+        const rate = _fxRates[code];
+        if (!Number.isFinite(rate)) return '';
+        const amount = rate * 100;
+        return `<div class="fx-row"><span class="fx-row-cur">${flag} ${code}</span><span class="fx-row-val">${escapeHtml(_fxFormatAmount(code, amount))}</span></div>`;
+      }).join('');
+      return `<div class="stat-criteria-desc">${escapeHtml(t('fxConverterTitle'))}</div>`
+        + `<div class="fx-base">${escapeHtml(t('fxConverterBase'))}</div>`
+        + `<div class="fx-rows">${rows}</div>`;
+    }
+    function _openFxPopover(popover) {
+      popover.dataset.kind = 'fx';
+      popover.classList.remove('psi-detail');
+      popover.classList.add('visible', 'fx-detail');
+      popover.innerHTML = _fxPopoverHtml();
     }
     // 「PM2.5 | PSI」の切り替え(開いている間だけ有効。保存しない)
     function setPsiMode(mode) {
@@ -833,6 +873,7 @@
 
     // 指標ウィジェットの前回取得時刻（設計書213: 画面遷移時の再取得判定に使用。成功時のみ更新）
     let _widgetStatsLastLoadedAt = 0;
+    let _fxRates = null;   // くらし画面「かんたん換算」(設計書236)用。100 SGD換算の12通貨レート。loadWidgetStats()が保持、タップ時は新規fetchしない
     async function loadWidgetStats() {
       try {
         const res = await fetch(API_BASE + '/api/widget-stats?city=' + getCity());
@@ -840,6 +881,7 @@
         const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
         const setHTML = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
         if (data.exchangeRate) setText('stat-fx', data.exchangeRate.toFixed(1) + '円');
+        if (data.fxRates) _fxRates = data.fxRates;
         if (data.psi) _statCurrentLevel.psi = data.psi.level;   // PSIの基準のチップの強調用(ポップアップの24時間モード)
         // 指標の値: 新しいサーバー応答(pm25あり)=中心部のPM2.5(1時間値)、無ければ従来の中心部のPSI(24時間値)にフォールバック
         const stat = data.pm25 ? { key: 'pm25', label: 'statPm25', v: data.pm25 } : (data.psi ? { key: 'psi', label: 'statPsi', v: data.psi } : null);

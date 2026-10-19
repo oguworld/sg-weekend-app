@@ -610,10 +610,12 @@ app.get('/api/weather', async (req, res) => {
 
 // GET /api/school-calendar — 長期休暇設定
 // GET /api/widget-stats — ホーム画面上部の指標ウィジェット（為替・天気・PSI）
-// 為替: Frankfurter（無料・キー不要）/ 天気: OpenWeatherMap（既存キー流用、降水確率付き）/ PSI: data.gov.sg（SGのみ）
+// 為替: open.er-api.com（無料・キー不要、exchangerate-api.comの無料版。166通貨全件を1回で返す）/ 天気: OpenWeatherMap（既存キー流用、降水確率付き）/ PSI: data.gov.sg（SGのみ）
 // フィールドごとに個別キャッシュ（1つが取得失敗しても他のフィールドの鮮度に影響しない。
 // 失敗時は古いキャッシュ値があればそれをフォールバックとして返す）
 const widgetStatsCache = new Map(); // city -> { exchangeRate: {value,cachedAt}, weather: {...}, psi: {...} }
+// くらし画面「かんたん換算」(設計書236)対象12通貨。open.er-api.comのratesから抽出する
+const FX_QUICK_CURRENCIES = ['JPY', 'IDR', 'MYR', 'THB', 'VND', 'INR', 'AUD', 'PHP', 'TWD', 'HKD', 'USD', 'EUR'];
 // フィールドごとにTTLを個別化（設計書213）。元データの更新頻度・体感上の鮮度要求に応じて調整。
 const WIDGET_STATS_TTL_MS = {
   exchangeRate: 30 * 60 * 1000,  // 30分（元データが平日1日1回更新のため現状維持）
@@ -696,7 +698,7 @@ app.get('/api/widget-stats', async (req, res) => {
   const isFresh = (field) => cityCache[field] && now - cityCache[field].cachedAt < WIDGET_STATS_TTL_MS[field];
 
   const [fxSettled, weatherSettled, psiSettled, nowcastSettled, dengueSettled, pm25Settled] = await Promise.allSettled([
-    isFresh('exchangeRate') ? Promise.resolve(null) : axios.get(`https://api.frankfurter.dev/v1/latest?base=${currency}&symbols=JPY`, { timeout: 6000 }),
+    isFresh('exchangeRate') ? Promise.resolve(null) : axios.get(`https://open.er-api.com/v6/latest/${currency}`, { timeout: 6000 }),
     isFresh('weather') || !process.env.OPENWEATHER_API_KEY
       ? Promise.resolve(null)
       : axios.get(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(CITIES[city].weatherQ)}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric&lang=ja`, { timeout: 6000 }),
@@ -715,7 +717,13 @@ app.get('/api/widget-stats', async (req, res) => {
   ]);
 
   if (fxSettled.status === 'fulfilled' && fxSettled.value) {
-    cityCache.exchangeRate = { value: fxSettled.value.data.rates.JPY, cachedAt: now };
+    const rates = fxSettled.value.data.rates;
+    cityCache.exchangeRate = { value: rates.JPY, cachedAt: now };
+    const fxRates = {};
+    for (const code of FX_QUICK_CURRENCIES) {
+      if (Number.isFinite(rates[code])) fxRates[code] = rates[code];
+    }
+    cityCache.fxRates = { value: fxRates, cachedAt: now };
   } else if (fxSettled.status === 'rejected') {
     console.error('widget-stats fx error:', fxSettled.reason.message);
   }
@@ -782,6 +790,7 @@ app.get('/api/widget-stats', async (req, res) => {
 
   const result = {};
   if (cityCache.exchangeRate) result.exchangeRate = cityCache.exchangeRate.value;
+  if (cityCache.fxRates) result.fxRates = cityCache.fxRates.value;   // くらし画面「かんたん換算」(設計書236)用。12通貨
   if (cityCache.weather) result.weather = cityCache.weather.value;
   if (cityCache.psi) result.psi = cityCache.psi.value;
   if (cityCache.pm25) result.pm25 = cityCache.pm25.value;   // 新アプリ(1.8.16以降)はこれを指標に使う。旧アプリは従来のpsiを使い続ける

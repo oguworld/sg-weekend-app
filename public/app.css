@@ -1256,6 +1256,16 @@
     .psi-chips { display: flex; flex-wrap: wrap; gap: 8px 8px; }
     .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
 
+    /* 為替「かんたん換算」(設計書236): 100 SGDが主要12通貨でいくらかの早見表。12行は縦長になるため内部スクロール付き */
+    #stat-criteria-popover.fx-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    #stat-criteria-popover.fx-detail > * { flex-shrink: 0; }
+    .fx-base { font-size: 13px; font-weight: 700; color: var(--midnight); }
+    .fx-rows { display: flex; flex-direction: column; gap: 2px; }
+    .fx-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 2px; border-bottom: 1px solid var(--sand); }
+    .fx-row:last-child { border-bottom: none; }
+    .fx-row-cur { font-size: 13px; font-weight: 600; color: var(--warm-gray); }
+    .fx-row-val { font-size: 15px; font-weight: 700; color: var(--midnight); }
+
     /* ─── カレンダー画面 ─── */
     #calendar-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 10px 20px 12px; flex-shrink: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     #calendar-filter-row::-webkit-scrollbar { display: none; }

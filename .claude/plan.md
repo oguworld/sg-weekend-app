@@ -22492,3 +22492,91 @@ PSIをタップした時に、もう少し詳しい情報(エリアごと、1時
 - ユーザー指示: 1.8.16の紹介カードは簡潔にし、「使ってみる」の案内で、ウィジェットの表示→(タップした)ポップアップ内のトグル(PM2.5⇄PSI)・エリアごとの数値・凡例を、ハイライトしながら説明する。色は3色(緑=安全・黄=ちょっと危険・赤=危険)。
 - 実装: ステップの`before`(許可リスト`_TOUR_BEFORE`、`open-psi`)、新アンカー`psi-toggle`/`psi-map`/`psi-chips`、`startTour()`の存在確認を`before`以降のステップで外す、`_tourShow()`をasync化(before実行→アンカー待ち→表示、実行中は「次へ」無効)、ツアー中はポップアップの外タップ閉じを無効化、終了でポップアップを閉じる(`st.psiOpened`)。サーバーとアプリ内(`tourPm25Step1〜4`)の文言は完全一致(機械検証済み)。
 - 検証: jsdomで25項目OK(紹介entryの4ステップ取り込み、before許可リスト、存在確認の除外なし、busy、ポップアップ開閉、touchend、失敗時3秒で終了、描画遅延、スキップ、既存ツアーの挙動不変、文言一致)。**実機未確認**(スポットライトの位置・ポップアップとの重なり・スクロール)。
+
+## 設計書236(2026-10-19): くらし画面の為替ウィジェットをタップすると、主要通貨の早見表(100 SGD→各通貨)を即座に表示する(設計中・ユーザー確認待ち)
+
+### ユーザー依頼・要望の経緯(発言そのまま、複数回にわたり明確化された)
+1.「ウィジットの為替表示をタップしたときに簡易的な通貨コンバータをつけたい」
+2.「東南アジアの主要(通貨も)追加でカバーして、ちょっとしたときに確認できるやつです」
+3.「あれいくらだっけ、みたいなのをものすごくクイックに知るやつです。例えば100 SGDはいくら、とかそんなんでもありです。作り込みが難しければ(機能を削ってよい)」
+4.「とにかく素早く確認できること、これが重要です」
+
+→ 結論: **入力・通貨選択・往復変換(⇄)を備えた「本格コンバータ」ではなく、タップした瞬間に「100 SGDが主要通貨でいくらか」の早見表がそのまま表示される、作り込み最小の機能**。速さ最優先のため、**タップ時点で新規通信を発生させない**(既存の`loadWidgetStats()`で画面表示時に先読み済みのデータから即座に描画する)ことを設計原則とする。
+
+### 現状(コード確認済み)
+- くらし画面(`#screen-news`)の指標ウィジェット`#stat-widget-info`は3列: 為替(`#stat-fx`、`public/index.html` 156〜160行目、現在タップ不可)・PM2.5/PSI(`data-stat-crit="psi"`)・デング熱(`data-stat-crit="dengue"`)。後者2列は`onclick="if(!_touchCapableDetected) toggleStatCriteria('psi'|'dengue')"`で、共通の`toggleStatCriteria(kind)`(`public/app.js` 661行目〜)が同じ場所に挿入される`#stat-criteria-popover`を開閉する。
+- **排他制御は`toggleStatCriteria()`内に内包**: `kind`が異なる状態で別の列をタップすると`popover.innerHTML`を丸ごと書き換えて`dataset.kind`を更新するだけで、明示的な「閉じる」処理は無い(常に最新タップの種類だけが表示される)。同じ`kind`の再タップはトグルで閉じる。
+- PM2.5(`kind==='psi'`)は`_openPsiPopover(popover)`に分岐し、`GET /api/psi-detail`を**ポップアップを開くたびに**非同期取得する(設計書234)。**本機能ではこのパターンは踏襲しない**(読み込み待ちが発生し「素早さ」を損なうため、ユーザーの要望4に反する)。
+- ポップアップを閉じる処理は3か所に分散: (1)`toggleStatCriteria()`内の同種再タップ (2)`document`の`touchend`リスナー(822〜832行目、外タップで閉じる。`_tourState`中は閉じない、`composedPath()`で誤判定を回避済み) (3)`_closeStatPopover()`(ミニチュートリアル`pm25-1`終了時専用)。
+- 為替の値は`loadWidgetStats()`(`public/app.js` 836行目〜)が`GET /api/widget-stats?city=sg`の`data.exchangeRate`(数値、SGD→JPYレート1本のみ)を`.toFixed(1) + '円'`として`#stat-fx`に表示。ローカル変数のみでグローバル保持は無い。
+- サーバー側(`server.js` 693〜699行目付近): Frankfurter API(`https://api.frankfurter.dev/v1/latest?base=SGD&symbols=JPY`)をTTL30分でキャッシュ(`widgetStatsCache`、`WIDGET_STATS_TTL_MS.exchangeRate`)。**実際にAPIを呼んで確認した結果、Frankfurter API(対応30通貨、`/v1/currencies`で確認)にはベトナムドン(VND)が存在しない**(ECB参照レートの対象外と推測)。ユーザーに確認した結果、**VNDも対応通貨に含める方針が確定した**ため、本設計では**データ源をFrankfurter APIから`open.er-api.com`(exchangerate-api.comの無料・APIキー不要版)に変更する**。
+- `open.er-api.com`は`GET https://open.er-api.com/v6/latest/SGD`の1回の呼び出しで166通貨全ての対SGDレートを返す(`symbols`的な絞り込みパラメータは無く、常に全件。必要な12通貨だけをレスポンスから取り出して使う)。実際に呼んで確認済み: `{"result":"success","time_last_update_utc":"...","rates":{"JPY":123.5,"THB":26.1,"MYR":3.19,"IDR":14095,"PHP":49.2,"VND":20218.76,...}}`。更新頻度は1日1回(`time_last_update_utc`/`time_next_update_utc`で確認可能)。ドキュメント: `https://www.exchangerate-api.com/docs/free`、利用規約: `https://www.exchangerate-api.com/terms`。APIキー不要・無料枠で、既存の為替TTL30分キャッシュと組み合わせれば呼び出し頻度は十分低く保てる。
+- その後ユーザーから対象通貨の指定が入った: 「日本円、インドネシア、マレーシア、タイ、ベトナム、インド、オーストリア、フィリピンは押さえて」。**「オーストリア」はオーストリア(EUR、ヨーロッパ)ではなく「オーストラリア」(AUD)の表記ゆれと判断した**(このアプリの既存スコープ(`content/fare-seasons.json`の旅行先20都市にシドニー・パースが含まれる=オーストラリア)に合致し、オーストリアはアプリのどこにも登場しないため)。誤りがあればご指摘ください。
+- 続けてユーザーから「台湾、香港も」「あっアメリカドル、ユーロもお願い。」の追加指定。台湾ドル(TWD)・香港ドル(HKD)・米ドル(USD)・ユーロ(EUR)も`open.er-api.com`で対応確認済み。
+- 最終的な対象12通貨(「あとはいいです」+USD/EUR追加で確定): 日本円(JPY)・インドネシアルピア(IDR)・マレーシアリンギット(MYR)・タイバーツ(THB)・ベトナムドン(VND)・インドルピー(INR)・オーストラリアドル(AUD)・フィリピンペソ(PHP)・台湾ドル(TWD)・香港ドル(HKD)・米ドル(USD)・ユーロ(EUR)。`open.er-api.com`で全て対応確認済み(実際に`https://open.er-api.com/v6/latest/SGD`を呼び、`rates`に12通貨すべて存在することを確認済み)。
+
+### 設計(推奨案)
+
+#### 1. スコープ: 対象通貨は「JPY・IDR・MYR・THB・VND・INR・AUD・PHP・TWD・HKD・USD・EUR」の12つ(ユーザー指定で確定)
+- ユーザーから複数回にわたり対象通貨の指定があり、最終的に12通貨(日本・インドネシア・マレーシア・タイ・ベトナム・インド・オーストラリア・フィリピン・台湾・香港・米国・ユーロ圏)に確定。いずれもシンガポール在住者の旅行先・近隣国・国際的な基準通貨(USD/EUR)として頻度が高い。データ源は`open.er-api.com`(上記「現状」参照)で全て対応確認済み。
+- 基準額は固定で**100 SGD**(ユーザー例示どおり)。入力欄による金額変更は本設計のスコープ外(下記「不採用案」参照)。
+
+#### 2. UI方式: 既存`#stat-criteria-popover`を拡張し、タップ即座に固定表の一覧を表示する(新規モーダル・入力欄・通貨選択UIは作らない)
+- 為替列(`.stat-col`、`#stat-fx`を含む)に`data-stat-crit="fx"` + `onclick="if(!_touchCapableDetected) toggleStatCriteria('fx')"`を追加。
+- `toggleStatCriteria()`に`kind==='fx'`の分岐を追加し、`_openFxPopover(popover)`(新規関数)を呼ぶ。**非同期取得は行わない**(`_openPsiPopover()`とは異なり、`await`なしで同期的にDOM生成して即`classList.add('visible')`。見た目上ワンテンポの遅延なく表示される)。
+- 表示内容: 見出し(例: 「かんたん換算」)+「100 SGD は:」+12行(🇯🇵JPY・🇮🇩IDR・🇲🇾MYR・🇹🇭THB・🇻🇳VND・🇮🇳INR・🇦🇺AUD・🇵🇭PHP・🇹🇼TWD・🇭🇰HKD・🇺🇸USD・🇪🇺EUR、国旗絵文字+金額)の固定テーブル。**入力欄・通貨選択・⇄切替ボタンは置かない**(要望3「作り込みが難しければ(削ってよい)」+要望4「とにかく素早く」を素直に反映した最小構成)。**12行は既存のPSI/デング熱ポップアップより明らかに縦長になるため、ポップアップに`max-height`+内部スクロール(PM2.5詳細の`.psi-detail`と同じ考え方)を付けることを前提とする**(下記「リスク」にも記載)。
+- 既存ポップアップとの排他制御・外タップで閉じる・ツアー中は閉じない、は`toggleStatCriteria()`既存ロジックがそのまま適用される(新規コード不要)。
+- CSSは`.psi-detail`と同様の修飾クラス(例: `.fx-detail`)で`#stat-criteria-popover`を拡張する既存パターンを踏襲。チップ・テキストのみで構成されるため、キーボード対応・`&lt;input&gt;`関連の実機リスクが**一切発生しない**(前回案で課題だった「ポップアップ内inputのキーボード被り」問題がそもそも無くなる)。
+
+#### 3. データ取得: サーバー側に新規フィールド`fxRates`を1つ追加。既存の為替API呼び出しを`open.er-api.com`に差し替えるが、追加のHTTPリクエストは発生しない(既存の1本の為替フェッチを置き換えるだけ)
+- `server.js`の既存フェッチ(`axios.get('https://api.frankfurter.dev/v1/latest?base=${currency}&symbols=JPY')`)を`axios.get('https://open.er-api.com/v6/latest/${currency}')`に差し替える。**1回のAPI呼び出しのレスポンス(`data.rates`に166通貨全て含まれる)から、`exchangeRate`(JPYのみ、既存・後方互換のため型・意味を変えない)と新規`fxRates`(JPY/IDR/MYR/THB/VND/INR/AUD/PHP/TWD/HKD/USD/EURの12通貨だけを抜き出したオブジェクト)の両方を生成する**(サーバーのリクエスト数は増えない。レスポンス形状が変わるため、既存のパース箇所(`fxSettled.value.data.rates.JPY`)の読み取り元を`open.er-api.com`のレスポンス構造に合わせて修正する。フィールド名`rates.JPY`自体は両APIで共通のため、パースコード自体の変更は軽微)。
+- **後方互換性(重要、CLAUDE.mdの環境構成ルール)**: 既存`exchangeRate`フィールドの型(数値1個、SGD→JPYレート)は**絶対に変更しない**(旧バージョンのアプリ・`data.exchangeRate.toFixed(1)`の呼び出しをそのまま維持するため)。新機能用のデータは`result.fxRates = { JPY, IDR, MYR, THB, VND, INR, AUD, PHP, TWD, HKD, USD, EUR }`という**新規フィールドとして追加**する(pm25をpsiと並存させた設計書234と同じパターン)。旧アプリは`fxRates`を単に無視するだけで実害なし。**データ源の切替(Frankfurter→open.er-api.com)自体は`exchangeRate`(JPYレート)の値が変わる可能性がある**(別プロバイダのレートのため、小数点以下の差が出る程度と想定されるが、既存表示への実質的な影響はごく僅かと判断する)。
+- キャッシュ: 既存の`cityCache.exchangeRate`の鮮度判定(`isFresh('exchangeRate')`、TTL30分)をそのまま使い、同じ条件分岐の中で`cityCache.fxRates = { value: rates, cachedAt: now }`も一緒に書き込む(新規TTLエントリの追加は不要、同じAPIレスポンスから同時に作るため)。
+
+#### 4. フロント: `loadWidgetStats()`が`data.fxRates`を保持し、ポップアップはこのキャッシュ済み値を参照するだけ(タップ時点で新規fetchしない)
+- `loadWidgetStats()`内で`_fxRates = data.fxRates || null`をモジュールスコープ変数に保持する変更を追加(既存は`#stat-fx`描画にしか使っていないローカル値)。
+- `_openFxPopover(popover)`は`_fxRates`を直接参照して100倍した値を整形表示するだけの純粋な同期処理。
+- `_fxRates`が`null`(初回起動直後の通信失敗時等)の場合は、「レートを取得できませんでした。しばらくしてから開き直してください。」といった案内文のみを表示する(既存の「取得失敗時は古い値 or `--`のまま」という`loadWidgetStats()`のフォールバック方針と一貫)。
+- 既存の`loadWidgetStats()`呼び出しタイミング(起動時+home/news画面遷移で5分以上経過時)がそのまま先読みを担うため、**本機能のための新規ポーリング・新規呼び出しタイミングは不要**。
+
+#### 5. 表示形式(金額の整形)
+- 日本円(JPY)は既存の`#stat-fx`表示と同じ桁区切り整数表示(例: 「12,353円」)。
+- THB/MYR/PHP/AUD/TWD/HKD/USD/EURは小数のある通貨のため、小数1〜2桁程度で表示(例: 「2,612.2THB」「78.2USD」「69.6EUR」)。IDR/VNDは桁数が大きい(100 SGD ≈ IDR1,400,000台・VND2,000,000台)ため整数+桁区切り(例: 「1,407,524IDR」「2,021,876VND」)。INRは2桁程度(例: 「7,422.2INR」)。**具体的な小数桁数・通貨記号表記(「THB」等の略称 vs "฿"等の記号)はbuilder実装時に見やすさ優先で微調整可**とし、設計書では「読みやすさ優先、必要に応じて微調整可」とだけ定める。
+- 各行に国旗絵文字(🇯🇵🇮🇩🇲🇾🇹🇭🇻🇳🇮🇳🇦🇺🇵🇭🇹🇼🇭🇰🇺🇸🇪🇺)を付け、視認性を上げる(既存のPSI/デング熱の絵文字表示パターンと一貫)。
+
+#### 6. タッチ対応・i18n
+- タッチ端末対応の3点セット: (1)`.stat-col`の`onclick`属性ガード追加 (2)**新規の個別touchend委譲は不要**(ポップアップ内に操作対象のボタンが無いため。既存の`document`レベルの外タップ検知リスナーのみで足りる) (3)HTML側`onclick`は(1)と同じ。
+- i18n: 新規文字列は`data-i18n`+`STRINGS.ja`キー追加のみ。想定キー: `fxConverterTitle`(例:「かんたん換算」)、`fxConverterBase`(例:「100 SGD は:」)、`fxConverterUnavailable`(取得失敗時の案内)。
+
+#### 7. 影響ファイル一覧
+- `server.js`: 為替フェッチ元を`api.frankfurter.dev`から`open.er-api.com`に差し替え、レスポンスパース部分を新形状(`data.rates`に全166通貨)に合わせて修正、`cityCache.fxRates`追加、レスポンスへの`result.fxRates`(12通貨)追加。**既存`exchangeRate`フィールドの型・意味は無変更**(値はデータ源切替により多少変動する可能性があるが実質的な影響は僅少、上記「後方互換性」参照)。変更後は`pm2 restart sg-weekend`+curl検証必須(CLAUDE.md「server.js編集時の注意」)。
+- `public/index.html`: 為替列への`data-stat-crit="fx"`+`onclick`追加。CSS/JSキャッシュバスティング用クエリ更新。
+- `public/app.js`: `loadWidgetStats()`で`_fxRates`保持、`toggleStatCriteria()`への`kind==='fx'`分岐、`_openFxPopover()`新規関数(同期処理のみ)。
+- `public/app.css`: `.fx-detail`等の新規スタイル(既存`.psi-detail`パターンを極力再利用)。
+- `public/sw.js`: `CACHE_NAME`バンプ(CSS/JS変更に伴う必須作業)。
+
+#### 8. 環境・リリースへの影響
+- サーバー側APIレスポンスへの**フィールド追加のみ**(既存フィールドは無変更)のため後方互換性が保たれ、Web版・旧バージョンアプリとも即座に・無停止で反映できる(`pm2 restart`後、再起動のみで全環境に効く。データ構造の非互換変更には当たらない)。
+- フロント側(`public/`配下)の変更はCapacitorのローカルバンドル方式のため、**Web版は即時反映・ネイティブアプリ(iOS/Android)は次回ビルドから有効**(既存の多くの機能と同じパターン)。
+
+### 不採用案(検討したが見送り)
+- **本格コンバータ(入力欄+通貨選択+⇄双方向切替)**: 要望3「作り込みが難しければ(削ってよい)」・要望4「とにかく素早く」に反する。入力UIはタップ直後に即座に結果が見えるという体験を損ない、iOS Capacitorのキーボード被り対応という実機リスクも発生する。将来、金額を自由に変えたいという要望が出た場合は、本設計の固定100 SGD表をベースに、入力欄1つ(通貨選択なし、SGD固定)を追加する拡張として再検討できる。
+- **専用ボトムシート新設**: 既存`#stat-criteria-popover`の再利用で十分な規模であり、新規オーバーレイのz-index・3点セット・開閉パターンを一から用意するコストに見合わない。
+- **Frankfurter APIのまま(VND非対応で見送り)**: ユーザーがVND・その他広範な通貨を要求したため不採用。`open.er-api.com`への切替を採用(上記)。
+
+### 決めてほしいこと
+- (A)対象12通貨(JPY/IDR/MYR/THB/VND/INR/AUD/PHP/TWD/HKD/USD/EUR)でよいか(ユーザーの複数回の指定により確定済みと認識しているが、最終確認)。
+- (B)見出し文言「かんたん換算」でよいか(他の案: 「早見表」「100 SGDでいくら?」等)。
+- (C)将来的に金額を変えられるようにする拡張は、今回のリリースでは行わず様子を見てよいか(推奨=様子を見る。まずは最小構成で出す)。
+- (D)12行は縦に長くなるため、ポップアップ内スクロール(`.psi-detail`と同様の`max-height`+`overflow-y:auto`)にする前提でよいか(推奨=スクロールにする。全件を折りなしで出す案は画面占有が大きすぎると判断)。
+
+### スコープ外(明示)
+- 入力欄による金額変更、通貨選択UI、双方向(⇄)切替。
+- 上記12通貨以外の通貨(追加要望があれば`open.er-api.com`の対応可否を確認の上、随時追加可能)。
+- サーバー側の新規キャッシュTTL設定(既存`exchangeRate`のTTLに相乗りする)。
+- 入力値の永続化、レート変動のグラフ・履歴表示。
+
+### リスク・未解決の質問
+- 実機でのポップアップ表示位置・12行分のレイアウト(スクロール前提)が、既存のPSI/デング熱ポップアップ(チップ+短文、または5エリアのタイル)より縦に長くなる可能性があり、画面上部での見切れ・スクロールの操作感は未確認(この開発環境ではブラウザ実機確認ができないため、実装後に実機確認が必要)。
+- THB/MYR/PHP/IDR/VND/INR/AUD/TWD/HKD/USD/EURの小数桁数・表記の最終判断はbuilder実装時の目視確認で微調整が必要。
+- データ源切替(Frankfurter→open.er-api.com)により既存`#stat-fx`のJPY表示値が多少変動する可能性がある点は、ユーザーに実質的な影響なしと判断して進めるが、表示直後に気づかれる可能性はゼロではない。
