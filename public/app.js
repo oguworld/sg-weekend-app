@@ -660,6 +660,8 @@
       pm25: { '通常': '😊', 'やや高い': '😷', '高い': '😫', '非常に高い': '☠️' },
     };
     const _statCurrentLevel = { psi: null, dengue: null };
+    // デング熱の4段階→3色(緑=安全・黄=ちょっと危険・赤=危険)。PSI/PM2.5と同じ3色方針(2026-10-19ユーザー指定)
+    const _DENGUE_LEVEL_CLASS = { '警報なし': 'safe', '注意': 'caution', '警戒': 'danger', '厳重警戒': 'danger' };
 
     function toggleStatCriteria(kind) {
       const popover = document.getElementById('stat-criteria-popover');
@@ -672,9 +674,10 @@
       if (kind === 'fx') { _openFxPopover(popover); return; }
       popover.classList.remove('psi-detail', 'fx-detail');
       const currentLevel = _statCurrentLevel[kind];
-      const chips = STAT_CRITERIA[kind].map(it =>
-        `<span class="stat-criteria-chip${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`
-      ).join('');
+      const chips = STAT_CRITERIA[kind].map(it => {
+        const tierCls = _DENGUE_LEVEL_CLASS[it.label] ? ` dengue-lv-${_DENGUE_LEVEL_CLASS[it.label]}` : '';
+        return `<span class="stat-criteria-chip${tierCls}${it.label === currentLevel ? ' active' : ''}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`;
+      }).join('');
       popover.innerHTML = `<div class="stat-criteria-desc">${STAT_CRITERIA_DESC[kind]}</div><div class="stat-criteria-chips">${chips}</div>`;
       popover.dataset.kind = kind;
       popover.classList.add('visible');

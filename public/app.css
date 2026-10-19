@@ -46,6 +46,10 @@
       --pm25-elevated-bg: rgba(232,180,40,0.32); --pm25-elevated-text: #7A5A00;
       --pm25-high-bg: rgba(192,57,43,0.26); --pm25-high-text: #8E2218;
       --pm25-veryhigh-bg: rgba(192,57,43,0.26); --pm25-veryhigh-text: #8E2218;
+      /* デング熱の4段階→3色(緑/黄/赤)。PSI/PM2.5とは独立した変数(2026-10-19ユーザー指定) */
+      --dengue-safe-bg: rgba(76,175,110,0.24); --dengue-safe-text: #1F6B3A;
+      --dengue-caution-bg: rgba(232,180,40,0.32); --dengue-caution-text: #7A5A00;
+      --dengue-danger-bg: rgba(192,57,43,0.26); --dengue-danger-text: #8E2218;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
@@ -1222,6 +1226,11 @@
       color: #fff;
       font-weight: 700;
     }
+    /* デング熱の凡例チップも3色(緑/黄/赤)で色分け(2026-10-19ユーザー指定)。.stat-criteria-chipより詳細度は同じだが後方で上書きするため有効。
+       .active(2クラス=詳細度が高い)は変更不要でそのまま優先される */
+    .dengue-lv-safe { background: var(--dengue-safe-bg); color: var(--dengue-safe-text); }
+    .dengue-lv-caution { background: var(--dengue-caution-bg); color: var(--dengue-caution-text); }
+    .dengue-lv-danger { background: var(--dengue-danger-bg); color: var(--dengue-danger-text); }
 
     /* PSIタップの詳細(設計書234): 右上の「1時間 | 24時間」で、PSI(24時間値)とPM2.5(1時間値)の表示を切り替える。
        ポップアップは画面に収まる高さで、通常は内部スクロールしない(念のためmax-heightとoverflow-yを残す) */
@@ -1855,6 +1864,9 @@
       --pm25-elevated-bg: rgba(232,180,40,0.34); --pm25-elevated-text: #F2CF6A;
       --pm25-high-bg: rgba(192,57,43,0.42); --pm25-high-text: #F08A7E;
       --pm25-veryhigh-bg: rgba(192,57,43,0.42); --pm25-veryhigh-text: #F08A7E;
+      --dengue-safe-bg: rgba(76,175,110,0.36); --dengue-safe-text: #7FD69A;
+      --dengue-caution-bg: rgba(232,180,40,0.34); --dengue-caution-text: #F2CF6A;
+      --dengue-danger-bg: rgba(192,57,43,0.42); --dengue-danger-text: #F08A7E;
       color-scheme: dark;
     }
     html[data-theme="dark"] .screen-auth-gate {
