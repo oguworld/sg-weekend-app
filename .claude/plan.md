@@ -22481,3 +22481,9 @@ PSIをタップした時に、もう少し詳しい情報(エリアごと、1時
 
 ### リリース・検証
 画面コードの追加のため、**アプリの更新(次のリリース)が必要**。サーバーの変更は無い。検証: jsdomで、一覧の描画、`persist:false`で記録が変わらないこと、「最初から全部見る」の順序の制御。**スポットライトの位置・画面移動の待ち時間・シートとの重なりは、実機での確認が必要**。工数: 中(`app.js`・`app.css`・`index.html`)。
+
+### 設計書235 追記(2026-10-19): 決定事項と実装完了
+- **決定**: ユーザー「一旦全部おすすめ通りで」。(A)入口=設定の「サポート・情報」先頭 (B)一覧=ボトムシート (C)「最初から全部見る」あり (D)見た済みの印(✓)あり (E)calendar-1の文言はアプリ内(`tourCalStep1/2`)にも複製 (F)3つの案内のステップ定義を共通関数にまとめ、`TUTORIALS`に登録(自動表示の挙動は変えない) (G)名前=「基本の使い方」「カレンダー」「旅行シーズン情報」。
+- **実装**(コミット03ed13a): `public/app.js`(`TUTORIALS`登録、`_calendarTourSteps()`・`_fareSheetTourSteps()`、`openTutorialSheet`/`closeTutorialSheet`/`renderTutorialSheet`/`startTutorial`/`startTutorialAll`/`_runNextTutorial`/`_tutorialFinish`、`_tutorialRun`(再入ガード兼、見直し中は自動表示`_maybeStartFareSheetTour()`・`_maybeStartPendingTour()`を抑止))、`public/index.html`(設定の行、`#tutorial-sheet-overlay`/`#tutorial-sheet`。`.pin-sheet*`のCSSを流用)、`public/app.css`(`.tutorial-*`)、`public/sw.js`(v1063)・`app.js`/`app.css`のクエリ`20261019l`。見直しは`persist:false`で、記録(`app_tour_done_*`・`app_welcome_pending`・`app_tour_pending`)を一切更新しない。
+- **検証(jsdom、25項目OK)**: 一覧(3項目・見た済みの印)、各「見る」のstartTour引数(welcome 4ステップ・calendar 2・fare 3、`persist:false`)、3種の単独と「全部」の実行の前後でlocalStorageが完全に同一、実行順(welcome→calendar→fare→設定)、再入ガード、紹介カード・別の案内の表示中は始めない、見直し中は自動表示が始まらない、**自動表示(旅行シーズン初回)の`startTour`引数がリファクタ前と同一**、welcome自動表示・「使ってみる」・「あとで」・`startTour`/`_tourShow`/`_tourEnd`の関数本体が変更なし、隠しリセットが残っている、calendar-1の複製文言が`whats-new.json`の1.8.14・1.8.15と一致。**未確認**: 実機でのスポットライトの位置・画面移動後の待ち時間(600/700/500+450ms)・シートとの重なり・ボタンのタップ(jsdomでは測れない)。
+- **反映**: Web版は即時(`dosuru.app`)。アプリは次のリリース(1.8.16以降)から。
