@@ -1254,7 +1254,7 @@
     .psi-tile-val { font-size: 19px; font-weight: 800; line-height: 1.2; }
     .psi-tile-sub { font-size: 11px; line-height: 1.3; opacity: 0.9; min-height: 1.3em; }
     .psi-chips { display: flex; flex-wrap: wrap; gap: 8px 8px; }
-    .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--psi-tile-bg); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: transparent; border: 1.5px solid var(--sand-dark); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
     /* 区分の色(タイル・基準のチップで共通)。PSIとPM2.5は別の変数 */
     .psi-lv-good { color: var(--psi-good-text); }
     .psi-lv-normal { color: var(--psi-normal-text); }
@@ -1303,7 +1303,7 @@
        同じ日の予定は日付の列を1回だけ出して右に縦に積む。予定名の文字サイズは据え置き(14px・600) */
     .cal-day-group { display: grid; grid-template-columns: 30px 1fr; gap: 8px; padding: 13px 0; }
     .cal-day-group:first-child { padding-top: 0; }
-    .cal-day-date { text-align: center; line-height: 1.15; padding-top: 1px; }
+    .cal-day-date { text-align: center; line-height: 1.15; align-self: center; }
     .cal-day-num { display: block; font-size: 14px; font-weight: 700; color: var(--warm-gray); }
     .cal-day-wd { display: none; font-size: 13px; color: var(--warm-gray); opacity: 0.7; }
     .cal-day-holiday .cal-day-wd { color: var(--holiday-red); opacity: 0.75; }
