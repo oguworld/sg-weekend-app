@@ -1212,7 +1212,7 @@
       background: transparent;
       border: 1.5px solid var(--sand-dark);
       color: var(--warm-gray);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       white-space: nowrap;
     }
@@ -1254,7 +1254,7 @@
     .pm25-lv-high { background: var(--pm25-high-bg); color: var(--pm25-high-text); }
     .pm25-lv-veryhigh { background: var(--pm25-veryhigh-bg); color: var(--pm25-veryhigh-text); }
     .psi-chips { display: flex; flex-wrap: wrap; gap: 8px 8px; }
-    .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .psi-chip { flex-shrink: 0; padding: 3px 9px; border-radius: 20px; background: var(--sand); color: var(--warm-gray); font-size: 12px; font-weight: 600; white-space: nowrap; }
 
     /* 為替「かんたん換算」(設計書236): 100 SGDが主要12通貨でいくらかの早見表。12行は縦長になるため内部スクロール付き */
     #stat-criteria-popover.fx-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
