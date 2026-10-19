@@ -38,13 +38,13 @@
       --fare-tier-unknown-text: #5C5C56;
       /* PSIの区分(良好/普通/要注意/健康に悪い/危険)。--fare-tier-*とは別。PSIの詳細(エリア別タイル・表)の背景と文字 */
       --psi-good-bg: rgba(76,175,110,0.24); --psi-good-text: #1F6B3A;
-      --psi-normal-bg: rgba(70,130,200,0.20); --psi-normal-text: #24558F;
+      --psi-normal-bg: rgba(76,175,110,0.24); --psi-normal-text: #1F6B3A;
       --psi-caution-bg: rgba(232,180,40,0.32); --psi-caution-text: #7A5A00;
-      --psi-unhealthy-bg: rgba(224,120,50,0.30); --psi-unhealthy-text: #8F3F0C;
+      --psi-unhealthy-bg: rgba(192,57,43,0.26); --psi-unhealthy-text: #8E2218;
       --psi-hazard-bg: rgba(192,57,43,0.26); --psi-hazard-text: #8E2218;
       --pm25-normal-bg: rgba(76,175,110,0.24); --pm25-normal-text: #1F6B3A;
       --pm25-elevated-bg: rgba(232,180,40,0.32); --pm25-elevated-text: #7A5A00;
-      --pm25-high-bg: rgba(224,120,50,0.30); --pm25-high-text: #8F3F0C;
+      --pm25-high-bg: rgba(192,57,43,0.26); --pm25-high-text: #8E2218;
       --pm25-veryhigh-bg: rgba(192,57,43,0.26); --pm25-veryhigh-text: #8E2218;
       --radius-card: 24px;
       --radius-btn: 14px;
@@ -1837,13 +1837,13 @@
       --fare-tier-expensive-text: #F0A268;
       --fare-tier-unknown-text: #B8B8B0;
       --psi-good-bg: rgba(76,175,110,0.36); --psi-good-text: #7FD69A;
-      --psi-normal-bg: rgba(70,130,200,0.36); --psi-normal-text: #8DB8EC;
+      --psi-normal-bg: rgba(76,175,110,0.36); --psi-normal-text: #7FD69A;
       --psi-caution-bg: rgba(232,180,40,0.34); --psi-caution-text: #F2CF6A;
-      --psi-unhealthy-bg: rgba(224,120,50,0.38); --psi-unhealthy-text: #F4A672;
+      --psi-unhealthy-bg: rgba(192,57,43,0.42); --psi-unhealthy-text: #F08A7E;
       --psi-hazard-bg: rgba(192,57,43,0.42); --psi-hazard-text: #F08A7E;
       --pm25-normal-bg: rgba(76,175,110,0.36); --pm25-normal-text: #7FD69A;
       --pm25-elevated-bg: rgba(232,180,40,0.34); --pm25-elevated-text: #F2CF6A;
-      --pm25-high-bg: rgba(224,120,50,0.38); --pm25-high-text: #F4A672;
+      --pm25-high-bg: rgba(192,57,43,0.42); --pm25-high-text: #F08A7E;
       --pm25-veryhigh-bg: rgba(192,57,43,0.42); --pm25-veryhigh-text: #F08A7E;
       color-scheme: dark;
     }
