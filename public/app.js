@@ -431,6 +431,7 @@
         labelDarkMode: 'ダークモード',
         statTemp: '気温',
         statRain: '降水確率',
+        statUv: 'UV指数',
         statNowcast: '2時間予報',
         statFx: 'SGD→JPY',
         statPsi: 'PSI',
@@ -647,10 +648,17 @@
         { label: '警戒', range: '6-15区' },
         { label: '厳重警戒', range: '16区+' },
       ],
+      // UV指数(設計書237)。server.jsのuvLevel()としきい値・ラベルを必ず一致させること
+      uv: [
+        { label: '低い', range: '0-2', emoji: '🙂' },
+        { label: '高い', range: '3-7', emoji: '🕶️' },
+        { label: '非常に高い', range: '8+', emoji: '🥵' },
+      ],
     };
     const STAT_CRITERIA_DESC = {
       psi: '大気汚染の程度を示す指標です。中心部(セントラル地域)の過去24時間の値で、1時間ごとに更新されます',
       dengue: '現在活動中のデング熱クラスター(流行地区)の数です。日々の新規感染者数ではありません',
+      uv: '紫外線の強さを示す指標です。島内の実況値で、日中(7時〜19時)に更新されます',
     };
     // 指標レベル→絵文字マッピング（PSIのみ実装。将来デング熱等に展開する場合はキーを追加するだけでよい構造。
     // server.jsのpsiLevel()のレベル文字列と一致させること）
@@ -659,12 +667,19 @@
       // くらし画面の指標ウィジェットは、2026-10-19から中心部のPM2.5(1時間値)。区分はserver.jsのpm25Level()・_PM25_BANDSと一致させる
       pm25: { '通常': '😊', 'やや高い': '😷', '高い': '😫', '非常に高い': '☠️' },
     };
-    const _statCurrentLevel = { psi: null, dengue: null };
+    const _statCurrentLevel = { psi: null, dengue: null, uv: null };
     // デング熱の4段階→3色(緑=安全・黄=ちょっと危険・赤=危険)。PSI/PM2.5と同じ3色方針(2026-10-19ユーザー指定)
     const _DENGUE_LEVEL_CLASS = { '警報なし': 'safe', '注意': 'caution', '警戒': 'danger', '厳重警戒': 'danger' };
+    // UV指数の3段階→3色(設計書237、デング熱と同じ考え方)
+    const _UV_LEVEL_CLASS = { '低い': 'safe', '高い': 'caution', '非常に高い': 'danger' };
+    // kindごとのtier色分け設定(設計書237でdengue専用だったロジックを一般化。prefixはCSSクラス名の接頭辞)
+    const _TIER_CLASS_BY_KIND = {
+      dengue: { map: _DENGUE_LEVEL_CLASS, prefix: 'dengue-lv-' },
+      uv: { map: _UV_LEVEL_CLASS, prefix: 'uv-lv-' },
+    };
 
     function toggleStatCriteria(kind) {
-      const popoverId = kind === 'dengue' ? 'stat-criteria-popover-home' : 'stat-criteria-popover';
+      const popoverId = (kind === 'dengue' || kind === 'uv') ? 'stat-criteria-popover-home' : 'stat-criteria-popover';
       const popover = document.getElementById(popoverId);
       if (!popover) return;
       if (popover.classList.contains('visible') && popover.dataset.kind === kind) {
@@ -675,11 +690,12 @@
       if (kind === 'fx') { _openFxPopover(popover); return; }
       popover.classList.remove('psi-detail', 'fx-detail');
       const currentLevel = _statCurrentLevel[kind];
+      const tierInfo = _TIER_CLASS_BY_KIND[kind];
       const chips = STAT_CRITERIA[kind].map(it => {
-        const tierCls = _DENGUE_LEVEL_CLASS[it.label] ? ` dengue-lv-${_DENGUE_LEVEL_CLASS[it.label]}` : '';
-        // デング熱は凡例の3色文字色分けのみとし、現在値の塗りつぶしハイライトは行わない(2026-10-19ユーザー指定)。
-        // kind==='dengue'以外(将来の拡張用)は従来どおりactiveクラスで現在値を強調する。
-        const activeCls = (kind !== 'dengue' && it.label === currentLevel) ? ' active' : '';
+        const tierCls = (tierInfo && tierInfo.map[it.label]) ? ` ${tierInfo.prefix}${tierInfo.map[it.label]}` : '';
+        // tier色分け対象(デング熱・UV指数)は凡例の3色文字色分けのみとし、現在値の塗りつぶしハイライトは行わない(2026-10-19ユーザー指定)。
+        // それ以外(将来の拡張用)は従来どおりactiveクラスで現在値を強調する。
+        const activeCls = (!tierInfo && it.label === currentLevel) ? ' active' : '';
         return `<span class="stat-criteria-chip${tierCls}${activeCls}">${it.emoji ? it.emoji + ' ' : ''}${it.label} ${it.range}</span>`;
       }).join('');
       popover.innerHTML = `<div class="stat-criteria-desc">${STAT_CRITERIA_DESC[kind]}</div><div class="stat-criteria-chips">${chips}</div>`;
@@ -907,9 +923,9 @@
           _psiWidgetKind = stat.key;
         }
         if (data.dengue) { setHTML('stat-dengue', `${data.dengue.clusterCount}区<span class="stat-val-level">(${data.dengue.level})</span>`); _statCurrentLevel.dengue = data.dengue.level; }
+        if (data.uv) { setHTML('stat-uv', `${data.uv.value}<span class="stat-val-level">(${data.uv.level})</span>`); _statCurrentLevel.uv = data.uv.level; }
         if (data.weather) {
           setText('stat-temp', Math.round(data.weather.temp) + '°');
-          setText('stat-rain', data.weather.rainProbPercent + '%');
         }
         if (data.nowcast) setText('stat-nowcast', data.nowcast.text);
         _widgetStatsLastLoadedAt = Date.now(); // 成功時のみ更新（失敗時は直前の表示を維持し、次回遷移時に再試行させる）

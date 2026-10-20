@@ -51,6 +51,10 @@
       --dengue-safe-bg: rgba(76,175,110,0.24); --dengue-safe-text: #1F6B3A;
       --dengue-caution-bg: rgba(232,180,40,0.32); --dengue-caution-text: #7A5A00;
       --dengue-danger-bg: rgba(192,57,43,0.26); --dengue-danger-text: #8E2218;
+      /* UV指数の3段階→3色(設計書237、デング熱と同じ考え方) */
+      --uv-safe-text: #1F6B3A;
+      --uv-caution-text: #7A5A00;
+      --uv-danger-text: #8E2218;
       --radius-card: 24px;
       --radius-btn: 14px;
       --shadow-soft: 0 2px 12px rgba(43,43,39,0.06);
@@ -1232,6 +1236,10 @@
     .dengue-lv-safe { color: var(--dengue-safe-text); }
     .dengue-lv-caution { color: var(--dengue-caution-text); }
     .dengue-lv-danger { color: var(--dengue-danger-text); }
+    /* UV指数の凡例チップも3色(緑/黄/赤)で色分け(設計書237、デング熱と同じ考え方) */
+    .uv-lv-safe { color: var(--uv-safe-text); }
+    .uv-lv-caution { color: var(--uv-caution-text); }
+    .uv-lv-danger { color: var(--uv-danger-text); }
 
     /* PSIタップの詳細(設計書234): 右上の「1時間 | 24時間」で、PSI(24時間値)とPM2.5(1時間値)の表示を切り替える。
        ポップアップは画面に収まる高さで、通常は内部スクロールしない(念のためmax-heightとoverflow-yを残す) */
@@ -1868,6 +1876,9 @@
       --dengue-safe-bg: rgba(76,175,110,0.36); --dengue-safe-text: #7FD69A;
       --dengue-caution-bg: rgba(232,180,40,0.34); --dengue-caution-text: #F2CF6A;
       --dengue-danger-bg: rgba(192,57,43,0.42); --dengue-danger-text: #F08A7E;
+      --uv-safe-text: #7FD69A;
+      --uv-caution-text: #F2CF6A;
+      --uv-danger-text: #F08A7E;
       color-scheme: dark;
     }
     html[data-theme="dark"] .screen-auth-gate {

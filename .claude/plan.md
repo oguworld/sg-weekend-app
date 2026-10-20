@@ -22580,3 +22580,42 @@ PSIをタップした時に、もう少し詳しい情報(エリアごと、1時
 - 実機でのポップアップ表示位置・12行分のレイアウト(スクロール前提)が、既存のPSI/デング熱ポップアップ(チップ+短文、または5エリアのタイル)より縦に長くなる可能性があり、画面上部での見切れ・スクロールの操作感は未確認(この開発環境ではブラウザ実機確認ができないため、実装後に実機確認が必要)。
 - THB/MYR/PHP/IDR/VND/INR/AUD/TWD/HKD/USD/EURの小数桁数・表記の最終判断はbuilder実装時の目視確認で微調整が必要。
 - データ源切替(Frankfurter→open.er-api.com)により既存`#stat-fx`のJPY表示値が多少変動する可能性がある点は、ユーザーに実質的な影響なしと判断して進めるが、表示直後に気づかれる可能性はゼロではない。
+
+---
+## 設計書237(2026-10-20): おでかけ画面の降水確率をUV指数に入れ替え、タップで説明を見られるようにする(ユーザー承認済み、builder→checker→closer)
+
+### 背景・目的
+おでかけ画面の指標ウィジェット(気温・降水確率・デング熱)のうち、降水確率をUV指数に入れ替える。UV指数はPSI/デング熱と同様タップで説明(指標の見方、3段階の基準)を表示できるようにする。
+
+### データ源
+`GET https://api.data.gov.sg/v1/environment/uv-index`(キー不要、既存のPSI等と同じ無料API)。`items[0].index[0].value`が最新のUV指数(島内実況値、地域別無し)。7〜19時の間15分おき更新。
+
+### 変更構成
+- おでかけ画面(`#stat-widget-weather`): 気温・**UV指数**(新規、タップで説明あり)・デング熱。
+- 降水確率(`#stat-rain`)は撤去。
+
+### 実装内容
+1. **`server.js`**: `WIDGET_STATS_TTL_MS.uv = 15分`追加。`uvLevel(value)`(0-2低い/3-7高い/8+非常に高い、WHO5段階を3段階に単純化)追加。`/api/widget-stats`の`Promise.allSettled`配列にUV指数フェッチ追加(`city !== 'sg'`ガード・`isFresh('uv')`判定、既存SG専用フィールドと同パターン)。パース結果を`cityCache.uv = {value: {value, level}, cachedAt}`に格納、レスポンスに`result.uv`を追加。既存フィールド(exchangeRate/weather/psi/pm25/nowcast/dengue)の処理ロジックは一切変更しない。
+2. **`public/index.html`**: `#stat-rain`列を`#stat-uv`列(`data-stat-crit="uv"`、`onclick="if(!_touchCapableDetected) toggleStatCriteria('uv')"`、アイコン☀️)に差し替え。気温・デング熱列、`#stat-criteria-popover-home`はそのまま。
+3. **`public/app.js`**:
+   - `STAT_CRITERIA.uv`(低い0-2🙂/高い3-7🕶️/非常に高い8+🥵)、`STAT_CRITERIA_DESC.uv`追加。
+   - `_statCurrentLevel`に`uv: null`追加。
+   - `_UV_LEVEL_CLASS`(低い→safe/高い→caution/非常に高い→danger)を`_DENGUE_LEVEL_CLASS`と同形で追加。
+   - `toggleStatCriteria()`内、`dengue`専用だったtier色分けロジックを`_TIER_CLASS_BY_KIND`(`{dengue:{map,prefix:'dengue-lv-'}, uv:{map,prefix:'uv-lv-'}}`)で一般化。UV・デング熱とも強調ハイライト(`active`)は付けない既存方針を維持。
+   - `toggleStatCriteria()`冒頭のポップアップID振り分けに`uv`を追加(`dengue`と同じ`#stat-criteria-popover-home`を共有)。
+   - `loadWidgetStats()`に`data.uv`の表示処理(デング熱と同じ見た目パターン、`${value}<span class="stat-val-level">(${level})</span>`)追加。`#stat-rain`への書き込み処理のみ削除(`data.weather`自体・気温処理は変更しない)。
+4. **`public/app.css`**: `--uv-safe-text`/`--uv-caution-text`/`--uv-danger-text`をライト/ダーク双方の`:root`に追加(デング熱と同じ緑/黄/赤を再利用可)。`.uv-lv-safe`/`.uv-lv-caution`/`.uv-lv-danger`(文字色のみ、背景塗りつぶし無し)追加。
+5. **i18n**: `STRINGS.ja.statUv = 'UV指数'`追加。`statRain`は未使用確認の上、残置でも削除でもよい。
+
+### 変更しないもの
+気温・デング熱の表示・ロジック、くらし画面側(為替・PSI/PM2.5・2時間予報)、`.psi-detail`/`.fx-detail`等既存のPM2.5/PSI/為替関連コード・CSS、`STAT_CRITERIA.psi`/`STAT_CRITERIA.dengue`/既存`_DENGUE_LEVEL_CLASS`の中身。
+
+### 検証観点
+- `GET /api/widget-stats?city=sg`に`uv: {value, level}`が含まれる(curl確認)。他フィールドの形・値に変更がないこと。
+- おでかけ画面が気温・UV指数・デング熱の3列になり降水確率が無いこと。
+- UV指数タップで`#stat-criteria-popover-home`が開き、デング熱と同じ見た目(文字色3色分け、強調無し)になること。デング熱⇄UV指数の切り替えが正しく動くこと。
+- PM2.5/PSI/為替のタップ機能に影響がないこと。
+- `node --check public/app.js`が通ること。
+
+### リスク・未確認事項
+実機・ブラウザでの最終見た目(ポップアップ位置、アイコンの見え方)は未確認(この開発環境ではブラウザ起動不可のため)。次回のiOS/Androidビルドから反映(Web版は即時)。

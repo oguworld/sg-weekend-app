@@ -624,6 +624,7 @@ const WIDGET_STATS_TTL_MS = {
   pm25:         10 * 60 * 1000,  // 10分（中心部のPM2.5 1時間値。2026-10-19にくらし画面の指標をPSIからPM2.5に変更したため追加）
   nowcast:      10 * 60 * 1000,  // 10分（NEA側は概ね30分更新と推測、スコール検知の機能目的から短縮の意義大）
   dengue:       60 * 60 * 1000,  // 60分（元データが日次更新のため延長。新API方式で2段階リクエストのためコストもやや高い）
+  uv:           15 * 60 * 1000,  // 15分（設計書237。NEA系は10分、天気は20分なので中間的な値）
 };
 
 function psiLevel(value) {
@@ -679,6 +680,14 @@ function dengueLevel(clusterCount) {
   return '厳重警戒';
 }
 
+// UV指数の3段階(設計書237。緑/黄/赤の3色方針に合わせ、WHOの5段階(Low/Moderate/High/VeryHigh/Extreme)を単純化)
+// public/app.jsのSTAT_CRITERIA.uvと、しきい値・ラベルを必ず一致させること
+function uvLevel(value) {
+  if (value <= 2) return '低い';
+  if (value <= 7) return '高い';
+  return '非常に高い';
+}
+
 // data.gov.sgの新API（ダウンロードURLを一度発行してから取得する2段階方式）
 async function fetchDataGovSgDataset(datasetId) {
   const poll = await axios.get(`https://api-open.data.gov.sg/v1/public/api/datasets/${datasetId}/poll-download`, {
@@ -697,7 +706,7 @@ app.get('/api/widget-stats', async (req, res) => {
   const now = Date.now();
   const isFresh = (field) => cityCache[field] && now - cityCache[field].cachedAt < WIDGET_STATS_TTL_MS[field];
 
-  const [fxSettled, weatherSettled, psiSettled, nowcastSettled, dengueSettled, pm25Settled] = await Promise.allSettled([
+  const [fxSettled, weatherSettled, psiSettled, nowcastSettled, dengueSettled, pm25Settled, uvSettled] = await Promise.allSettled([
     isFresh('exchangeRate') ? Promise.resolve(null) : axios.get(`https://open.er-api.com/v6/latest/${currency}`, { timeout: 6000 }),
     isFresh('weather') || !process.env.OPENWEATHER_API_KEY
       ? Promise.resolve(null)
@@ -714,6 +723,9 @@ app.get('/api/widget-stats', async (req, res) => {
     isFresh('pm25') || city !== 'sg'
       ? Promise.resolve(null)
       : axios.get('https://api.data.gov.sg/v1/environment/pm25', { timeout: 6000 }),
+    isFresh('uv') || city !== 'sg'
+      ? Promise.resolve(null)
+      : axios.get('https://api.data.gov.sg/v1/environment/uv-index', { timeout: 6000 }),
   ]);
 
   if (fxSettled.status === 'fulfilled' && fxSettled.value) {
@@ -786,6 +798,18 @@ app.get('/api/widget-stats', async (req, res) => {
     console.error('widget-stats dengue error:', dengueSettled.reason.message);
   }
 
+  // UV指数(設計書237)。おでかけ画面の指標ウィジェット(旧降水確率)用。取得に失敗しても他フィールドには影響しない
+  if (uvSettled.status === 'fulfilled' && uvSettled.value) {
+    try {
+      const value = uvSettled.value.data.items[0].index[0].value;
+      if (Number.isFinite(value)) cityCache.uv = { value: { value, level: uvLevel(value) }, cachedAt: now };
+    } catch (e) {
+      console.error('widget-stats uv parse error:', e.message);
+    }
+  } else if (uvSettled.status === 'rejected') {
+    console.error('widget-stats uv error:', uvSettled.reason.message);
+  }
+
   widgetStatsCache.set(city, cityCache);
 
   const result = {};
@@ -796,6 +820,7 @@ app.get('/api/widget-stats', async (req, res) => {
   if (cityCache.pm25) result.pm25 = cityCache.pm25.value;   // 新アプリ(1.8.16以降)はこれを指標に使う。旧アプリは従来のpsiを使い続ける
   if (cityCache.nowcast) result.nowcast = cityCache.nowcast.value;
   if (cityCache.dengue) result.dengue = cityCache.dengue.value;
+  if (cityCache.uv) result.uv = cityCache.uv.value;   // 設計書237。おでかけ画面のUV指数(旧降水確率)
   res.json(result);
 });
 
