@@ -495,7 +495,7 @@
         tourHomeWidgetsStep3: 'デング熱をタップすると、活動中のクラスターの目安が見られます',
         tutorialName7: 'ピン留め',
         tutorialDesc7: 'ピン留めした項目の見方',
-        tourPinStep1: '気になるカードの📌をタップすると、ピン留めできます。試しに押してみましょう',
+        tourPinStep1: '気になるカードの📌で、ピン留めができます。次へを押すと、お試しでピン留めしてみます',
         tourPinStep2: 'ピン留めすると、ここに表示されます',
         tourPinStep3: 'ピン留めした項目が、ここに一覧で表示されます',
         tutorialName8: 'おでかけのイベント情報',
@@ -4413,6 +4413,13 @@
           await new Promise(r => setTimeout(r, 120));
         }
       },
+      // ピン留めツアーのステップ2(FAB)に進む直前、サンプルカードを裏側で自動的にピン留めする(ユーザーに実際にタップさせる代わり。
+      // ツアーの対象は常にタップ不可のため、「次へ」を押したタイミングで疑似的に体験してもらう)。既にピン留め済みなら何もしない。常に成功扱い
+      'auto-pin-sample': async () => {
+        const sampleBtn = document.querySelector('#news-list .card-pin-link');
+        if (sampleBtn && !sampleBtn.classList.contains('pinned')) sampleBtn.click();
+        return true;
+      },
       // 月見出しの季節アイコンの吹き出しを開く(最初のアイコンを使う)。すでに開いていれば何もしない
       'open-season-bubble': async () => {
         const btn = document.querySelector('.cal-season-icon-btn');
@@ -4669,7 +4676,7 @@
     function _pinTourSteps() {
       return [
         { anchor: 'news-card-pin-sample', text: t('tourPinStep1') },
-        { anchor: 'fab-pin', text: t('tourPinStep2') },
+        { anchor: 'fab-pin', before: 'auto-pin-sample', text: t('tourPinStep2') },
         { anchor: 'pin-sheet', before: 'open-pin', text: t('tourPinStep3') },
       ];
     }
