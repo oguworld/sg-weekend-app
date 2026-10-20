@@ -112,7 +112,7 @@
       </div>
 
       <!-- Category Filter (new horizontal scroll) -->
-      <div id="filter-row-category">
+      <div id="filter-row-category" data-tour="home-filters">
         <button class="filter-chip active" data-cat="all" data-i18n="catAll" onclick="if(!_touchCapableDetected) toggleCatFilter('all')">新着</button>
         <button class="filter-chip" data-cat="recommend" data-i18n="catRecommend" style="display:none;" onclick="if(!_touchCapableDetected) toggleCatFilter('recommend')">おすすめ</button>
         <button class="filter-chip" data-cat="event" data-i18n="catEvent" onclick="if(!_touchCapableDetected) toggleCatFilter('event')">限定イベント</button>
@@ -199,7 +199,7 @@
 
   <!-- ─── PIN SHEET（ピン留め一覧、くらし・おでかけ画面のクリップFABから開くボトムシート） ─── -->
   <div class="pin-sheet-overlay" id="pin-sheet-overlay" onclick="if(event.target===this) closePinSheet()">
-    <div class="pin-sheet" id="pin-sheet">
+    <div class="pin-sheet" id="pin-sheet" data-tour="pin-sheet">
       <div class="pin-sheet-handle"></div>
       <button class="pin-sheet-close" onclick="closePinSheet()">✕</button>
       <div class="pin-sheet-title" data-i18n="navPins">ピン留め</div>
@@ -509,7 +509,7 @@
 
   <!-- FAB -->
   <button class="fab" id="fab-top" onclick="if(!_touchCapableDetected) fabScrollTop()" aria-label="トップへ戻る">↑</button>
-  <button class="fab fab-pin" id="fab-pin" onclick="if(!_touchCapableDetected) openPinSheet()" aria-label="ピン留め一覧">
+  <button class="fab fab-pin" id="fab-pin" data-tour="fab-pin" onclick="if(!_touchCapableDetected) openPinSheet()" aria-label="ピン留め一覧">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V7a4 4 0 0 1 8 0v9a2.5 2.5 0 0 1-5 0V9"/></svg>
   </button>
 
@@ -602,11 +602,11 @@
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
   <script src="/sg-rainfall-map-data.js"></script>
-  <script src="/app.js?v=20261020j"></script>
+  <script src="/app.js?v=20261020k"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
-  <div id="event-filter-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:3100;background:var(--warm-white);border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,0px);max-height:85dvh;overflow-y:auto;">
+  <div id="event-filter-sheet" data-tour="event-filter-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:3100;background:var(--warm-white);border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,0px);max-height:85dvh;overflow-y:auto;">
     <div style="width:36px;height:4px;background:var(--border-color);border-radius:2px;margin:10px auto 0;"></div>
     <button data-close onclick="closeEventFilterSheet()" style="position:absolute;top:10px;right:16px;background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;z-index:1;">✕</button>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;">

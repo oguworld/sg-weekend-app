@@ -448,7 +448,7 @@
         tourWelcomeTitle1: 'SG在住Naviへようこそ',
         tourWelcomeStep1: 'シンガポール在住の方向けの、くらしとおでかけの情報アプリです。主な使い方を、30秒でご案内します',
         tourWelcomeStep2: '下のボタンで、くらし・おでかけ・カレンダー・設定を切り替えられます。カレンダーでは、祝日や行事、旅行シーズン情報が見られます',
-        tourWelcomeStep3: '為替・PM2.5(大気汚染)・2時間予報の今の値です。PM2.5はタップするとエリア別の詳細が見られます',
+        tourWelcomeStep3: 'カードの❤️でいいね、📌でピン留め、🔗で元記事が見られます',
         tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
         psiUpdated: '更新',
         psiMode1h: 'PM2.5',
@@ -460,6 +460,8 @@
         psiNote24h: 'NEA(シンガポール環境庁)データ。PSIは24時間平均',
         psiNote1h: 'NEA(シンガポール環境庁)データ。基準もNEAの値',
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
+        tourCalStep0a: '日付ごとに予定が並びます。シンガポールの祝日は赤色で表示されます',
+        tourCalStep0b: '季節の絵文字をタップすると、説明が見られます',
         tourCalStep1: 'オンにすると、予定の期間と説明がまとめて表示されます',
         tourCalStep2: 'この飛行機のアイコンをタップすると、旅行先ごとの高い・安いの目安を、月を切り替えながら見られます',
         labelTutorial: 'チュートリアル',
@@ -470,8 +472,8 @@
         tutorialClose: '閉じる',
         tutorialName1: '基本の使い方',
         tutorialDesc1: '画面の見方と、くらしの指標・カテゴリ',
-        tutorialName2: 'カレンダー',
-        tutorialDesc2: '予定の説明と、旅行シーズン情報の入口',
+        tutorialName2: 'カレンダーの見方',
+        tutorialDesc2: '予定一覧の見方・季節アイコン・説明・旅行シーズン情報の入口',
         tutorialName3: '旅行シーズン情報',
         tutorialDesc3: '月の切り替えと、都市ごとの詳細',
         tutorialName4: 'くらしの指標(PM2.5)',
@@ -485,15 +487,24 @@
         tourWidgetsStep1: '為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます',
         tourWidgetsStep2: '為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります',
         tourWidgetsStep3: 'PM2.5をタップすると、エリア別の詳細や色分けが見られます',
-        tourWidgetsStep4: '2時間予報をタップすると、直近30分の雨量が地図で分かります',
+        tourWidgetsStep4: '2時間予報をタップすると、直近50分の雨量が地図で分かります',
         tutorialName6: 'おでかけの指標ウィジェット',
         tutorialDesc6: '気温・UV指数・デング熱の使い方',
         tourHomeWidgetsStep1: '気温・UV指数・デング熱が並んでいます。タップすると詳しい情報が見られます',
         tourHomeWidgetsStep2: 'UV指数をタップすると、紫外線の強さの目安が見られます',
         tourHomeWidgetsStep3: 'デング熱をタップすると、活動中のクラスターの目安が見られます',
+        tutorialName7: 'ピン留め',
+        tutorialDesc7: 'ピン留めした項目の見方',
+        tourPinStep1: 'くらし・おでかけ共通で、ここからピン留めした項目をまとめて見られます',
+        tourPinStep2: 'ピン留めした項目が、ここに一覧で表示されます',
+        tutorialName8: 'おでかけのイベント情報',
+        tutorialDesc8: 'イベントカードの見方と絞り込み',
+        tourEventInfoStep1: 'イベントの写真・説明を確認できます。❤️でいいね、📌でピン留めできます',
+        tourEventInfoStep2: 'カテゴリで絞り込めます',
+        tourEventInfoStep3: 'いつ行く？誰と？エリアなど、詳しい条件でも絞り込めます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
-        rainfallDesc: '島内の観測地点ごとの、直近5分間の降水量です。色が濃いほど雨が強いことを示します',
+        rainfallDesc: '島内の観測地点ごとの、直近10分間の降水量です。色が濃いほど雨が強いことを示します',
         fxConverterTitle: 'かんたん換算',
         fxConverterBase: '100 SGD は:',
         fxConverterUnavailable: 'レートを取得できませんでした。しばらくしてから開き直してください。',
@@ -3902,7 +3913,7 @@
     // ─── 雨量観測マップ(設計書238→設計書239でアニメーション対応): くらし画面「2時間予報」タップで開く、89地点の降水量プロット ───
     // SVG座標変換(SG_OUTLINE_PATH・SG_MAP_PROJECTION・projectLatLng)は public/sg-rainfall-map-data.js(app.jsより前に読み込む)で定義。
     // 地図エンジン(Leaflet等)は使わない。固定サイズの静的SVGに輪郭+観測点の円を描画するのみ(パン・ズーム無し)。
-    // 直近30分(5分間隔、最大6コマ)を自動ループ再生する(再生/停止ボタン等は作らない、ユーザー指示の最小限の動き)。
+    // 直近50分(10分間隔、最大6コマ、2026-10-20に5分間隔から変更)を自動ループ再生する(再生/停止ボタン等は作らない、ユーザー指示の最小限の動き)。
     const _RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
     const _RAINFALL_ANIM_INTERVAL_MS = 900;
     let _rainfallDetail = null;   // { data, fetchedAt }
@@ -3910,8 +3921,8 @@
     let _rainfallAnimTimer = null;    // このポップアップ専用のsetInterval。他機能のタイマーと混同しないこと
     let _rainfallAnimFrames = null;   // 古い順に並べ替えたframes配列(再生用)
     let _rainfallAnimIndex = 0;
-    // 直近5分間降水量(mm)の色分け: 0mm=降水なし(薄灰色)/ 0超〜2.5mm=弱い雨(緑)/ 2.5超〜10mm=やや強い雨(黄)/ 10mm超=激しい雨(赤)。
-    // 気象庁の「弱い雨(1時間1-3mm相当)」区分を参考にした5分値への概算(厳密な気象学的根拠ではない)。
+    // 各コマの降水量(mm、観測間隔は10分)の色分け: 0mm=降水なし(薄灰色)/ 0超〜2.5mm=弱い雨(緑)/ 2.5超〜10mm=やや強い雨(黄)/ 10mm超=激しい雨(赤)。
+    // 気象庁の「弱い雨(1時間1-3mm相当)」区分を参考にした概算(厳密な気象学的根拠ではない)。しきい値自体は観測間隔変更前から不変。
     const _RAINFALL_BANDS = [
       { cls: 'none', label: '降水なし', max: 0, r: 2.6 },
       { cls: 'light', label: '弱い雨', max: 2.5, r: 3.6 },
@@ -3986,7 +3997,7 @@
       _rainfallAnimFrames = null;
       _rainfallAnimIndex = 0;
     }
-    // 直近30分(最大6コマ)を古い順に並べ替えて0.9秒間隔でループ再生する。1コマ目は即時表示
+    // 直近50分(最大6コマ、10分間隔)を古い順に並べ替えて0.9秒間隔でループ再生する。1コマ目は即時表示
     function _startRainfallAnimation(svgId, data) {
       _stopRainfallAnimation();
       const stations = data.stations || [];
@@ -4403,7 +4414,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'home-filters', 'event-filter-sheet'];
     // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4484,6 +4495,44 @@
           await new Promise(r => setTimeout(r, 120));
         }
       },
+      // ピン留めシートを開く(すでに開いていれば何もしない)。中身(シート本体)が描画されるまで最大約3秒待つ
+      'open-pin': async () => {
+        if (!document.getElementById('pin-sheet-overlay')?.classList.contains('visible')) openPinSheet();
+        const t0 = Date.now();
+        for (;;) {
+          const sheet = document.getElementById('pin-sheet');
+          if (sheet && _tourVisible(sheet)) { if (_tourState) _tourState.pinSheetOpened = true; return true; }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
+      // おでかけの詳細条件フィルターシートを開く(すでに開いていれば何もしない)。中身が描画されるまで最大約3秒待つ
+      'open-event-filter': async () => {
+        const sheetEl = document.getElementById('event-filter-sheet');
+        if (!(sheetEl && sheetEl.style.display === 'block')) openEventFilterSheet();
+        const t0 = Date.now();
+        for (;;) {
+          const sheet = document.getElementById('event-filter-sheet');
+          if (sheet && _tourVisible(sheet)) { if (_tourState) _tourState.eventFilterOpened = true; return true; }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
+      // 月見出しの季節アイコンの吹き出しを開く(最初のアイコンを使う)。すでに開いていれば何もしない
+      'open-season-bubble': async () => {
+        const btn = document.querySelector('.cal-season-icon-btn');
+        if (!btn) return false;
+        const headRow = btn.closest('.cal-month-head-outer');
+        const bubble = headRow?.querySelector('.cal-month-season-bubble');
+        if (!(bubble && bubble.classList.contains('visible'))) toggleMonthSeasonNote(btn);
+        const t0 = Date.now();
+        for (;;) {
+          const b = btn.closest('.cal-month-head-outer')?.querySelector('.cal-month-season-bubble.visible');
+          if (b && _tourVisible(b)) { if (_tourState) _tourState.seasonBubbleOpened = true; return true; }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
     };
     function _closeStatPopover() {
       const popover = document.getElementById('stat-criteria-popover');
@@ -4502,6 +4551,10 @@
       return r.width > 0 && r.height > 0;
     }
     function _tourAnchorEl(name) {
+      if (name === 'news-card-sample') return document.querySelector('#news-list .spot-card');
+      if (name === 'home-card-sample') return document.querySelector('#cards-grid .spot-card');
+      if (name === 'cal-item-sample') return document.querySelector('#calendar-list .cal-item');
+      if (name === 'cal-season-icon') return document.querySelector('.cal-season-icon-btn');
       if (!_TOUR_ANCHORS.includes(name)) return null;
       const els = Array.from(document.querySelectorAll(`[data-tour="${name}"]`));
       if (name === 'cal-fare-entry') {
@@ -4655,6 +4708,9 @@
       if (st.locked) unlockScroll();
       if (st.popoverOpened) _closeStatPopover();   // 案内が開いた指標ウィジェットのポップアップ(PSI/為替/雨量)は、終了で閉じる
       if (st.homePopoverOpened) document.getElementById('stat-criteria-popover-home')?.classList.remove('visible');   // おでかけ画面のポップアップ(UV指数/デング熱)。専用の後処理が無いためクラス操作のみ
+      if (st.pinSheetOpened) closePinSheet();   // 案内が開いたピン留めシートは、終了で閉じる
+      if (st.eventFilterOpened) closeEventFilterSheet();   // 案内が開いた詳細条件フィルターシートは、終了で閉じる
+      if (st.seasonBubbleOpened) _closeAllCalBubbles();   // 案内が開いた季節アイコンの吹き出しは、終了で閉じる
       if (typeof st.onEnd === 'function') {
         try { st.onEnd({ shown: st.steps.length > 0, record: !!record }); } catch (_) {}
       }
@@ -4668,7 +4724,7 @@
       return [
         { anchor: null, title: t('tourWelcomeTitle1'), text: t('tourWelcomeStep1'), nextLabel: t('tourWelcomeStart') },
         { anchor: 'nav-bar', text: t('tourWelcomeStep2'), noScroll: true },
-        { anchor: 'news-stats', text: t('tourWelcomeStep3') },
+        { anchor: 'news-card-sample', text: t('tourWelcomeStep3') },
         { anchor: 'news-filters', text: t('tourWelcomeStep4') },
       ];
     }
@@ -4701,8 +4757,25 @@
     // 変える時は、whats-new.json とアプリ内 STRINGS.ja の2か所を直す。
     function _calendarTourSteps() {
       return [
+        { anchor: 'cal-item-sample', text: t('tourCalStep0a') },
+        { anchor: 'cal-season-icon', before: 'open-season-bubble', text: t('tourCalStep0b') },
         { anchor: 'cal-notes-switch', text: t('tourCalStep1') },
         { anchor: 'cal-fare-entry', text: t('tourCalStep2') },
+      ];
+    }
+    // ピン留め(クリップ型FAB→一覧シート)の案内。設定の「チュートリアル」専用(自動表示のCTAには紐付けない)
+    function _pinTourSteps() {
+      return [
+        { anchor: 'fab-pin', text: t('tourPinStep1') },
+        { anchor: 'pin-sheet', before: 'open-pin', text: t('tourPinStep2') },
+      ];
+    }
+    // おでかけのイベント情報(カード・カテゴリ絞り込み・詳細条件フィルター)の案内。設定の「チュートリアル」専用
+    function _eventInfoTourSteps() {
+      return [
+        { anchor: 'home-card-sample', text: t('tourEventInfoStep1') },
+        { anchor: 'home-filters', text: t('tourEventInfoStep2') },
+        { anchor: 'event-filter-sheet', before: 'open-event-filter', text: t('tourEventInfoStep3') },
       ];
     }
     // くらしの指標(PM2.5)の案内。1.8.16の紹介カードの「使ってみる」(ツアーID pm25-1、文言はサーバー側`content/whats-new.json`)と同じ内容。
@@ -4740,19 +4813,24 @@
         prepare: async () => { switchNav('news'); await _tutorialWait(600); },
       },
       {
-        id: 'pm25-1', nameKey: 'tutorialName4', descKey: 'tutorialDesc4', steps: _pm25TourSteps,
-        prepare: async () => { switchNav('news'); await _tutorialWait(600); },
-        cleanup: () => _closeStatPopover(),
-      },
-      {
         id: 'widgets-1817', nameKey: 'tutorialName5', descKey: 'tutorialDesc5', steps: _widgetsTourSteps,
         prepare: async () => { switchNav('news'); await _tutorialWait(600); },
         cleanup: () => _closeStatPopover(),
       },
       {
+        id: 'pin-1', nameKey: 'tutorialName7', descKey: 'tutorialDesc7', steps: _pinTourSteps,
+        prepare: async () => { switchNav('news'); await _tutorialWait(600); },
+        cleanup: () => closePinSheet(),
+      },
+      {
         id: 'home-widgets-1817', nameKey: 'tutorialName6', descKey: 'tutorialDesc6', steps: _homeWidgetsTourSteps,
         prepare: async () => { switchNav('home'); await _tutorialWait(600); },
         cleanup: () => { document.getElementById('stat-criteria-popover-home')?.classList.remove('visible'); },
+      },
+      {
+        id: 'event-info-1', nameKey: 'tutorialName8', descKey: 'tutorialDesc8', steps: _eventInfoTourSteps,
+        prepare: async () => { switchNav('home'); await _tutorialWait(600); },
+        cleanup: () => closeEventFilterSheet(),
       },
       {
         id: 'calendar-1', nameKey: 'tutorialName2', descKey: 'tutorialDesc2', steps: _calendarTourSteps,

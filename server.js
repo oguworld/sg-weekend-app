@@ -887,11 +887,15 @@ app.get('/api/psi-detail', async (req, res) => {
   }
 });
 
-// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238→設計書239でアニメーション対応)。
-// data.gov.sgの雨量観測データ(約89地点)を、直近30分(5分間隔、最大6コマ)の時系列で返す。
+// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238→設計書239でアニメーション対応→2026-10-20に間隔を10分へ変更)。
+// data.gov.sgの雨量観測データ(約89地点)を、直近50分(10分間隔、最大6コマ)の時系列で返す。
 // /api/psi-detailと同じパターン(TTLキャッシュ・取得失敗時は古い値へフォールバック・city!=='sg'は404)。
 const RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
-const RAINFALL_DETAIL_MAX_FRAMES = 6;   // 5分間隔×6=直近30分
+const RAINFALL_DETAIL_MAX_FRAMES = 6;   // 10分間隔×6=直近50分
+// 外部APIは5分間隔のバッチを返すため、1つ飛ばし(インデックス0,2,4,6,8,10)で抽出して10分間隔にする。
+// そのため最大6コマを得るには先頭11件(インデックス10まで)が必要。
+const RAINFALL_DETAIL_STEP = 2;
+const RAINFALL_DETAIL_NEEDED_BLOCKS = (RAINFALL_DETAIL_MAX_FRAMES - 1) * RAINFALL_DETAIL_STEP + 1;   // 11件
 let rainfallDetailCache = null;   // { value, cachedAt }。取得失敗時は古い値があればそれを返す
 async function rainfallDetailCached() {
   const now = Date.now();
@@ -915,7 +919,11 @@ async function rainfallDetailCached() {
         lng: s.location.longitude,
       }));
     if (stationsOut.length === 0) throw new Error('rainfall stations empty');
-    const frames = readingsBlocks.slice(0, RAINFALL_DETAIL_MAX_FRAMES).map(block => {
+    // 1つ飛ばし(0,2,4,6,8,10)で10分間隔・最大6コマを抽出。件数が足りない場合は取得できた範囲で間引く(例: 7件なら0,2,4,6の4コマ)。
+    const blocksAvailable = Math.min(readingsBlocks.length, RAINFALL_DETAIL_NEEDED_BLOCKS);
+    const selectedBlocks = [];
+    for (let i = 0; i < blocksAvailable; i += RAINFALL_DETAIL_STEP) selectedBlocks.push(readingsBlocks[i]);
+    const frames = selectedBlocks.slice(0, RAINFALL_DETAIL_MAX_FRAMES).map(block => {
       const values = {};
       (block && block.data || []).forEach(r => { if (r && r.stationId) values[r.stationId] = r.value; });
       return { timestamp: block ? block.timestamp : null, values };
