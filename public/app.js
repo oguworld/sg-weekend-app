@@ -4408,14 +4408,23 @@
           await new Promise(r => setTimeout(r, 120));
         }
       },
-      // ピン留めシートを開く(すでに開いていれば何もしない)。中身(シート本体)が描画されるまで最大約3秒待つ
+      // ピン留めシートを開く(すでに開いていれば何もしない)。中身(シート本体)が描画されるまで最大約3秒待つ。
+      // シート自体が下から0.25秒かけてせり上がるCSSアニメーション(transform: translateY)を持つため、
+      // _tourVisible()が真になった直後(アニメーション開始直後)ではまだ最終位置に達しておらず、
+      // そのままハイライトの位置を測るとカードが実際より下の位置で光ってしまう(2026-10-21に実機で発覚)。
+      // せり上がりが終わるのを待ってから返す
       // ピン留めの有無に関わらず常に開く(0件の場合は既存の空状態メッセージがそのまま表示される)
       'open-pin': async () => {
-        if (!document.getElementById('pin-sheet-overlay')?.classList.contains('visible')) openPinSheet();
+        const wasOpen = document.getElementById('pin-sheet-overlay')?.classList.contains('visible');
+        if (!wasOpen) openPinSheet();
         const t0 = Date.now();
         for (;;) {
           const sheet = document.getElementById('pin-sheet');
-          if (sheet && _tourVisible(sheet)) { if (_tourState) _tourState.pinSheetOpened = true; return true; }
+          if (sheet && _tourVisible(sheet)) {
+            if (!wasOpen) await new Promise(r => setTimeout(r, 300));   // せり上がり(0.25秒)が終わるのを待つ
+            if (_tourState) _tourState.pinSheetOpened = true;
+            return true;
+          }
           if (Date.now() - t0 >= 3000) return false;
           await new Promise(r => setTimeout(r, 120));
         }
@@ -4442,13 +4451,19 @@
           await new Promise(r => setTimeout(r, 120));
         }
       },
-      // 設定の「チュートリアル」一覧シートを開く(すでに開いていれば何もしない)。中身(「最初から全部見る」ボタン)が描画されるまで最大約3秒待つ
+      // 設定の「チュートリアル」一覧シートを開く(すでに開いていれば何もしない)。中身(「最初から全部見る」ボタン)が描画されるまで最大約3秒待つ。
+      // #tutorial-sheetは.pin-sheetのCSS(0.25秒のせり上がりtransform)を流用しているため、open-pinと同じ理由でアニメーション完了を待つ
       'open-tutorial-sheet': async () => {
-        if (!_isTutorialSheetOpen()) openTutorialSheet();
+        const wasOpen = _isTutorialSheetOpen();
+        if (!wasOpen) openTutorialSheet();
         const t0 = Date.now();
         for (;;) {
           const btn = document.querySelector('.tutorial-all-btn');
-          if (btn && _tourVisible(btn)) { if (_tourState) _tourState.tutorialSheetOpened = true; return true; }
+          if (btn && _tourVisible(btn)) {
+            if (!wasOpen) await new Promise(r => setTimeout(r, 300));   // せり上がり(0.25秒)が終わるのを待つ
+            if (_tourState) _tourState.tutorialSheetOpened = true;
+            return true;
+          }
           if (Date.now() - t0 >= 3000) return false;
           await new Promise(r => setTimeout(r, 120));
         }
