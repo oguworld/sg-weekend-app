@@ -447,7 +447,7 @@
         tourWelcomeTitle1: 'SG在住Naviへようこそ',
         tourWelcomeStep1: 'シンガポール在住の方向けの、くらしとおでかけの情報アプリです。主な使い方を、30秒でご案内します',
         tourWelcomeStep2: '下のボタンで、くらし・おでかけ・カレンダー・設定を切り替えられます。カレンダーでは、祝日や行事、旅行シーズン情報が見られます',
-        tourWelcomeStep3: '為替・PM2.5(大気汚染)・デング熱の今の値です。PM2.5はタップするとエリア別の詳細が、デング熱は基準が見られます',
+        tourWelcomeStep3: '為替・PM2.5(大気汚染)・2時間予報の今の値です。PM2.5はタップするとエリア別の詳細が見られます',
         tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
         psiUpdated: '更新',
         psiMode1h: 'PM2.5',
@@ -664,7 +664,8 @@
     const _DENGUE_LEVEL_CLASS = { '警報なし': 'safe', '注意': 'caution', '警戒': 'danger', '厳重警戒': 'danger' };
 
     function toggleStatCriteria(kind) {
-      const popover = document.getElementById('stat-criteria-popover');
+      const popoverId = kind === 'dengue' ? 'stat-criteria-popover-home' : 'stat-criteria-popover';
+      const popover = document.getElementById(popoverId);
       if (!popover) return;
       if (popover.classList.contains('visible') && popover.dataset.kind === kind) {
         popover.classList.remove('visible');
@@ -875,9 +876,13 @@
       // 案内(スポットライト)の表示中は、「次へ」「スキップ」のタップ(案内のレイヤー上=ポップアップの外)で閉じない(2026-10-19)
       if (_tourState) return;
       const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
-      const popover = document.getElementById('stat-criteria-popover');
-      if (e.target.closest('[data-stat-crit]') || e.target.closest('#stat-criteria-popover') || (popover && path.includes(popover))) return;
-      popover?.classList.remove('visible');
+      const popovers = [document.getElementById('stat-criteria-popover'), document.getElementById('stat-criteria-popover-home')];
+      if (e.target.closest('[data-stat-crit]')) return;
+      for (const popover of popovers) {
+        if (!popover) continue;
+        if (e.target.closest('.stat-criteria-popover') === popover || path.includes(popover)) continue;
+        popover.classList.remove('visible');
+      }
     }, { passive: true });
 
     // 指標ウィジェットの前回取得時刻（設計書213: 画面遷移時の再取得判定に使用。成功時のみ更新）
@@ -2068,8 +2073,16 @@
       }
     }, { passive: false });
 
-    // ─── PSI・デング熱指標タップでクライテリア表示 即時タップ対応 ───
+    // ─── PSI・為替指標タップでクライテリア表示 即時タップ対応 ───
     document.getElementById('stat-widget-info')?.addEventListener('touchend', e => {
+      const col = e.target.closest('[data-stat-crit]');
+      if (!col) return;
+      e.preventDefault();
+      toggleStatCriteria(col.dataset.statCrit);
+    }, { passive: false });
+
+    // ─── デング熱指標タップでクライテリア表示 即時タップ対応(おでかけ画面) ───
+    document.getElementById('stat-widget-weather')?.addEventListener('touchend', e => {
       const col = e.target.closest('[data-stat-crit]');
       if (!col) return;
       e.preventDefault();

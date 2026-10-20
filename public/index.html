@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20261020i">
+  <link rel="stylesheet" href="/app.css?v=20261020j">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -73,7 +73,7 @@
         <span class="screen-title" data-i18n="homeScreenTitle">おでかけ情報</span>
       </div>
 
-      <!-- 指標ウィジェット: 気温・降水確率・スコール情報 -->
+      <!-- 指標ウィジェット: 気温・降水確率・デング熱警戒 -->
       <div class="stat-widget" id="stat-widget-weather">
         <div class="stat-col">
           <div class="stat-row"><span class="stat-icon">🌡️</span><span class="stat-val" id="stat-temp">--</span></div>
@@ -85,10 +85,11 @@
           <div class="stat-sub" data-i18n="statRain">降水確率</div>
         </div>
         <div class="stat-div"></div>
-        <div class="stat-col">
-          <div class="stat-row"><span class="stat-icon">⛈️</span><span class="stat-val" id="stat-nowcast">--</span></div>
-          <div class="stat-sub" data-i18n="statNowcast">2時間予報</div>
+        <div class="stat-col" data-stat-crit="dengue" onclick="if(!_touchCapableDetected) toggleStatCriteria('dengue')">
+          <div class="stat-row"><span class="stat-icon">🦟</span><span class="stat-val" id="stat-dengue">--</span></div>
+          <div class="stat-sub" data-i18n="statDengue">デング熱</div>
         </div>
+        <div id="stat-criteria-popover-home" class="stat-criteria-popover"></div>
       </div>
 
       <!-- Section Header (moved from main) -->
@@ -152,7 +153,7 @@
     <div class="plan-title-header">
       <span class="screen-title" data-i18n="newsScreenTitle">くらし情報</span>
     </div>
-    <!-- 指標ウィジェット: 為替・PSI・デング熱警戒 -->
+    <!-- 指標ウィジェット: 為替・PSI・2時間予報 -->
     <div class="stat-widget" id="stat-widget-info" data-tour="news-stats">
       <div class="stat-col" data-stat-crit="fx" onclick="if(!_touchCapableDetected) toggleStatCriteria('fx')">
         <div class="stat-row"><span class="stat-val" id="stat-fx">--</span></div>
@@ -164,11 +165,11 @@
         <div class="stat-sub" id="stat-psi-label" data-i18n="statPsi">PSI</div>
       </div>
       <div class="stat-div"></div>
-      <div class="stat-col" data-stat-crit="dengue" onclick="if(!_touchCapableDetected) toggleStatCriteria('dengue')">
-        <div class="stat-row"><span class="stat-val" id="stat-dengue">--</span></div>
-        <div class="stat-sub" data-i18n="statDengue">デング熱</div>
+      <div class="stat-col">
+        <div class="stat-row"><span class="stat-val" id="stat-nowcast">--</span></div>
+        <div class="stat-sub" data-i18n="statNowcast">2時間予報</div>
       </div>
-      <div id="stat-criteria-popover"></div>
+      <div id="stat-criteria-popover" class="stat-criteria-popover"></div>
     </div>
     <div class="section-header" style="padding:0 16px 4px;margin-bottom:0;min-height:0;">
       <div style="display:flex;align-items:center;gap:8px;margin-left:auto;height:28px;">
@@ -600,7 +601,7 @@
   <script src="/vendor/leaflet/leaflet.js"></script>
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
-  <script src="/app.js?v=20261019x"></script>
+  <script src="/app.js?v=20261020a"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
