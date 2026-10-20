@@ -4401,7 +4401,10 @@
         }
       },
       // ピン留めシートを開く(すでに開いていれば何もしない)。中身(シート本体)が描画されるまで最大約3秒待つ
+      // ピン留め0件でFAB自体が実際には見えていない(opacity:0)場合は、シートを開かずツアーを進めない
       'open-pin': async () => {
+        const fab = document.getElementById('fab-pin');
+        if (!fab || !_tourVisible(fab)) return false;
         if (!document.getElementById('pin-sheet-overlay')?.classList.contains('visible')) openPinSheet();
         const t0 = Date.now();
         for (;;) {
@@ -4441,7 +4444,12 @@
     function _tourVisible(el) {
       if (!el) return false;
       const r = el.getBoundingClientRect();
-      return r.width > 0 && r.height > 0;
+      if (!(r.width > 0 && r.height > 0)) return false;
+      // opacity:0/visibility:hiddenで非表示方式の要素(例: 未表示状態の.fab)は、幅・高さがあっても「見えない」と判定する
+      const style = window.getComputedStyle(el);
+      if (parseFloat(style.opacity) <= 0) return false;
+      if (style.visibility === 'hidden') return false;
+      return true;
     }
     function _tourAnchorEl(name) {
       if (name === 'news-card-sample') return document.querySelector('#news-list .spot-card');
@@ -4490,7 +4498,7 @@
       if (_tourState || !id || !Array.isArray(steps)) return;
       const layer = document.getElementById('tour-layer');
       if (!layer) return;
-      _tourState = { id, persist: !!persist, steps: [], index: -1, locked: false, onEnd };
+      _tourState = { id, persist: !!persist, steps: [], index: -1, locked: false, onEnd, shownAny: false };
       const st = _tourState;
       // 見つかるステップだけ残す(全部無ければ何も出さず、記録もしない)。anchorがnullのステップは、中央に出すカードで、常に残す
       // beforeを持つステップと、それ以降のステップは、beforeの実行(ポップアップを開く等)の後に初めて出現するため、最初の存在確認から外す
@@ -4522,14 +4530,16 @@
         try { ok = !!(fn && await fn()); } catch (_) { ok = false; }
         st.busy = false;
         if (_tourState !== st) return;
-        if (!ok) { _tourEnd(true); return; }
+        // before失敗/アンカー待機タイムアウト時は、それまでに1ステップでも表示できていた場合のみ「見た」記録をする(shownAny)
+        if (!ok) { _tourEnd(st.shownAny); return; }
         const first = await _tourWaitAnchor(step.anchor, 2500);
         if (_tourState !== st) return;
-        if (!first) { _tourEnd(true); return; }
+        if (!first) { _tourEnd(st.shownAny); return; }
       }
       const el = center ? null : _tourAnchorEl(step.anchor);
       if (!center && !_tourVisible(el)) { _tourShow(i + 1); return; }   // 途中で消えたステップは飛ばす
       st.index = i;
+      st.shownAny = true;   // 実際にスポットライトを表示した(終了時の「見た」記録の判定に使う)
       const inPopover = !!step.anchor && _TOUR_POPOVER_ANCHORS.includes(step.anchor);
       if (el && !step.noScroll) el.scrollIntoView({ block: inPopover ? 'nearest' : 'center', inline: 'nearest' });   // noScroll: 画面下端に固定の要素(ボトムナビ)など
       const isLast = i === st.steps.length - 1;
@@ -4584,7 +4594,7 @@
       if (!_tourState || _tourState.busy) return;
       _tourShow(_tourState.index + 1);
     }
-    function tourSkip() { _tourEnd(true); }
+    function tourSkip() { _tourEnd(!!(_tourState && _tourState.shownAny)); }
 
     // 終了。record=trueかつpersistなら「見終わった」を記録する(Web確認のpersist=falseは記録しない)
     function _tourEnd(record) {
