@@ -887,14 +887,14 @@ app.get('/api/psi-detail', async (req, res) => {
   }
 });
 
-// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238→設計書239でアニメーション対応→2026-10-20に間隔を10分へ変更→同日、10分の倍数の時刻(8:00/8:10/8:20...)だけを残す方式に修正)。
-// data.gov.sgの雨量観測データ(約89地点)を、直近50分(10分間隔、最大6コマ)の時系列で返す。
+// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238→設計書239でアニメーション対応→2026-10-20に間隔を10分へ変更→同日、10分の倍数の時刻(8:00/8:10/8:20...)だけを残す方式に修正→同日、直近1時間(60分・7コマ)に拡張)。
+// data.gov.sgの雨量観測データ(約89地点)を、直近1時間(60分、10分間隔、最大7コマ)の時系列で返す。
 // /api/psi-detailと同じパターン(TTLキャッシュ・取得失敗時は古い値へフォールバック・city!=='sg'は404)。
 const RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
-const RAINFALL_DETAIL_MAX_FRAMES = 6;   // 10分間隔×6=直近50分
+const RAINFALL_DETAIL_MAX_FRAMES = 7;   // 10分間隔×7=直近1時間(60分)。0,10,20,30,40,50,60分前の7コマ
 // 外部APIは5分間隔のバッチ(新しい順)を返す。「インデックスを1つ飛ばし」だと起点が5分刻み(8:05等)の場合に
 // 10の倍数からズレるため、各バッチのtimestampを見て分が10の倍数(0/10/20/30/40/50)のものだけを残す方式にする。
-// 5分間隔のデータから10分刻みを6個集めるには理論上11件で足りるが、取得タイミングのブレに備えて多めに確保する。
+// 5分間隔のデータから10分刻みを7個集めるには理論上13件で足りるが、取得タイミングのブレに備えて多めに確保する。
 const RAINFALL_DETAIL_NEEDED_BLOCKS = 20;
 // timestampの分が10の倍数かどうか。タイムゾーンオフセット付きのISO8601文字列(例: "2026-10-20T13:30:00+08:00")から
 // 文字列のまま分を抜き出す(Dateでパースしてローカルタイムゾーンに依存するズレを避けるため)。
@@ -925,7 +925,7 @@ async function rainfallDetailCached() {
         lng: s.location.longitude,
       }));
     if (stationsOut.length === 0) throw new Error('rainfall stations empty');
-    // 分が10の倍数(0/10/20/30/40/50)のバッチだけを残し、新しい順の先頭から最大6コマを抽出する。
+    // 分が10の倍数(0/10/20/30/40/50)のバッチだけを残し、新しい順の先頭から最大7コマを抽出する。
     // 件数が足りない場合(取得期間が短い等)は取得できた範囲でそのまま返す。
     const blocksAvailable = readingsBlocks.slice(0, RAINFALL_DETAIL_NEEDED_BLOCKS);
     const selectedBlocks = blocksAvailable.filter(block => isRainfallTenMinuteMark(block && block.timestamp));

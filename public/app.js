@@ -487,7 +487,7 @@
         tourWidgetsStep1: '為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます',
         tourWidgetsStep2: '為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります',
         tourWidgetsStep3: 'PM2.5をタップすると、エリア別の詳細や色分けが見られます',
-        tourWidgetsStep4: '2時間予報をタップすると、直近50分の雨量が地図で分かります',
+        tourWidgetsStep4: '2時間予報をタップすると、直近1時間の雨量が地図で分かります',
         tutorialName6: 'おでかけの指標ウィジェット',
         tutorialDesc6: '気温・UV指数・デング熱の使い方',
         tourHomeWidgetsStep1: '気温・UV指数・デング熱が並んでいます。タップすると詳しい情報が見られます',
@@ -503,7 +503,7 @@
         tourEventInfoStep2: 'カテゴリで絞り込めます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
-        rainfallDesc: '島内の観測地点ごとの、直近10分間の降水量です。色が濃いほど雨が強いことを示します',
+        rainfallDesc: '島内の観測地点ごとの、直近5分間の降水量です。色が濃いほど雨が強いことを示します',
         fxConverterTitle: 'かんたん換算',
         fxConverterBase: '100 SGD は:',
         fxConverterUnavailable: 'レートを取得できませんでした。しばらくしてから開き直してください。',
@@ -3818,7 +3818,7 @@
     // ─── 雨量観測マップ(設計書238→設計書239でアニメーション対応): くらし画面「2時間予報」タップで開く、89地点の降水量プロット ───
     // SVG座標変換(SG_OUTLINE_PATH・SG_MAP_PROJECTION・projectLatLng)は public/sg-rainfall-map-data.js(app.jsより前に読み込む)で定義。
     // 地図エンジン(Leaflet等)は使わない。固定サイズの静的SVGに輪郭+観測点の円を描画するのみ(パン・ズーム無し)。
-    // 直近50分(10分間隔、最大6コマ、2026-10-20に5分間隔から変更)を自動ループ再生する(再生/停止ボタン等は作らない、ユーザー指示の最小限の動き)。
+    // 直近1時間(60分、10分間隔、最大7コマ、2026-10-20に5分間隔から変更。同日、50分・6コマから1時間・7コマへ拡張)を自動ループ再生する(再生/停止ボタン等は作らない、ユーザー指示の最小限の動き)。
     const _RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
     const _RAINFALL_ANIM_INTERVAL_MS = 900;
     let _rainfallDetail = null;   // { data, fetchedAt }
@@ -3902,7 +3902,7 @@
       _rainfallAnimFrames = null;
       _rainfallAnimIndex = 0;
     }
-    // 直近50分(最大6コマ、10分間隔)を古い順に並べ替えて0.9秒間隔でループ再生する。1コマ目は即時表示
+    // 直近1時間(最大7コマ、10分間隔)を古い順に並べ替えて0.9秒間隔でループ再生する。1コマ目は即時表示
     function _startRainfallAnimation(svgId, data) {
       _stopRainfallAnimation();
       const stations = data.stations || [];
