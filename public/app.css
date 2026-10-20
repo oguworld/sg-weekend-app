@@ -1194,6 +1194,7 @@
     .stat-sub { font-size: 11px; font-weight: 600; color: var(--warm-gray); margin-top: 1px; white-space: nowrap; }
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
     .stat-col[data-stat-crit] { cursor: pointer; }
+    .stat-col[data-rainfall-tap] { cursor: pointer; }
     /* PSI・デング熱タップ時のクライテリア表示（指標の説明＋各レベルをピル型チップで並べ、現在値のチップだけ強調） */
     .stat-criteria-popover {
       display: none;
@@ -1631,6 +1632,21 @@
       box-shadow: 0 0 0 2px var(--midnight) inset;
       font-weight: 700;
     }
+
+    /* ─── 雨量観測マップ(設計書238): くらし画面「2時間予報」タップで開く専用画面。#fare-sheetと全く同じCSSパターン(.fare-sheet-overlay/.fare-sheetを共用) ───
+       地図エンジンは使わない。固定サイズの静的SVG(輪郭+89地点の円)で、パン・ズーム操作は無し */
+    .rainfall-map-wrap { width: 100%; margin: 4px 0 14px; }
+    #rainfall-map { width: 100%; height: auto; display: block; }
+    .rainfall-outline { fill: var(--psi-tile-bg); stroke: var(--sand-dark); stroke-width: 1; }
+    .rainfall-point { stroke: var(--warm-white); stroke-width: 0.6; }
+    .rainfall-lv-none { fill: var(--sand-dark); }
+    .rainfall-lv-light { fill: var(--pm25-normal-text); }
+    .rainfall-lv-medium { fill: var(--pm25-elevated-text); }
+    .rainfall-lv-heavy { fill: var(--pm25-high-text); }
+    .rainfall-lv-chip-none { color: var(--warm-gray); }
+    .rainfall-lv-chip-light { color: var(--pm25-normal-text); }
+    .rainfall-lv-chip-medium { color: var(--pm25-elevated-text); }
+    .rainfall-lv-chip-heavy { color: var(--pm25-high-text); }
 
     .cal-fare-detail {
       margin-top: 24px; padding-top: 0; border-top: 1px solid var(--sand-dark);

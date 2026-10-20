@@ -482,6 +482,9 @@
         tourPm25Step4: '色と顔の絵文字の見方です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
+        rainfallSheetTitle: '雨量観測マップ',
+        rainfallSheetDesc: 'シンガポール島内89地点の、直近5分間の降水量です。色が濃いほど雨が強いことを示します。',
+        rainfallSheetNote: 'データ: NEA(シンガポール環境庁)/ data.gov.sg。地図: geoBoundaries(ODbL)',
         fxConverterTitle: 'かんたん換算',
         fxConverterBase: '100 SGD は:',
         fxConverterUnavailable: 'レートを取得できませんでした。しばらくしてから開き直してください。',
@@ -2092,9 +2095,16 @@
     // ─── PSI・為替指標タップでクライテリア表示 即時タップ対応 ───
     document.getElementById('stat-widget-info')?.addEventListener('touchend', e => {
       const col = e.target.closest('[data-stat-crit]');
-      if (!col) return;
-      e.preventDefault();
-      toggleStatCriteria(col.dataset.statCrit);
+      if (col) {
+        e.preventDefault();
+        toggleStatCriteria(col.dataset.statCrit);
+        return;
+      }
+      // 2時間予報タップ→雨量観測マップ(設計書238)。data-stat-critとは別の仕組み(toggleStatCriteriaは狭いポップオーバー前提のため)
+      if (e.target.closest('[data-rainfall-tap]')) {
+        e.preventDefault();
+        openRainfallSheet();
+      }
     }, { passive: false });
 
     // ─── デング熱指標タップでクライテリア表示 即時タップ対応(おでかけ画面) ───
@@ -3880,6 +3890,118 @@
     function closeFareSheet() {
       if (!_isFareSheetOpen()) return;
       document.getElementById('fare-sheet-overlay')?.classList.remove('visible');
+      unlockScroll();
+    }
+
+    // ─── 雨量観測マップ(設計書238): くらし画面「2時間予報」タップで開く、89地点の降水量(直近5分)プロット ───
+    // SVG座標変換(SG_OUTLINE_PATH・SG_MAP_PROJECTION・projectLatLng)は public/sg-rainfall-map-data.js(app.jsより前に読み込む)で定義。
+    // 地図エンジン(Leaflet等)は使わない。固定サイズの静的SVGに輪郭+観測点の円を描画するのみ(パン・ズーム無し)。
+    const _RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
+    let _rainfallDetail = null;   // { data, fetchedAt }
+    let _rainfallDetailPromise = null;
+    // 直近5分間降水量(mm)の色分け: 0mm=降水なし(薄灰色)/ 0超〜2.5mm=弱い雨(緑)/ 2.5超〜10mm=やや強い雨(黄)/ 10mm超=激しい雨(赤)。
+    // 気象庁の「弱い雨(1時間1-3mm相当)」区分を参考にした5分値への概算(厳密な気象学的根拠ではない)。
+    const _RAINFALL_BANDS = [
+      { cls: 'none', label: '降水なし', max: 0, r: 2.6 },
+      { cls: 'light', label: '弱い雨', max: 2.5, r: 3.6 },
+      { cls: 'medium', label: 'やや強い雨', max: 10, r: 5 },
+      { cls: 'heavy', label: '激しい雨', max: Infinity, r: 6.4 },
+    ];
+    function _rainfallBandOfValue(v) {
+      if (!Number.isFinite(v)) return null;
+      for (const b of _RAINFALL_BANDS) { if (v <= b.max) return b; }
+      return _RAINFALL_BANDS[_RAINFALL_BANDS.length - 1];
+    }
+    function _isRainfallSheetOpen() {
+      return !!document.getElementById('rainfall-sheet-overlay')?.classList.contains('visible');
+    }
+    function _loadRainfallDetail() {
+      if (_rainfallDetail && Date.now() - _rainfallDetail.fetchedAt < _RAINFALL_DETAIL_TTL_MS) return Promise.resolve(_rainfallDetail.data);
+      if (_rainfallDetailPromise) return _rainfallDetailPromise;
+      _rainfallDetailPromise = (async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/rainfall-detail?city=${getCity()}`);
+          if (!res.ok) throw new Error('rainfall-detail failed');
+          const data = await res.json();
+          _rainfallDetail = { data, fetchedAt: Date.now() };
+          return data;
+        } catch (_) {
+          return null;
+        } finally {
+          _rainfallDetailPromise = null;
+        }
+      })();
+      return _rainfallDetailPromise;
+    }
+    function _rainfallDetailValid(d) {
+      return !!(d && Array.isArray(d.stations) && d.stations.length > 0);
+    }
+    // 輪郭パスは1回だけ描画し、観測点の<circle>だけ毎回入れ替える(既に輪郭が描画済みなら再利用)
+    function _renderRainfallMap(data) {
+      const svg = document.getElementById('rainfall-map');
+      if (!svg) return;
+      if (!svg.querySelector('.rainfall-outline')) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'rainfall-outline');
+        path.setAttribute('d', SG_OUTLINE_PATH);
+        svg.appendChild(path);
+      }
+      svg.querySelectorAll('.rainfall-point').forEach(el => el.remove());
+      (data.stations || []).forEach(st => {
+        if (!Number.isFinite(st.lat) || !Number.isFinite(st.lng)) return;
+        const [x, y] = projectLatLng(st.lng, st.lat);
+        const band = _rainfallBandOfValue(st.value) || _RAINFALL_BANDS[0];
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('class', `rainfall-point rainfall-lv-${band.cls}`);
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', y);
+        circle.setAttribute('r', band.r);
+        const valText = Number.isFinite(st.value) ? `${st.value}mm` : '–';
+        const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        titleEl.textContent = `${st.name}: ${valText}（${band.label}）`;
+        circle.appendChild(titleEl);
+        svg.appendChild(circle);
+      });
+    }
+    function _rainfallLegendHtml() {
+      return _RAINFALL_BANDS.map(b => `<span class="psi-chip rainfall-lv-chip-${b.cls}">${escapeHtml(b.label)}</span>`).join('');
+    }
+    function _renderRainfallSheetFailed() {
+      const body = document.getElementById('rainfall-sheet-body');
+      if (body) body.innerHTML = `<div class="cal-fare-state">${escapeHtml(t('fareSheetFailed'))}</div>`;
+    }
+    function openRainfallSheet() {
+      if (_isRainfallSheetOpen()) return;
+      document.getElementById('rainfall-sheet-overlay')?.classList.add('visible');
+      lockScroll();
+      const legend = document.getElementById('rainfall-legend');
+      if (legend) legend.innerHTML = _rainfallLegendHtml();
+      const fresh = _rainfallDetail && Date.now() - _rainfallDetail.fetchedAt < _RAINFALL_DETAIL_TTL_MS;
+      if (fresh && _rainfallDetailValid(_rainfallDetail.data)) {
+        _renderRainfallMap(_rainfallDetail.data);
+        return;
+      }
+      const body = document.getElementById('rainfall-sheet-body');
+      const svg = document.getElementById('rainfall-map');
+      if (svg && !svg.querySelector('.rainfall-outline')) {
+        // ローディング中でも輪郭だけは先に見せる(経路は固定データなので通信を待たない)
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'rainfall-outline');
+        path.setAttribute('d', SG_OUTLINE_PATH);
+        svg.appendChild(path);
+      }
+      _loadRainfallDetail().then(data => {
+        if (!_isRainfallSheetOpen()) return;
+        if (_rainfallDetailValid(data)) {
+          _renderRainfallMap(data);
+        } else {
+          _renderRainfallSheetFailed();
+        }
+      });
+    }
+    function closeRainfallSheet() {
+      if (!_isRainfallSheetOpen()) return;
+      document.getElementById('rainfall-sheet-overlay')?.classList.remove('visible');
       unlockScroll();
     }
 

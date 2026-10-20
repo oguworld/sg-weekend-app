@@ -887,6 +887,52 @@ app.get('/api/psi-detail', async (req, res) => {
   }
 });
 
+// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238)。
+// data.gov.sgの雨量観測データ(約89地点、直近5分間降水量)を返す。/api/psi-detailと同じパターン(TTLキャッシュ・取得失敗時は古い値へフォールバック・city!=='sg'は404)。
+const RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
+let rainfallDetailCache = null;   // { value, cachedAt }。取得失敗時は古い値があればそれを返す
+async function rainfallDetailCached() {
+  const now = Date.now();
+  if (rainfallDetailCache && now - rainfallDetailCache.cachedAt < RAINFALL_DETAIL_TTL_MS) return rainfallDetailCache.value;
+  try {
+    const res = await axios.get('https://api-open.data.gov.sg/v2/real-time/api/rainfall', { timeout: 8000 });
+    const stations = (res.data && res.data.data && res.data.data.stations) || [];
+    const readingsBlock = res.data && res.data.data && res.data.data.readings && res.data.data.readings[0];
+    const readings = (readingsBlock && readingsBlock.data) || [];
+    const valueById = {};
+    readings.forEach(r => { if (r && r.stationId) valueById[r.stationId] = r.value; });
+    const stationsOut = stations
+      .filter(s => s && s.id && s.location)
+      .map(s => ({
+        id: s.id,
+        name: s.name || s.id,
+        lat: s.location.latitude,
+        lng: s.location.longitude,
+        value: Number.isFinite(valueById[s.id]) ? valueById[s.id] : null,
+      }));
+    if (stationsOut.length === 0) throw new Error('rainfall stations empty');
+    const value = { updatedAt: readingsBlock ? readingsBlock.timestamp : null, stations: stationsOut };
+    rainfallDetailCache = { value, cachedAt: now };
+    return value;
+  } catch (e) {
+    console.error('rainfall-detail error:', e.message);
+    return rainfallDetailCache ? rainfallDetailCache.value : null;
+  }
+}
+app.get('/api/rainfall-detail', async (req, res) => {
+  const city = resolveCity(req);
+  if (city !== 'sg') return res.status(404).json({ error: 'この都市は対象外です' });
+  try {
+    const data = await rainfallDetailCached();
+    if (!data) return res.status(502).json({ error: '雨量データを取得できませんでした' });
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json(data);
+  } catch (e) {
+    console.error('rainfall-detail route error:', e.message);
+    res.status(502).json({ error: '雨量データを取得できませんでした' });
+  }
+});
+
 // GET /api/school-calendar — 長期休暇設定
 app.get('/api/school-calendar', (req, res) => {
   try {
