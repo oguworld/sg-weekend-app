@@ -4695,7 +4695,8 @@
 
     // ─── 設定の「チュートリアル」(これまでのハイライト付きの案内を、いつでも見直せる。設計書235) ───
     // 案内は TUTORIALS に登録する。新しい案内を足す時は、ここに1件足す(必要なら、対象の要素に data-tour を付けて _TOUR_ANCHORS に追加)。
-    // 見直しは persist:false で動かし、「見た」の記録(app_tour_done_*)・新規の対象フラグ・「あとで」の保留は、一切更新しない。
+    // 見直しも persist:true で動かし、「見た」の記録(app_tour_done_*)を更新する(自動表示と見直しで記録を共通化。設計書235追記)。
+    // 「あとで」の保留(app_tour_pending)は見終わると消える(_tourEnd→_tourPendingClear、副作用として自然)。新規の対象フラグ(app_welcome_pending)はこの経路では変更されない。
     // calendar-1 の文言は、自動表示ではサーバー(content/whats-new.json)のentryが使われ、見直しではアプリ内(tourCalStep1/2)が使われる。
     // 変える時は、whats-new.json とアプリ内 STRINGS.ja の2か所を直す。
     function _calendarTourSteps() {
@@ -4826,7 +4827,7 @@
         if (_tutorialRun !== run) return;
         setTimeout(() => _runNextTutorial(), 300);
       };
-      await startTour({ id: tu.id, steps: tu.steps(), persist: false, onEnd });
+      await startTour({ id: tu.id, steps: tu.steps(), persist: true, onEnd });
       // startTour が何も始めなかった(別の案内が出ていた等)場合は、終わったものとして次へ進む(止まらないように)
       if (!ended && !(_tourState && _tourState.id === tu.id)) onEnd();
     }
