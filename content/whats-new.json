@@ -127,55 +127,26 @@
       }
     },
     "1.8.17": {
-      "title": "ウィジェットが使いやすくなりました",
-      "subtitle": "アップデートの内容をご紹介します",
+      "title": "バージョン1.8.17の新機能",
+      "subtitle": "チュートリアルを作りました",
       "items": [
         {
-          "icon": "💱",
-          "title": "為替に「かんたん換算」",
-          "body": "タップすると、100 SGDが主要12通貨でいくらか分かります。"
-        },
-        {
-          "icon": "🌧️",
-          "title": "2時間予報に「雨量観測マップ」",
-          "body": "タップすると、直近1時間の雨量が地図で分かります。"
-        },
-        {
-          "icon": "😷",
-          "title": "PM2.5の見やすさを改善",
-          "body": "エリア別の色分けを、より見やすくしました。"
+          "icon": "🎓",
+          "title": "チュートリアル",
+          "body": "アプリの使い方を、いつでも見返せます。設定から開けます。"
         }
       ],
       "cta": {
         "label": "使ってみる",
-        "screen": "news",
-        "tour": "widgets-1817"
+        "screen": "settings",
+        "tour": "intro-1817"
       },
       "tours": {
-        "widgets-1817": {
+        "intro-1817": {
           "steps": [
             {
-              "anchor": "news-stats",
-              "text": "為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます"
-            },
-            {
-              "anchor": "fx-rows",
-              "before": "open-fx",
-              "text": "為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります"
-            },
-            {
-              "anchor": "psi-toggle",
-              "before": "open-psi",
-              "text": "ここでPM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です"
-            },
-            {
-              "anchor": "psi-map",
-              "text": "エリア別の詳細や色分けが見られます"
-            },
-            {
-              "anchor": "rainfall-map-popover",
-              "before": "open-rainfall",
-              "text": "2時間予報をタップすると、直近1時間の雨量が地図で分かります"
+              "anchor": "settings-tutorial-row",
+              "text": "アプリの使い方をいつでも見返せる「チュートリアル」を追加しました。ここから開けます"
             }
           ]
         }
