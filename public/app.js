@@ -495,8 +495,9 @@
         tourHomeWidgetsStep3: 'デング熱をタップすると、活動中のクラスターの目安が見られます',
         tutorialName7: 'ピン留め',
         tutorialDesc7: 'ピン留めした項目の見方',
-        tourPinStep1: 'くらし・おでかけ共通で、ここからピン留めした項目をまとめて見られます',
-        tourPinStep2: 'ピン留めした項目が、ここに一覧で表示されます',
+        tourPinStep1: '気になるカードの📌をタップすると、ピン留めできます。試しに押してみましょう',
+        tourPinStep2: 'ピン留めすると、ここに表示されます',
+        tourPinStep3: 'ピン留めした項目が、ここに一覧で表示されます',
         tutorialName8: 'おでかけのイベント情報',
         tutorialDesc8: 'イベントカードの見方と絞り込み',
         tourEventInfoStep1: 'イベントの写真・説明を確認できます。❤️でいいね、📌でピン留めできます',
@@ -4319,7 +4320,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'home-filters'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'home-filters', 'news-card-pin-sample'];
     // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4401,10 +4402,8 @@
         }
       },
       // ピン留めシートを開く(すでに開いていれば何もしない)。中身(シート本体)が描画されるまで最大約3秒待つ
-      // ピン留め0件でFAB自体が実際には見えていない(opacity:0)場合は、シートを開かずツアーを進めない
+      // ピン留めの有無に関わらず常に開く(0件の場合は既存の空状態メッセージがそのまま表示される)
       'open-pin': async () => {
-        const fab = document.getElementById('fab-pin');
-        if (!fab || !_tourVisible(fab)) return false;
         if (!document.getElementById('pin-sheet-overlay')?.classList.contains('visible')) openPinSheet();
         const t0 = Date.now();
         for (;;) {
@@ -4456,6 +4455,7 @@
       if (name === 'home-card-sample') return document.querySelector('#cards-grid .spot-card');
       if (name === 'cal-item-sample') return document.querySelector('#calendar-list .cal-item');
       if (name === 'cal-season-icon') return document.querySelector('.cal-season-icon-btn');
+      if (name === 'news-card-pin-sample') return document.querySelector('#news-list .card-pin-link');
       if (!_TOUR_ANCHORS.includes(name)) return null;
       const els = Array.from(document.querySelectorAll(`[data-tour="${name}"]`));
       if (name === 'cal-fare-entry') {
@@ -4665,11 +4665,12 @@
         { anchor: 'cal-fare-entry', text: t('tourCalStep2') },
       ];
     }
-    // ピン留め(クリップ型FAB→一覧シート)の案内。設定の「チュートリアル」専用(自動表示のCTAには紐付けない)
+    // ピン留め(カードの📌→クリップ型FAB→一覧シート)の体験型案内。設定の「チュートリアル」専用(自動表示のCTAには紐付けない)
     function _pinTourSteps() {
       return [
-        { anchor: 'fab-pin', text: t('tourPinStep1') },
-        { anchor: 'pin-sheet', before: 'open-pin', text: t('tourPinStep2') },
+        { anchor: 'news-card-pin-sample', text: t('tourPinStep1') },
+        { anchor: 'fab-pin', text: t('tourPinStep2') },
+        { anchor: 'pin-sheet', before: 'open-pin', text: t('tourPinStep3') },
       ];
     }
     // おでかけのイベント情報(カード・カテゴリ絞り込み)の案内。設定の「チュートリアル」専用
