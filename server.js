@@ -887,15 +887,21 @@ app.get('/api/psi-detail', async (req, res) => {
   }
 });
 
-// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238→設計書239でアニメーション対応→2026-10-20に間隔を10分へ変更)。
+// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238→設計書239でアニメーション対応→2026-10-20に間隔を10分へ変更→同日、10分の倍数の時刻(8:00/8:10/8:20...)だけを残す方式に修正)。
 // data.gov.sgの雨量観測データ(約89地点)を、直近50分(10分間隔、最大6コマ)の時系列で返す。
 // /api/psi-detailと同じパターン(TTLキャッシュ・取得失敗時は古い値へフォールバック・city!=='sg'は404)。
 const RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
 const RAINFALL_DETAIL_MAX_FRAMES = 6;   // 10分間隔×6=直近50分
-// 外部APIは5分間隔のバッチを返すため、1つ飛ばし(インデックス0,2,4,6,8,10)で抽出して10分間隔にする。
-// そのため最大6コマを得るには先頭11件(インデックス10まで)が必要。
-const RAINFALL_DETAIL_STEP = 2;
-const RAINFALL_DETAIL_NEEDED_BLOCKS = (RAINFALL_DETAIL_MAX_FRAMES - 1) * RAINFALL_DETAIL_STEP + 1;   // 11件
+// 外部APIは5分間隔のバッチ(新しい順)を返す。「インデックスを1つ飛ばし」だと起点が5分刻み(8:05等)の場合に
+// 10の倍数からズレるため、各バッチのtimestampを見て分が10の倍数(0/10/20/30/40/50)のものだけを残す方式にする。
+// 5分間隔のデータから10分刻みを6個集めるには理論上11件で足りるが、取得タイミングのブレに備えて多めに確保する。
+const RAINFALL_DETAIL_NEEDED_BLOCKS = 20;
+// timestampの分が10の倍数かどうか。タイムゾーンオフセット付きのISO8601文字列(例: "2026-10-20T13:30:00+08:00")から
+// 文字列のまま分を抜き出す(Dateでパースしてローカルタイムゾーンに依存するズレを避けるため)。
+function isRainfallTenMinuteMark(isoTimestamp) {
+  const m = /T\d{2}:(\d{2}):/.exec(isoTimestamp || '');
+  return !!m && Number(m[1]) % 10 === 0;
+}
 let rainfallDetailCache = null;   // { value, cachedAt }。取得失敗時は古い値があればそれを返す
 async function rainfallDetailCached() {
   const now = Date.now();
@@ -919,10 +925,10 @@ async function rainfallDetailCached() {
         lng: s.location.longitude,
       }));
     if (stationsOut.length === 0) throw new Error('rainfall stations empty');
-    // 1つ飛ばし(0,2,4,6,8,10)で10分間隔・最大6コマを抽出。件数が足りない場合は取得できた範囲で間引く(例: 7件なら0,2,4,6の4コマ)。
-    const blocksAvailable = Math.min(readingsBlocks.length, RAINFALL_DETAIL_NEEDED_BLOCKS);
-    const selectedBlocks = [];
-    for (let i = 0; i < blocksAvailable; i += RAINFALL_DETAIL_STEP) selectedBlocks.push(readingsBlocks[i]);
+    // 分が10の倍数(0/10/20/30/40/50)のバッチだけを残し、新しい順の先頭から最大6コマを抽出する。
+    // 件数が足りない場合(取得期間が短い等)は取得できた範囲でそのまま返す。
+    const blocksAvailable = readingsBlocks.slice(0, RAINFALL_DETAIL_NEEDED_BLOCKS);
+    const selectedBlocks = blocksAvailable.filter(block => isRainfallTenMinuteMark(block && block.timestamp));
     const frames = selectedBlocks.slice(0, RAINFALL_DETAIL_MAX_FRAMES).map(block => {
       const values = {};
       (block && block.data || []).forEach(r => { if (r && r.stationId) values[r.stationId] = r.value; });
