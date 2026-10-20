@@ -482,9 +482,7 @@
         tourPm25Step4: '色と顔の絵文字の見方です',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
-        rainfallSheetTitle: '雨量観測マップ',
-        rainfallSheetDesc: 'シンガポール島内89地点の、直近5分間の降水量です。色が濃いほど雨が強いことを示します。',
-        rainfallSheetNote: 'データ: NEA(シンガポール環境庁)/ data.gov.sg。地図: geoBoundaries(ODbL)',
+        rainfallDesc: '島内の観測地点ごとの、直近5分間の降水量です。色が濃いほど雨が強いことを示します',
         fxConverterTitle: 'かんたん換算',
         fxConverterBase: '100 SGD は:',
         fxConverterUnavailable: 'レートを取得できませんでした。しばらくしてから開き直してください。',
@@ -691,7 +689,8 @@
       }
       if (kind === 'psi') { _openPsiPopover(popover); return; }
       if (kind === 'fx') { _openFxPopover(popover); return; }
-      popover.classList.remove('psi-detail', 'fx-detail');
+      if (kind === 'nowcast') { _openRainfallPopover(popover); return; }
+      popover.classList.remove('psi-detail', 'fx-detail', 'rainfall-detail');
       const currentLevel = _statCurrentLevel[kind];
       const tierInfo = _TIER_CLASS_BY_KIND[kind];
       const chips = STAT_CRITERIA[kind].map(it => {
@@ -826,7 +825,7 @@
     function _openPsiPopover(popover) {
       _psiMode = _psiWidgetKind === 'psi' ? '24h' : '1h';   // 開くたびに、ウィジェットと同じ指標(通常はPM2.5)で始める
       popover.dataset.kind = 'psi';
-      popover.classList.remove('fx-detail');
+      popover.classList.remove('fx-detail', 'rainfall-detail');
       popover.classList.add('visible', 'psi-detail');
       const fresh = _psiDetail && Date.now() - _psiDetail.fetchedAt < _PSI_DETAIL_TTL_MS;
       popover.innerHTML = _psiPopoverHtml(!fresh);
@@ -870,7 +869,7 @@
     }
     function _openFxPopover(popover) {
       popover.dataset.kind = 'fx';
-      popover.classList.remove('psi-detail');
+      popover.classList.remove('psi-detail', 'rainfall-detail');
       popover.classList.add('visible', 'fx-detail');
       popover.innerHTML = _fxPopoverHtml();
     }
@@ -2092,18 +2091,12 @@
       }
     }, { passive: false });
 
-    // ─── PSI・為替指標タップでクライテリア表示 即時タップ対応 ───
+    // ─── PSI・為替・2時間予報指標タップでクライテリア表示 即時タップ対応 ───
     document.getElementById('stat-widget-info')?.addEventListener('touchend', e => {
       const col = e.target.closest('[data-stat-crit]');
       if (col) {
         e.preventDefault();
         toggleStatCriteria(col.dataset.statCrit);
-        return;
-      }
-      // 2時間予報タップ→雨量観測マップ(設計書238)。data-stat-critとは別の仕組み(toggleStatCriteriaは狭いポップオーバー前提のため)
-      if (e.target.closest('[data-rainfall-tap]')) {
-        e.preventDefault();
-        openRainfallSheet();
       }
     }, { passive: false });
 
@@ -3912,9 +3905,6 @@
       for (const b of _RAINFALL_BANDS) { if (v <= b.max) return b; }
       return _RAINFALL_BANDS[_RAINFALL_BANDS.length - 1];
     }
-    function _isRainfallSheetOpen() {
-      return !!document.getElementById('rainfall-sheet-overlay')?.classList.contains('visible');
-    }
     function _loadRainfallDetail() {
       if (_rainfallDetail && Date.now() - _rainfallDetail.fetchedAt < _RAINFALL_DETAIL_TTL_MS) return Promise.resolve(_rainfallDetail.data);
       if (_rainfallDetailPromise) return _rainfallDetailPromise;
@@ -3936,9 +3926,9 @@
     function _rainfallDetailValid(d) {
       return !!(d && Array.isArray(d.stations) && d.stations.length > 0);
     }
-    // 輪郭パスは1回だけ描画し、観測点の<circle>だけ毎回入れ替える(既に輪郭が描画済みなら再利用)
-    function _renderRainfallMap(data) {
-      const svg = document.getElementById('rainfall-map');
+    // 輪郭パスは1回だけ描画し、観測点の<circle>だけ毎回入れ替える(既に輪郭が描画済みなら再利用)。svgIdで描画対象を指定する
+    function _renderRainfallMapInto(svgId, data) {
+      const svg = document.getElementById(svgId);
       if (!svg) return;
       if (!svg.querySelector('.rainfall-outline')) {
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -3966,43 +3956,41 @@
     function _rainfallLegendHtml() {
       return _RAINFALL_BANDS.map(b => `<span class="psi-chip rainfall-lv-chip-${b.cls}">${escapeHtml(b.label)}</span>`).join('');
     }
-    function _renderRainfallSheetFailed() {
-      const body = document.getElementById('rainfall-sheet-body');
-      if (body) body.innerHTML = `<div class="cal-fare-state">${escapeHtml(t('fareSheetFailed'))}</div>`;
+    // ポップアップのHTML組み立て(PSI/為替のポップアップと同じパターン)。地図はポップアップ内に収まる縮小サイズ、凡例は右寄せ
+    function _rainfallPopoverHtml(loading) {
+      return `<div class="stat-criteria-desc">${escapeHtml(t('rainfallDesc'))}</div>`
+        + `<div class="rainfall-map-wrap-sm"><svg id="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div>`
+        + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
+        + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
     }
-    function openRainfallSheet() {
-      if (_isRainfallSheetOpen()) return;
-      document.getElementById('rainfall-sheet-overlay')?.classList.add('visible');
-      lockScroll();
-      const legend = document.getElementById('rainfall-legend');
-      if (legend) legend.innerHTML = _rainfallLegendHtml();
+    function _openRainfallPopover(popover) {
+      popover.dataset.kind = 'nowcast';
+      popover.classList.remove('psi-detail', 'fx-detail');
+      popover.classList.add('visible', 'rainfall-detail');
       const fresh = _rainfallDetail && Date.now() - _rainfallDetail.fetchedAt < _RAINFALL_DETAIL_TTL_MS;
-      if (fresh && _rainfallDetailValid(_rainfallDetail.data)) {
-        _renderRainfallMap(_rainfallDetail.data);
+      const freshValid = fresh && _rainfallDetailValid(_rainfallDetail.data);
+      popover.innerHTML = _rainfallPopoverHtml(!freshValid);
+      if (freshValid) {
+        _renderRainfallMapInto('rainfall-map-popover', _rainfallDetail.data);
         return;
       }
-      const body = document.getElementById('rainfall-sheet-body');
-      const svg = document.getElementById('rainfall-map');
+      // ローディング中でも輪郭だけは先に見せる(経路は固定データなので通信を待たない)
+      const svg = popover.querySelector('#rainfall-map-popover');
       if (svg && !svg.querySelector('.rainfall-outline')) {
-        // ローディング中でも輪郭だけは先に見せる(経路は固定データなので通信を待たない)
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('class', 'rainfall-outline');
         path.setAttribute('d', SG_OUTLINE_PATH);
         svg.appendChild(path);
       }
       _loadRainfallDetail().then(data => {
-        if (!_isRainfallSheetOpen()) return;
+        if (popover.dataset.kind !== 'nowcast' || !popover.classList.contains('visible')) return;
         if (_rainfallDetailValid(data)) {
-          _renderRainfallMap(data);
+          popover.innerHTML = _rainfallPopoverHtml(false);
+          _renderRainfallMapInto('rainfall-map-popover', data);
         } else {
-          _renderRainfallSheetFailed();
+          popover.innerHTML = `<div class="stat-criteria-desc">${escapeHtml(t('fareSheetFailed'))}</div>`;
         }
       });
-    }
-    function closeRainfallSheet() {
-      if (!_isRainfallSheetOpen()) return;
-      document.getElementById('rainfall-sheet-overlay')?.classList.remove('visible');
-      unlockScroll();
     }
 
     // 専用画面の本文: 「‹ 11月 ›」の月の切り替え → 凡例 → 都市ピル → 詳細(都市選択時)/ヒント → 注記。

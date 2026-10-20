@@ -1194,7 +1194,6 @@
     .stat-sub { font-size: 11px; font-weight: 600; color: var(--warm-gray); margin-top: 1px; white-space: nowrap; }
     .stat-div { width: 1px; height: 24px; background: var(--sand); flex-shrink: 0; }
     .stat-col[data-stat-crit] { cursor: pointer; }
-    .stat-col[data-rainfall-tap] { cursor: pointer; }
     /* PSI・デング熱タップ時のクライテリア表示（指標の説明＋各レベルをピル型チップで並べ、現在値のチップだけ強調） */
     .stat-criteria-popover {
       display: none;
@@ -1633,10 +1632,15 @@
       font-weight: 700;
     }
 
-    /* ─── 雨量観測マップ(設計書238): くらし画面「2時間予報」タップで開く専用画面。#fare-sheetと全く同じCSSパターン(.fare-sheet-overlay/.fare-sheetを共用) ───
-       地図エンジンは使わない。固定サイズの静的SVG(輪郭+89地点の円)で、パン・ズーム操作は無し */
-    .rainfall-map-wrap { width: 100%; margin: 4px 0 14px; }
-    #rainfall-map { width: 100%; height: auto; display: block; }
+    /* ─── 雨量観測マップ(設計書238→設計書239でPSI/為替と同じ狭いポップアップ方式に作り直し): くらし画面「2時間予報」タップで
+       #stat-criteria-popoverの中に表示。地図エンジンは使わない。固定サイズの静的SVG(輪郭+観測点の円)で、パン・ズーム操作は無し */
+    .stat-criteria-popover.rainfall-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    .stat-criteria-popover.rainfall-detail > * { flex-shrink: 0; }
+    /* ポップアップ内に収まるよう地図を小さめに表示する */
+    .rainfall-map-wrap-sm { width: 100%; max-height: 160px; overflow: hidden; }
+    #rainfall-map-popover { width: 100%; height: auto; max-height: 160px; display: block; }
+    /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */
+    .rainfall-legend-sm { justify-content: flex-end; }
     .rainfall-outline { fill: var(--psi-tile-bg); stroke: var(--sand-dark); stroke-width: 1; }
     .rainfall-point { stroke: var(--warm-white); stroke-width: 0.6; }
     .rainfall-lv-none { fill: var(--sand-dark); }
