@@ -1637,8 +1637,8 @@
     .stat-criteria-popover.rainfall-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .stat-criteria-popover.rainfall-detail > * { flex-shrink: 0; }
     /* ポップアップ内に収まるよう地図を小さめに表示する */
-    .rainfall-map-wrap-sm { width: 100%; max-height: 160px; overflow: hidden; }
-    #rainfall-map-popover { width: 100%; height: auto; max-height: 160px; display: block; }
+    .rainfall-map-wrap-sm { width: 100%; overflow: hidden; }
+    #rainfall-map-popover { width: 100%; height: auto; display: block; }
     /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */
     .rainfall-legend-sm { justify-content: flex-end; }
     .rainfall-outline { fill: var(--psi-tile-bg); stroke: var(--sand-dark); stroke-width: 1; }
