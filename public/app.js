@@ -4327,7 +4327,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'pin-sheet-content', 'home-filters', 'news-card-pin-sample', 'settings-tutorial-row', 'nav-settings-tab', 'tutorial-sheet-all-btn', 'tutorial-sheet-item-sample'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'home-filters', 'news-card-pin-sample', 'settings-tutorial-row', 'nav-settings-tab', 'tutorial-sheet-all-btn', 'tutorial-sheet-item-sample', 'pin-sheet-card-sample'];
     // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4482,6 +4482,7 @@
       if (name === 'cal-season-icon') return document.querySelector('.cal-season-icon-btn');
       if (name === 'news-card-pin-sample') return document.querySelector('#news-list .card-pin-link');
       if (name === 'tutorial-sheet-item-sample') return document.querySelector('#tutorial-sheet-body .tutorial-item');
+      if (name === 'pin-sheet-card-sample') return document.querySelector('#pins-sectioned-content .spot-card');
       if (!_TOUR_ANCHORS.includes(name)) return null;
       const els = Array.from(document.querySelectorAll(`[data-tour="${name}"]`));
       if (name === 'cal-fare-entry') {
@@ -4698,7 +4699,7 @@
       return [
         { anchor: 'news-card-pin-sample', text: t('tourPinStep1') },
         { anchor: 'fab-pin', before: 'auto-pin-sample', text: t('tourPinStep2') },
-        { anchor: 'pin-sheet-content', before: 'open-pin', text: t('tourPinStep3') },
+        { anchor: 'pin-sheet-card-sample', before: 'open-pin', text: t('tourPinStep3') },
       ];
     }
     // チュートリアル機能自体の紹介。設定の「チュートリアル」一覧専用(紹介カードのCTAにも紐づく、cta.tour='intro-1817')

@@ -198,12 +198,12 @@
 
   <!-- ─── PIN SHEET（ピン留め一覧、くらし・おでかけ画面のクリップFABから開くボトムシート） ─── -->
   <div class="pin-sheet-overlay" id="pin-sheet-overlay" onclick="if(event.target===this) closePinSheet()">
-    <div class="pin-sheet" id="pin-sheet" data-tour="pin-sheet">
+    <div class="pin-sheet" id="pin-sheet">
       <div class="pin-sheet-handle"></div>
       <button class="pin-sheet-close" onclick="closePinSheet()">✕</button>
       <div class="pin-sheet-title" data-i18n="navPins">ピン留め</div>
       <div class="pin-sheet-scroll">
-        <div id="pins-sectioned-content" data-tour="pin-sheet-content">
+        <div id="pins-sectioned-content">
           <div class="section-title" data-i18n="pinSectionNews" style="margin-bottom:10px;">くらし情報</div>
           <div id="news-pin-list-content" style="display:flex;flex-direction:column;gap:12px;"></div>
           <div class="section-divider" style="margin:24px 0;">
@@ -601,7 +601,7 @@
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
   <script src="/sg-rainfall-map-data.js"></script>
-  <script src="/app.js?v=20261021f"></script>
+  <script src="/app.js?v=20261021g"></script>
 
 </body>
 </html>
