@@ -507,6 +507,8 @@
         tutorialName9: 'バージョン1.8.17の新機能',
         tutorialDesc9: 'チュートリアルを作りました',
         tourIntro1817Step1: 'アプリの使い方をいつでも見返せる「チュートリアル」を追加しました。ここから開けます',
+        tourIntro1817Step2: 'ここを押すと、全部まとめて続けて見られます',
+        tourIntro1817Step3: '項目ごとに選んで、個別に見返すこともできます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         rainfallDesc: '過去1時間の降水量の変化を自動で再生します。色が濃いほど雨が強いことを示します',
@@ -4325,7 +4327,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'pin-sheet-content', 'home-filters', 'news-card-pin-sample', 'settings-tutorial-row', 'nav-settings-tab'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'pin-sheet-content', 'home-filters', 'news-card-pin-sample', 'settings-tutorial-row', 'nav-settings-tab', 'tutorial-sheet-all-btn', 'tutorial-sheet-item-sample'];
     // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4440,6 +4442,17 @@
           await new Promise(r => setTimeout(r, 120));
         }
       },
+      // 設定の「チュートリアル」一覧シートを開く(すでに開いていれば何もしない)。中身(「最初から全部見る」ボタン)が描画されるまで最大約3秒待つ
+      'open-tutorial-sheet': async () => {
+        if (!_isTutorialSheetOpen()) openTutorialSheet();
+        const t0 = Date.now();
+        for (;;) {
+          const btn = document.querySelector('.tutorial-all-btn');
+          if (btn && _tourVisible(btn)) { if (_tourState) _tourState.tutorialSheetOpened = true; return true; }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
     };
     function _closeStatPopover() {
       const popover = document.getElementById('stat-criteria-popover');
@@ -4468,6 +4481,7 @@
       if (name === 'cal-item-sample') return document.querySelector('#calendar-list .cal-item');
       if (name === 'cal-season-icon') return document.querySelector('.cal-season-icon-btn');
       if (name === 'news-card-pin-sample') return document.querySelector('#news-list .card-pin-link');
+      if (name === 'tutorial-sheet-item-sample') return document.querySelector('#tutorial-sheet-body .tutorial-item');
       if (!_TOUR_ANCHORS.includes(name)) return null;
       const els = Array.from(document.querySelectorAll(`[data-tour="${name}"]`));
       if (name === 'cal-fare-entry') {
@@ -4625,6 +4639,7 @@
       if (st.homePopoverOpened) document.getElementById('stat-criteria-popover-home')?.classList.remove('visible');   // おでかけ画面のポップアップ(UV指数/デング熱)。専用の後処理が無いためクラス操作のみ
       if (st.pinSheetOpened) closePinSheet();   // 案内が開いたピン留めシートは、終了で閉じる
       if (st.seasonBubbleOpened) _closeAllCalBubbles();   // 案内が開いた季節アイコンの吹き出しは、終了で閉じる
+      if (st.tutorialSheetOpened) closeTutorialSheet();   // 案内が開いたチュートリアル一覧シートは、終了で閉じる
       if (typeof st.onEnd === 'function') {
         try { st.onEnd({ shown: st.steps.length > 0, record: !!record }); } catch (_) {}
       }
@@ -4686,10 +4701,12 @@
         { anchor: 'pin-sheet-content', before: 'open-pin', text: t('tourPinStep3') },
       ];
     }
-    // チュートリアル機能自体の紹介(メタな1ステップ)。設定の「チュートリアル」一覧専用
+    // チュートリアル機能自体の紹介。設定の「チュートリアル」一覧専用(紹介カードのCTAにも紐づく、cta.tour='intro-1817')
     function _intro1817TourSteps() {
       return [
         { anchor: 'settings-tutorial-row', text: t('tourIntro1817Step1') },
+        { anchor: 'tutorial-sheet-all-btn', before: 'open-tutorial-sheet', text: t('tourIntro1817Step2') },
+        { anchor: 'tutorial-sheet-item-sample', text: t('tourIntro1817Step3') },
       ];
     }
     // おでかけのイベント情報(カード・カテゴリ絞り込み)の案内。設定の「チュートリアル」専用
@@ -4789,7 +4806,7 @@
           <button type="button" class="tutorial-item-btn" onclick="startTutorial('${escapeHtml(tu.id)}')">${escapeHtml(t('tutorialSee'))}</button>
         </div>`;
       }).join('');
-      body.innerHTML = `<button type="button" class="tutorial-all-btn" onclick="startTutorialAll()">${escapeHtml(t('tutorialAll'))}</button>${items}`;
+      body.innerHTML = `<button type="button" class="tutorial-all-btn" data-tour="tutorial-sheet-all-btn" onclick="startTutorialAll()">${escapeHtml(t('tutorialAll'))}</button>${items}`;
     }
     function openTutorialSheet() {
       if (_isTutorialSheetOpen()) return;

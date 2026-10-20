@@ -147,6 +147,15 @@
             {
               "anchor": "settings-tutorial-row",
               "text": "アプリの使い方をいつでも見返せる「チュートリアル」を追加しました。ここから開けます"
+            },
+            {
+              "anchor": "tutorial-sheet-all-btn",
+              "before": "open-tutorial-sheet",
+              "text": "ここを押すと、全部まとめて続けて見られます"
+            },
+            {
+              "anchor": "tutorial-sheet-item-sample",
+              "text": "項目ごとに選んで、個別に見返すこともできます"
             }
           ]
         }
