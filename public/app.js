@@ -450,6 +450,7 @@
         tourWelcomeStep2: '下のボタンで、くらし・おでかけ・カレンダー・設定を切り替えられます。カレンダーでは、祝日や行事、旅行シーズン情報が見られます',
         tourWelcomeStep3: 'カードの❤️でいいね、📌でピン留め、🔗で元記事が見られます',
         tourWelcomeStep4: 'ニュースを、カテゴリで絞り込めます',
+        tourWelcomeStep5: '困ったときは、設定の「チュートリアル」から、いつでも使い方を見返せます',
         psiUpdated: '更新',
         psiMode1h: 'PM2.5',
         psiMode24h: 'PSI',
@@ -486,8 +487,9 @@
         tutorialDesc5: '為替・PM2.5・2時間予報の使い方',
         tourWidgetsStep1: '為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます',
         tourWidgetsStep2: '為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります',
-        tourWidgetsStep3: 'PM2.5をタップすると、エリア別の詳細や色分けが見られます',
-        tourWidgetsStep4: '2時間予報をタップすると、直近1時間の雨量が地図で分かります',
+        tourWidgetsStep3: 'ここでPM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
+        tourWidgetsStep4: 'エリア別の詳細や色分けが見られます',
+        tourWidgetsStep5: '2時間予報をタップすると、直近1時間の雨量が地図で分かります',
         tutorialName6: 'おでかけの指標ウィジェット',
         tutorialDesc6: '気温・UV指数・デング熱の使い方',
         tourHomeWidgetsStep1: '気温・UV指数・デング熱が並んでいます。タップすると詳しい情報が見られます',
@@ -502,9 +504,12 @@
         tutorialDesc8: 'イベントカードの見方と絞り込み',
         tourEventInfoStep1: 'イベントの写真・説明を確認できます。❤️でいいね、📌でピン留めできます',
         tourEventInfoStep2: 'カテゴリで絞り込めます',
+        tutorialName9: 'バージョン1.8.17の新機能',
+        tutorialDesc9: 'チュートリアルを作りました',
+        tourIntro1817Step1: 'アプリの使い方をいつでも見返せる「チュートリアル」を追加しました。ここから開けます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
-        rainfallDesc: '島内の観測地点ごとの、直近5分間の降水量です。過去1時間の変化を自動で再生します。色が濃いほど雨が強いことを示します',
+        rainfallDesc: '過去1時間の降水量の変化を自動で再生します。色が濃いほど雨が強いことを示します',
         fxConverterTitle: 'かんたん換算',
         fxConverterBase: '100 SGD は:',
         fxConverterUnavailable: 'レートを取得できませんでした。しばらくしてから開き直してください。',
@@ -4320,7 +4325,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'home-filters', 'news-card-pin-sample'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'pin-sheet-content', 'home-filters', 'news-card-pin-sample', 'settings-tutorial-row', 'nav-settings-tab'];
     // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4635,6 +4640,7 @@
         { anchor: 'nav-bar', text: t('tourWelcomeStep2'), noScroll: true },
         { anchor: 'news-card-sample', text: t('tourWelcomeStep3') },
         { anchor: 'news-filters', text: t('tourWelcomeStep4') },
+        { anchor: 'nav-settings-tab', text: t('tourWelcomeStep5') },
       ];
     }
     // 終了(最後まで見る/スキップ)で、対象フラグを消し、そのあとで通知の許可を尋ねる
@@ -4677,7 +4683,13 @@
       return [
         { anchor: 'news-card-pin-sample', text: t('tourPinStep1') },
         { anchor: 'fab-pin', before: 'auto-pin-sample', text: t('tourPinStep2') },
-        { anchor: 'pin-sheet', before: 'open-pin', text: t('tourPinStep3') },
+        { anchor: 'pin-sheet-content', before: 'open-pin', text: t('tourPinStep3') },
+      ];
+    }
+    // チュートリアル機能自体の紹介(メタな1ステップ)。設定の「チュートリアル」一覧専用
+    function _intro1817TourSteps() {
+      return [
+        { anchor: 'settings-tutorial-row', text: t('tourIntro1817Step1') },
       ];
     }
     // おでかけのイベント情報(カード・カテゴリ絞り込み)の案内。設定の「チュートリアル」専用
@@ -4698,13 +4710,14 @@
       ];
     }
     // くらし画面の3ウィジェット(為替・PM2.5・2時間予報)の案内。1.8.17の紹介カードの「使ってみる」(ツアーID widgets-1817)と同じ内容。
-    // 文言は、サーバーの1.8.17のentryとアプリ内`tourWidgetsStep1`〜`4`の2か所(変える時は両方)
+    // 文言は、サーバーの1.8.17のentryとアプリ内`tourWidgetsStep1`〜`5`の2か所(変える時は両方)
     function _widgetsTourSteps() {
       return [
         { anchor: 'news-stats', text: t('tourWidgetsStep1') },
         { anchor: 'fx-rows', before: 'open-fx', text: t('tourWidgetsStep2') },
-        { anchor: 'psi-map', before: 'open-psi', text: t('tourWidgetsStep3') },
-        { anchor: 'rainfall-map-popover', before: 'open-rainfall', text: t('tourWidgetsStep4') },
+        { anchor: 'psi-toggle', before: 'open-psi', text: t('tourWidgetsStep3') },
+        { anchor: 'psi-map', text: t('tourWidgetsStep4') },
+        { anchor: 'rainfall-map-popover', before: 'open-rainfall', text: t('tourWidgetsStep5') },
       ];
     }
     // おでかけ画面の3ウィジェット(気温・UV指数・デング熱)の案内。くらし版(widgets-1817)と対になる、設定の「チュートリアル」専用(紹介カードのCTAには紐付けない)
@@ -4717,6 +4730,10 @@
     }
     const _tutorialWait = ms => new Promise(r => setTimeout(r, ms));
     const TUTORIALS = [
+      {
+        id: 'intro-1817', nameKey: 'tutorialName9', descKey: 'tutorialDesc9', steps: _intro1817TourSteps,
+        prepare: async () => { switchNav('settings'); await _tutorialWait(400); },
+      },
       {
         id: _WELCOME_TOUR_ID, nameKey: 'tutorialName1', descKey: 'tutorialDesc1', steps: _welcomeTourSteps,
         prepare: async () => { switchNav('news'); await _tutorialWait(600); },

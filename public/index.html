@@ -203,7 +203,7 @@
       <button class="pin-sheet-close" onclick="closePinSheet()">✕</button>
       <div class="pin-sheet-title" data-i18n="navPins">ピン留め</div>
       <div class="pin-sheet-scroll">
-        <div id="pins-sectioned-content">
+        <div id="pins-sectioned-content" data-tour="pin-sheet-content">
           <div class="section-title" data-i18n="pinSectionNews" style="margin-bottom:10px;">くらし情報</div>
           <div id="news-pin-list-content" style="display:flex;flex-direction:column;gap:12px;"></div>
           <div class="section-divider" style="margin:24px 0;">
@@ -384,7 +384,7 @@
     <div class="settings-section">
       <div class="settings-section-title" data-i18n="secSupport">サポート・情報</div>
 
-      <div class="settings-item" style="padding:14px 18px;cursor:pointer;" role="button" tabindex="0" onclick="openTutorialSheet()">
+      <div class="settings-item" data-tour="settings-tutorial-row" style="padding:14px 18px;cursor:pointer;" role="button" tabindex="0" onclick="openTutorialSheet()">
         <span class="settings-item-label" data-i18n="labelTutorial">チュートリアル</span>
         <span style="font-size:20px;line-height:1;color:var(--light-gray);" aria-hidden="true">›</span>
       </div>
@@ -500,7 +500,7 @@
       <span class="nav-icon"><svg class="nav-icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1Zm13 8H4v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1Z"/></svg></span>
       <span class="nav-label">カレンダー</span>
     </button>
-    <button class="nav-item" id="nav-settings" onclick="if(!_touchCapableDetected) switchNav('settings')">
+    <button class="nav-item" id="nav-settings" data-tour="nav-settings-tab" onclick="if(!_touchCapableDetected) switchNav('settings')">
       <span class="nav-icon"><svg class="nav-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><circle cx="15" cy="6" r="2.2" fill="currentColor" stroke="none"/><circle cx="8" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="17" cy="18" r="2.2" fill="currentColor" stroke="none"/></svg></span>
       <span class="nav-label" data-i18n="navSettings">設定</span>
     </button>
@@ -601,7 +601,7 @@
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
   <script src="/sg-rainfall-map-data.js"></script>
-  <script src="/app.js?v=20261021a"></script>
+  <script src="/app.js?v=20261021c"></script>
 
 </body>
 </html>

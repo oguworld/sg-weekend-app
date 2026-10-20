@@ -22808,3 +22808,80 @@ CARTO等ダークモード対応タイルプロバイダの採用を前提に、
 - **機能名称**: ユーザーとの会話で「レーダー」ではなく実体に即した呼び方にする方針は維持。「雨量観測マップ」を仮称として実装し、後で変更可能とする。
 
 この追記により、設計書238は実装準備完了とする。
+
+## 設計書240(2026-10-21): ミニチュートリアル4点の調整(ユーザー承認済み、builder→checker→closer)
+
+ユーザーからの4件の指示を1つの設計書にまとめる。すべて`public/app.js`・`public/index.html`中心の変更、`server.js`は無変更。
+
+### 1. pin-1ツアー ステップ3のハイライト範囲を縮小
+現状、`anchor: 'pin-sheet'`で`#pin-sheet`全体(ハンドル・✕・タイトル「ピン留め」も含む)がスポットライトされており、ユーザーから「もう少し記事(カード本体)にフォーカスが当たるように」との指摘。
+- `public/index.html`の`<div id="pins-sectioned-content">`(`.pin-sheet-scroll`直下、section-title「くらし情報」〜カード〜divider〜「おでかけ情報」〜カード、実質的な中身全体)に`data-tour="pin-sheet-content"`を追加する。
+- `public/app.js`の`_TOUR_ANCHORS`配列に`'pin-sheet-content'`を追加する。
+- `_pinTourSteps()`のステップ3の`anchor`を`'pin-sheet'`→`'pin-sheet-content'`に変更する(`before:'open-pin'`・文言`tourPinStep3`は無変更)。
+- `open-pin`の`_TOUR_BEFORE`フック自体(シートを開く処理)は`#fab-pin`/`#pin-sheet`を見ているので無変更でよい(ハイライト対象の差し替えのみ)。
+
+### 2. widgets-1817ツアーに、PM2.5⇄PSIトグルの専用ステップを追加
+現状4ステップのうちステップ3(`anchor:'psi-map', before:'open-psi'`、文言「PM2.5をタップすると、エリア別の詳細や色分けが見られます」)が、トグルとタイルの2つの機能を1ステップで説明している。ユーザーの要望は「ハイライトを広げてトグルも含める、もしくはトグル専用のステップを追加」の二択で、**ステップ追加の方を採用**(トグルとタイルはDOM上の兄弟要素で共通の親を持たず、ハイライト範囲を広げるには新規ラッパー要素が必要になりCSSのgapレイアウトを崩すリスクがあるため、既存エンジンでそのまま実現できるステップ追加を選んだ)。4→5ステップに拡張する。
+
+新しいステップ構成(`_widgetsTourSteps()`、`public/app.js`):
+```js
+function _widgetsTourSteps() {
+  return [
+    { anchor: 'news-stats', text: t('tourWidgetsStep1') },
+    { anchor: 'fx-rows', before: 'open-fx', text: t('tourWidgetsStep2') },
+    { anchor: 'psi-toggle', before: 'open-psi', text: t('tourWidgetsStep3') },
+    { anchor: 'psi-map', text: t('tourWidgetsStep4') },
+    { anchor: 'rainfall-map-popover', before: 'open-rainfall', text: t('tourWidgetsStep5') },
+  ];
+}
+```
+(ステップ4の`psi-map`は`before`無し。直前のステップ3で`open-psi`によりポップアップは既に開いているため、`_pm25TourSteps()`の既存パターン(ステップ2`psi-toggle`+before、ステップ3`psi-map`+before無し)と同じ考え方)
+
+`STRINGS.ja`(`public/app.js`)の文言変更:
+- `tourWidgetsStep3`の値を新トグル文言に差し替える: `'ここでPM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です'`(既存`tourPm25Step2`と同内容)
+- `tourWidgetsStep4`の値を新タイル文言に差し替える: `'エリア別の詳細や色分けが見られます'`(旧`tourWidgetsStep3`から「PM2.5をタップすると、」を削除しただけ)
+- 新規キー`tourWidgetsStep5`を追加: `'2時間予報をタップすると、直近1時間の雨量が地図で分かります'`(旧`tourWidgetsStep4`の値をそのまま移動)
+
+**重要(文言の2か所一致ルール、CLAUDE.md既存ルール)**: `content/whats-new.json`の`entries["1.8.17"].tours.widgets-1817.steps`も同じ5ステップ構成・同じ文言に書き換える(現状4ステップ→5ステップ、anchor/before/textを上記と完全一致させること)。1.8.17はまだrelease/mainへ未pushのためこの変更に後方互換の問題は無い。
+
+### 3. 設定の「チュートリアル」一覧の先頭に、新規エントリ「バージョン1.8.17の新機能」を追加
+チュートリアル機能自体ができたことを知らせる、メタな1ステップの案内。`TUTORIALS`配列(`public/app.js`)の**先頭**(index 0、`_WELCOME_TOUR_ID`のエントリより前)に追加する:
+```js
+{
+  id: 'intro-1817', nameKey: 'tutorialName9', descKey: 'tutorialDesc9', steps: _intro1817TourSteps,
+  prepare: async () => { switchNav('settings'); await _tutorialWait(400); },
+},
+```
+新規関数(他の`_xxxTourSteps()`関数と同じ並びに追加):
+```js
+function _intro1817TourSteps() {
+  return [
+    { anchor: 'settings-tutorial-row', text: t('tourIntro1817Step1') },
+  ];
+}
+```
+`STRINGS.ja`に追加:
+- `tutorialName9: 'バージョン1.8.17の新機能'`
+- `tutorialDesc9: 'チュートリアルを作りました'`
+- `tourIntro1817Step1: 'アプリの使い方をいつでも見返せる「チュートリアル」を追加しました。ここから開けます'`
+
+`public/index.html`の設定画面「チュートリアル」行(`<div class="settings-item" ... onclick="openTutorialSheet()">`、387行目付近)に`data-tour="settings-tutorial-row"`を追加する。`_TOUR_ANCHORS`配列に`'settings-tutorial-row'`を追加する。cleanupは不要(ポップアップ等を開かないため)。
+
+### 4. 新規インストール向けウェルカムツアー(welcome-1)に、チュートリアル機能への案内ステップを追加
+新規インストールの人に、上記3で作った「チュートリアル」機能の存在を知らせる。既存4ステップ(中央カード→nav-bar→news-card-sample→news-filters)の末尾に5番目のステップを追加する。**画面移動はしない**(既存の「くらし画面だけで完結、画面移動なし、ピン留めのステップは作らない」というユーザー決定は維持。ボトムナビの「設定」タブ自体をスポットライトするだけで、くらし画面に留まる)。
+
+`public/index.html`のボトムナビ`#nav-settings`ボタン(503行目付近)に`data-tour="nav-settings-tab"`を追加する。`_TOUR_ANCHORS`配列に`'nav-settings-tab'`を追加する。
+
+`STRINGS.ja`に追加: `tourWelcomeStep5: '困ったときは、設定の「チュートリアル」から、いつでも使い方を見返せます'`
+
+`_welcomeTourSteps()`の配列末尾に追加:
+```js
+{ anchor: 'nav-settings-tab', text: t('tourWelcomeStep5') },
+```
+
+### 共通の実施事項
+- `node --check public/app.js`で構文確認
+- `public/index.html`の`<script src="/app.js?v=...">`と`public/sw.js`の`CACHE_NAME`を1つ上げる(キャッシュバスティング手順、両方同時に)
+- `server.js`は変更しないため`pm2 restart`不要
+- **このセッション内で既に直接編集済みの未コミット変更(`public/app.js`の`rainfallDesc`文言修正「島内の観測地点ごとの、直近5分間の降水量です。」を削除し「過去1時間の降水量の変化を自動で再生します。色が濃いほど雨が強いことを示します」に短縮、`public/sw.js`のCACHE_NAME v1115、`public/index.html`のv=20261021b)も、今回の一連の変更とあわせて最終的に1つのコミットにまとめてよい**(内容は既に妥当性確認済み、再修正不要)
+- 実機・ブラウザでの最終確認は未実施である旨を、他のミニチュートリアル関連の記述と同様にCLAUDE.mdへ追記する

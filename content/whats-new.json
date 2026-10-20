@@ -164,9 +164,13 @@
               "text": "為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります"
             },
             {
-              "anchor": "psi-map",
+              "anchor": "psi-toggle",
               "before": "open-psi",
-              "text": "PM2.5をタップすると、エリア別の詳細や色分けが見られます"
+              "text": "ここでPM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です"
+            },
+            {
+              "anchor": "psi-map",
+              "text": "エリア別の詳細や色分けが見られます"
             },
             {
               "anchor": "rainfall-map-popover",
