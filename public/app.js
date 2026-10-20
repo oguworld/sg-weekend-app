@@ -4731,10 +4731,6 @@
     const _tutorialWait = ms => new Promise(r => setTimeout(r, ms));
     const TUTORIALS = [
       {
-        id: 'intro-1817', nameKey: 'tutorialName9', descKey: 'tutorialDesc9', steps: _intro1817TourSteps,
-        prepare: async () => { switchNav('settings'); await _tutorialWait(400); },
-      },
-      {
         id: _WELCOME_TOUR_ID, nameKey: 'tutorialName1', descKey: 'tutorialDesc1', steps: _welcomeTourSteps,
         prepare: async () => { switchNav('news'); await _tutorialWait(600); },
       },
@@ -4770,6 +4766,10 @@
           await _tutorialWait(450);   // 画面が下からせり上がる動き(0.25秒)が終わってから測る
         },
         cleanup: () => closeFareSheet(),
+      },
+      {
+        id: 'intro-1817', nameKey: 'tutorialName9', descKey: 'tutorialDesc9', steps: _intro1817TourSteps,
+        prepare: async () => { switchNav('settings'); await _tutorialWait(400); },
       },
     ];
 
