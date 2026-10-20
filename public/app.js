@@ -480,6 +480,17 @@
         tourPm25Step2: 'ここで、PM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
         tourPm25Step3: 'エリアごとの値です。緑は安全、黄色はちょっと危険、赤は危険です',
         tourPm25Step4: '色と顔の絵文字の見方です',
+        tutorialName5: 'くらしの指標ウィジェット',
+        tutorialDesc5: '為替・PM2.5・2時間予報の使い方',
+        tourWidgetsStep1: '為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます',
+        tourWidgetsStep2: '為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります',
+        tourWidgetsStep3: 'PM2.5をタップすると、エリア別の詳細や色分けが見られます',
+        tourWidgetsStep4: '2時間予報をタップすると、直近30分の雨量が地図で分かります',
+        tutorialName6: 'おでかけの指標ウィジェット',
+        tutorialDesc6: '気温・UV指数・デング熱の使い方',
+        tourHomeWidgetsStep1: '気温・UV指数・デング熱が並んでいます。タップすると詳しい情報が見られます',
+        tourHomeWidgetsStep2: 'UV指数をタップすると、紫外線の強さの目安が見られます',
+        tourHomeWidgetsStep3: 'デング熱をタップすると、活動中のクラスターの目安が見られます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         rainfallDesc: '島内の観測地点ごとの、直近5分間の降水量です。色が濃いほど雨が強いことを示します',
@@ -866,7 +877,7 @@
       }).join('');
       return `<div class="stat-criteria-desc">${escapeHtml(t('fxConverterTitle'))}</div>`
         + `<div class="fx-base">${escapeHtml(t('fxConverterBase'))}</div>`
-        + `<div class="fx-rows">${rows}</div>`;
+        + `<div class="fx-rows" data-tour="fx-rows">${rows}</div>`;
     }
     function _openFxPopover(popover) {
       popover.dataset.kind = 'fx';
@@ -4001,7 +4012,7 @@
     // #rainfall-frame-time は再生中のコマの時刻(「13:05」)を小さく表示する(静的な初期値は空、_startRainfallAnimation()が都度更新)
     function _rainfallPopoverHtml(loading) {
       return `<div class="stat-criteria-desc">${escapeHtml(t('rainfallDesc'))}</div>`
-        + `<div class="rainfall-map-wrap-sm"><span id="rainfall-frame-time" class="rainfall-frame-time"></span><svg id="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div>`
+        + `<div class="rainfall-map-wrap-sm"><span id="rainfall-frame-time" class="rainfall-frame-time"></span><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div>`
         + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
         + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
     }
@@ -4392,9 +4403,9 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips'];
-    // PSI詳細のポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
-    const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover'];
+    // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
+    const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
     const _TOUR_BEFORE = {
       // くらしの指標のウィジェットをタップした時のPSI詳細ポップアップを開く(すでに開いていれば何もしない)。中身が描画されるまで最大約3秒待つ
@@ -4405,7 +4416,68 @@
         const t0 = Date.now();
         for (;;) {
           if (pop.querySelector('.psi-map') && _tourVisible(pop.querySelector('.psi-mode'))) {
-            if (_tourState) _tourState.psiOpened = true;
+            if (_tourState) _tourState.popoverOpened = true;
+            return true;
+          }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
+      // 為替のかんたん換算ポップアップを開く(すでに開いていれば何もしない)。中身(通貨の一覧)が描画されるまで最大約3秒待つ
+      'open-fx': async () => {
+        const pop = document.getElementById('stat-criteria-popover');
+        if (!pop) return false;
+        if (!(pop.classList.contains('visible') && pop.dataset.kind === 'fx')) toggleStatCriteria('fx');
+        const t0 = Date.now();
+        for (;;) {
+          if (pop.querySelector('.fx-rows') && _tourVisible(pop.querySelector('.fx-rows'))) {
+            if (_tourState) _tourState.popoverOpened = true;
+            return true;
+          }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
+      // 2時間予報(雨量観測マップ)ポップアップを開く(すでに開いていれば何もしない)。地図の輪郭が描画されるまで最大約3秒待つ
+      'open-rainfall': async () => {
+        const pop = document.getElementById('stat-criteria-popover');
+        if (!pop) return false;
+        if (!(pop.classList.contains('visible') && pop.dataset.kind === 'nowcast')) toggleStatCriteria('nowcast');
+        const t0 = Date.now();
+        for (;;) {
+          const svg = pop.querySelector('#rainfall-map-popover');
+          if (svg && svg.querySelector('.rainfall-outline') && _tourVisible(svg)) {
+            if (_tourState) _tourState.popoverOpened = true;
+            return true;
+          }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
+      // おでかけ画面のUV指数ポップアップを開く(すでに開いていれば何もしない)。#stat-criteria-popover-home はくらし画面の#stat-criteria-popoverとは別要素
+      'open-uv': async () => {
+        const pop = document.getElementById('stat-criteria-popover-home');
+        if (!pop) return false;
+        if (!(pop.classList.contains('visible') && pop.dataset.kind === 'uv')) toggleStatCriteria('uv');
+        const t0 = Date.now();
+        for (;;) {
+          if (_tourVisible(pop) && pop.querySelector('.stat-criteria-chips')) {
+            if (_tourState) _tourState.homePopoverOpened = true;
+            return true;
+          }
+          if (Date.now() - t0 >= 3000) return false;
+          await new Promise(r => setTimeout(r, 120));
+        }
+      },
+      // おでかけ画面のデング熱ポップアップを開く(すでに開いていれば何もしない)
+      'open-dengue': async () => {
+        const pop = document.getElementById('stat-criteria-popover-home');
+        if (!pop) return false;
+        if (!(pop.classList.contains('visible') && pop.dataset.kind === 'dengue')) toggleStatCriteria('dengue');
+        const t0 = Date.now();
+        for (;;) {
+          if (_tourVisible(pop) && pop.querySelector('.stat-criteria-chips')) {
+            if (_tourState) _tourState.homePopoverOpened = true;
             return true;
           }
           if (Date.now() - t0 >= 3000) return false;
@@ -4581,7 +4653,8 @@
       window.removeEventListener('orientationchange', _tourReposition);
       document.getElementById('tour-layer')?.classList.remove('visible', 'tour-center');
       if (st.locked) unlockScroll();
-      if (st.psiOpened) _closeStatPopover();   // 案内が開いたPSI詳細のポップアップは、終了で閉じる
+      if (st.popoverOpened) _closeStatPopover();   // 案内が開いた指標ウィジェットのポップアップ(PSI/為替/雨量)は、終了で閉じる
+      if (st.homePopoverOpened) document.getElementById('stat-criteria-popover-home')?.classList.remove('visible');   // おでかけ画面のポップアップ(UV指数/デング熱)。専用の後処理が無いためクラス操作のみ
       if (typeof st.onEnd === 'function') {
         try { st.onEnd({ shown: st.steps.length > 0, record: !!record }); } catch (_) {}
       }
@@ -4641,6 +4714,24 @@
         { anchor: 'psi-chips', text: t('tourPm25Step4') },
       ];
     }
+    // くらし画面の3ウィジェット(為替・PM2.5・2時間予報)の案内。1.8.17の紹介カードの「使ってみる」(ツアーID widgets-1817)と同じ内容。
+    // 文言は、サーバーの1.8.17のentryとアプリ内`tourWidgetsStep1`〜`4`の2か所(変える時は両方)
+    function _widgetsTourSteps() {
+      return [
+        { anchor: 'news-stats', text: t('tourWidgetsStep1') },
+        { anchor: 'fx-rows', before: 'open-fx', text: t('tourWidgetsStep2') },
+        { anchor: 'psi-map', before: 'open-psi', text: t('tourWidgetsStep3') },
+        { anchor: 'rainfall-map-popover', before: 'open-rainfall', text: t('tourWidgetsStep4') },
+      ];
+    }
+    // おでかけ画面の3ウィジェット(気温・UV指数・デング熱)の案内。くらし版(widgets-1817)と対になる、設定の「チュートリアル」専用(紹介カードのCTAには紐付けない)
+    function _homeWidgetsTourSteps() {
+      return [
+        { anchor: 'home-stats', text: t('tourHomeWidgetsStep1') },
+        { anchor: 'home-popover', before: 'open-uv', text: t('tourHomeWidgetsStep2') },
+        { anchor: 'home-popover', before: 'open-dengue', text: t('tourHomeWidgetsStep3') },
+      ];
+    }
     const _tutorialWait = ms => new Promise(r => setTimeout(r, ms));
     const TUTORIALS = [
       {
@@ -4651,6 +4742,16 @@
         id: 'pm25-1', nameKey: 'tutorialName4', descKey: 'tutorialDesc4', steps: _pm25TourSteps,
         prepare: async () => { switchNav('news'); await _tutorialWait(600); },
         cleanup: () => _closeStatPopover(),
+      },
+      {
+        id: 'widgets-1817', nameKey: 'tutorialName5', descKey: 'tutorialDesc5', steps: _widgetsTourSteps,
+        prepare: async () => { switchNav('news'); await _tutorialWait(600); },
+        cleanup: () => _closeStatPopover(),
+      },
+      {
+        id: 'home-widgets-1817', nameKey: 'tutorialName6', descKey: 'tutorialDesc6', steps: _homeWidgetsTourSteps,
+        prepare: async () => { switchNav('home'); await _tutorialWait(600); },
+        cleanup: () => { document.getElementById('stat-criteria-popover-home')?.classList.remove('visible'); },
       },
       {
         id: 'calendar-1', nameKey: 'tutorialName2', descKey: 'tutorialDesc2', steps: _calendarTourSteps,

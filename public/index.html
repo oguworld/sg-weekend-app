@@ -74,7 +74,7 @@
       </div>
 
       <!-- 指標ウィジェット: 気温・UV指数・デング熱警戒(設計書237、旧降水確率から変更) -->
-      <div class="stat-widget" id="stat-widget-weather">
+      <div class="stat-widget" id="stat-widget-weather" data-tour="home-stats">
         <div class="stat-col">
           <div class="stat-row"><span class="stat-icon">🌡️</span><span class="stat-val" id="stat-temp">--</span></div>
           <div class="stat-sub" data-i18n="statTemp">気温</div>
@@ -89,7 +89,7 @@
           <div class="stat-row"><span class="stat-icon">🦟</span><span class="stat-val" id="stat-dengue">--</span></div>
           <div class="stat-sub" data-i18n="statDengue">デング熱</div>
         </div>
-        <div id="stat-criteria-popover-home" class="stat-criteria-popover"></div>
+        <div id="stat-criteria-popover-home" class="stat-criteria-popover" data-tour="home-popover"></div>
       </div>
 
       <!-- Section Header (moved from main) -->
@@ -602,7 +602,7 @@
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
   <script src="/sg-rainfall-map-data.js"></script>
-  <script src="/app.js?v=20261020g"></script>
+  <script src="/app.js?v=20261020i"></script>
 
   <!-- ─── EVENT FILTER SHEET ─── -->
   <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
