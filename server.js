@@ -887,20 +887,25 @@ app.get('/api/psi-detail', async (req, res) => {
   }
 });
 
-// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238)。
-// data.gov.sgの雨量観測データ(約89地点、直近5分間降水量)を返す。/api/psi-detailと同じパターン(TTLキャッシュ・取得失敗時は古い値へフォールバック・city!=='sg'は404)。
+// GET /api/rainfall-detail?city=sg — くらし画面「2時間予報」タップの雨量観測マップ(設計書238→設計書239でアニメーション対応)。
+// data.gov.sgの雨量観測データ(約89地点)を、直近30分(5分間隔、最大6コマ)の時系列で返す。
+// /api/psi-detailと同じパターン(TTLキャッシュ・取得失敗時は古い値へフォールバック・city!=='sg'は404)。
 const RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
+const RAINFALL_DETAIL_MAX_FRAMES = 6;   // 5分間隔×6=直近30分
 let rainfallDetailCache = null;   // { value, cachedAt }。取得失敗時は古い値があればそれを返す
 async function rainfallDetailCached() {
   const now = Date.now();
   if (rainfallDetailCache && now - rainfallDetailCache.cachedAt < RAINFALL_DETAIL_TTL_MS) return rainfallDetailCache.value;
   try {
-    const res = await axios.get('https://api-open.data.gov.sg/v2/real-time/api/rainfall', { timeout: 8000 });
+    // date=を付けると、その日の5分間隔の複数バッチ(新しい順)が返る(date=無しだと最新1件のみ)。SGT基準の今日の日付を渡す。
+    const todaySgt = new Date(now + 8 * 3600 * 1000).toISOString().slice(0, 10);
+    const res = await axios.get('https://api-open.data.gov.sg/v2/real-time/api/rainfall', {
+      params: { date: todaySgt },
+      timeout: 8000,
+    });
     const stations = (res.data && res.data.data && res.data.data.stations) || [];
-    const readingsBlock = res.data && res.data.data && res.data.data.readings && res.data.data.readings[0];
-    const readings = (readingsBlock && readingsBlock.data) || [];
-    const valueById = {};
-    readings.forEach(r => { if (r && r.stationId) valueById[r.stationId] = r.value; });
+    const readingsBlocks = (res.data && res.data.data && res.data.data.readings) || [];
+    if (readingsBlocks.length === 0) throw new Error('rainfall readings empty');
     const stationsOut = stations
       .filter(s => s && s.id && s.location)
       .map(s => ({
@@ -908,10 +913,14 @@ async function rainfallDetailCached() {
         name: s.name || s.id,
         lat: s.location.latitude,
         lng: s.location.longitude,
-        value: Number.isFinite(valueById[s.id]) ? valueById[s.id] : null,
       }));
     if (stationsOut.length === 0) throw new Error('rainfall stations empty');
-    const value = { updatedAt: readingsBlock ? readingsBlock.timestamp : null, stations: stationsOut };
+    const frames = readingsBlocks.slice(0, RAINFALL_DETAIL_MAX_FRAMES).map(block => {
+      const values = {};
+      (block && block.data || []).forEach(r => { if (r && r.stationId) values[r.stationId] = r.value; });
+      return { timestamp: block ? block.timestamp : null, values };
+    });
+    const value = { updatedAt: frames[0] ? frames[0].timestamp : null, stations: stationsOut, frames };
     rainfallDetailCache = { value, cachedAt: now };
     return value;
   } catch (e) {

@@ -685,6 +685,7 @@
       if (!popover) return;
       if (popover.classList.contains('visible') && popover.dataset.kind === kind) {
         popover.classList.remove('visible');
+        if (kind === 'nowcast') _stopRainfallAnimation();
         return;
       }
       if (kind === 'psi') { _openPsiPopover(popover); return; }
@@ -899,6 +900,7 @@
       for (const popover of popovers) {
         if (!popover) continue;
         if (e.target.closest('.stat-criteria-popover') === popover || path.includes(popover)) continue;
+        if (popover.dataset.kind === 'nowcast') _stopRainfallAnimation();
         popover.classList.remove('visible');
       }
     }, { passive: true });
@@ -3886,12 +3888,17 @@
       unlockScroll();
     }
 
-    // ─── 雨量観測マップ(設計書238): くらし画面「2時間予報」タップで開く、89地点の降水量(直近5分)プロット ───
+    // ─── 雨量観測マップ(設計書238→設計書239でアニメーション対応): くらし画面「2時間予報」タップで開く、89地点の降水量プロット ───
     // SVG座標変換(SG_OUTLINE_PATH・SG_MAP_PROJECTION・projectLatLng)は public/sg-rainfall-map-data.js(app.jsより前に読み込む)で定義。
     // 地図エンジン(Leaflet等)は使わない。固定サイズの静的SVGに輪郭+観測点の円を描画するのみ(パン・ズーム無し)。
+    // 直近30分(5分間隔、最大6コマ)を自動ループ再生する(再生/停止ボタン等は作らない、ユーザー指示の最小限の動き)。
     const _RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
+    const _RAINFALL_ANIM_INTERVAL_MS = 900;
     let _rainfallDetail = null;   // { data, fetchedAt }
     let _rainfallDetailPromise = null;
+    let _rainfallAnimTimer = null;    // このポップアップ専用のsetInterval。他機能のタイマーと混同しないこと
+    let _rainfallAnimFrames = null;   // 古い順に並べ替えたframes配列(再生用)
+    let _rainfallAnimIndex = 0;
     // 直近5分間降水量(mm)の色分け: 0mm=降水なし(薄灰色)/ 0超〜2.5mm=弱い雨(緑)/ 2.5超〜10mm=やや強い雨(黄)/ 10mm超=激しい雨(赤)。
     // 気象庁の「弱い雨(1時間1-3mm相当)」区分を参考にした5分値への概算(厳密な気象学的根拠ではない)。
     const _RAINFALL_BANDS = [
@@ -3924,10 +3931,11 @@
       return _rainfallDetailPromise;
     }
     function _rainfallDetailValid(d) {
-      return !!(d && Array.isArray(d.stations) && d.stations.length > 0);
+      return !!(d && Array.isArray(d.stations) && d.stations.length > 0 && Array.isArray(d.frames) && d.frames.length > 0);
     }
-    // 輪郭パスは1回だけ描画し、観測点の<circle>だけ毎回入れ替える(既に輪郭が描画済みなら再利用)。svgIdで描画対象を指定する
-    function _renderRainfallMapInto(svgId, data) {
+    // 輪郭パスは1回だけ描画し、観測点の<circle>だけ毎回入れ替える(既に輪郭が描画済みなら再利用)。svgIdで描画対象を指定する。
+    // stations=地点の位置情報(id/name/lat/lng)の配列、frameValues={stationId: value}の1コマ分
+    function _renderRainfallFrame(svgId, stations, frameValues) {
       const svg = document.getElementById(svgId);
       if (!svg) return;
       if (!svg.querySelector('.rainfall-outline')) {
@@ -3937,29 +3945,63 @@
         svg.appendChild(path);
       }
       svg.querySelectorAll('.rainfall-point').forEach(el => el.remove());
-      (data.stations || []).forEach(st => {
+      (stations || []).forEach(st => {
         if (!Number.isFinite(st.lat) || !Number.isFinite(st.lng)) return;
+        const value = frameValues ? frameValues[st.id] : undefined;
         const [x, y] = projectLatLng(st.lng, st.lat);
-        const band = _rainfallBandOfValue(st.value) || _RAINFALL_BANDS[0];
+        const band = _rainfallBandOfValue(value) || _RAINFALL_BANDS[0];
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('class', `rainfall-point rainfall-lv-${band.cls}`);
         circle.setAttribute('cx', x);
         circle.setAttribute('cy', y);
         circle.setAttribute('r', band.r);
-        const valText = Number.isFinite(st.value) ? `${st.value}mm` : '–';
+        const valText = Number.isFinite(value) ? `${value}mm` : '–';
         const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
         titleEl.textContent = `${st.name}: ${valText}（${band.label}）`;
         circle.appendChild(titleEl);
         svg.appendChild(circle);
       });
     }
+    // 現在のコマの時刻(「13:05」形式)を描画する。無ければ何もしない
+    function _renderRainfallFrameTime(timestamp) {
+      const el = document.getElementById('rainfall-frame-time');
+      if (!el) return;
+      const tp = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(timestamp || '');
+      el.textContent = tp ? `${tp[4]}:${tp[5]}` : '';
+    }
+    // アニメーション停止。多重起動防止のため開始前にも必ず呼ぶ。ポップアップを閉じる全経路から呼ぶこと(メモリリーク防止)
+    function _stopRainfallAnimation() {
+      if (_rainfallAnimTimer) { clearInterval(_rainfallAnimTimer); _rainfallAnimTimer = null; }
+      _rainfallAnimFrames = null;
+      _rainfallAnimIndex = 0;
+    }
+    // 直近30分(最大6コマ)を古い順に並べ替えて0.9秒間隔でループ再生する。1コマ目は即時表示
+    function _startRainfallAnimation(svgId, data) {
+      _stopRainfallAnimation();
+      const stations = data.stations || [];
+      const frames = (data.frames || []).slice().reverse();   // サーバーは新しい順→古い順にする
+      if (frames.length === 0) return;
+      _rainfallAnimFrames = frames;
+      _rainfallAnimIndex = 0;
+      _renderRainfallFrame(svgId, stations, frames[0].values);
+      _renderRainfallFrameTime(frames[0].timestamp);
+      if (frames.length === 1) return;   // コマが1つだけならループ不要
+      _rainfallAnimTimer = setInterval(() => {
+        if (!_rainfallAnimFrames) return;
+        _rainfallAnimIndex = (_rainfallAnimIndex + 1) % _rainfallAnimFrames.length;
+        const frame = _rainfallAnimFrames[_rainfallAnimIndex];
+        _renderRainfallFrame(svgId, stations, frame.values);
+        _renderRainfallFrameTime(frame.timestamp);
+      }, _RAINFALL_ANIM_INTERVAL_MS);
+    }
     function _rainfallLegendHtml() {
       return _RAINFALL_BANDS.map(b => `<span class="psi-chip rainfall-lv-chip-${b.cls}">${escapeHtml(b.label)}</span>`).join('');
     }
-    // ポップアップのHTML組み立て(PSI/為替のポップアップと同じパターン)。地図はポップアップ内に収まる縮小サイズ、凡例は右寄せ
+    // ポップアップのHTML組み立て(PSI/為替のポップアップと同じパターン)。地図はポップアップ内に収まる縮小サイズ、凡例は右寄せ。
+    // #rainfall-frame-time は再生中のコマの時刻(「13:05」)を小さく表示する(静的な初期値は空、_startRainfallAnimation()が都度更新)
     function _rainfallPopoverHtml(loading) {
       return `<div class="stat-criteria-desc">${escapeHtml(t('rainfallDesc'))}</div>`
-        + `<div class="rainfall-map-wrap-sm"><svg id="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div>`
+        + `<div class="rainfall-map-wrap-sm"><span id="rainfall-frame-time" class="rainfall-frame-time"></span><svg id="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div>`
         + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
         + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
     }
@@ -3967,11 +4009,12 @@
       popover.dataset.kind = 'nowcast';
       popover.classList.remove('psi-detail', 'fx-detail');
       popover.classList.add('visible', 'rainfall-detail');
+      _stopRainfallAnimation();   // 多重起動防止(前回開いた時のタイマーが残っていれば先に止める)
       const fresh = _rainfallDetail && Date.now() - _rainfallDetail.fetchedAt < _RAINFALL_DETAIL_TTL_MS;
       const freshValid = fresh && _rainfallDetailValid(_rainfallDetail.data);
       popover.innerHTML = _rainfallPopoverHtml(!freshValid);
       if (freshValid) {
-        _renderRainfallMapInto('rainfall-map-popover', _rainfallDetail.data);
+        _startRainfallAnimation('rainfall-map-popover', _rainfallDetail.data);
         return;
       }
       // ローディング中でも輪郭だけは先に見せる(経路は固定データなので通信を待たない)
@@ -3986,7 +4029,7 @@
         if (popover.dataset.kind !== 'nowcast' || !popover.classList.contains('visible')) return;
         if (_rainfallDetailValid(data)) {
           popover.innerHTML = _rainfallPopoverHtml(false);
-          _renderRainfallMapInto('rainfall-map-popover', data);
+          _startRainfallAnimation('rainfall-map-popover', data);
         } else {
           popover.innerHTML = `<div class="stat-criteria-desc">${escapeHtml(t('fareSheetFailed'))}</div>`;
         }
@@ -4370,7 +4413,11 @@
         }
       },
     };
-    function _closeStatPopover() { document.getElementById('stat-criteria-popover')?.classList.remove('visible'); }
+    function _closeStatPopover() {
+      const popover = document.getElementById('stat-criteria-popover');
+      if (popover && popover.dataset.kind === 'nowcast') _stopRainfallAnimation();
+      popover?.classList.remove('visible');
+    }
     const _TOUR_DONE_PREFIX = 'app_tour_done_';
     let _tourState = null;   // { id, persist, steps, index, locked }
 
