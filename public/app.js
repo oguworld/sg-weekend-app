@@ -504,7 +504,7 @@
         tourEventInfoStep2: 'カテゴリで絞り込めます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
-        rainfallDesc: '島内の観測地点ごとの、直近5分間の降水量です。色が濃いほど雨が強いことを示します',
+        rainfallDesc: '島内の観測地点ごとの、直近5分間の降水量です。過去1時間の変化を自動で再生します。色が濃いほど雨が強いことを示します',
         fxConverterTitle: 'かんたん換算',
         fxConverterBase: '100 SGD は:',
         fxConverterUnavailable: 'レートを取得できませんでした。しばらくしてから開き直してください。',
