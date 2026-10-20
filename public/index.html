@@ -57,7 +57,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+Opti:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="/app.css?v=20261020o">
+  <link rel="stylesheet" href="/app.css?v=20261020p">
   <!-- スタンプラリー機能用 Leaflet（設計書69）。ローカルバンドル方式（オフライン起動時もライブラリ自体は読み込める、地図タイル自体はオンライン前提） -->
   <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
 </head>
@@ -86,7 +86,7 @@
         </div>
         <div class="stat-div"></div>
         <div class="stat-col" data-stat-crit="dengue" onclick="if(!_touchCapableDetected) toggleStatCriteria('dengue')">
-          <div class="stat-row"><span class="stat-icon">🦟</span><span class="stat-val" id="stat-dengue">--</span></div>
+          <div class="stat-row"><span class="stat-icon">🩹</span><span class="stat-val" id="stat-dengue">--</span></div>
           <div class="stat-sub" data-i18n="statDengue">デング熱</div>
         </div>
         <div id="stat-criteria-popover-home" class="stat-criteria-popover" data-tour="home-popover"></div>
@@ -97,7 +97,6 @@
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto;height:28px;">
           <button id="pin-filter-btn" class="sort-btn" style="display:none;" title="ピン留めした項目のみ表示">📌</button>
           <button id="new-filter-btn" class="sort-btn" style="display:none;" title="新着（1日以内）のみ表示">🔔</button>
-          <button id="event-filter-btn" class="sort-btn" onclick="openEventFilterSheet()" style="display:none;align-items:center;gap:3px;" title="絞り込み">🔽<span id="event-filter-badge" style="display:none;background:var(--caramel);color:#fff;border-radius:10px;font-size:11px;padding:1px 5px;"></span></button>
           <div id="result-count" style="font-family:var(--font-heading);font-size:17px;font-weight:700;color:var(--caramel);min-width:2.4em;text-align:right;font-variant-numeric:tabular-nums;"></div>
         </div>
       </div>
@@ -602,65 +601,7 @@
   <!-- QRコード生成（アプリ共有シート用。ローカルバンドル、app.jsより先に読み込む） -->
   <script src="/qrcode-generator.js"></script>
   <script src="/sg-rainfall-map-data.js"></script>
-  <script src="/app.js?v=20261020k"></script>
-
-  <!-- ─── EVENT FILTER SHEET ─── -->
-  <div id="event-filter-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3099;" onclick="closeEventFilterSheet()"></div>
-  <div id="event-filter-sheet" data-tour="event-filter-sheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:3100;background:var(--warm-white);border-radius:20px 20px 0 0;padding:0 0 env(safe-area-inset-bottom,0px);max-height:85dvh;overflow-y:auto;">
-    <div style="width:36px;height:4px;background:var(--border-color);border-radius:2px;margin:10px auto 0;"></div>
-    <button data-close onclick="closeEventFilterSheet()" style="position:absolute;top:10px;right:16px;background:var(--sand);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:none;cursor:pointer;z-index:1;">✕</button>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px 10px;">
-      <div style="font-family:var(--font-heading);font-size:17px;font-weight:700;color:var(--midnight);">絞り込み</div>
-      <button id="event-filter-clear-btn" onclick="clearEventFilter()" style="background:none;border:none;font-size:14px;color:var(--caramel);cursor:pointer;display:none;padding-right:28px;">すべてクリア</button>
-    </div>
-    <div style="padding:0 20px 24px;display:flex;flex-direction:column;gap:20px;">
-      <!-- いつ行く？ -->
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">いつ行く？</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          <button class="ef-chip" data-key="week" data-val="weekend" onclick="toggleEfChip(this)">今週</button>
-          <button class="ef-chip" data-key="week" data-val="nextweekend" onclick="toggleEfChip(this)">来週</button>
-          <button class="ef-chip" data-key="week" data-val="afterweekend" onclick="toggleEfChip(this)">2週後</button>
-          <button class="ef-chip" data-key="week" data-val="threeweeks" onclick="toggleEfChip(this)">3週後</button>
-        </div>
-      </div>
-      <!-- 誰と -->
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">誰と</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          <button class="ef-chip" data-key="who" data-val="family" onclick="toggleEfChip(this)">&#x1F46A; ファミリー</button>
-          <button class="ef-chip" data-key="who" data-val="couple" onclick="toggleEfChip(this)">&#x1F491; カップル</button>
-          <button class="ef-chip" data-key="who" data-val="solo" onclick="toggleEfChip(this)">&#x1F9CD; ひとり</button>
-          <button class="ef-chip" data-key="who" data-val="group" onclick="toggleEfChip(this)">&#x1F465; 友人グループ</button>
-        </div>
-      </div>
-      <!-- エリア -->
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">エリア</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          <button class="ef-chip" data-key="area" data-val="Central" onclick="toggleEfChip(this)">&#x1F3D9; Central</button>
-          <button class="ef-chip" data-key="area" data-val="East" onclick="toggleEfChip(this)">&#x1F305; East</button>
-          <button class="ef-chip" data-key="area" data-val="West" onclick="toggleEfChip(this)">&#x1F307; West</button>
-          <button class="ef-chip" data-key="area" data-val="North" onclick="toggleEfChip(this)">&#x1F33F; North</button>
-          <button class="ef-chip" data-key="area" data-val="North-East" onclick="toggleEfChip(this)">&#x1F333; North-East</button>
-          <button class="ef-chip" data-key="area" data-val="Island-wide" onclick="toggleEfChip(this)">&#x1F5FA;&#xFE0F; Island-wide</button>
-          <button class="ef-chip" data-key="area" data-val="Sentosa" onclick="toggleEfChip(this)">&#x1F3D6; Sentosa</button>
-        </div>
-      </div>
-      <!-- キーワード -->
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--warm-gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">キーワード</div>
-        <input id="ef-keyword-input" type="search" placeholder="例：バレエ、マリーナベイ…"
-          style="width:100%;padding:10px 14px;border:1.5px solid var(--border-color);border-radius:10px;
-                 font-size:16px;font-family:'Noto Sans JP',sans-serif;background:var(--card-bg);
-                 color:var(--midnight);box-sizing:border-box;outline:none;" />
-      </div>
-    </div>
-    <div style="padding:0 20px calc(80px + env(safe-area-inset-bottom,0px));">
-      <button onclick="applyEventFilter()" style="width:100%;padding:15px;background:var(--caramel);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;font-family:'Noto Sans JP',sans-serif;cursor:pointer;">適用する</button>
-    </div>
-  </div>
-
+  <script src="/app.js?v=20261020l"></script>
 
 </body>
 </html>

@@ -501,7 +501,6 @@
         tutorialDesc8: 'イベントカードの見方と絞り込み',
         tourEventInfoStep1: 'イベントの写真・説明を確認できます。❤️でいいね、📌でピン留めできます',
         tourEventInfoStep2: 'カテゴリで絞り込めます',
-        tourEventInfoStep3: 'いつ行く？誰と？エリアなど、詳しい条件でも絞り込めます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         rainfallDesc: '島内の観測地点ごとの、直近10分間の降水量です。色が濃いほど雨が強いことを示します',
@@ -1019,16 +1018,15 @@
 
     // ─── フィルター変数 ───
     let filterCats    = new Set();
+    // filterWeek/filterWho/filterAreas/filterKeyword: 詳細条件フィルターシート(#event-filter-sheet)は
+    // 到達不能な死んだコードだったため削除済み(2026-10-20)。ロジック(renderEventCards内)は残しているが
+    // 値を変更する入口が無いため常にデフォルト値（絞り込みなし）のまま。
     let filterWeek    = '';
     let filterWho     = new Set();
     let filterAreas   = new Set();
     let filterKeyword = '';
     let filterNew     = true; // 先頭チップ（旧「すべて」）は「新着」化したため、初期状態からON
     let _recommendModeActive = false;
-    let _draftFilterWeek    = '';
-    let _draftFilterWho     = new Set();
-    let _draftFilterAreas   = new Set();
-    let _draftFilterKeyword = '';
 
     // ─── おでかけデータ読み込み ───
     async function loadEventData() {
@@ -1612,7 +1610,6 @@
         if (type === 'pin')    { showPinnedOnly = true; document.getElementById('pin-filter-btn')?.classList.add('active'); }
         if (type === 'new')    { filterNew      = true; document.getElementById('new-filter-btn')?.classList.add('active'); }
       }
-      updateFilterBadge();
       document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
       renderEventCards();
     }
@@ -1659,7 +1656,6 @@
       }
       _syncCatChips();
       _syncRecommendChip();
-      updateFilterBadge();
       document.getElementById('home-scroll-content')?.scrollTo({ top: 0, behavior: 'instant' });
       renderEventCards();
     }
@@ -1696,95 +1692,6 @@
       const cutoff = new Date(thisSun.getTime() + 5 * 86400000);
       const ed = e.end_date ? new Date(e.end_date) : null;
       return ed && ed >= today && ed <= cutoff;
-    }
-
-    function updateFilterBadge() {
-      // シートで設定したフィルターのみカウント（カテゴリ・アイコンは除外）
-      const sheetCount = (filterWeek ? 1 : 0) + filterWho.size + filterAreas.size + (filterKeyword ? 1 : 0);
-      const badge = document.getElementById('event-filter-badge');
-      if (badge) {
-        badge.style.display = sheetCount > 0 ? '' : 'none';
-        badge.textContent = '+' + sheetCount;
-      }
-      document.getElementById('event-filter-btn')?.classList.toggle('active', sheetCount > 0);
-    }
-
-    function openEventFilterSheet() {
-      _draftFilterWeek    = filterWeek;
-      _draftFilterWho     = new Set(filterWho);
-      _draftFilterAreas   = new Set(filterAreas);
-      _draftFilterKeyword = filterKeyword;
-      document.querySelectorAll('#event-filter-sheet .ef-chip').forEach(b => {
-        const key = b.dataset.key;
-        const val = b.dataset.val;
-        let active = false;
-        if (key === 'week')  active = _draftFilterWeek === val;
-        if (key === 'who')   active = _draftFilterWho.has(val);
-        if (key === 'area')  active = _draftFilterAreas.has(val);
-        b.classList.toggle('active', active);
-      });
-      const kw = document.getElementById('ef-keyword-input');
-      if (kw) kw.value = _draftFilterKeyword;
-      _updateEfClearBtn();
-      document.getElementById('event-filter-overlay').style.display = 'block';
-      document.getElementById('event-filter-sheet').style.display = 'block';
-      lockScroll();
-    }
-
-    function closeEventFilterSheet() {
-      _blurIfFocusInside('event-filter-sheet');
-      document.getElementById('event-filter-overlay').style.display = 'none';
-      document.getElementById('event-filter-sheet').style.display = 'none';
-      unlockScroll();
-    }
-
-    function toggleEfChip(btn) {
-      const key = btn.dataset.key;
-      const val = btn.dataset.val;
-      if (key === 'week') {
-        const already = _draftFilterWeek === val;
-        document.querySelectorAll('#event-filter-sheet .ef-chip[data-key="week"]').forEach(b => b.classList.remove('active'));
-        _draftFilterWeek = already ? '' : val;
-        if (!already) btn.classList.add('active');
-      } else if (key === 'who') {
-        if (_draftFilterWho.has(val)) _draftFilterWho.delete(val);
-        else _draftFilterWho.add(val);
-        btn.classList.toggle('active', _draftFilterWho.has(val));
-      } else if (key === 'area') {
-        if (_draftFilterAreas.has(val)) _draftFilterAreas.delete(val);
-        else _draftFilterAreas.add(val);
-        btn.classList.toggle('active', _draftFilterAreas.has(val));
-      }
-      _updateEfClearBtn();
-    }
-
-    function _updateEfClearBtn() {
-      const kw = (document.getElementById('ef-keyword-input')?.value || '').trim();
-      const hasAny = _draftFilterWeek !== '' || _draftFilterWho.size > 0 || _draftFilterAreas.size > 0 || kw !== '';
-      const btn = document.getElementById('event-filter-clear-btn');
-      if (btn) btn.style.display = hasAny ? '' : 'none';
-    }
-
-    function applyEventFilter() {
-      filterWeek    = _draftFilterWeek;
-      filterWho     = new Set(_draftFilterWho);
-      filterAreas   = new Set(_draftFilterAreas);
-      filterKeyword = (document.getElementById('ef-keyword-input')?.value || '').trim();
-      updateFilterBadge();
-      closeEventFilterSheet();
-      renderEventCards();
-    }
-
-    function clearEventFilter() {
-      _draftFilterWeek    = '';
-      _draftFilterWho     = new Set();
-      _draftFilterAreas   = new Set();
-      _draftFilterKeyword = '';
-      document.querySelectorAll('#event-filter-sheet .ef-chip').forEach(b => b.classList.remove('active'));
-      const kw = document.getElementById('ef-keyword-input');
-      if (kw) kw.value = '';
-      _updateEfClearBtn();
-      applyEventFilter();
     }
 
     function genreMatch(e) {
@@ -2362,7 +2269,6 @@
       e.preventDefault();
       if (btn.id === 'pin-filter-btn') togglePinFilter();
       else if (btn.id === 'new-filter-btn') toggleNewFilter();
-      else if (btn.id === 'event-filter-btn') openEventFilterSheet();
     }, { passive: false });
 
     // ─── 設定画面 即時タップ対応 ───
@@ -3325,7 +3231,6 @@
     // ─── NAV LOGIC ───
     function closeAllPopups() {
       closePinDetail();
-      closeEventFilterSheet();
       _closeAllCalBubbles();
     }
 
@@ -4414,7 +4319,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'home-filters', 'event-filter-sheet'];
+    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'pin-sheet', 'home-filters'];
     // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4502,18 +4407,6 @@
         for (;;) {
           const sheet = document.getElementById('pin-sheet');
           if (sheet && _tourVisible(sheet)) { if (_tourState) _tourState.pinSheetOpened = true; return true; }
-          if (Date.now() - t0 >= 3000) return false;
-          await new Promise(r => setTimeout(r, 120));
-        }
-      },
-      // おでかけの詳細条件フィルターシートを開く(すでに開いていれば何もしない)。中身が描画されるまで最大約3秒待つ
-      'open-event-filter': async () => {
-        const sheetEl = document.getElementById('event-filter-sheet');
-        if (!(sheetEl && sheetEl.style.display === 'block')) openEventFilterSheet();
-        const t0 = Date.now();
-        for (;;) {
-          const sheet = document.getElementById('event-filter-sheet');
-          if (sheet && _tourVisible(sheet)) { if (_tourState) _tourState.eventFilterOpened = true; return true; }
           if (Date.now() - t0 >= 3000) return false;
           await new Promise(r => setTimeout(r, 120));
         }
@@ -4709,7 +4602,6 @@
       if (st.popoverOpened) _closeStatPopover();   // 案内が開いた指標ウィジェットのポップアップ(PSI/為替/雨量)は、終了で閉じる
       if (st.homePopoverOpened) document.getElementById('stat-criteria-popover-home')?.classList.remove('visible');   // おでかけ画面のポップアップ(UV指数/デング熱)。専用の後処理が無いためクラス操作のみ
       if (st.pinSheetOpened) closePinSheet();   // 案内が開いたピン留めシートは、終了で閉じる
-      if (st.eventFilterOpened) closeEventFilterSheet();   // 案内が開いた詳細条件フィルターシートは、終了で閉じる
       if (st.seasonBubbleOpened) _closeAllCalBubbles();   // 案内が開いた季節アイコンの吹き出しは、終了で閉じる
       if (typeof st.onEnd === 'function') {
         try { st.onEnd({ shown: st.steps.length > 0, record: !!record }); } catch (_) {}
@@ -4770,12 +4662,11 @@
         { anchor: 'pin-sheet', before: 'open-pin', text: t('tourPinStep2') },
       ];
     }
-    // おでかけのイベント情報(カード・カテゴリ絞り込み・詳細条件フィルター)の案内。設定の「チュートリアル」専用
+    // おでかけのイベント情報(カード・カテゴリ絞り込み)の案内。設定の「チュートリアル」専用
     function _eventInfoTourSteps() {
       return [
         { anchor: 'home-card-sample', text: t('tourEventInfoStep1') },
         { anchor: 'home-filters', text: t('tourEventInfoStep2') },
-        { anchor: 'event-filter-sheet', before: 'open-event-filter', text: t('tourEventInfoStep3') },
       ];
     }
     // くらしの指標(PM2.5)の案内。1.8.16の紹介カードの「使ってみる」(ツアーID pm25-1、文言はサーバー側`content/whats-new.json`)と同じ内容。
@@ -4830,7 +4721,6 @@
       {
         id: 'event-info-1', nameKey: 'tutorialName8', descKey: 'tutorialDesc8', steps: _eventInfoTourSteps,
         prepare: async () => { switchNav('home'); await _tutorialWait(600); },
-        cleanup: () => closeEventFilterSheet(),
       },
       {
         id: 'calendar-1', nameKey: 'tutorialName2', descKey: 'tutorialDesc2', steps: _calendarTourSteps,
