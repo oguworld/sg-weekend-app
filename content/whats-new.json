@@ -110,13 +110,13 @@
               "text": "真ん中は、空気の汚れ具合(PM2.5)です。顔の絵文字と色で、今の状態が分かります"
             },
             {
-              "anchor": "psi-toggle",
+              "anchor": "psi-map",
               "before": "open-psi",
-              "text": "ここで、PM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です"
+              "text": "エリアごとの値です。緑は安全、黄色はちょっと危険、赤は危険です"
             },
             {
-              "anchor": "psi-map",
-              "text": "エリアごとの値です。緑は安全、黄色はちょっと危険、赤は危険です"
+              "anchor": "psi-toggle",
+              "text": "ここで、PM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です"
             },
             {
               "anchor": "psi-chips",

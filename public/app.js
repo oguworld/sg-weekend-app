@@ -480,15 +480,15 @@
         tutorialName4: 'くらしの指標(PM2.5)',
         tutorialDesc4: 'PM2.5の見方と、タップで見える詳細',
         tourPm25Step1: '真ん中は、空気の汚れ具合(PM2.5)です。顔の絵文字と色で、今の状態が分かります',
-        tourPm25Step2: 'ここで、PM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
-        tourPm25Step3: 'エリアごとの値です。緑は安全、黄色はちょっと危険、赤は危険です',
+        tourPm25Step2: 'エリアごとの値です。緑は安全、黄色はちょっと危険、赤は危険です',
+        tourPm25Step3: 'ここで、PM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
         tourPm25Step4: '色と顔の絵文字の見方です',
         tutorialName5: 'くらしの指標ウィジェット',
         tutorialDesc5: '為替・PM2.5・2時間予報の使い方',
         tourWidgetsStep1: '為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます',
         tourWidgetsStep2: '為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります',
-        tourWidgetsStep3: 'ここでPM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
-        tourWidgetsStep4: 'エリア別の詳細や色分けが見られます',
+        tourWidgetsStep3: 'エリア別の詳細や色分けが見られます',
+        tourWidgetsStep4: 'ここでPM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
         tourWidgetsStep5: '2時間予報をタップすると、直近1時間の雨量が地図で分かります',
         tutorialName6: 'おでかけの指標ウィジェット',
         tutorialDesc6: '気温・UV指数・デング熱の使い方',
@@ -4704,8 +4704,8 @@
     function _pm25TourSteps() {
       return [
         { anchor: 'news-stat-pm25', text: t('tourPm25Step1') },
-        { anchor: 'psi-toggle', before: 'open-psi', text: t('tourPm25Step2') },
-        { anchor: 'psi-map', text: t('tourPm25Step3') },
+        { anchor: 'psi-map', before: 'open-psi', text: t('tourPm25Step2') },
+        { anchor: 'psi-toggle', text: t('tourPm25Step3') },
         { anchor: 'psi-chips', text: t('tourPm25Step4') },
       ];
     }
@@ -4715,8 +4715,8 @@
       return [
         { anchor: 'news-stats', text: t('tourWidgetsStep1') },
         { anchor: 'fx-rows', before: 'open-fx', text: t('tourWidgetsStep2') },
-        { anchor: 'psi-toggle', before: 'open-psi', text: t('tourWidgetsStep3') },
-        { anchor: 'psi-map', text: t('tourWidgetsStep4') },
+        { anchor: 'psi-map', before: 'open-psi', text: t('tourWidgetsStep3') },
+        { anchor: 'psi-toggle', text: t('tourWidgetsStep4') },
         { anchor: 'rainfall-map-popover', before: 'open-rainfall', text: t('tourWidgetsStep5') },
       ];
     }
