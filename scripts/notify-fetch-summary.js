@@ -103,17 +103,19 @@ function loadLifeInfoLast24hSummary(cityKey) {
   return merged;
 }
 
-async function pushToLine(text) {
-  const token  = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  const userId = process.env.LINE_USER_ID;
-  if (!token || !userId) {
+// 開発者向け取り込み件数サマリーは、利用者が少なく他の管理者向け通知(承認依頼・X投稿下書き)ほど
+// 機密性が無いため、2026-10-21ユーザー指示でpush(管理者1人宛)からbroadcast(この公式アカウントを
+// 友だち追加している全員宛)に変更した
+async function broadcastToLine(text) {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token) {
     console.warn('⚠️  LINE credentials未設定のため通知をスキップ');
     return;
   }
-  const res = await fetch('https://api.line.me/v2/bot/message/push', {
+  const res = await fetch('https://api.line.me/v2/bot/message/broadcast', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] }),
+    body: JSON.stringify({ messages: [{ type: 'text', text }] }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -234,7 +236,7 @@ async function main() {
 
   console.log(message);
 
-  await pushToLine(message);
+  await broadcastToLine(message);
   console.log('📱 LINE通知送信完了');
 }
 
