@@ -487,7 +487,7 @@
         tutorialDesc5: '為替・PM2.5・2時間予報の使い方',
         tourWidgetsStep1: '為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます',
         tourWidgetsStep2: '為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります',
-        tourWidgetsStep3: 'エリア別の詳細や色分けが見られます',
+        tourWidgetsStep3: 'PM2.5をタップすると、エリア別の詳細や色分けが見られます',
         tourWidgetsStep4: 'ここでPM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
         tourWidgetsStep5: '2時間予報をタップすると、直近1時間の雨量が地図で分かります',
         tutorialName6: 'おでかけの指標ウィジェット',
