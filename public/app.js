@@ -934,6 +934,15 @@
       }
     }, { passive: true });
 
+    // 2時間予報の値(#stat-nowcast)は、他の列と違い天候文言がそのまま入るため、短い文言(「曇り」等)は他列と同じ16pxのまま、
+    // 「激しい雷雨・突風」等の長い文言ではみ出す時だけ.stat-val-sm(12px)を付与する。非表示(screen切替前)の間は幅が測れないため、
+    // switchNav('news')時にも呼び直す
+    function _fitStatNowcastText() {
+      const el = document.getElementById('stat-nowcast');
+      if (!el) return;
+      el.classList.remove('stat-val-sm');
+      if (el.scrollWidth > el.clientWidth) el.classList.add('stat-val-sm');
+    }
     // 指標ウィジェットの前回取得時刻（設計書213: 画面遷移時の再取得判定に使用。成功時のみ更新）
     let _widgetStatsLastLoadedAt = 0;
     let _fxRates = null;   // くらし画面「かんたん換算」(設計書236)用。100 SGD換算の12通貨レート。loadWidgetStats()が保持、タップ時は新規fetchしない
@@ -960,7 +969,7 @@
         if (data.weather) {
           setText('stat-temp', Math.round(data.weather.temp) + '°');
         }
-        if (data.nowcast) setText('stat-nowcast', data.nowcast.text);
+        if (data.nowcast) { setText('stat-nowcast', data.nowcast.text); _fitStatNowcastText(); }
         _widgetStatsLastLoadedAt = Date.now(); // 成功時のみ更新（失敗時は直前の表示を維持し、次回遷移時に再試行させる）
       } catch (e) { /* 取得失敗時は「--」のまま表示 */ }
     }
@@ -3351,6 +3360,9 @@
         if (screen === 'news') {
           // 指標ウィジェット（為替・PSI・デング熱等）は前回取得から5分以上経過していれば再取得する（設計書213）
           if (Date.now() - _widgetStatsLastLoadedAt > 5 * 60 * 1000) loadWidgetStats();
+          // 画面が非表示(display:none)の間はscrollWidth/clientWidthが測れないため、表示に切り替わった直後に測り直す
+          // (loadWidgetStats()を再取得しなかった場合でも、前回値のまま正しいクラスが付くようにするため)
+          requestAnimationFrame(_fitStatNowcastText);
           // ボトムナビからニュースタブを開くたびにカテゴリ絞り込みを先頭チップ（新着）にリセットする
           _newsCategory = '';
           _newsFilterNew = true;
