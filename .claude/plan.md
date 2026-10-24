@@ -23050,3 +23050,30 @@ function _setRainfallProgressStep(containerId, index) {
 - データ取得API・コマ構成(直近1時間・10分間隔・最大7コマ)・ヒートグロー自体の描画ロジック・凡例・ポップアップの開閉ロジックは一切変更しない。
 - 再生/停止ボタン等のUIは追加しない(既存方針通り、自動ループのみ)。
 - 実機・ブラウザでの最終確認は未実施である旨を、他のミニチュートリアル関連の記述と同様にCLAUDE.mdへ追記する
+
+## 設計書242(2026-10-24): 雨量観測マップの進捗バー(ストーリーズ風)を控えめなサイズに調整(ユーザー承認済み、builder→checker→closer)
+
+### 背景
+設計書241で実装したストーリーズ風進捗バー(`.rainfall-progress`/`.rainfall-progress-seg`/`.rainfall-progress-fill`)について、ユーザーから「実装としてはいいね。ただ長さが長すぎる、画面いっぱいな感じがする。もうちょっと見え方控えめにできない?パッと見て分かる感じでいい」とのフィードバック。ロジック・アニメーション(現在のコマが0.9秒かけて左から右へ埋まる挙動)は評価されており変更不要、**見た目のサイズだけ**を控えめにする。
+
+### やること(`public/app.css`のみ、CSS2ルールの調整)
+変更前:
+```css
+.rainfall-progress { display: flex; gap: 4px; margin-bottom: 6px; }
+.rainfall-progress-seg { flex: 1; height: 3px; border-radius: 2px; background: var(--sand-dark); overflow: hidden; }
+```
+変更後:
+```css
+.rainfall-progress { display: flex; justify-content: center; gap: 3px; margin-bottom: 6px; }
+.rainfall-progress-seg { flex: 0 0 14px; height: 2px; border-radius: 1px; background: var(--sand-dark); overflow: hidden; }
+```
+`.rainfall-progress-fill`は`height:100%`で親に追従するため無変更。`public/app.js`・HTML構造・アニメーションロジック・色(`--caramel`)は変更しない。
+
+### キャッシュバスティング
+`app.css`のみ変更のため、`index.html`の`app.css?v=...`クエリと`sw.js`の`CACHE_NAME`を更新する。`app.js?v=...`は変更不要。
+
+### 検証
+`server.js`は無変更のため`pm2 restart`不要。curlで`/app.css`・`/sw.js`の配信内容を確認する。実機・ブラウザでの最終見た目確認は本環境では実施不可。
+
+### スコープ外
+`public/app.js`・HTML構造・アニメーションロジック・色・他の雨量観測マップ機能。
