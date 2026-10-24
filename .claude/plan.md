@@ -22884,4 +22884,169 @@ function _intro1817TourSteps() {
 - `public/index.html`の`<script src="/app.js?v=...">`と`public/sw.js`の`CACHE_NAME`を1つ上げる(キャッシュバスティング手順、両方同時に)
 - `server.js`は変更しないため`pm2 restart`不要
 - **このセッション内で既に直接編集済みの未コミット変更(`public/app.js`の`rainfallDesc`文言修正「島内の観測地点ごとの、直近5分間の降水量です。」を削除し「過去1時間の降水量の変化を自動で再生します。色が濃いほど雨が強いことを示します」に短縮、`public/sw.js`のCACHE_NAME v1115、`public/index.html`のv=20261021b)も、今回の一連の変更とあわせて最終的に1つのコミットにまとめてよい**(内容は既に妥当性確認済み、再修正不要)
+
+## 設計書241: 雨量観測マップに進捗バー(ストーリーズ風)を追加
+
+### 背景
+くらし画面「2時間予報」タップで開く雨量観測マップ(`public/app.js`、`#rainfall-map-popover`)は、直近1時間(10分間隔・最大7コマ)を0.9秒間隔でループ再生し、右上に現在のコマの時刻(例: 「13:05」)だけをテキストで表示している。ユーザーから「時刻が同じ場所で変わるだけだと、進んでいるのか戻っているのか分かりづらい」との指摘があり、Instagramのストーリーズのような「コマ数分のセグメントが左から右へ順に埋まっていく進捗バー」を地図の上に追加することで合意済み(時刻テキストはそのまま残す)。
+
+### 現状のコード(`public/app.js`、雨量観測マップ節、3838行目付近〜)
+
+`_rainfallPopoverHtml()`(抜粋):
+```js
+function _rainfallPopoverHtml(loading) {
+  return `<div class="stat-criteria-desc">${escapeHtml(t('rainfallDesc'))}</div>`
+    + `<div class="rainfall-map-wrap-sm"><span id="rainfall-frame-time" class="rainfall-frame-time"></span><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div>`
+    + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
+    + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
+}
+```
+
+`_renderRainfallFrameTime(timestamp)`:
+```js
+function _renderRainfallFrameTime(timestamp) {
+  const el = document.getElementById('rainfall-frame-time');
+  if (!el) return;
+  const tp = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(timestamp || '');
+  el.textContent = tp ? `${tp[4]}:${tp[5]}` : '';
+}
+```
+
+`_stopRainfallAnimation()`・`_startRainfallAnimation(svgId, data)`:
+```js
+function _stopRainfallAnimation() {
+  if (_rainfallAnimTimer) { clearInterval(_rainfallAnimTimer); _rainfallAnimTimer = null; }
+  _rainfallAnimFrames = null;
+  _rainfallAnimIndex = 0;
+}
+function _startRainfallAnimation(svgId, data) {
+  _stopRainfallAnimation();
+  const stations = data.stations || [];
+  const frames = (data.frames || []).slice().reverse();   // サーバーは新しい順→古い順にする
+  if (frames.length === 0) return;
+  _rainfallAnimFrames = frames;
+  _rainfallAnimIndex = 0;
+  _renderRainfallFrame(svgId, stations, frames[0].values);
+  _renderRainfallFrameTime(frames[0].timestamp);
+  if (frames.length === 1) return;   // コマが1つだけならループ不要
+  _rainfallAnimTimer = setInterval(() => {
+    if (!_rainfallAnimFrames) return;
+    _rainfallAnimIndex = (_rainfallAnimIndex + 1) % _rainfallAnimFrames.length;
+    const frame = _rainfallAnimFrames[_rainfallAnimIndex];
+    _renderRainfallFrame(svgId, stations, frame.values);
+    _renderRainfallFrameTime(frame.timestamp);
+  }, _RAINFALL_ANIM_INTERVAL_MS);
+}
+```
+`_RAINFALL_ANIM_INTERVAL_MS = 900`(定数、既存)。
+
+現状の`public/app.css`(1622〜1640行目付近、抜粋):
+```css
+.stat-criteria-popover.rainfall-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.stat-criteria-popover.rainfall-detail > * { flex-shrink: 0; }
+
+.rainfall-map-wrap-sm { width: 100%; overflow: hidden; position: relative; }
+#rainfall-map-popover { width: 100%; height: auto; display: block; }
+
+.rainfall-frame-time { position: absolute; top: 2px; right: 4px; font-size: 11px; color: var(--warm-gray); background: var(--warm-white); padding: 1px 6px; border-radius: 8px; line-height: 1.4; z-index: 1; }
+
+.rainfall-legend-sm { justify-content: flex-end; }
+.rainfall-outline { fill: var(--psi-tile-bg); stroke: var(--sand-dark); stroke-width: 1; }
+
+.rainfall-glow-dot { stroke: none; }
+.rainfall-lv-light { fill: var(--pm25-normal-text); }
+.rainfall-lv-medium { fill: var(--pm25-elevated-text); }
+.rainfall-lv-heavy { fill: var(--pm25-high-text); }
+.rainfall-lv-chip-none { color: var(--warm-gray); }
+.rainfall-lv-chip-light { color: var(--pm25-normal-text); }
+.rainfall-lv-chip-medium { color: var(--pm25-elevated-text); }
+.rainfall-lv-chip-heavy { color: var(--pm25-high-text); }
+```
+
+### やること
+
+#### 1. マークアップ構造の変更(重要な注意点あり)
+`.rainfall-frame-time`は現在`.rainfall-map-wrap-sm`(`position:relative`)を基準に`position:absolute; top:2px; right:4px`で地図右上に配置されている。**進捗バーを単純に`.rainfall-map-wrap-sm`の最初の子要素として追加すると、時刻バッジが進捗バーの上に重なって表示される**(absoluteな位置決めはドキュメントフロー無視で`top:2px`は常にラップ全体の最上部を指すため)。これを避けるため、SVGと時刻バッジだけをくるむ内側ラッパーを新設する:
+
+```html
+<div class="rainfall-map-wrap-sm">
+  <div class="rainfall-progress" id="rainfall-progress"></div>
+  <div class="rainfall-map-inner">
+    <span id="rainfall-frame-time" class="rainfall-frame-time"></span>
+    <svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+</div>
+```
+`_rainfallPopoverHtml()`内のテンプレート文字列をこの構造に書き換える。`.rainfall-map-inner`に新規`position: relative`を追加し、時刻バッジ(`.rainfall-frame-time`)の位置決めの基準をこの内側ラッパーに変更する(`.rainfall-map-wrap-sm`自体の`position: relative`は残してよい、害はない)。
+
+`_openRainfallPopover()`内のローディング中に輪郭だけ先に描く処理(`popover.querySelector('#rainfall-map-popover')`で直接svg要素を取得している箇所)はIDセレクタで取得しているため、この構造変更の影響を受けない(無変更でよい)。
+
+#### 2. 進捗バーの描画・更新ロジック(`public/app.js`に追加)
+Instagramストーリーズ同様、各コマに対応するセグメントが「現在再生中のコマだけアニメーションで左から右へ0.9秒かけて埋まる、通過済みのコマは満タン、未来のコマは空」という見え方にする。
+
+```js
+// 雨量アニメーションの進捗バー(ストーリーズ風)。フレーム数分のセグメントを作り、現在のコマだけ0.9秒かけて埋まるアニメーションにする
+function _renderRainfallProgressBar(containerId, frameCount) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  for (let i = 0; i < frameCount; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'rainfall-progress-seg';
+    const fill = document.createElement('div');
+    fill.className = 'rainfall-progress-fill';
+    seg.appendChild(fill);
+    el.appendChild(seg);
+  }
+}
+function _setRainfallProgressStep(containerId, index) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.querySelectorAll('.rainfall-progress-seg').forEach((seg, i) => {
+    const fill = seg.querySelector('.rainfall-progress-fill');
+    if (!fill) return;
+    if (i < index) {
+      fill.style.transition = 'none';
+      fill.style.width = '100%';
+    } else if (i === index) {
+      fill.style.transition = 'none';
+      fill.style.width = '0%';
+      void fill.offsetWidth;   // 強制リフロー(幅を0に戻した状態を確定させてからアニメーションさせるため)
+      fill.style.transition = `width ${_RAINFALL_ANIM_INTERVAL_MS}ms linear`;
+      fill.style.width = '100%';
+    } else {
+      fill.style.transition = 'none';
+      fill.style.width = '0%';
+    }
+  });
+}
+```
+
+`_startRainfallAnimation(svgId, data)`内で、`frames`の長さが確定した直後に`_renderRainfallProgressBar('rainfall-progress', frames.length)`を1回呼び、以後`_renderRainfallFrameTime(...)`を呼んでいる2箇所(初回表示時・`setInterval`コールバック内)の直後に、それぞれ`_setRainfallProgressStep('rainfall-progress', 0)` / `_setRainfallProgressStep('rainfall-progress', _rainfallAnimIndex)`を追加で呼ぶ(時刻表示の更新と同じタイミングでバーの状態も更新する)。`frames.length === 1`で早期returnするケースも、その手前で初回の`_setRainfallProgressStep`呼び出しが実行されるようにする(returnより前に置く)。
+
+`_stopRainfallAnimation()`自体は変更不要(`popover.innerHTML = _rainfallPopoverHtml(...)`でポップアップを開き直すたびに`#rainfall-progress`も作り直されるため、明示的なクリア処理は不要)。
+
+#### 3. `public/app.css`の追加(`.rainfall-frame-time`の近くに追加)
+```css
+.rainfall-progress { display: flex; gap: 4px; margin-bottom: 6px; }
+.rainfall-progress-seg { flex: 1; height: 3px; border-radius: 2px; background: var(--sand-dark); overflow: hidden; }
+.rainfall-progress-fill { height: 100%; width: 0%; background: var(--caramel); border-radius: 2px; }
+.rainfall-map-inner { position: relative; }
+```
+`--caramel`は現在のアプリ配色(柳グリーン基調)でのアクセントカラー変数で、ボトムナビのactive状態等で使われているのと同じ変数(値は`#6F8F63`、キャラメル色ではなく柳グリーン。変数名は歴史的経緯でそのまま)。生のhex値を書かず必ずこの変数を使うこと。
+`.rainfall-map-wrap-sm { position: relative; }`は既存のまま残してよい(実害なし)。
+
+#### 4. キャッシュバスティング(必須)
+`public/app.js`・`public/app.css`の両方を変更するため、`public/index.html`の`app.css?v=...`・`app.js?v=...`クエリと`public/sw.js`の`CACHE_NAME`を必ず同時に更新する(現在`app.css?v=20261024a`・`app.js?v=20261024a`・`CACHE_NAME = 'sg-weekend-v1126'`、既存のバージョン番号の続きとして妥当な値にバンプする)。
+
+#### 5. 検証
+- `node --check public/app.js`で構文検証。
+- `server.js`は変更しないため`pm2 restart`不要。`curl`で`/app.js`・`/app.css`・`/sw.js`の配信内容に変更が反映されていることを確認する(バージョン文字列・新しい関数/CSSクラスの存在)。
+- 進捗バーのセグメント数は`frames.length`(通常7、データ取得状況により少ない場合あり)に追従すること、`.rainfall-map-inner`追加により時刻バッジの表示位置(地図右上)が従来通り保たれること(進捗バーの上に重ならないこと)をコード上で確認する。
+- この画面はiOS/Androidアプリにバンドルされるため、Web版は即時反映・アプリは次回ネイティブビルドから反映される旨を記録に残す(このコードベースの慣習通り)。
+- 実機・ブラウザでの最終見た目確認(アニメーションの滑らかさ・セグメントの重なり有無)はこの開発環境では実施不可。
+
+### スコープ外
+- データ取得API・コマ構成(直近1時間・10分間隔・最大7コマ)・ヒートグロー自体の描画ロジック・凡例・ポップアップの開閉ロジックは一切変更しない。
+- 再生/停止ボタン等のUIは追加しない(既存方針通り、自動ループのみ)。
 - 実機・ブラウザでの最終確認は未実施である旨を、他のミニチュートリアル関連の記述と同様にCLAUDE.mdへ追記する

@@ -1624,6 +1624,11 @@
     /* ポップアップ内に収まるよう地図を小さめに表示する */
     .rainfall-map-wrap-sm { width: 100%; overflow: hidden; position: relative; }
     #rainfall-map-popover { width: 100%; height: auto; display: block; }
+    /* 進捗バー(設計書241、ストーリーズ風)。地図・時刻バッジとは別の内側ラッパーを基準にするため、SVGと時刻バッジを.rainfall-map-innerで包む */
+    .rainfall-progress { display: flex; gap: 4px; margin-bottom: 6px; }
+    .rainfall-progress-seg { flex: 1; height: 3px; border-radius: 2px; background: var(--sand-dark); overflow: hidden; }
+    .rainfall-progress-fill { height: 100%; width: 0%; background: var(--caramel); border-radius: 2px; }
+    .rainfall-map-inner { position: relative; }
     /* 直近30分をループ再生中のコマの時刻表示(設計書239)。地図右上に小さく重ねる */
     .rainfall-frame-time { position: absolute; top: 2px; right: 4px; font-size: 11px; color: var(--warm-gray); background: var(--warm-white); padding: 1px 6px; border-radius: 8px; line-height: 1.4; z-index: 1; }
     /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */

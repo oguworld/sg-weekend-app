@@ -3961,6 +3961,41 @@
       const tp = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(timestamp || '');
       el.textContent = tp ? `${tp[4]}:${tp[5]}` : '';
     }
+    // 雨量アニメーションの進捗バー(ストーリーズ風)。フレーム数分のセグメントを作り、現在のコマだけ0.9秒かけて埋まるアニメーションにする
+    function _renderRainfallProgressBar(containerId, frameCount) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = '';
+      for (let i = 0; i < frameCount; i++) {
+        const seg = document.createElement('div');
+        seg.className = 'rainfall-progress-seg';
+        const fill = document.createElement('div');
+        fill.className = 'rainfall-progress-fill';
+        seg.appendChild(fill);
+        el.appendChild(seg);
+      }
+    }
+    function _setRainfallProgressStep(containerId, index) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.querySelectorAll('.rainfall-progress-seg').forEach((seg, i) => {
+        const fill = seg.querySelector('.rainfall-progress-fill');
+        if (!fill) return;
+        if (i < index) {
+          fill.style.transition = 'none';
+          fill.style.width = '100%';
+        } else if (i === index) {
+          fill.style.transition = 'none';
+          fill.style.width = '0%';
+          void fill.offsetWidth;   // 強制リフロー(幅を0に戻した状態を確定させてからアニメーションさせるため)
+          fill.style.transition = `width ${_RAINFALL_ANIM_INTERVAL_MS}ms linear`;
+          fill.style.width = '100%';
+        } else {
+          fill.style.transition = 'none';
+          fill.style.width = '0%';
+        }
+      });
+    }
     // アニメーション停止。多重起動防止のため開始前にも必ず呼ぶ。ポップアップを閉じる全経路から呼ぶこと(メモリリーク防止)
     function _stopRainfallAnimation() {
       if (_rainfallAnimTimer) { clearInterval(_rainfallAnimTimer); _rainfallAnimTimer = null; }
@@ -3975,8 +4010,10 @@
       if (frames.length === 0) return;
       _rainfallAnimFrames = frames;
       _rainfallAnimIndex = 0;
+      _renderRainfallProgressBar('rainfall-progress', frames.length);
       _renderRainfallFrame(svgId, stations, frames[0].values);
       _renderRainfallFrameTime(frames[0].timestamp);
+      _setRainfallProgressStep('rainfall-progress', 0);
       if (frames.length === 1) return;   // コマが1つだけならループ不要
       _rainfallAnimTimer = setInterval(() => {
         if (!_rainfallAnimFrames) return;
@@ -3984,6 +4021,7 @@
         const frame = _rainfallAnimFrames[_rainfallAnimIndex];
         _renderRainfallFrame(svgId, stations, frame.values);
         _renderRainfallFrameTime(frame.timestamp);
+        _setRainfallProgressStep('rainfall-progress', _rainfallAnimIndex);
       }, _RAINFALL_ANIM_INTERVAL_MS);
     }
     function _rainfallLegendHtml() {
@@ -3993,7 +4031,7 @@
     // #rainfall-frame-time は再生中のコマの時刻(「13:05」)を小さく表示する(静的な初期値は空、_startRainfallAnimation()が都度更新)
     function _rainfallPopoverHtml(loading) {
       return `<div class="stat-criteria-desc">${escapeHtml(t('rainfallDesc'))}</div>`
-        + `<div class="rainfall-map-wrap-sm"><span id="rainfall-frame-time" class="rainfall-frame-time"></span><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div>`
+        + `<div class="rainfall-map-wrap-sm"><div class="rainfall-progress" id="rainfall-progress"></div><div class="rainfall-map-inner"><span id="rainfall-frame-time" class="rainfall-frame-time"></span><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div></div>`
         + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
         + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
     }
