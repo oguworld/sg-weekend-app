@@ -2920,6 +2920,14 @@
       }
     }
 
+    // タブ復帰時に能動的にSW更新をチェックする(バックグラウンド→フォアグラウンド復帰だけだとブラウザの標準の更新チェックが走らず、
+    // 何度サーバー側を更新しても古い版のまま固定されて見えることがあるため。更新が見つかった場合の反映(controllerchangeでの
+    // 1回限りのreload)は既存のリスナーがそのまま処理する)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      navigator.serviceWorker?.getRegistration().then(reg => reg?.update()).catch(() => {});
+    });
+
     // QR共有シートの「シェア」ボタン。紹介ページ・アプリ両方のリンクを含めて送る
     // 文言はabout.htmlのヒーロー見出しと表現を揃えている（「週末」限定の旧文言は
     // くらし情報・カレンダー等を含む現在の機能構成と合わなくなったため2026-09-11変更）

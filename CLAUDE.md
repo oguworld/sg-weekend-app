@@ -78,6 +78,7 @@ sg-weekend-app/
 ## PWA・Service Worker
 - 「ホーム画面に追加」誘導バナー・「アプリが更新されました」バナーはUIごと削除済み(iOSアプリ=App Store配信を正式運用形態とするため)
 - **SW登録は`public/app.js`の初期化処理内**(Web版プッシュ通知の`navigator.serviceWorker.ready`依存＋SW更新時の自動反映のため必要)。登録時に`navigator.serviceWorker.controller`が既にあった場合(既存訪問者のSW更新時)のみ`controllerchange`で1回だけ`location.reload()`(フラグ`_hadController`で新規訪問者と区別)
+- **タブ復帰時の能動的な更新チェック(2026-10-24追加)**: ブラウザは通常ページの再読み込み(ナビゲーション)時にSWスクリプトの更新チェックを行うが、タブをバックグラウンドにして戻ってくるだけ(実際のページ再読み込みを伴わない操作)ではこの更新チェックが走らない。短時間にサーバー側のコードを何度も更新してテストする際、タブを閉じずに切り替えて戻る使い方だと最新版が反映されないように見える事故が起きたため、`document.addEventListener('visibilitychange', ...)`で`visibilityState==='visible'`になった時に`navigator.serviceWorker.getRegistration().then(reg => reg?.update())`を呼び、能動的に更新チェックを行う処理を追加した(上記`if ('serviceWorker' in navigator) {...}`ブロックの外に配置)。実際に更新が見つかった場合の反映(`controllerchange`での1回限りのreload)は既存の仕組みがそのまま処理する(`_hadController`/`_swReloaded`は無変更)
 - 既知の残存事項(対応不要): `public/index.html`に到達不能な`#install-modal`が残存(orphaned markup、実害なし)
 
 ## アプリアイコン・スプラッシュ画面
