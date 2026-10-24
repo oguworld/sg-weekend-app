@@ -1629,7 +1629,7 @@
     .rainfall-progress-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
     .rainfall-progress { display: flex; gap: 3px; }
     .rainfall-progress-seg { flex: 0 0 20px; height: 3px; border-radius: 1.5px; background: var(--light-gray); overflow: hidden; }
-    .rainfall-progress-fill { height: 100%; width: 0%; background: var(--caramel); border-radius: 1.5px; }
+    .rainfall-progress-fill { height: 100%; width: 0%; background: var(--caramel); border-radius: 1.5px; will-change: width; }
     /* 直近30分をループ再生中のコマの時刻表示(設計書239) */
     .rainfall-frame-time { font-size: 11px; color: var(--warm-gray); background: var(--warm-white); padding: 1px 6px; border-radius: 8px; line-height: 1.4; }
     /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */

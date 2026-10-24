@@ -3995,9 +3995,16 @@
         } else if (i === index) {
           fill.style.transition = 'none';
           fill.style.width = '0%';
-          void fill.offsetWidth;   // 強制リフロー(幅を0に戻した状態を確定させてからアニメーションさせるため)
-          fill.style.transition = `width ${_RAINFALL_ANIM_INTERVAL_MS}ms linear`;
-          fill.style.width = '100%';
+          // 同期的な強制リフロー(void offsetWidth)の代わりに二重requestAnimationFrameでtransitionを再始動する
+          // (WebKit/iOS Safariで、0.9秒間隔の無限ループ中に強制リフロー+インラインtransition切り替えを繰り返すと
+          // 描画・コンポジットが一瞬ズレる不具合があり、進捗バーのセグメントが時刻表示を挟んで分裂して見える
+          // 実機不具合の原因と推測されるため。Chromiumでは発生しないことを確認済み)
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              fill.style.transition = `width ${_RAINFALL_ANIM_INTERVAL_MS}ms linear`;
+              fill.style.width = '100%';
+            });
+          });
         } else {
           fill.style.transition = 'none';
           fill.style.width = '0%';
