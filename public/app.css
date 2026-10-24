@@ -1622,16 +1622,16 @@
     .stat-criteria-popover.rainfall-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .stat-criteria-popover.rainfall-detail > * { flex-shrink: 0; }
     /* ポップアップ内に収まるよう地図を小さめに表示する */
-    .rainfall-map-wrap-sm { width: 100%; overflow: hidden; position: relative; }
+    .rainfall-map-wrap-sm { width: 100%; overflow: hidden; }
     #rainfall-map-popover { width: 100%; height: auto; display: block; }
-    /* 進捗バー(設計書241、ストーリーズ風)。地図・時刻バッジとは別の内側ラッパーを基準にするため、SVGと時刻バッジを.rainfall-map-innerで包む */
+    /* 進捗バー(設計書241、ストーリーズ風)+時刻表示(設計書239)は1行にまとめ、地図の下・凡例の上(設計書243)に右寄せで配置 */
     /* 設計書242: 地図の横幅いっぱいに伸びて目立ちすぎるとのフィードバックを受け、固定幅の小さいセグメントで中央寄せに縮小 */
-    .rainfall-progress { display: flex; justify-content: center; gap: 3px; margin-bottom: 6px; }
+    .rainfall-progress-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    .rainfall-progress { display: flex; gap: 3px; }
     .rainfall-progress-seg { flex: 0 0 14px; height: 2px; border-radius: 1px; background: var(--sand-dark); overflow: hidden; }
     .rainfall-progress-fill { height: 100%; width: 0%; background: var(--caramel); border-radius: 2px; }
-    .rainfall-map-inner { position: relative; }
-    /* 直近30分をループ再生中のコマの時刻表示(設計書239)。地図右上に小さく重ねる */
-    .rainfall-frame-time { position: absolute; top: 2px; right: 4px; font-size: 11px; color: var(--warm-gray); background: var(--warm-white); padding: 1px 6px; border-radius: 8px; line-height: 1.4; z-index: 1; }
+    /* 直近30分をループ再生中のコマの時刻表示(設計書239) */
+    .rainfall-frame-time { font-size: 11px; color: var(--warm-gray); background: var(--warm-white); padding: 1px 6px; border-radius: 8px; line-height: 1.4; }
     /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */
     .rainfall-legend-sm { justify-content: flex-end; }
     .rainfall-outline { fill: var(--psi-tile-bg); stroke: var(--sand-dark); stroke-width: 1; }

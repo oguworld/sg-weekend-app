@@ -4031,7 +4031,7 @@
     // #rainfall-frame-time は再生中のコマの時刻(「13:05」)を小さく表示する(静的な初期値は空、_startRainfallAnimation()が都度更新)
     function _rainfallPopoverHtml(loading) {
       return `<div class="stat-criteria-desc">${escapeHtml(t('rainfallDesc'))}</div>`
-        + `<div class="rainfall-map-wrap-sm"><div class="rainfall-progress" id="rainfall-progress"></div><div class="rainfall-map-inner"><span id="rainfall-frame-time" class="rainfall-frame-time"></span><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg></div></div>`
+        + `<div class="rainfall-map-wrap-sm"><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg><div class="rainfall-progress-row"><div class="rainfall-progress" id="rainfall-progress"></div><span id="rainfall-frame-time" class="rainfall-frame-time"></span></div></div>`
         + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
         + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
     }
