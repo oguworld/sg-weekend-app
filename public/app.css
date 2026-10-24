@@ -1616,8 +1616,9 @@
       font-weight: 700;
     }
 
-    /* ─── 雨量観測マップ(設計書238→設計書239でPSI/為替と同じ狭いポップアップ方式に作り直し): くらし画面「2時間予報」タップで
-       #stat-criteria-popoverの中に表示。地図エンジンは使わない。固定サイズの静的SVG(輪郭+観測点の円)で、パン・ズーム操作は無し */
+    /* ─── 雨量観測マップ(設計書238→設計書239でPSI/為替と同じ狭いポップアップ方式に作り直し。2026-10-24にヒートグロー方式へ変更):
+       くらし画面「2時間予報」タップで#stat-criteria-popoverの中に表示。地図エンジンは使わない。固定サイズの静的SVG(輪郭+観測点の
+       ぼかし光彩)で、パン・ズーム操作は無し */
     .stat-criteria-popover.rainfall-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .stat-criteria-popover.rainfall-detail > * { flex-shrink: 0; }
     /* ポップアップ内に収まるよう地図を小さめに表示する */
@@ -1628,8 +1629,8 @@
     /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */
     .rainfall-legend-sm { justify-content: flex-end; }
     .rainfall-outline { fill: var(--psi-tile-bg); stroke: var(--sand-dark); stroke-width: 1; }
-    .rainfall-point { stroke: var(--warm-white); stroke-width: 0.6; }
-    .rainfall-lv-none { fill: var(--sand-dark); }
+    /* ヒートグロー(ぼかし光彩)の円。枠線は付けない(ぼかしブロブに白枠は不要) */
+    .rainfall-glow-dot { stroke: none; }
     .rainfall-lv-light { fill: var(--pm25-normal-text); }
     .rainfall-lv-medium { fill: var(--pm25-elevated-text); }
     .rainfall-lv-heavy { fill: var(--pm25-high-text); }

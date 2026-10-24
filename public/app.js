@@ -3835,9 +3835,10 @@
       unlockScroll();
     }
 
-    // ─── 雨量観測マップ(設計書238→設計書239でアニメーション対応): くらし画面「2時間予報」タップで開く、89地点の降水量プロット ───
+    // ─── 雨量観測マップ(設計書238→設計書239でアニメーション対応→2026-10-24にヒートグロー方式へ変更): くらし画面「2時間予報」タップで開く、89地点の降水量プロット ───
     // SVG座標変換(SG_OUTLINE_PATH・SG_MAP_PROJECTION・projectLatLng)は public/sg-rainfall-map-data.js(app.jsより前に読み込む)で定義。
-    // 地図エンジン(Leaflet等)は使わない。固定サイズの静的SVGに輪郭+観測点の円を描画するのみ(パン・ズーム無し)。
+    // 地図エンジン(Leaflet等)は使わない。固定サイズの静的SVGに輪郭+観測点のぼかし光彩(グロー)を描画するのみ(パン・ズーム無し)。
+    // 2026-10-24: ユーザーから「点だと分かりづらい」と指摘を受け、点プロット/ヒートグロー/メッシュ補間/ボロノイ風の4案モックを提示し、ヒートグロー方式(案A)が承認された。
     // 直近1時間(60分、10分間隔、最大7コマ、2026-10-20に5分間隔から変更。同日、50分・6コマから1時間・7コマへ拡張)を自動ループ再生する(再生/停止ボタン等は作らない、ユーザー指示の最小限の動き)。
     const _RAINFALL_DETAIL_TTL_MS = 10 * 60 * 1000;
     const _RAINFALL_ANIM_INTERVAL_MS = 900;
@@ -3846,14 +3847,20 @@
     let _rainfallAnimTimer = null;    // このポップアップ専用のsetInterval。他機能のタイマーと混同しないこと
     let _rainfallAnimFrames = null;   // 古い順に並べ替えたframes配列(再生用)
     let _rainfallAnimIndex = 0;
-    // 各コマの降水量(mm、観測間隔は10分)の色分け: 0mm=降水なし(薄灰色)/ 0超〜2.5mm=弱い雨(緑)/ 2.5超〜10mm=やや強い雨(黄)/ 10mm超=激しい雨(赤)。
+    // 各コマの降水量(mm、観測間隔は10分)の色分け: 0mm=降水なし(ヒートグローでは描画しない)/ 0超〜2.5mm=弱い雨(緑)/ 2.5超〜10mm=やや強い雨(黄)/ 10mm超=激しい雨(赤)。
     // 気象庁の「弱い雨(1時間1-3mm相当)」区分を参考にした概算(厳密な気象学的根拠ではない)。しきい値自体は観測間隔変更前から不変。
     const _RAINFALL_BANDS = [
-      { cls: 'none', label: '降水なし', max: 0, r: 2.6 },
-      { cls: 'light', label: '弱い雨', max: 2.5, r: 3.6 },
-      { cls: 'medium', label: 'やや強い雨', max: 10, r: 5 },
-      { cls: 'heavy', label: '激しい雨', max: Infinity, r: 6.4 },
+      { cls: 'none', label: '降水なし', max: 0 },
+      { cls: 'light', label: '弱い雨', max: 2.5 },
+      { cls: 'medium', label: 'やや強い雨', max: 10 },
+      { cls: 'heavy', label: '激しい雨', max: Infinity },
     ];
+    // ヒートグローの半径・不透明度(viewBox単位、2026-10-24承認済みモックと同じ値)。noneは描画しないため含まない
+    const _RAINFALL_GLOW_PARAMS = {
+      light: { r: 14, opacity: 0.38 },
+      medium: { r: 20, opacity: 0.5 },
+      heavy: { r: 28, opacity: 0.62 },
+    };
     function _rainfallBandOfValue(v) {
       if (!Number.isFinite(v)) return null;
       for (const b of _RAINFALL_BANDS) { if (v <= b.max) return b; }
@@ -3880,7 +3887,7 @@
     function _rainfallDetailValid(d) {
       return !!(d && Array.isArray(d.stations) && d.stations.length > 0 && Array.isArray(d.frames) && d.frames.length > 0);
     }
-    // 輪郭パスは1回だけ描画し、観測点の<circle>だけ毎回入れ替える(既に輪郭が描画済みなら再利用)。svgIdで描画対象を指定する。
+    // 輪郭パスとdefs(clipPath/blur)は1回だけ描画し、観測点のヒートグロー(<g class="rainfall-glow">)だけ毎回入れ替える。svgIdで描画対象を指定する。
     // stations=地点の位置情報(id/name/lat/lng)の配列、frameValues={stationId: value}の1コマ分
     function _renderRainfallFrame(svgId, stations, frameValues) {
       const svg = document.getElementById(svgId);
@@ -3891,23 +3898,61 @@
         path.setAttribute('d', SG_OUTLINE_PATH);
         svg.appendChild(path);
       }
-      svg.querySelectorAll('.rainfall-point').forEach(el => el.remove());
+      const clipId = `${svgId}-rainfall-clip`;
+      const blurId = `${svgId}-rainfall-blur`;
+      if (!svg.querySelector(`#${clipId}`)) {
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+        clipPath.setAttribute('id', clipId);
+        const clipPathShape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        clipPathShape.setAttribute('d', SG_OUTLINE_PATH);
+        clipPath.appendChild(clipPathShape);
+        const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+        filter.setAttribute('id', blurId);
+        filter.setAttribute('x', '-20%');
+        filter.setAttribute('y', '-20%');
+        filter.setAttribute('width', '140%');
+        filter.setAttribute('height', '140%');
+        const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+        blur.setAttribute('stdDeviation', '4.5');
+        filter.appendChild(blur);
+        defs.appendChild(clipPath);
+        defs.appendChild(filter);
+        svg.appendChild(defs);
+      }
+      svg.querySelectorAll('.rainfall-glow').forEach(el => el.remove());
+      const titleByStation = new Map();
       (stations || []).forEach(st => {
         if (!Number.isFinite(st.lat) || !Number.isFinite(st.lng)) return;
         const value = frameValues ? frameValues[st.id] : undefined;
-        const [x, y] = projectLatLng(st.lng, st.lat);
         const band = _rainfallBandOfValue(value) || _RAINFALL_BANDS[0];
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        circle.setAttribute('class', `rainfall-point rainfall-lv-${band.cls}`);
-        circle.setAttribute('cx', x);
-        circle.setAttribute('cy', y);
-        circle.setAttribute('r', band.r);
-        const valText = Number.isFinite(value) ? `${value}mm` : '–';
-        const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        titleEl.textContent = `${st.name}: ${valText}（${band.label}）`;
-        circle.appendChild(titleEl);
-        svg.appendChild(circle);
+        if (band.cls === 'none') return;   // 降水なしの地点は描画しない(薄灰色のドットを出さない、2026-10-24承認済み方針)
+        titleByStation.set(st, { value, band });
       });
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', 'rainfall-glow');
+      g.setAttribute('clip-path', `url(#${clipId})`);
+      g.setAttribute('filter', `url(#${blurId})`);
+      ['light', 'medium', 'heavy'].forEach(cls => {
+        const params = _RAINFALL_GLOW_PARAMS[cls];
+        (stations || []).forEach(st => {
+          const info = titleByStation.get(st);
+          if (!info || info.band.cls !== cls) return;
+          const [x, y] = projectLatLng(st.lng, st.lat);
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('class', `rainfall-glow-dot rainfall-lv-${cls}`);
+          circle.setAttribute('cx', x);
+          circle.setAttribute('cy', y);
+          circle.setAttribute('r', params.r);
+          circle.setAttribute('opacity', params.opacity);
+          const valText = Number.isFinite(info.value) ? `${info.value}mm` : '–';
+          const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+          titleEl.textContent = `${st.name}: ${valText}（${info.band.label}）`;
+          circle.appendChild(titleEl);
+          g.appendChild(circle);
+        });
+      });
+      svg.appendChild(g);
     }
     // 現在のコマの時刻(「13:05」形式)を描画する。無ければ何もしない
     function _renderRainfallFrameTime(timestamp) {
