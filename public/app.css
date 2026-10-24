@@ -1622,11 +1622,11 @@
     .stat-criteria-popover.rainfall-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .stat-criteria-popover.rainfall-detail > * { flex-shrink: 0; }
     /* ポップアップ内に収まるよう地図を小さめに表示する */
-    .rainfall-map-wrap-sm { width: 100%; overflow: hidden; position: relative; }
+    .rainfall-map-wrap-sm { width: 100%; overflow: hidden; }
     #rainfall-map-popover { width: 100%; height: auto; display: block; }
-    /* 進捗バー(設計書241、ストーリーズ風)+時刻表示(設計書239)は1行にまとめ、地図右上にオーバーレイ配置(設計書244、実機確認で地図の下配置がだめとのことで右上に戻した) */
+    /* 進捗バー(設計書241、ストーリーズ風)+時刻表示(設計書239)は1行にまとめ、地図の下・中央寄せに配置(設計書245、右上オーバーレイ(設計書244)も不採用だったため通常フロー配置に戻した) */
     /* 設計書242: 地図の横幅いっぱいに伸びて目立ちすぎるとのフィードバックを受け、固定幅の小さいセグメントで中央寄せに縮小 */
-    .rainfall-progress-row { position: absolute; top: 2px; right: 4px; display: flex; align-items: center; gap: 6px; z-index: 1; }
+    .rainfall-progress-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
     .rainfall-progress { display: flex; gap: 3px; }
     .rainfall-progress-seg { flex: 0 0 20px; height: 3px; border-radius: 1.5px; background: var(--light-gray); overflow: hidden; }
     .rainfall-progress-fill { height: 100%; width: 0%; background: var(--caramel); border-radius: 1.5px; }
