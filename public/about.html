@@ -167,8 +167,9 @@
 
     /* ── FEATURES ── */
     .features {
-      background: #fff;
+      background: var(--caramel-pale);
       padding: 80px 24px;
+      position: relative;
     }
     .section-label {
       text-align: center;
@@ -183,6 +184,19 @@
       font-size: clamp(24px, 5vw, 36px);
       font-weight: 700;
       margin-bottom: 48px;
+    }
+    .section-num {
+      position: absolute;
+      top: 16px; left: 24px;
+      font-size: clamp(40px, 8vw, 64px);
+      font-weight: 900;
+      color: rgba(111,143,99,0.14);
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+    .detail-views .section-num {
+      color: rgba(238,243,234,0.14);
     }
     .feature-grid {
       display: grid;
@@ -215,17 +229,26 @@
 
     /* ── DETAIL VIEWS ── */
     .detail-views {
-      background: var(--cream);
-      padding: 80px 24px;
+      background: var(--midnight);
+      padding: 80px 0;
+      position: relative;
+    }
+    .detail-views .section-title {
+      color: #fff;
     }
     .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 24px;
-      max-width: 1000px;
-      margin: 0 auto;
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding: 4px 24px 12px;
+      max-width: 100%;
+      margin: 0;
     }
     .detail-card {
+      flex: 0 0 200px;
+      scroll-snap-align: start;
       background: #fff;
       border-radius: 20px;
       padding: 16px 16px 24px;
@@ -248,13 +271,21 @@
       line-height: 1.7;
       margin: 0 8px;
     }
+    .detail-scroll-hint {
+      text-align: center;
+      font-size: 12px;
+      color: #C9CFC3;
+      margin-top: 8px;
+    }
 
     /* ── CONCEPT ── */
     .concept {
+      background: var(--cream);
       padding: 80px 24px;
       max-width: 620px;
       margin: 0 auto;
       text-align: center;
+      position: relative;
     }
     .concept p {
       font-size: 15px; color: var(--warm-gray);
@@ -269,10 +300,12 @@
 
     /* ── AUDIENCE ── */
     .audience {
+      background: var(--cream);
       padding: 80px 24px;
       max-width: 680px;
       margin: 0 auto;
       text-align: center;
+      position: relative;
     }
     .audience-list {
       list-style: none;
@@ -294,6 +327,7 @@
       background: var(--caramel-pale);
       padding: 80px 24px;
       text-align: center;
+      position: relative;
     }
     .cta-bottom-icon {
       width: 96px; height: 96px;
@@ -339,6 +373,7 @@
       padding: 64px 24px;
       background: #fff;
       text-align: center;
+      position: relative;
     }
     .sources-lead {
       font-size: 15px; color: var(--warm-gray);
@@ -452,6 +487,7 @@
 
   <!-- CONCEPT -->
   <section class="concept">
+    <div class="section-num">01</div>
     <div class="section-label">CONCEPT</div>
     <h2 class="section-title">情報を、選び抜く。</h2>
     <p>SG在住Naviは、数あるメディア・情報源の中から、シンガポール在住日本人に本当に役立つ情報だけを選び抜いてお届けする、キュレーション型の生活・おでかけ情報アプリです。</p>
@@ -462,6 +498,7 @@
 
   <!-- SOURCES -->
   <section class="sources">
+    <div class="section-num">02</div>
     <div class="section-label">DATA SOURCES</div>
     <h2 class="section-title">主要メディアから毎日自動収集</h2>
     <p class="sources-lead">シンガポールの有名情報サイト・公式機関をまとめてチェック。自分で各サイトを見て回る手間がありません。取りこぼしや重複ができるだけ出ないよう工夫しています。</p>
@@ -481,6 +518,7 @@
 
   <!-- FEATURES -->
   <section class="features">
+    <div class="section-num">03</div>
     <div class="section-label">FEATURES</div>
     <h2 class="section-title">5つの便利な機能</h2>
     <div class="feature-grid">
@@ -514,6 +552,7 @@
 
   <!-- DETAIL VIEWS -->
   <section class="detail-views">
+    <div class="section-num">04</div>
     <div class="section-label">DETAILS</div>
     <h2 class="section-title">タップするともっと詳しく</h2>
     <div class="detail-grid">
@@ -548,10 +587,12 @@
         <p>カレンダー画面の飛行機アイコンから、20都市の航空券が安い時期の目安をチェックできます。</p>
       </div>
     </div>
+    <p class="detail-scroll-hint">← スワイプでもっと見る →</p>
   </section>
 
   <!-- AUDIENCE -->
   <section class="audience">
+    <div class="section-num">05</div>
     <div class="section-label">FOR YOU</div>
     <h2 class="section-title">こんな方におすすめ</h2>
     <ul class="audience-list">
@@ -564,6 +605,7 @@
 
   <!-- CTA BOTTOM -->
   <section class="cta-bottom" id="download">
+    <div class="section-num">06</div>
     <img src="/icons/icon-512.png" alt="SG在住Navi" class="cta-bottom-icon">
     <h2>今すぐ始めよう</h2>
     <p>無料でご利用いただけます。</p>
