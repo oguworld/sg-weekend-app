@@ -213,6 +213,42 @@
       line-height: 1.7;
     }
 
+    /* ── DETAIL VIEWS ── */
+    .detail-views {
+      background: var(--cream);
+      padding: 80px 24px;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .detail-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 16px 16px 24px;
+      box-shadow: 0 2px 8px rgba(44,36,32,0.05);
+    }
+    .detail-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      display: block;
+      margin-bottom: 16px;
+      border: 1px solid var(--sand);
+    }
+    .detail-card h4 {
+      font-size: 16px; font-weight: 700;
+      margin: 0 8px 8px;
+    }
+    .detail-card p {
+      font-size: 14px; color: var(--warm-gray);
+      line-height: 1.7;
+      margin: 0 8px;
+    }
+
     /* ── CONCEPT ── */
     .concept {
       padding: 80px 24px;
@@ -472,6 +508,44 @@
         <div class="feature-icon">📌</div>
         <h3>ピン留め</h3>
         <p>気になる情報は、いいね♡やピン留めで。タップひとつで保存・応援でき、あとからまとめて見返せます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DETAIL VIEWS -->
+  <section class="detail-views">
+    <div class="section-label">DETAILS</div>
+    <h2 class="section-title">タップするともっと詳しく</h2>
+    <div class="detail-grid">
+      <div class="detail-card">
+        <img src="/screenshots/detail-fx.jpg?v=1" alt="為替：かんたん換算">
+        <h4>為替：かんたん換算</h4>
+        <p>為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります。</p>
+      </div>
+      <div class="detail-card">
+        <img src="/screenshots/detail-pm25.jpg?v=1" alt="PM2.5：エリア別詳細">
+        <h4>PM2.5：エリア別詳細</h4>
+        <p>PM2.5をタップすると、エリアごとの詳細や色分けが見られます。PSI表示への切り替えも可能です。</p>
+      </div>
+      <div class="detail-card">
+        <img src="/screenshots/detail-rainfall.jpg?v=1" alt="2時間予報：雨量観測マップ">
+        <h4>2時間予報：雨量観測マップ</h4>
+        <p>2時間予報をタップすると、直近1時間の降水量をエリア別の地図で確認できます。</p>
+      </div>
+      <div class="detail-card">
+        <img src="/screenshots/detail-uv.jpg?v=1" alt="UV指数：詳細">
+        <h4>UV指数：詳細</h4>
+        <p>UV指数をタップすると、紫外線の強さの目安が分かります。</p>
+      </div>
+      <div class="detail-card">
+        <img src="/screenshots/detail-dengue.jpg?v=1" alt="デング熱：詳細">
+        <h4>デング熱：詳細</h4>
+        <p>デング熱をタップすると、クラスター(流行地区)の警戒レベルが分かります。</p>
+      </div>
+      <div class="detail-card">
+        <img src="/screenshots/detail-fare-season.jpg?v=1" alt="旅行シーズン情報">
+        <h4>旅行シーズン情報</h4>
+        <p>カレンダー画面の飛行機アイコンから、20都市の航空券が安い時期の目安をチェックできます。</p>
       </div>
     </div>
   </section>

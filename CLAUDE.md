@@ -14,6 +14,7 @@
 - App StoreのURL: `https://apps.apple.com/sg/app/sg%E5%9C%A8%E4%BD%8Fnavi/id6787159354`
 - 現行機能一覧「5つの便利な機能」（くらし情報/おでかけ情報/カレンダー/気温・UV指数・為替/ピン留めの順）・スクリーンショット4枚(1170×2309px統一)は2026-10-25時点の実機最新版と同期済み（設計書250、PM2.5(1時間値)・2時間予報のくらし画面移動・UV指数/デング熱のおでかけ画面移動・❤️いいね機能・カレンダー「説明」スイッチ方式・旅行シーズン情報入口を反映）。`public/privacy.html`/`public/contact.html`（`public/css/about-shared.css`共有）ともに柳グリーン配色で統一済み
 - Android版がPlay Storeで公開済み(2026-10時点、`app.dosuru`)になったため、ダウンロードセクション(`.cta-store-badges`)にApp Storeバッジと並べてGoogle Play公式日本語バッジ・リンク(`https://play.google.com/store/apps/details?id=app.dosuru`)も追加済み
+- **「DETAILS」セクション(設計書251、2026-10-25追加)**: FEATURESセクション(5つの便利な機能)の直後・AUDIENCEセクションの前に、指標ウィジェットをタップした時の詳細画面を紹介する新セクション(`.detail-views`/`.detail-grid`/`.detail-card`、既存`.phone`/`.phone-img-wrap`とは別の新規CSSクラス、画像は`height:auto`でカードごとに自然な比率)。6枚: 為替「かんたん換算」・PM2.5エリア別詳細・2時間予報の雨量観測マップ・UV指数詳細・デング熱詳細・旅行シーズン情報(専用画面)。画像は`public/screenshots/detail-{fx,pm25,rainfall,uv,dengue,fare-season}.jpg`(幅1170px、高さは内容に応じ個別、JPEG品質82)。クロップ基準は既存4枚と同じ元画像y≈229開始だが、下端は画像ごとに「ポップアップ/画面の内容が終わる自然な位置」を目視確認して個別に決める(機械的な統一値にしない)。
 - **このLPのレイアウト微調整（角丸・余白・クロップ位置等）は過去に非常に多くの反復があった。次に触る際はブラウザ実機で確認しながら調整すること**（詳細経緯は`CLAUDE_HISTORY.md`参照、数値だけ復元しても実機での見え方は保証されない）
 
 ## 起動・操作コマンド
