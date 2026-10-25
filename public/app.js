@@ -3983,37 +3983,20 @@
         el.appendChild(seg);
       }
     }
+    // 各コマのセグメントを即座に塗り/未塗りへ切り替える(アニメーションなし)。
+    // 以前はCSSトランジションで現在のコマだけ0.9秒かけて伸ばす演出をしていたが、
+    // iOS Safariで描画が不安定になる不具合が解消しなかったため、2026-10-25にアニメーションを廃止した。
     function _setRainfallProgressStep(containerId, index) {
       const el = document.getElementById(containerId);
       if (!el) return;
       el.querySelectorAll('.rainfall-progress-seg').forEach((seg, i) => {
         const fill = seg.querySelector('.rainfall-progress-fill');
         if (!fill) return;
-        if (i < index) {
-          fill.style.transition = 'none';
-          fill.style.width = '100%';
-        } else if (i === index) {
-          fill.style.transition = 'none';
-          fill.style.width = '0%';
-          // 同期的な強制リフロー(void offsetWidth)の代わりに二重requestAnimationFrameでtransitionを再始動する
-          // (WebKit/iOS Safariで、0.9秒間隔の無限ループ中に強制リフロー+インラインtransition切り替えを繰り返すと
-          // 描画・コンポジットが一瞬ズレる不具合があり、進捗バーのセグメントが時刻表示を挟んで分裂して見える
-          // 実機不具合の原因と推測されるため。Chromiumでは発生しないことを確認済み)
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              fill.style.transition = `width ${_RAINFALL_ANIM_INTERVAL_MS}ms linear`;
-              fill.style.width = '100%';
-            });
-          });
-        } else {
-          fill.style.transition = 'none';
-          fill.style.width = '0%';
-        }
+        fill.style.width = i <= index ? '100%' : '0%';
       });
     }
     // アニメーション停止。多重起動防止のため開始前にも必ず呼ぶ。ポップアップを閉じる全経路から呼ぶこと(メモリリーク防止)
     function _stopRainfallAnimation() {
-      _sendDebugLog('rainfall_stop', { hadTimer: !!_rainfallAnimTimer, ts: Date.now() }); // 一時計装（原因確定後に削除）
       if (_rainfallAnimTimer) { clearInterval(_rainfallAnimTimer); _rainfallAnimTimer = null; }
       _rainfallAnimFrames = null;
       _rainfallAnimIndex = 0;
@@ -4031,7 +4014,6 @@
       _renderRainfallFrameTime(frames[0].timestamp);
       _setRainfallProgressStep('rainfall-progress', 0);
       if (frames.length === 1) return;   // コマが1つだけならループ不要
-      _sendDebugLog('rainfall_start', { frameCount: frames.length, firstTimestamp: frames[0].timestamp, ts: Date.now() }); // 一時計装（原因確定後に削除）
       _rainfallAnimTimer = setInterval(() => {
         if (!_rainfallAnimFrames) return;
         _rainfallAnimIndex = (_rainfallAnimIndex + 1) % _rainfallAnimFrames.length;
@@ -4039,7 +4021,6 @@
         _renderRainfallFrame(svgId, stations, frame.values);
         _renderRainfallFrameTime(frame.timestamp);
         _setRainfallProgressStep('rainfall-progress', _rainfallAnimIndex);
-        _sendDebugLog('rainfall_tick', { index: _rainfallAnimIndex, timestamp: frame.timestamp, ts: Date.now() }); // 一時計装（原因確定後に削除）
       }, _RAINFALL_ANIM_INTERVAL_MS);
     }
     function _rainfallLegendHtml() {
@@ -4054,7 +4035,6 @@
         + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
     }
     function _openRainfallPopover(popover) {
-      _sendDebugLog('rainfall_open', { hadTimer: !!_rainfallAnimTimer, ts: Date.now() }); // 一時計装（原因確定後に削除）
       popover.dataset.kind = 'nowcast';
       popover.classList.remove('psi-detail', 'fx-detail');
       popover.classList.add('visible', 'rainfall-detail');
