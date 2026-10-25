@@ -23109,3 +23109,24 @@ function _setRainfallProgressStep(containerId, index) {
 
 ### スコープ外
 進捗バーのSVG描画ロジック・サイズ・アニメーションの有無・データ取得API・凡例・ポップアップの開閉ロジック・`public/app.js`。
+
+## 設計書248(2026-10-25): 雨量観測マップ右上オーバーレイのピル背景を削除し、プレーン表示に戻す(ユーザー承認済み、builder→checker→closer)
+
+### 背景
+設計書247で`.rainfall-progress-row`(時刻+進捗バーの行全体)に白いピル状の背景(`background`+`padding`+`border-radius`+`box-shadow`)を追加したが、ユーザーから「あのピルの形にしなくていい、普通のフラット表示でいい。大きくなったので」との指摘があった。ピル背景を削除し、プレーンな(背景なしの)表示に戻す。位置(右上オーバーレイ)・配色(`--terracotta`/`--light-gray`)は変更しない。
+
+### やること(`public/app.css`のみ)
+`.rainfall-progress-row`から`background`・`padding`・`border-radius`・`box-shadow`を削除し、位置決め(`position`/`top`/`right`/`z-index`)とレイアウト(`display`/`align-items`/`gap`)のみ残す:
+```css
+.rainfall-progress-row { position: absolute; top: 4px; right: 4px; display: flex; align-items: center; gap: 6px; z-index: 1; }
+```
+`.rainfall-frame-time`自体の個別の白いピル背景(`background: var(--warm-white); padding: 1px 6px; border-radius: 8px;`)は、今回の指摘対象(行全体を包む背景)とは別物のため変更しない。
+
+### キャッシュバスティング
+`public/app.css`のみ変更のため、`index.html`の`app.css?v=...`クエリと`sw.js`の`CACHE_NAME`を更新する。`app.js`は内容を変更しないため`app.js?v=...`クエリは変更不要。
+
+### 検証
+`server.js`は無変更のため`pm2 restart`不要。curlで`/app.css`・`/sw.js`の配信内容に変更が反映されていることを確認する。`.rainfall-frame-time`の個別の背景スタイルが誤って削除されていないことを確認する。実機・ブラウザでの最終見た目確認は本環境では実施不可。
+
+### スコープ外
+バッジの位置(右上オーバーレイ)・配色(`--terracotta`/`--light-gray`)・SVG描画ロジック・地図の`padding-top`・データ取得API・凡例・ポップアップの開閉ロジックは一切変更しない(`.rainfall-progress-row`の背景関連プロパティの削除のみ)。
