@@ -1628,7 +1628,7 @@
     /* 設計書242: 地図の横幅いっぱいに伸びて目立ちすぎるとのフィードバックを受け、固定幅の小さいセグメントで中央寄せに縮小 */
     /* 2026-10-25: モバイルSafari実機で「セグメントが時刻表示を挟んで分裂して見える」不具合がHTML+CSS flexbox方式
        (小さい固定幅div複数)では解消しなかったため、地図と同じSVG座標描画方式に作り直した。見た目(配置・サイズ・色)は変更しない */
-    .rainfall-progress-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
+    .rainfall-progress-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }
     .rainfall-progress-svg { display: block; height: 3px; }
     .rainfall-progress-seg { fill: var(--light-gray); }
     .rainfall-progress-seg.done { fill: var(--caramel); }
