@@ -165,8 +165,8 @@
       display: block;
     }
 
-    /* ── FEATURES ── */
-    .features {
+    /* ── MAIN FEATURES ── */
+    .main-features {
       background: var(--caramel-pale);
       padding: 80px 24px;
       position: relative;
@@ -195,20 +195,20 @@
       pointer-events: none;
       user-select: none;
     }
-    .detail-views .section-num {
-      color: rgba(238,243,234,0.14);
-    }
-    .feature-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 24px;
+    .feature-block {
       max-width: 900px;
-      margin: 0 auto;
-    }
-    .feature-card {
+      margin: 0 auto 40px;
       background: var(--cream);
-      border-radius: 20px;
-      padding: 28px 24px;
+      border-radius: 24px;
+      padding: 32px 24px;
+    }
+    .feature-block:last-of-type {
+      margin-bottom: 0;
+    }
+    .feature-block-head {
+      text-align: center;
+      max-width: 560px;
+      margin: 0 auto 24px;
     }
     .feature-icon {
       width: 52px; height: 52px;
@@ -216,37 +216,26 @@
       border-radius: 16px;
       display: flex; align-items: center; justify-content: center;
       font-size: 24px;
-      margin-bottom: 16px;
+      margin: 0 auto 16px;
     }
-    .feature-card h3 {
-      font-size: 17px; font-weight: 700;
+    .feature-block-head h3 {
+      font-size: 19px; font-weight: 700;
       margin-bottom: 8px;
     }
-    .feature-card p {
+    .feature-block-head p {
       font-size: 14px; color: var(--warm-gray);
       line-height: 1.7;
     }
-
-    /* ── DETAIL VIEWS ── */
-    .detail-views {
-      background: var(--midnight);
-      padding: 80px 0;
-      position: relative;
-    }
-    .detail-views .section-title {
-      color: #fff;
-    }
-    .detail-grid {
+    .sub-feature-row {
       display: flex;
       gap: 16px;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
       -webkit-overflow-scrolling: touch;
-      padding: 4px 24px 12px;
-      max-width: 100%;
-      margin: 0;
+      padding: 4px 4px 8px;
+      margin: 0 -4px;
     }
-    .detail-card {
+    .sub-feature-card {
       flex: 0 0 200px;
       scroll-snap-align: start;
       background: #fff;
@@ -254,7 +243,7 @@
       padding: 16px 16px 24px;
       box-shadow: 0 2px 8px rgba(44,36,32,0.05);
     }
-    .detail-card img {
+    .sub-feature-card img {
       width: 100%;
       height: auto;
       border-radius: 12px;
@@ -262,20 +251,48 @@
       margin-bottom: 16px;
       border: 1px solid var(--sand);
     }
-    .detail-card h4 {
+    .sub-feature-card h4 {
       font-size: 16px; font-weight: 700;
       margin: 0 8px 8px;
     }
-    .detail-card p {
+    .sub-feature-card p {
       font-size: 14px; color: var(--warm-gray);
       line-height: 1.7;
       margin: 0 8px;
     }
-    .detail-scroll-hint {
+    .utility-features {
+      max-width: 900px;
+      margin: 40px auto 0;
       text-align: center;
-      font-size: 12px;
-      color: #C9CFC3;
-      margin-top: 8px;
+    }
+    .utility-features h4 {
+      font-size: 13px; font-weight: 700;
+      color: var(--caramel-dark);
+      letter-spacing: 0.03em;
+      margin-bottom: 16px;
+    }
+    .utility-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(255,255,255,0.5);
+      border-radius: 16px;
+      padding: 16px 20px;
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    .utility-card .feature-icon {
+      flex-shrink: 0;
+      width: 40px; height: 40px;
+      font-size: 18px;
+      margin: 0;
+      background: var(--cream);
+    }
+    .utility-card p {
+      font-size: 13px; color: var(--warm-gray);
+      line-height: 1.6;
+      margin: 0;
     }
 
     /* ── CONCEPT ── */
@@ -516,83 +533,84 @@
     <p class="sources-note">※ その他複数ソースから取得・AIでフィルタリングしています</p>
   </section>
 
-  <!-- FEATURES -->
-  <section class="features">
+  <!-- MAIN FEATURES -->
+  <section class="main-features">
     <div class="section-num">03</div>
-    <div class="section-label">FEATURES</div>
-    <h2 class="section-title">5つの便利な機能</h2>
-    <div class="feature-grid">
-      <div class="feature-card">
+    <div class="section-label">MAIN FEATURES</div>
+    <h2 class="section-title">主要機能とサブ機能</h2>
+
+    <div class="feature-block">
+      <div class="feature-block-head">
         <div class="feature-icon">📰</div>
         <h3>くらし情報</h3>
         <p>政府・都市開発、交通、医療・健康、天候・災害、コミュニティ、教育・子育てなど、複数のメディアの中から在住日本人の暮らしに関係のあるニュースだけを厳選し、日本語でまとめてお届けします。</p>
       </div>
-      <div class="feature-card">
+      <div class="sub-feature-row">
+        <div class="sub-feature-card">
+          <img src="/screenshots/detail-fx.jpg?v=1" alt="為替：かんたん換算">
+          <h4>為替：かんたん換算</h4>
+          <p>為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります。</p>
+        </div>
+        <div class="sub-feature-card">
+          <img src="/screenshots/detail-pm25.jpg?v=1" alt="PM2.5：エリア別詳細">
+          <h4>PM2.5：エリア別詳細</h4>
+          <p>PM2.5をタップすると、エリアごとの詳細や色分けが見られます。PSI表示への切り替えも可能です。</p>
+        </div>
+        <div class="sub-feature-card">
+          <img src="/screenshots/detail-rainfall.jpg?v=1" alt="2時間予報：雨量観測マップ">
+          <h4>2時間予報：雨量観測マップ</h4>
+          <p>2時間予報をタップすると、直近1時間の降水量をエリア別の地図で確認できます。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-block">
+      <div class="feature-block-head">
         <div class="feature-icon">🔍</div>
         <h3>おでかけ情報</h3>
         <p>数多くのイベント・グルメ・体験・旅行情報の中から、シンガポール生活に合うものを選んで毎日自動更新。情報収集の手間を減らします。</p>
       </div>
-      <div class="feature-card">
+      <div class="sub-feature-row">
+        <div class="sub-feature-card">
+          <img src="/screenshots/detail-uv.jpg?v=1" alt="UV指数：詳細">
+          <h4>UV指数：詳細</h4>
+          <p>UV指数をタップすると、紫外線の強さの目安が分かります。</p>
+        </div>
+        <div class="sub-feature-card">
+          <img src="/screenshots/detail-dengue.jpg?v=1" alt="デング熱：詳細">
+          <h4>デング熱：詳細</h4>
+          <p>デング熱をタップすると、クラスター(流行地区)の警戒レベルが分かります。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature-block">
+      <div class="feature-block-head">
         <div class="feature-icon">📅</div>
         <h3>カレンダー</h3>
         <p>シンガポール・日本の祝日、旧正月やディパバリなどの文化行事、ローカル校・日本人学校の学校行事を1年分まとめて確認できます。「説明」をオンにすれば行事の解説も読め、行き先ごとの航空券が安い時期の目安もチェックできます。</p>
       </div>
-      <div class="feature-card">
-        <div class="feature-icon">🌡️</div>
-        <h3>気温・UV指数・為替をひと目で確認</h3>
-        <p>おでかけ画面では気温・UV指数・デング熱の警戒レベル、くらし画面では為替(SGD→JPY)・PM2.5・2時間予報(スコール情報)を、それぞれ画面上部でまとめてチェック。タップすればエリア別の詳細や通貨の早見表も見られます。</p>
+      <div class="sub-feature-row">
+        <div class="sub-feature-card">
+          <img src="/screenshots/detail-fare-season.jpg?v=1" alt="旅行シーズン情報">
+          <h4>旅行シーズン情報</h4>
+          <p>カレンダー画面の飛行機アイコンから、20都市の航空券が安い時期の目安をチェックできます。</p>
+        </div>
       </div>
-      <div class="feature-card">
+    </div>
+
+    <div class="utility-features">
+      <h4>いつでも使える機能</h4>
+      <div class="utility-card">
         <div class="feature-icon">📌</div>
-        <h3>ピン留め</h3>
         <p>気になる情報は、いいね♡やピン留めで。タップひとつで保存・応援でき、あとからまとめて見返せます。</p>
       </div>
     </div>
   </section>
 
-  <!-- DETAIL VIEWS -->
-  <section class="detail-views">
-    <div class="section-num">04</div>
-    <div class="section-label">DETAILS</div>
-    <h2 class="section-title">タップするともっと詳しく</h2>
-    <div class="detail-grid">
-      <div class="detail-card">
-        <img src="/screenshots/detail-fx.jpg?v=1" alt="為替：かんたん換算">
-        <h4>為替：かんたん換算</h4>
-        <p>為替をタップすると、100 SGDが主要12通貨でいくらかすぐ分かります。</p>
-      </div>
-      <div class="detail-card">
-        <img src="/screenshots/detail-pm25.jpg?v=1" alt="PM2.5：エリア別詳細">
-        <h4>PM2.5：エリア別詳細</h4>
-        <p>PM2.5をタップすると、エリアごとの詳細や色分けが見られます。PSI表示への切り替えも可能です。</p>
-      </div>
-      <div class="detail-card">
-        <img src="/screenshots/detail-rainfall.jpg?v=1" alt="2時間予報：雨量観測マップ">
-        <h4>2時間予報：雨量観測マップ</h4>
-        <p>2時間予報をタップすると、直近1時間の降水量をエリア別の地図で確認できます。</p>
-      </div>
-      <div class="detail-card">
-        <img src="/screenshots/detail-uv.jpg?v=1" alt="UV指数：詳細">
-        <h4>UV指数：詳細</h4>
-        <p>UV指数をタップすると、紫外線の強さの目安が分かります。</p>
-      </div>
-      <div class="detail-card">
-        <img src="/screenshots/detail-dengue.jpg?v=1" alt="デング熱：詳細">
-        <h4>デング熱：詳細</h4>
-        <p>デング熱をタップすると、クラスター(流行地区)の警戒レベルが分かります。</p>
-      </div>
-      <div class="detail-card">
-        <img src="/screenshots/detail-fare-season.jpg?v=1" alt="旅行シーズン情報">
-        <h4>旅行シーズン情報</h4>
-        <p>カレンダー画面の飛行機アイコンから、20都市の航空券が安い時期の目安をチェックできます。</p>
-      </div>
-    </div>
-    <p class="detail-scroll-hint">← スワイプでもっと見る →</p>
-  </section>
-
   <!-- AUDIENCE -->
   <section class="audience">
-    <div class="section-num">05</div>
+    <div class="section-num">04</div>
     <div class="section-label">FOR YOU</div>
     <h2 class="section-title">こんな方におすすめ</h2>
     <ul class="audience-list">
@@ -605,7 +623,7 @@
 
   <!-- CTA BOTTOM -->
   <section class="cta-bottom" id="download">
-    <div class="section-num">06</div>
+    <div class="section-num">05</div>
     <img src="/icons/icon-512.png" alt="SG在住Navi" class="cta-bottom-icon">
     <h2>今すぐ始めよう</h2>
     <p>無料でご利用いただけます。</p>
