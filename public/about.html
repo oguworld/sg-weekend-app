@@ -122,49 +122,6 @@
     }
     .btn-secondary:hover { border-color: var(--caramel); transform: translateY(-1px); }
 
-    /* ── PHONE MOCKUP ── */
-    .mockup-wrap {
-      padding: 0 24px 80px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-    }
-    .mockup-wrap::-webkit-scrollbar { display: none; }
-    .mockup-inner {
-      display: flex;
-      gap: 24px;
-      justify-content: center;
-      min-width: max-content;
-      padding: 0 24px;
-    }
-    .mockup-item {
-      display: flex; flex-direction: column; align-items: center; gap: 14px;
-    }
-    .mockup-label {
-      font-size: 13px; font-weight: 700; color: var(--warm-gray);
-      letter-spacing: 0.04em;
-    }
-    .phone {
-      width: 220px;
-      background: #DCE5D6;
-      border-radius: 26px;
-      padding: 10px;
-      box-shadow: 0 24px 60px rgba(82,112,74,0.18), 0 8px 20px rgba(82,112,74,0.1);
-    }
-    .phone-img-wrap {
-      border-radius: 16px;
-      overflow: hidden;
-      position: relative;
-      aspect-ratio: 1170 / 2309;
-    }
-    .phone img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: top;
-      display: block;
-    }
-
     /* ── MAIN FEATURES ── */
     .main-features {
       background: var(--caramel-pale);
@@ -530,53 +487,6 @@
     </div>
   </section>
 
-  <!-- PHONE MOCKUP -->
-  <div class="mockup-wrap">
-    <div class="mockup-inner">
-
-      <!-- SCREEN 1: くらし情報 -->
-      <div class="mockup-item">
-        <div class="phone">
-          <div class="phone-img-wrap">
-            <img src="/screenshots/screen-news.jpg?v=6" alt="くらし情報">
-          </div>
-        </div>
-        <div class="mockup-label">くらし情報</div>
-      </div>
-
-      <!-- SCREEN 2: おでかけ情報 -->
-      <div class="mockup-item">
-        <div class="phone">
-          <div class="phone-img-wrap">
-            <img src="/screenshots/screen-home.jpg?v=6" alt="おでかけ情報">
-          </div>
-        </div>
-        <div class="mockup-label">おでかけ情報</div>
-      </div>
-
-      <!-- SCREEN 3: カレンダー -->
-      <div class="mockup-item">
-        <div class="phone">
-          <div class="phone-img-wrap">
-            <img src="/screenshots/screen-calendar.jpg?v=4" alt="カレンダー">
-          </div>
-        </div>
-        <div class="mockup-label">カレンダー</div>
-      </div>
-
-      <!-- SCREEN 4: ピン留め -->
-      <div class="mockup-item">
-        <div class="phone">
-          <div class="phone-img-wrap">
-            <img src="/screenshots/screen-pins.jpg?v=7" alt="ピン留めで整理">
-          </div>
-        </div>
-        <div class="mockup-label">ピン留めで整理</div>
-      </div>
-
-    </div>
-  </div>
-
   <!-- CONCEPT -->
   <section class="concept">
     <div class="section-num">01</div>
@@ -620,6 +530,9 @@
         <h3>くらし情報</h3>
         <p>政府・都市開発、交通、医療・健康、天候・災害、コミュニティ、教育・子育てなど、複数のメディアの中から在住日本人の暮らしに関係のあるニュースだけを厳選し、日本語でまとめてお届けします。為替・PM2.5・2時間予報など、毎日チェックしたい生活指標も画面上部でコンパクトに確認できます。</p>
       </div>
+      <div class="featured-sub-feature">
+        <img src="/screenshots/screen-news.jpg?v=6" alt="くらし情報">
+      </div>
       <div class="sub-feature-row">
         <div class="sub-feature-card">
           <img src="/screenshots/detail-fx.jpg?v=1" alt="為替：かんたん換算">
@@ -644,6 +557,9 @@
         <div class="feature-icon">🔍</div>
         <h3>おでかけ情報</h3>
         <p>数多くのイベント・グルメ・体験・旅行情報の中から、シンガポール生活に合うものを選んで毎日自動更新。情報収集の手間を減らします。気温・UV指数・デング熱の警戒レベルなど、お出かけ前に見ておきたい指標もひと目で確認できます。</p>
+      </div>
+      <div class="featured-sub-feature">
+        <img src="/screenshots/screen-home.jpg?v=6" alt="おでかけ情報">
       </div>
       <div class="sub-feature-row">
         <div class="sub-feature-card">

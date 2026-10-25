@@ -23598,3 +23598,46 @@ CSSセレクタは、`.feature-block:nth-of-type(1) .sub-feature-card img`/`.fea
 ### スコープ外
 - 画像ファイル自体の再クロップ(コーディネーターが完了済み)。
 - 他のサブ機能カード・セクション。
+
+---
+
+## 設計書262: PHONE MOCKUPセクションを削除し、くらし情報・おでかけ情報ブロックにメインスクショを追加
+
+### 背景
+ユーザーから「『こんなことができます』セクションのくらし情報・おでかけ情報ブロックにもメインのスクショを載せてほしい。むしろ(ページ冒頭の)最初の(PHONE MOCKUPの)方はいらないかも」との依頼。コーディネーターが「PHONE MOCKUPセクションを削除すると、ピン留め画面のスクショがページから無くなるがよいか」を確認したところ、**「削除する(ピン留めの画像は無しでよい)」と回答済み**。
+
+### 設計方針
+
+**1. くらし情報・おでかけ情報ブロックにメインスクショを追加**: カレンダーブロック(設計書256)・旅行シーズン情報ブロック(設計書257)が既に使っている`.featured-sub-feature`の構成(`feature-block-head`の直後に大きめの画像)を、くらし情報・おでかけ情報ブロックにも適用する。画像は既存の`screen-news.jpg`(くらし情報)・`screen-home.jpg`(おでかけ情報)をそのまま再利用する(新規クロップ不要、PHONE MOCKUPセクションで使われていたのと同じファイル)。配置順は: `feature-block-head`→`.featured-sub-feature`(メインスクショ)→`.sub-feature-row`(タップ詳細のサブ機能カード)。
+
+```html
+<div class="feature-block">
+  <div class="feature-block-head">
+    <div class="feature-icon">📰</div>
+    <h3>くらし情報</h3>
+    <p>(既存の説明文、変更不要)</p>
+  </div>
+  <div class="featured-sub-feature">
+    <img src="/screenshots/screen-news.jpg?v=6" alt="くらし情報">
+  </div>
+  <div class="sub-feature-row">
+    (既存の為替・PM2.5・雨量観測マップの3枚、変更不要)
+  </div>
+</div>
+```
+(おでかけ情報ブロックも同様に`screen-home.jpg?v=6`を追加)
+
+**2. PHONE MOCKUPセクションを削除**: `public/about.html`の`<!-- PHONE MOCKUP -->`から始まる`<div class="mockup-wrap">`〜`</div>`全体(HTML)と、対応するCSS(`.mockup-wrap`/`.mockup-wrap::-webkit-scrollbar`/`.mockup-inner`/`.mockup-item`/`.mockup-label`/`.phone`/`.phone-img-wrap`/`.phone img`、これらのクラスは他の箇所で使われていないことを確認済み)を削除する。`screen-pins.jpg`はどこにも表示されなくなる(ユーザー承認済み)が、画像ファイル自体は削除不要(他用途の可能性を考慮し残置してよい)。
+
+### 変更するファイル
+- `public/about.html`のみ
+
+### リスク・注意点
+- 「PHONE MOCKUP」セクションは過去の設計書で繰り返し「変更しない」対象として明記されてきたが、今回はユーザーの明示指示により削除する(例外)。
+- `.phone`/`.phone-img-wrap`等のクラスが他のセクションで再利用されていないことを削除前に`grep`で必ず再確認すること。
+- 実機・ブラウザでの最終見た目確認はこの開発環境では実施不可。
+
+### スコープ外
+- カレンダー・旅行シーズン情報ブロックの構成変更(既存の`.featured-sub-feature`をそのまま踏襲するのみ)。
+- `screen-pins.jpg`・`screen-news.jpg`・`screen-home.jpg`・`screen-calendar.jpg`ファイル自体の削除・再クロップ。
+- 他のセクションの変更。
