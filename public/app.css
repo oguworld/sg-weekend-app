@@ -1621,8 +1621,11 @@
        ぼかし光彩)で、パン・ズーム操作は無し */
     .stat-criteria-popover.rainfall-detail { gap: 8px; max-height: calc(100dvh - 202px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .stat-criteria-popover.rainfall-detail > * { flex-shrink: 0; }
-    /* ポップアップ内に収まるよう地図を小さめに表示する */
-    .rainfall-map-wrap-sm { width: 100%; overflow: hidden; position: relative; }
+    /* ポップアップ内に収まるよう地図を小さめに表示する。padding-topは右上オーバーレイの時刻バッジ(.rainfall-progress-row)と
+       地図内の地形(SVG輪郭右上付近の離島)が視覚的に重なる不具合(2026-10-25実機確認)を避けるための余白。
+       absolute配置の.rainfall-progress-rowはpadding boxの外側の端を基準にするため位置は変わらず、
+       通常フローの子要素(地図SVG)だけが押し下げられる */
+    .rainfall-map-wrap-sm { width: 100%; overflow: hidden; position: relative; padding-top: 32px; }
     #rainfall-map-popover { width: 100%; height: auto; display: block; }
     /* 進捗バー(設計書241、ストーリーズ風)+時刻表示(設計書239)。設計書244で一度右上オーバーレイを試み分裂不具合で一旦通常フロー配置(設計書245)に戻したが、
        SVG座標描画方式への作り直し(2026-10-25)で分裂不具合が解消したため、設計書243で再び地図右上のオーバーレイ配置に変更した */
