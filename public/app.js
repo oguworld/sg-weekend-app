@@ -3969,30 +3969,39 @@
       const tp = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(timestamp || '');
       el.textContent = tp ? `${tp[4]}:${tp[5]}` : '';
     }
-    // 雨量アニメーションの進捗バー(ストーリーズ風)。フレーム数分のセグメントを作り、現在のコマだけ0.9秒かけて埋まるアニメーションにする
+    // 雨量アニメーションの進捗バーをSVGの<rect>で描く。
+    // 以前はHTML+CSS flexboxで小さい固定幅div(.rainfall-progress-seg)を複数並べる方式だったが、
+    // モバイルSafari(iOS)実機で「セグメントが時刻表示を挟んで分裂して見える」不具合が
+    // 配置変更・配色変更・アニメーション方式変更(二重requestAnimationFrame化)・アニメーション廃止(即時切替化)
+    // のいずれでも解消しなかったため、2026-10-25に地図(#rainfall-map-popover)と同じ
+    // 「座標を指定してSVG要素を描く」方式へ作り直した(CSS flexboxでの複数要素並べを完全に廃止)。
+    const _RAINFALL_PROGRESS_SEG_W = 20;
+    const _RAINFALL_PROGRESS_GAP = 3;
     function _renderRainfallProgressBar(containerId, frameCount) {
-      const el = document.getElementById(containerId);
-      if (!el) return;
-      el.innerHTML = '';
+      const svg = document.getElementById(containerId);
+      if (!svg) return;
+      const totalW = frameCount * _RAINFALL_PROGRESS_SEG_W + Math.max(frameCount - 1, 0) * _RAINFALL_PROGRESS_GAP;
+      svg.setAttribute('viewBox', `0 0 ${totalW} 3`);
+      svg.setAttribute('width', totalW);
+      svg.setAttribute('height', 3);
+      svg.innerHTML = '';
       for (let i = 0; i < frameCount; i++) {
-        const seg = document.createElement('div');
-        seg.className = 'rainfall-progress-seg';
-        const fill = document.createElement('div');
-        fill.className = 'rainfall-progress-fill';
-        seg.appendChild(fill);
-        el.appendChild(seg);
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('class', 'rainfall-progress-seg');
+        rect.setAttribute('x', i * (_RAINFALL_PROGRESS_SEG_W + _RAINFALL_PROGRESS_GAP));
+        rect.setAttribute('y', 0);
+        rect.setAttribute('width', _RAINFALL_PROGRESS_SEG_W);
+        rect.setAttribute('height', 3);
+        rect.setAttribute('rx', 1.5);
+        svg.appendChild(rect);
       }
     }
     // 各コマのセグメントを即座に塗り/未塗りへ切り替える(アニメーションなし)。
-    // 以前はCSSトランジションで現在のコマだけ0.9秒かけて伸ばす演出をしていたが、
-    // iOS Safariで描画が不安定になる不具合が解消しなかったため、2026-10-25にアニメーションを廃止した。
     function _setRainfallProgressStep(containerId, index) {
-      const el = document.getElementById(containerId);
-      if (!el) return;
-      el.querySelectorAll('.rainfall-progress-seg').forEach((seg, i) => {
-        const fill = seg.querySelector('.rainfall-progress-fill');
-        if (!fill) return;
-        fill.style.width = i <= index ? '100%' : '0%';
+      const svg = document.getElementById(containerId);
+      if (!svg) return;
+      svg.querySelectorAll('.rainfall-progress-seg').forEach((rect, i) => {
+        rect.setAttribute('class', i <= index ? 'rainfall-progress-seg done' : 'rainfall-progress-seg');
       });
     }
     // アニメーション停止。多重起動防止のため開始前にも必ず呼ぶ。ポップアップを閉じる全経路から呼ぶこと(メモリリーク防止)
@@ -4030,7 +4039,7 @@
     // #rainfall-frame-time は再生中のコマの時刻(「13:05」)を小さく表示する(静的な初期値は空、_startRainfallAnimation()が都度更新)
     function _rainfallPopoverHtml(loading) {
       return `<div class="stat-criteria-desc">${escapeHtml(t('rainfallDesc'))}</div>`
-        + `<div class="rainfall-map-wrap-sm"><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg><div class="rainfall-progress-row"><div class="rainfall-progress" id="rainfall-progress"></div><span id="rainfall-frame-time" class="rainfall-frame-time"></span></div></div>`
+        + `<div class="rainfall-map-wrap-sm"><svg id="rainfall-map-popover" data-tour="rainfall-map-popover" viewBox="0 0 400 233.3" preserveAspectRatio="xMidYMid meet"></svg><div class="rainfall-progress-row"><svg id="rainfall-progress" class="rainfall-progress-svg"></svg><span id="rainfall-frame-time" class="rainfall-frame-time"></span></div></div>`
         + (loading ? `<div class="psi-loading">${escapeHtml(t('psiLoading'))}</div>` : '')
         + `<div class="psi-chips rainfall-legend-sm">${_rainfallLegendHtml()}</div>`;
     }

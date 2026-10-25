@@ -1626,10 +1626,12 @@
     #rainfall-map-popover { width: 100%; height: auto; display: block; }
     /* 進捗バー(設計書241、ストーリーズ風)+時刻表示(設計書239)は1行にまとめ、地図の下・中央寄せに配置(設計書245、右上オーバーレイ(設計書244)も不採用だったため通常フロー配置に戻した) */
     /* 設計書242: 地図の横幅いっぱいに伸びて目立ちすぎるとのフィードバックを受け、固定幅の小さいセグメントで中央寄せに縮小 */
+    /* 2026-10-25: モバイルSafari実機で「セグメントが時刻表示を挟んで分裂して見える」不具合がHTML+CSS flexbox方式
+       (小さい固定幅div複数)では解消しなかったため、地図と同じSVG座標描画方式に作り直した。見た目(配置・サイズ・色)は変更しない */
     .rainfall-progress-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
-    .rainfall-progress { display: flex; gap: 3px; }
-    .rainfall-progress-seg { flex: 0 0 20px; height: 3px; border-radius: 1.5px; background: var(--light-gray); overflow: hidden; }
-    .rainfall-progress-fill { height: 100%; width: 0%; background: var(--caramel); border-radius: 1.5px; }
+    .rainfall-progress-svg { display: block; height: 3px; }
+    .rainfall-progress-seg { fill: var(--light-gray); }
+    .rainfall-progress-seg.done { fill: var(--caramel); }
     /* 直近30分をループ再生中のコマの時刻表示(設計書239) */
     .rainfall-frame-time { font-size: 11px; color: var(--warm-gray); background: var(--warm-white); padding: 1px 6px; border-radius: 8px; line-height: 1.4; }
     /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */
