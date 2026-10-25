@@ -3975,7 +3975,7 @@
     // 配置変更・配色変更・アニメーション方式変更(二重requestAnimationFrame化)・アニメーション廃止(即時切替化)
     // のいずれでも解消しなかったため、2026-10-25に地図(#rainfall-map-popover)と同じ
     // 「座標を指定してSVG要素を描く」方式へ作り直した(CSS flexboxでの複数要素並べを完全に廃止)。
-    const _RAINFALL_PROGRESS_SEG_W = 20;
+    const _RAINFALL_PROGRESS_SEG_W = 16;
     const _RAINFALL_PROGRESS_GAP = 3;
     function _renderRainfallProgressBar(containerId, frameCount) {
       const svg = document.getElementById(containerId);
