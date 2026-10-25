@@ -294,6 +294,40 @@
       font-size: 14px; color: var(--warm-gray);
       line-height: 1.7;
     }
+    .attached-feature {
+      margin-top: 20px;
+    }
+    .attached-feature-label {
+      font-size: 12px;
+      color: var(--warm-gray);
+      margin-bottom: 10px;
+    }
+    .attached-feature-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 10px 14px;
+      border: 1px solid var(--sand);
+    }
+    .attached-feature-card img {
+      flex: 0 0 72px;
+      width: 72px;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+      border: 1px solid var(--sand);
+    }
+    .attached-feature-card h4 {
+      font-size: 14px; font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .attached-feature-card p {
+      font-size: 12.5px; color: var(--warm-gray);
+      line-height: 1.6;
+      margin: 0;
+    }
     .utility-features {
       max-width: 900px;
       margin: 40px auto 0;
@@ -483,7 +517,7 @@
   <section class="hero">
     <div class="hero-badge">シンガポール在住の日本人向け</div>
     <h1>シンガポールの出来事を、<br><em>日本語で</em><br>まるごとチェック。</h1>
-    <p>おでかけ情報も生活ニュースも毎日更新。<br>気になるスポットを巡って、シンガポール暮らしをもっと楽しく。</p>
+    <p>おでかけ情報も生活ニュースも毎日更新。<br>為替・天気・カレンダーまで、シンガポール生活に必要な情報をこれ1つに。</p>
     <div class="hero-btns">
       <a href="#download" class="btn-primary">📱 アプリを入手</a>
     </div>
@@ -544,6 +578,7 @@
     <p>SG在住Naviは、数あるメディア・情報源の中から、シンガポール在住日本人に本当に役立つ情報だけを選び抜いてお届けする、キュレーション型の生活・おでかけ情報アプリです。</p>
     <p>シンガポールの情報サイトやニュースは、基本的に現地の人向け。在住日本人には関係のない情報も多く、逆に知っておきたい生活情報は埋もれがちです。</p>
     <p>このアプリは本当に必要な情報だけに絞り込んで、シンガポールでの暮らしをもっと快適にします。</p>
+    <p>為替アプリも天気アプリも、何個も入れなくて大丈夫。シンガポール生活に必要な情報は、これ1つで足りるようにしています。</p>
     <p class="concept-tagline">シンガポールに関する情報は多すぎて追いきれない、そんな方にこそ。</p>
   </section>
 
@@ -570,8 +605,8 @@
   <!-- MAIN FEATURES -->
   <section class="main-features">
     <div class="section-num">03</div>
-    <div class="section-label">MAIN FEATURES</div>
-    <h2 class="section-title">主要機能とサブ機能</h2>
+    <div class="section-label">FEATURES</div>
+    <h2 class="section-title">こんなことができます</h2>
 
     <div class="feature-block">
       <div class="feature-block-head">
@@ -625,10 +660,17 @@
         <p>シンガポール・日本の祝日、旧正月やディパバリなどの文化行事、ローカル校・日本人学校の学校行事を1年分まとめて確認できます。「説明」をオンにすれば行事の解説も読め、行き先ごとの航空券が安い時期の目安もチェックできます。</p>
       </div>
       <div class="featured-sub-feature">
-        <div class="featured-badge">イチオシ機能</div>
-        <img src="/screenshots/detail-fare-season.jpg?v=1" alt="旅行シーズン情報">
-        <h4>旅行シーズン情報</h4>
-        <p>カレンダー画面の飛行機アイコンから、20都市の航空券が安い時期の目安をチェックできます。</p>
+        <img src="/screenshots/feature-calendar-main.jpg?v=1" alt="カレンダー">
+      </div>
+      <div class="attached-feature">
+        <p class="attached-feature-label">↳ 月の見出しの✈️アイコンから、旅行シーズン情報も見られます</p>
+        <div class="attached-feature-card">
+          <img src="/screenshots/detail-fare-season.jpg?v=1" alt="旅行シーズン情報">
+          <div>
+            <h4>旅行シーズン情報</h4>
+            <p>20都市の航空券が安い時期の目安をチェックできます。</p>
+          </div>
+        </div>
       </div>
     </div>
 
