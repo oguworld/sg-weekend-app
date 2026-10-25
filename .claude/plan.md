@@ -23077,3 +23077,35 @@ function _setRainfallProgressStep(containerId, index) {
 
 ### スコープ外
 `public/app.js`・HTML構造・アニメーションロジック・色・他の雨量観測マップ機能。
+
+## 設計書247(2026-10-25): 雨量観測マップの進捗バーを地図右上オーバーレイへ再配置し、配色のコントラストを強化(ユーザー承認済み、builder→checker→closer)
+
+注: この設計はCLAUDE.md/next.mdの実施履歴上、設計書240〜246(配色コントラスト修正・右上オーバーレイ試行・中央寄せ復帰・iOS Safari分裂修正・デバッグ計装まで使用済み)の続きとして実施したため、plan.md上の番号を247に合わせている。
+
+### 背景
+設計書241/242で実装した雨量観測マップの進捗バー(ストーリーズ風)は、現在地図の下・右寄せ(`justify-content: flex-end`)に配置されている。ユーザーから2点の追加要望: (1)地図右上のオーバーレイ配置に変更したい、(2)バーの色のメリハリ(コントラスト)を強める。
+
+### やること(`public/app.css`のみ)
+
+#### 1. 右上オーバーレイへの再配置
+```css
+.rainfall-map-wrap-sm { width: 100%; overflow: hidden; position: relative; }
+.rainfall-progress-row { position: absolute; top: 4px; right: 4px; display: flex; align-items: center; gap: 6px; z-index: 1; background: var(--warm-white); padding: 3px 6px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+```
+`justify-content: flex-end`・`margin-top: 6px`は絶対配置化に伴い削除。
+
+#### 2. 配色のコントラスト強化
+```css
+.rainfall-progress-seg { fill: var(--light-gray); }
+.rainfall-progress-seg.done { fill: var(--terracotta); }
+```
+塗り済みセグメントを`var(--caramel)`から`var(--terracotta)`(#52704A)に変更。
+
+### キャッシュバスティング
+`app.css`のみ変更のため、`index.html`の`app.css?v=...`クエリと`sw.js`の`CACHE_NAME`を更新する。`app.js?v=...`は変更不要。
+
+### 検証
+`server.js`は無変更のため`pm2 restart`不要。curlで`/app.css`・`/sw.js`の配信内容を確認する。`--terracotta`がダークモードでも破綻しないことをhex値ベースで確認する。実機・ブラウザでの最終見た目確認は本環境では実施不可。
+
+### スコープ外
+進捗バーのSVG描画ロジック・サイズ・アニメーションの有無・データ取得API・凡例・ポップアップの開閉ロジック・`public/app.js`。
