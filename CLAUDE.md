@@ -356,11 +356,12 @@ Central/East/West/North/North-East/Island-wide/Sentosaの7区分(Sentosaはケ�
 | ジョブ | 内容 | 頻度(SGT) |
 |---|---|---|
 | `scripts/run-fetch-all.sh` | `fetch-events.js --city=sg`→`check-content-integrity.js`→`fetch-life-info.js`(**ユーザー向けプッシュ通知あり**)→`notify-fetch-summary.js`(開発者向けLINE通知) | 毎日7:00 |
-| `scripts/run-fetch-extra.sh` | 同上だが`fetch-life-info.js --no-notify` | 毎日12:00・21:00 |
+| `scripts/run-fetch-extra.sh` | 同上だが`fetch-life-info.js --no-notify` | 平日(月〜金)12:00・21:00 |
 | `scripts/run-source-analysis.sh` | `discover-sources.js --no-notify`→`analyze-sources.js --no-notify` | 水・日7:30 |
 
 BKK/SYDのfetchは`run-fetch-all.sh`内でコメントアウト中。旧`refresh-courses.js`のcronは完全削除済み。
 
+- **crontabの時刻指定(2026-10-25変更)**: サーバーのシステムタイムゾーンはEurope/Berlinで、ヨーロッパの夏時間(CEST⇄CET)切り替えの影響を受けるため、crontab冒頭に`CRON_TZ=Asia/Singapore`を指定し、各ジョブの時刻をSGT(シンガポール時間、夏時間なし)で直接記述するようにした(旧: CEST基準の手計算、夏時間終了時に全ジョブが1時間遅れる不具合があった)。同時に、土日はイベント・生活情報の更新が少ないため、追加取得(`run-fetch-extra.sh`)を平日(月〜金)限定に変更した(本取得`run-fetch-all.sh`は変更なく毎日)
 - **1日3回取得の理由**: Goody Feed/The Smart Local/Eatbook等、投稿頻度に対しRSSフィード保持件数が少なく1日1回では記事が流れ落ちるリスクがあるため。ハイウォーターマーク方式(`data/source-fetch-state.json`)により重複取得はされない
 - **開発者向けLINE通知は1日3回、その都度その回だけの件数を通知**(`notify-fetch-summary.js`が`logs/fetch-summary-${city}.json`/`logs/fetch-life-info-summary.json`の最新1回分をそのまま表示)。過去24h合算用の関数・履歴ファイル(48時間分)は残置だが現在未使用
 - **`notify-fetch-summary.js`はLINE `push`(管理者1人=`LINE_USER_ID`宛)ではなく`broadcast`(この公式アカウントを友だち追加している全員宛)で送信する**(2026-10-21、ユーザー指示「ほとんど使われてないので全員に送っていい」。対象はこの開発者向け取り込み件数サマリーのみ)。他の2つのLINE通知(`notify-line.js`のイベント承認依頼Flex・`post-to-x.js --to-line`のX投稿下書き)は、管理者限定の操作(承認ボタン等)を含むため**従来どおり`push`(`LINE_USER_ID`宛のみ)のまま変更していない**。承認postbackの処理自体は`server.js`の`/api/line-webhook`で`userId !== adminUserId`なら無視するサーバー側チェックが別途あるため、仮に承認依頼を誰かに誤送信してもボタン操作自体は安全だが、今回はこの変更の対象外とした

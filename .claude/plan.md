@@ -23130,3 +23130,22 @@ function _setRainfallProgressStep(containerId, index) {
 
 ### スコープ外
 バッジの位置(右上オーバーレイ)・配色(`--terracotta`/`--light-gray`)・SVG描画ロジック・地図の`padding-top`・データ取得API・凡例・ポップアップの開閉ロジックは一切変更しない(`.rainfall-progress-row`の背景関連プロパティの削除のみ)。
+
+## 設計書249(2026-10-25): crontabをSGT直接指定(CRON_TZ=Asia/Singapore)に固定し、夏時間ズレを恒久解消。追加取得(run-fetch-extra.sh)を平日限定に変更(ユーザー承認済み、builder→checker→closer)
+
+### 背景
+サーバーのシステムタイムゾーンはEurope/Berlinで、crontabはこれまでEurope/Berlin(CEST、UTC+2)からの手計算(CEST + 6h = SGT)でSGT時刻を記述していた。2026-10-25のヨーロッパ夏時間終了(CEST→CET、UTC+1)でサーバーのシステム時刻が1時間変わり、全ジョブが意図したSGT時刻より1時間遅く実行される不具合が発生した(ユーザーが実際の時刻ズレに気づいて指摘)。設計書53(2026-07-17)でも同じ問題を認識していたが「スコープ外」として恒久対応を見送っていた。今回、ユーザー指示により恒久対応する。
+
+### やること
+1. **crontab冒頭に`CRON_TZ=Asia/Singapore`を追加**し、以降の全ジョブの時刻をSGTそのまま(手計算不要)で直接記述する。既存のEurope/Berlin手計算コメント節を置き換える。
+2. **`run-fetch-extra.sh`(追加取得、現行12:00・21:00 SGTの2回)を平日(月〜金、dow=1-5)限定に変更**(土日はイベント・生活情報の更新が少ないため)。`run-fetch-all.sh`(毎日7:00 SGT)・`run-source-analysis.sh`(水・日7:30 SGT)は変更しない。
+3. コメントアウト済みのX自動投稿2行はそのまま無効(`#`付き)で保持する。
+4. `CLAUDE.md`の「イベント取り込みパイプライン構成」節の表の`run-fetch-extra.sh`行を「平日(月〜金)12:00・21:00」に更新し、crontabのSGT直接指定への変更理由を1〜2行追記する。
+
+### 検証
+- `crontab -l`で新内容のインストールを確認、`CRON_TZ=Asia/Singapore`が全時刻指定ジョブより前にあること、dow指定(`3,0`=水・日、`1-5`=月〜金)が意図通りであることを確認。
+- アプリケーションコード(`server.js`・`public/`等)は変更しないため`pm2 restart`・`node --check`・curl検証は不要。
+- `CLAUDE.md`の変更のみローカルコミット対象(crontab自体はGit管理外)。
+
+### スコープ外
+アプリケーションコード一切・X自動投稿の再有効化・`run-source-analysis.sh`の曜日頻度変更。
