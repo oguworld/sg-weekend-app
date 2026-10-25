@@ -1635,7 +1635,7 @@
     .rainfall-progress-row { position: absolute; top: 4px; right: 4px; display: flex; align-items: center; gap: 6px; z-index: 1; }
     .rainfall-progress-svg { display: block; height: 3px; }
     .rainfall-progress-seg { fill: var(--light-gray); }
-    .rainfall-progress-seg.done { fill: var(--terracotta); }
+    .rainfall-progress-seg.done { fill: var(--pm25-normal-text); }
     /* 直近30分をループ再生中のコマの時刻表示(設計書239) */
     .rainfall-frame-time { font-size: 11px; color: var(--warm-gray); background: var(--warm-white); padding: 1px 6px; border-radius: 8px; line-height: 1.4; }
     /* 凡例は他のポップアップと同じ.psi-chipsベースだが、右寄せにする(ユーザー指定) */
