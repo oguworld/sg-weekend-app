@@ -3640,8 +3640,10 @@
             ).join('') +
             _fareGoHtml(monthNum) +
             `</span>`;
+          // 1月だけ年を付けて表示する（複数年のデータが並ぶ場合に年の境目を分かりやすくするため。他の月は従来通り年を省く）
+          const monthLabel = monthNum === 1 ? `${month.slice(0, 4)}年${monthNum}月` : `${monthNum}月`;
           html += `<div class="cal-month-head-outer" data-month="${month}">
-            <span class="cal-month-head-label">${monthNum}月</span>
+            <span class="cal-month-head-label">${monthLabel}</span>
             ${seasonBadgeHtml}
             <div class="cal-month-season-bubble"></div>
           </div>
