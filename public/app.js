@@ -3500,8 +3500,18 @@
       const key = `${getCity()}_${_calendarYear}`;
       if (_calendarLoadedYear !== key) {
         try {
-          const res = await fetch(`${API_BASE}/api/calendar?city=${getCity()}&year=${_calendarYear}`);
-          CALENDAR_DATA = await res.json();
+          // 今年と来年を取得して続けて表示する（来年分が未整備/取得失敗でも今年分は出す）。年をまたぐ予定はid重複を除く
+          const fetchYear = async y => {
+            const res = await fetch(`${API_BASE}/api/calendar?city=${getCity()}&year=${y}`);
+            const arr = await res.json();
+            return Array.isArray(arr) ? arr : [];
+          };
+          const [thisYear, nextYear] = await Promise.all([
+            fetchYear(_calendarYear),
+            fetchYear(_calendarYear + 1).catch(() => []),
+          ]);
+          const seen = new Set();
+          CALENDAR_DATA = [...thisYear, ...nextYear].filter(it => !seen.has(it.id) && seen.add(it.id));
           _calendarLoadedYear = key;
         } catch (e) { CALENDAR_DATA = []; }
       }
