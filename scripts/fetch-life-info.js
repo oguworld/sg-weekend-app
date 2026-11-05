@@ -99,6 +99,9 @@ const CITY_CONFIG = {
       { url: 'https://expatliving.sg/feed/',          name: 'Expat Living' },
       { url: 'https://singaporemotherhood.com/feed/', name: 'SingaporeMotherhood' },
       { url: 'https://www.asiax.biz/news/feed/', name: 'AsiaX' },
+      // KAMO CONSULTANCY(東南アジア各国のビジネスニュース、日本語)。他国の記事が混ざるため題名の「【シンガポール」で絞り、
+      // フィードの説明文が短い(約114字)ため本文全体(content:encoded)を要約の材料にする
+      { url: 'https://kamobs.com/feed', name: 'KAMO', titleIncludes: '【シンガポール', useFullContent: true },
     ],
   },
 };
@@ -204,11 +207,14 @@ async function fetchNewItems(feeds, cityKey, dryRun) {
           }
 
           if (!item.title || item.title.trim().length === 0) return false;
+          if (feed.titleIncludes && !item.title.includes(feed.titleIncludes)) return false;
           return true;
         })
         .map(item => ({
           title:       item.title || '',
-          description: item.contentSnippet || item.summary || item.content || '',
+          description: feed.useFullContent
+            ? (item['content:encoded'] || item.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+            : (item.contentSnippet || item.summary || item.content || ''),
           link:        item.link || '',
           pubDate:     item.pubDate || item.isoDate || new Date().toISOString(),
           source:      feed.name,
