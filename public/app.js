@@ -342,7 +342,6 @@
         pinScreenTitle: '📌 ピン留め',
         homeScreenTitle: 'おでかけ情報',
         settingsTitle: '設定',
-        calNotesSwitch: '説明',
         secProfile: 'プロフィール',
         secAppSettings: 'アプリ設定',
         secData: 'データ',
@@ -463,7 +462,6 @@
         tourFareStep3: '選んだ都市のシーズン情報が見られます。バーの月をタップすると、月を切り替えられます。表示は目安です',
         tourCalStep0a: 'カレンダーの見方です。日付ごとに予定が並びます。シンガポールの祝日は赤色で表示されます',
         tourCalStep0b: '季節の絵文字をタップすると、説明が見られます',
-        tourCalStep1: 'オンにすると、予定の期間と説明がまとめて表示されます',
         tourCalStep2: 'この飛行機のアイコンをタップすると、旅行先ごとの高い・安いの目安を、月を切り替えながら見られます',
         labelTutorial: 'チュートリアル',
         tutorialSheetTitle: 'チュートリアル',
@@ -474,7 +472,7 @@
         tutorialName1: '基本の使い方',
         tutorialDesc1: '画面の見方と、くらしの指標・カテゴリ',
         tutorialName2: 'カレンダーの見方',
-        tutorialDesc2: '予定一覧の見方・季節アイコン・説明・旅行シーズン情報の入口',
+        tutorialDesc2: '予定一覧の見方・季節アイコン・旅行シーズン情報の入口',
         tutorialName3: '旅行シーズン情報',
         tutorialDesc3: '月の切り替えと、都市ごとの詳細',
         tutorialName4: 'くらしの指標(PM2.5)',
@@ -3668,8 +3666,8 @@
           const c = CALENDAR_CATEGORY_COLORS[it.category] || CALENDAR_CATEGORY_COLORS['festival'];
           const label = CALENDAR_CATEGORY_LABELS[it.category] || '';
           const range = _calendarRangeText(it);
-          // 日本の祝日はnoteを出さない（馴染みがあるため）。説明(期間・note)は常にDOMに置き、
-          // 画面ヘッダーのスイッチ(#calendar-list.cal-notes-on)でCSSの表示を切り替える。1行目は期間、noteがあれば続ける
+          // 日本の祝日はnoteを出さない（馴染みがあるため）。
+          // 説明(期間・note)は常に表示する。1行目は期間、noteがあれば続ける
           const noteText = (it.note && it.category !== 'holiday-jp') ? it.note : '';
           const noteHtml = (noteText || range)
             ? `<div class="cal-item-note">${range ? `<span class="cal-item-note-range">${range}</span>` : ''}${noteText ? _noBreakJa(noteText) : ''}</div>`
@@ -3712,39 +3710,6 @@
       const need = lastCard ? Math.max(0, scrollEl.clientHeight - lastCard.getBoundingClientRect().height) : 0;
       listEl.style.paddingBottom = `${need}px`;
     }
-
-    // 画面ヘッダーの「説明」スイッチ: 全ての月の予定の説明(期間・note)をまとめて開閉する。状態はlocalStorage(sg_cal_notes)
-    let _calNotesOn = false;
-    try { _calNotesOn = localStorage.getItem('sg_cal_notes') === '1'; } catch (_) {}
-    function _applyCalNotesState() {
-      document.getElementById('calendar-list')?.classList.toggle('cal-notes-on', _calNotesOn);
-      document.getElementById('cal-notes-switch')?.setAttribute('aria-checked', _calNotesOn ? 'true' : 'false');
-    }
-    function toggleCalNotes() {
-      const scrollEl = document.getElementById('calendar-scroll-content');
-      // 切替前後で、画面上端に見えている最初の予定の位置が動かないようにスクロールを補正する
-      const anchorOf = () => {
-        if (!scrollEl) return null;
-        const top = scrollEl.getBoundingClientRect().top;
-        return [...document.querySelectorAll('#calendar-list .cal-item')].find(el => el.getBoundingClientRect().bottom > top + 1) || null;
-      };
-      const anchor = anchorOf();
-      const before = anchor && scrollEl ? anchor.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top : 0;
-      _calNotesOn = !_calNotesOn;
-      try { localStorage.setItem('sg_cal_notes', _calNotesOn ? '1' : '0'); } catch (_) {}
-      _applyCalNotesState();
-      if (anchor && scrollEl) {
-        const after = anchor.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top;
-        scrollEl.scrollTop += after - before;
-      }
-      _updateCalendarEndPadding();
-    }
-    _applyCalNotesState();
-    // 画面ヘッダーのスイッチ 即時タップ対応(onclick属性はゴーストクリック対策のガード付き)
-    document.getElementById('cal-notes-switch')?.addEventListener('touchend', e => {
-      e.preventDefault();
-      toggleCalNotes();
-    }, { passive: false });
 
     // ─── 航空券シーズン表（設計書222。SG発の航空券の月別の目安。実運賃は扱わない）───
     // 月見出しの飛行機アイコンから専用画面(#fare-sheet、設計書231)を、その月をセットして開く。画面内で月を切り替えられ、
@@ -4442,7 +4407,7 @@
 
     // ─── ミニチュートリアル(スポットライト、設計書232) ───
     // アンカーは、アプリ側が持つ固定の名前だけ(要素に data-tour を付ける)。未知・見つからない・非表示のステップは飛ばす
-    const _TOUR_ANCHORS = ['cal-notes-switch', 'cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'home-filters', 'news-card-pin-sample', 'settings-tutorial-row', 'nav-settings-tab', 'tutorial-sheet-all-btn', 'tutorial-sheet-item-sample', 'pin-sheet-card-sample'];
+    const _TOUR_ANCHORS = ['cal-fare-entry', 'fare-month-step', 'fare-pills', 'fare-detail', 'nav-bar', 'news-stats', 'news-stat-pm25', 'news-filters', 'psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-stats', 'home-popover', 'news-card-sample', 'home-card-sample', 'cal-item-sample', 'cal-season-icon', 'fab-pin', 'home-filters', 'news-card-pin-sample', 'settings-tutorial-row', 'nav-settings-tab', 'tutorial-sheet-all-btn', 'tutorial-sheet-item-sample', 'pin-sheet-card-sample'];
     // 指標ウィジェットのポップアップの中の要素(ポップアップは画面上部にあり、通常スクロール不要なので、scrollIntoViewは最小限にする)
     const _TOUR_POPOVER_ANCHORS = ['psi-toggle', 'psi-map', 'psi-chips', 'fx-rows', 'rainfall-map-popover', 'home-popover'];
     // ステップの直前に実行する動作の許可リスト(サーバーのentryの`before`は、この名前だけ有効)。成功でtrue、失敗でfalse(そのステップ以降を打ち切る)
@@ -4814,13 +4779,12 @@
     // 案内は TUTORIALS に登録する。新しい案内を足す時は、ここに1件足す(必要なら、対象の要素に data-tour を付けて _TOUR_ANCHORS に追加)。
     // 見直しも persist:true で動かし、「見た」の記録(app_tour_done_*)を更新する(自動表示と見直しで記録を共通化。設計書235追記)。
     // 「あとで」の保留(app_tour_pending)は見終わると消える(_tourEnd→_tourPendingClear、副作用として自然)。新規の対象フラグ(app_welcome_pending)はこの経路では変更されない。
-    // calendar-1 の文言は、自動表示ではサーバー(content/whats-new.json)のentryが使われ、見直しではアプリ内(tourCalStep1/2)が使われる。
+    // calendar-1 の文言は、自動表示ではサーバー(content/whats-new.json)のentryが使われ、見直しではアプリ内(tourCalStep2)が使われる。
     // 変える時は、whats-new.json とアプリ内 STRINGS.ja の2か所を直す。
     function _calendarTourSteps() {
       return [
         { anchor: 'cal-item-sample', text: t('tourCalStep0a') },
         { anchor: 'cal-season-icon', before: 'open-season-bubble', text: t('tourCalStep0b') },
-        { anchor: 'cal-notes-switch', text: t('tourCalStep1') },
         { anchor: 'cal-fare-entry', text: t('tourCalStep2') },
       ];
     }
