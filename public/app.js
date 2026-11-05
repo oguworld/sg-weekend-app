@@ -533,7 +533,6 @@
         labelAboutApp: 'アプリについて',
         labelOfficialSite: '公式サイト',
         labelAboutSns: '公式サイト・SNS',
-        secWilloa: 'Willoa',
         labelAboutWilloa: 'About Willoa',
       }
     };
