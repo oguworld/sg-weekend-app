@@ -533,7 +533,6 @@
         labelAboutApp: 'アプリについて',
         labelOfficialSite: '公式サイト',
         labelAboutSns: '公式サイト・SNS',
-        labelSisterApp: '姉妹アプリ SGBusNavi',
         secWilloa: 'Willoa',
         labelAboutWilloa: 'About Willoa',
       }
