@@ -100,7 +100,7 @@ const CITY_CONFIG = {
       { url: 'https://singaporemotherhood.com/feed/', name: 'SingaporeMotherhood' },
       { url: 'https://www.asiax.biz/news/feed/', name: 'AsiaX' },
       // KAMO CONSULTANCY(東南アジア各国のビジネスニュース、日本語)。他国の記事が混ざるため題名の「【シンガポール」で絞り、
-      // フィードの説明文が短い(約114字)ため本文全体(content:encoded)を要約の材料にする
+      // フィードの説明文が短い(約114字)ため本文(content:encoded)の先頭350字を要約の材料にする(長く渡すと要約が長くなる)
       { url: 'https://kamobs.com/feed', name: 'KAMO', titleIncludes: '【シンガポール', useFullContent: true },
     ],
   },
@@ -213,7 +213,7 @@ async function fetchNewItems(feeds, cityKey, dryRun) {
         .map(item => ({
           title:       item.title || '',
           description: feed.useFullContent
-            ? (item['content:encoded'] || item.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+            ? (item['content:encoded'] || item.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 350)
             : (item.contentSnippet || item.summary || item.content || ''),
           link:        item.link || '',
           pubDate:     item.pubDate || item.isoDate || new Date().toISOString(),
@@ -350,7 +350,7 @@ async function enrichBatch(batch, cityKey) {
 各エントリについて以下のフィールドを返すこと：
 - index: 受け取ったindexをそのまま返す
 - title_ja: 日本語タイトル（30文字以内）
-- summary_ja: 日本語要約（130〜150文字。150文字を超えないこと。元の記事が長く詳しくても、最も重要な事実に絞って収める）。何が起きたか・背景・経緯を具体的に記述すること。「在住日本人にとって〜」のような読者への補足・呼びかけは書かないこと
+- summary_ja: 日本語要約（150〜180文字程度）。何が起きたか・背景・経緯を具体的に記述すること。「在住日本人にとって〜」のような読者への補足・呼びかけは書かないこと
 
 JSON配列のみ返すこと（前置き・説明・コードブロック不要）。
 

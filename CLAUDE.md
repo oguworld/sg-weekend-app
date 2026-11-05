@@ -123,7 +123,7 @@ ios-app/ (Capacitor + Fastlane) / android-app/ (Capacitor、VPS上でCLIビル�
 
 ## イベント取り込み・くらし情報
 - イベント: `fetch-events.js`(ハイウォーターマーク方式`data/source-fetch-state.json`)→`filter-events.js`(Haikuで採否・`scoreThreshold=6`、採用分はSonnetで日本語記事生成)→重複削除(タイトル類似度75%)。`data/sources.json`の`status`は`active`/`paused`/`rejected`のみが取得可否を決める。不良ソースは`analyze-sources.js`が`rejected`にする(新規ソースは手動で追加)
-- くらし: `fetch-life-info.js`がRSSを取得(ソースはスクリプト内`CITY_CONFIG.sg.feeds`。KAMO(`kamobs.com/feed`)は他国の記事が混ざるため`titleIncludes:'【シンガポール'`で絞り、説明文が短いため`useFullContent:true`で本文全体を要約の材料にする。Haikuで関連性判定+カテゴリ、Sonnetで130〜150字の日本語要約、`data/sg/life-info.json`、リテンション7日)。カテゴリ6種(admin/weather/transport/community/health/education)。新着は`fetched_at`降順。Expat LivingはWAFで403(正常にスキップ)。**くらし側には採用ゼロの自動検知が無い**ので手動で見る。おでかけとの重複排除は無い
+- くらし: `fetch-life-info.js`がRSSを取得(ソースはスクリプト内`CITY_CONFIG.sg.feeds`。KAMO(`kamobs.com/feed`)は他国の記事が混ざるため`titleIncludes:'【シンガポール'`で絞り、説明文が短いため`useFullContent:true`で本文の先頭350字を要約の材料にする。Haikuで関連性判定+カテゴリ、Sonnetで150〜180字の日本語要約(実際は約125字。指示の文字数を変えるとKAMO以外のソースも全部変わるので注意)、`data/sg/life-info.json`、リテンション7日)。カテゴリ6種(admin/weather/transport/community/health/education)。新着は`fetched_at`降順。Expat LivingはWAFで403(正常にスキップ)。**くらし側には採用ゼロの自動検知が無い**ので手動で見る。おでかけとの重複排除は無い
 - **ユーザー向けプッシュ**: イベント側は停止。くらし側(7:00 SGT)が`POST /api/notify-events-updated`を呼び、**その日がカレンダーの`holiday-sg`/`festival`(`confirmed`≠false)の開始日の時だけ**「今日は〇〇です」を送る(該当しない日は送らない)。**緊急停止**: `touch data/push-paused`(再開は`rm`、再起動不要)
 - 開発者向けLINE通知(`notify-fetch-summary.js`)は`broadcast`、承認依頼等は管理者宛`push`のまま
 - イベントカードは`_cardElCache`によるDOM差分更新(iframeの再読込防止)。`grid.innerHTML`の一括再代入を別分岐に残さない。`renderEventCards()`ではキャッシュヒット時も`.like-btn`を最新値に同期する
