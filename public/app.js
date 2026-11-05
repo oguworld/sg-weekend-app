@@ -3428,10 +3428,11 @@
       'holiday-jp':      { bg: 'var(--sky-pale)',           color: 'var(--sky)' },
       'festival':        { bg: 'var(--festival-gold-pale)', color: 'var(--festival-gold)' },
       'school-vacation':  { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
+      'procedure':       { bg: 'var(--sand)',              color: 'var(--warm-gray)' },
     };
     const CALENDAR_CATEGORY_LABELS = {
       'holiday-sg': '祝日', 'holiday-jp': '日本の祝日', 'festival': '文化・催し',
-      'school-vacation': '学校行事',
+      'school-vacation': '学校行事', 'procedure': '手続き・締切',
     };
     // 休みかどうかが大事な祝日(SG)だけ、塗りつぶしのラベルで目立たせる(日本の祝日・文化・催し・学校行事は塗りなしの文字)
     const CALENDAR_FILLED_LABEL_CATEGORIES = ['holiday-sg'];

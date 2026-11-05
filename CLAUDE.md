@@ -110,7 +110,7 @@ ios-app/ (Capacitor + Fastlane) / android-app/ (Capacitor、VPS上でCLIビル�
 
 ## カレンダー(`#screen-calendar`)
 - データ: `data/sg/calendar-events.json`(手動キュレーション、**年1回、年末までに翌年分を追記**。**過去年のデータは消さず、同じ`items`に追記**)+`school-calendar.json`(日本人学校、毎年4月更新)→`GET /api/calendar?city=sg&year=`。アプリは**今年と来年の2年分を取得して続けて表示**し、1月の見出しだけ「2027年1月」のように年を付ける。不確実な日付は`confirmed:false`か`note`に明記。日程が未発表のイベントは載せず、発表後に追記
-- カテゴリ: `holiday-sg`(塗りつぶしの赤ラベル)/`holiday-jp`/`festival`(文化・催し)/`school-vacation`(学校行事)。「すべて」では日本の祝日を除く。SG祝日は日付の列も赤。SG祝日名は現地通用名のカタカナ
+- カテゴリ: `holiday-sg`(塗りつぶしの赤ラベル)/`holiday-jp`/`festival`(文化・催し)/`school-vacation`(学校行事)/`procedure`(手続き・締切。IRAS所得税の申告など、日付が固定で在住者に当てはまるものだけ。2027年分は仮の日付で`confirmed:false`、公式で要確認)。「すべて」では日本の祝日を除く。SG祝日は日付の列も赤。SG祝日名は現地通用名のカタカナ
 - 予定の説明は画面ヘッダーの「説明」スイッチで全月まとめて開閉(`localStorage`の`sg_cal_notes`)。`holiday-jp`はnoteを出さない
 - 月見出し右に季節アイコン(`MONTH_SEASONAL_TAGS`)と旅行シーズン情報の入口(✈️)。開くと今月までスクロール(「すべて」のみ)
 - 説明文の折り返しは`_noBreakJa()`(数字+単位・英単語・文末4文字を崩さない)+`line-break:strict`
