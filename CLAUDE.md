@@ -133,7 +133,7 @@ ios-app/ (Capacitor + Fastlane) / android-app/ (Capacitor、VPS上でCLIビル�
 - `/api/version`は`ios-app/package.json`の版を毎回読んで返す(Web版の設定のバージョン表示用)
 
 ## 紹介LP(`public/about.html`、`about.dosuru.app`)
-App Store: `https://apps.apple.com/sg/app/sg%E5%9C%A8%E4%BD%8Fnavi/id6787159354`、Google Play: `https://play.google.com/store/apps/details?id=app.dosuru`。Express route `GET /about`と、Hostが`about.dosuru.app`の`GET /`。`privacy.html`/`contact.html`は`css/about-shared.css`を共有(柳グリーン配色)。構成は、くらし/おでかけ/カレンダー/旅行シーズン情報の4つの`.feature-block`(サブ機能は横スクロールの`.sub-feature-row`)。画像は`public/screenshots/`。**レイアウト微調整(角丸・余白・クロップ)は過去に非常に多くの反復があったので、触る時はブラウザの実機で確認しながら調整**。プライバシーポリシーは外部ページ`https://willoa.net/privacy-policy`(2026-09-15更新)を使用。内容が現行機能に追いついていない(チェックイン位置情報・Stripeの記述が残る、いいね・Android・FCMなし等の記載が無い)ので、更新が必要
+App Store: `https://apps.apple.com/sg/app/sg%E5%9C%A8%E4%BD%8Fnavi/id6787159354`、Google Play: `https://play.google.com/store/apps/details?id=app.dosuru`。Express route `GET /about`と、Hostが`about.dosuru.app`の`GET /`。`privacy.html`/`contact.html`は`css/about-shared.css`を共有(柳グリーン配色)。構成は、くらし/おでかけ/カレンダー/旅行シーズン情報の4つの`.feature-block`(サブ機能は横スクロールの`.sub-feature-row`)。画像は`public/screenshots/`。**レイアウト微調整(角丸・余白・クロップ)は過去に非常に多くの反復があったので、触る時はブラウザの実機で確認しながら調整**。プライバシーポリシーは`https://willoa.net/privacy-policy`(日英。ソースは`~/willoa-site/src/app/privacy-policy/`、SGBusNaviとの共通ページ。変更後は`npm run build && pm2 restart willoa --update-env`)を使用。**収集する情報や外部サービスを変えたら、このページのSG在住Naviの節も同時に更新する**(2026-11-05に現行機能へ更新済み)
 
 ## ダークモード
 `localStorage`の`sg_theme`(`auto`/`light`/`dark`、既定`light`)。`getTheme()`/`applyTheme()`/`cycleTheme()`/`updateThemeUI()`。`<head>`内スクリプトが初期のちらつきを防ぐ。配色は柳グリーン基調。ボトムナビアイコンはSVG+`currentColor`で自動追従。
@@ -151,6 +151,3 @@ cronはシステムcrontabのみ(PM2 cron不可)/APIキー・秘密情報をロ�
 - **軽微な修正はメインエージェントが直接実施してよい**(1ファイル内の定数・文言・表示値・CSS微調整・ドキュメントで、API/データ構造/認証/CIに触れず影響範囲が自明なもの。迷ったら通常フロー)。直接でも省略しないこと: (1)`app.js`/`app.css`を変えたらキャッシュバスティングのセット (2)`node --check`で構文検証 (3)`server.js`を変えたら`pm2 restart`+`curl`検証 (4)ローカルコミットし`.claude/next.md`に1行記録
 - `.claude/plan.md`はgit管理。**必ず末尾に追記し、既存の設計書を削除・上書きしない**(「設計書N」の連番)
 - ユーザーから明示的に頼まれるまで`git push`しない(リリース手順の中で指示された場合を除く)
-
-## UI・仕様の未確認事項(次の実機確認で見ること)
-この開発環境ではブラウザが描画できず、以下は実機で未確認: 雨量観測マップ(右上の進捗バー・ヒートグロー)/各ツアーのスポットライト位置とポップアップの開閉/紹介LPの見た目/カレンダーの1月見出し・2027年の続き表示/空状態の文字サイズ/設定の「アプリ通知」表記
