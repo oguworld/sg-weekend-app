@@ -1863,7 +1863,7 @@ app.get('/api/ig-embed', async (req, res) => {
 // Static HTML pages (about subdomain)
 // ─────────────────────────────────────────────
 app.get('/api/version', (req, res) => {
-  const pkg = require('./ios-app/package.json');
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'ios-app', 'package.json'), 'utf8'));
   res.json({ version: pkg.version });
 });
 
