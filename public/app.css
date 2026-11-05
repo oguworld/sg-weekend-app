@@ -808,22 +808,21 @@
     .empty-state {
       display: none;
       text-align: center;
-      padding: 52px 24px;
+      padding: 60px 24px;
     }
     .empty-state.visible { display: block; }
-    .empty-emoji { font-size: 36px; margin-bottom: 14px; }
+    .empty-emoji { font-size: 32px; margin-bottom: 10px; }
     .empty-title {
-      font-family: var(--font-heading);
-      font-size: 20px;
+      font-size: 15px;
       color: var(--midnight);
-      margin-bottom: 10px;
+      margin-bottom: 6px;
       font-weight: 700;
     }
     .empty-desc {
-      font-size: 15px;
+      font-size: 14px;
       color: var(--warm-gray);
-      font-weight: 300;
-      line-height: 1.8;
+      font-weight: 400;
+      line-height: 1.7;
     }
 
     /* ─── SCREENS (pin list, calendar, settings) ─── */

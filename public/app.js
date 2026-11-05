@@ -386,7 +386,7 @@
         toastUrlCopied: '🔗 URLをコピーしました！',
         loadingEvents: 'おでかけ情報を読み込み中...',
         loadingLifeInfo: 'くらし情報を読み込み中...',
-        labelPush: '更新の通知',
+        labelPush: 'アプリ通知',
         pushOn: 'オン',
         pushOff: 'オフ',
         pushDenied: '許可が必要',
