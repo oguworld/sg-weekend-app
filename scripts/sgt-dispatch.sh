@@ -28,3 +28,8 @@ fi
 if { [ "$HM" = "12:00" ] || [ "$HM" = "21:00" ]; } && [ "$DOW" -le 5 ]; then
   ./scripts/run-fetch-extra.sh >> logs/run-fetch-extra.log 2>&1
 fi
+
+# data/の日次バックアップ（毎日3:00 SGT）
+if [ "$HM" = "03:00" ]; then
+  ./scripts/backup-data.sh >> logs/backup-data.log 2>&1
+fi

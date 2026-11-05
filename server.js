@@ -1089,7 +1089,12 @@ app.get('/api/whats-new', (req, res) => {
 // POST /api/debug-log — 実機デバッグ用ログ収集（原因特定後に削除すること）
 app.post('/api/debug-log', (req, res) => {
   const line = JSON.stringify({ receivedAt: new Date().toISOString(), ...req.body }) + '\n';
-  fs.appendFile(path.join(__dirname, 'logs', 'debug-nav.log'), line, () => {});
+  const logPath = path.join(__dirname, 'logs', 'debug-nav.log');
+  // 無制限に肥大化しないよう、5MBを超えたら1世代だけ残して切り替える
+  try {
+    if (fs.statSync(logPath).size > 5 * 1024 * 1024) fs.renameSync(logPath, logPath + '.1');
+  } catch (e) { /* ファイル未作成は無視 */ }
+  fs.appendFile(logPath, line, () => {});
   res.json({ ok: true });
 });
 
@@ -1872,55 +1877,6 @@ app.get('/about', (req, res) => {
 });
 app.get('/contact', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'contact.html'));
-});
-
-// ─────────────────────────────────────────────
-// Android APK 一時配布ルート（設計書214）
-// 動作確認用の暫定措置。実機確認が完了次第、このルートと
-// releases/android/ ディレクトリごと撤去する想定（恒久機能ではない）
-// ─────────────────────────────────────────────
-const ANDROID_APK_DL_TOKEN = '95a82b43-f667-4010-b70e-ad3b52b5a361';
-app.get('/dl/:token', (req, res) => {
-  if (req.params.token !== ANDROID_APK_DL_TOKEN) {
-    return res.sendStatus(404);
-  }
-  const apkPath = path.join(__dirname, 'releases', 'android', 'app-debug.apk');
-  if (!fs.existsSync(apkPath)) {
-    return res.sendStatus(404);
-  }
-  res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-  res.setHeader('Content-Disposition', 'attachment; filename="dosuru-debug.apk"');
-  fs.createReadStream(apkPath).pipe(res);
-});
-
-// 署名付きAAB(Play Console提出用)の一時ダウンロード。Play提出が済んだら、このルートとreleases/を撤去する。
-const ANDROID_AAB_DL_TOKEN = 'fc6e2000-f5e4-466f-aefa-c3070d158777';
-app.get('/dl-aab/:token', (req, res) => {
-  if (req.params.token !== ANDROID_AAB_DL_TOKEN) {
-    return res.sendStatus(404);
-  }
-  const aabPath = path.join(__dirname, 'releases', 'android', 'app-release.aab');
-  if (!fs.existsSync(aabPath)) {
-    return res.sendStatus(404);
-  }
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', 'attachment; filename="dosuru-release.aab"');
-  fs.createReadStream(aabPath).pipe(res);
-});
-
-// Play Console掲載用の画像一式(zip)の一時ダウンロード。Play提出が済んだら撤去する。
-const ANDROID_ASSETS_DL_TOKEN = '105d0359-b629-414e-8e29-a65354843739';
-app.get('/dl-assets/:token', (req, res) => {
-  if (req.params.token !== ANDROID_ASSETS_DL_TOKEN) {
-    return res.sendStatus(404);
-  }
-  const zipPath = path.join(__dirname, 'releases', 'android', 'store-assets.zip');
-  if (!fs.existsSync(zipPath)) {
-    return res.sendStatus(404);
-  }
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', 'attachment; filename="dosuru-store-assets.zip"');
-  fs.createReadStream(zipPath).pipe(res);
 });
 
 // ─────────────────────────────────────────────
