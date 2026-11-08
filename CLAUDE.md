@@ -46,6 +46,7 @@ ios-app/ (Capacitor + Fastlane) / android-app/ (Capacitor、VPS上でCLIビル�
 - **モーダル/シートを閉じる時は先にフォーカスをblur**(`_blurIfFocusInside`)。残ると iOS でボトムナビが無反応になる
 - **キャッシュバスティング(必須セット)**: `app.js`/`app.css`を変えたら、`index.html`の`?v=`と`public/sw.js`の`CACHE_NAME`を同時に上げる
 - 画面本体のスクロールは内部コンテナ(`.screen-scroll-content`)。FABのスクロール監視もそのコンテナに対して行う
+- **PCブラウザ向け中央寄せ(設計書229)**: `app.css`末尾の`@media (min-width: 900px)`ブロックのみがPC表示を担う(900px未満=モバイル/Capacitorアプリは対象外、無変更)。最大幅480pxで`.main`/`.screen.visible`/`.bottom-nav`等を中央寄せ。`fixed`要素に新しいtransformアニメーションを追加する時は、既存の`translateY(...)`と`@media`内の`translateX(-50%)`を漏れなく合成すること(片方だけ更新すると900px以上でズレる)。最大幅を変える時は`.fab`/`.fab-pin`の`calc(50vw - 240px + 20px)`内の240px(480の半分)も一緒に直す
 
 ## iOS/Capacitor・WKWebViewの禁止事項
 - `html, body { overflow:hidden; height:100% }`禁止(ボトムナビが浮く)。スクリーンコンテナに`position:fixed`禁止(ナビのタップが効かなくなる)。画面は`height: calc(100dvh - 60px - env(safe-area-inset-bottom,0px))`の通常フロー+`flex:1; min-height:0; overflow-y:auto`

@@ -23641,3 +23641,130 @@ CSSセレクタは、`.feature-block:nth-of-type(1) .sub-feature-card img`/`.fea
 - カレンダー・旅行シーズン情報ブロックの構成変更(既存の`.featured-sub-feature`をそのまま踏襲するのみ)。
 - `screen-pins.jpg`・`screen-news.jpg`・`screen-home.jpg`・`screen-calendar.jpg`ファイル自体の削除・再クロップ。
 - 他のセクションの変更。
+
+---
+
+# 設計書229 — PCブラウザ向けレイアウト改善(中央寄せ+最大幅、Web版のみ。モバイル/Capacitorアプリは無変更)
+
+## 背景・ユーザーストーリー
+現状、PWA(`public/index.html`+`public/app.css`+`public/app.js`)はスマホファーストで作られており、`app.css`に`@media`クエリが1つも存在しないため、PCブラウザで開くと画面幅いっぱいにスマホ版が間延びして表示される(中央寄せ・幅制限が一切ない)。ユーザーは「縦一列のスクロールで見た目が良くない」と感じ、姉妹ブランドLP `https://willoa.net/`(中央寄せmax-width LP)に近い、「中央に幅を制限し周りに余白を持たせる」見た目への改善を希望している。本格的なサイドバー化等の別レイアウトへの変更は望まれておらず、スマホ版のコンテンツをそのまま中央寄せ+最大幅に収める程度の軽めの改善が対象。
+
+## 受け入れ基準
+
+### 正常系
+- PCブラウザ(目安: 幅900px以上)でアプリを開くと、4画面(くらし/おでかけ/カレンダー/設定)すべてのコンテンツが中央寄せされ、左右に余白ができる
+- ボトムナビ(`.bottom-nav`)も画面幅いっぱいに伸びず、コンテンツと同じ幅で中央寄せされる
+- FAB(`#fab-top`/`#fab-pin`)はコンテンツ幅の右下/左下に収まる(画面全体の右端/左端に張り付かない)
+- モーダル・シート類(ピン詳細、ピン留めシート、チュートリアルシート、旅行シーズン画面、QR共有シート、Web誘導ポップアップ、What's Newモーダル、トースト)も中央寄せされたコンテンツ幅に収まって見える
+- 既存のポップオーバー(為替/PSI/2時間予報の詳細、月見出し季節アイコンの吹き出し)がデスクトップでも位置ズレせず正しい場所に出る
+- スマホの狭い画面(幅900px未満を想定)およびiOS/Android Capacitorアプリでは、`@media (min-width: 900px)`の範囲外になるため**見た目・動作ともに一切変化しない**(既存の挙動を完全に維持)
+
+### 失敗系・エッジケース
+- ウィンドウ幅をブレークポイント付近(899px⇔900px)でリサイズしても、レイアウトが崩れたり要素が重なったりしない(実機・ブラウザでの確認が必須、この環境では描画確認不可のため申し送り事項とする)
+- ブラウザの開発者ツールでレスポンシブ表示を切り替えても、モバイル表示時に中央寄せ用CSSの余白・影響が残らない(`@media`の外に出す、または`min-width`指定を厳密に守る)
+- タッチ対応の大型タブレット(iPadのSafari等、幅900px以上でタッチ操作)で開いた場合: 本設計のCSSのみでは`@media (min-width:900px)`に該当し中央寄せが適用されるが、タップ・touchend委譲の既存ロジック自体は変更しないため操作性に影響はない想定(ただし実機確認は未実施、申し送り事項とする)
+- 既存のJSによる位置計算(ポップオーバー・吹き出し・ツアー・カレンダースクロール)が中央寄せ後にズレていないか(下記「JS位置計算の確認箇所」参照、個別に確認済みだがブラウザでの最終確認は必須)
+
+## スコープ外(作らないもの)
+- サイドバー化・2カラム化・PC専用の別デザイン(要望は「中央寄せ+最大幅」の軽い改善のみ)
+- `.cards-grid`の複数列化(現状`flex-direction:column`の1列のまま維持。要望に含まれていない)
+- about.html(紹介LP)側の変更(対象外、既に別レイアウト)
+- iOS/Androidアプリ(Capacitor)の表示変更(`_isCapacitorApp`で分岐する既存の仕組みを使わず、`@media (min-width:...)`のみでデスクトップブラウザを対象化するため、アプリ側は無変更)
+- タブレット専用の中間ブレークポイント(今回はPC(min-width:900px)のみ対応。タブレットでの見た目調整が必要になった場合は別途設計)
+- ボトムナビ・モーダル類のデザイン自体の変更(配色・アイコン・文言は無変更。中央寄せ+最大幅の適用のみ)
+
+## 影響範囲(触る必要があるファイル)
+- `public/app.css`(本体。`@media (min-width: 900px) { ... }`ブロックを追加するのみ。既存ルールは変更しない)
+- `public/index.html`(キャッシュバスティングの`app.css?v=`更新のみ。構造・クラス追加は原則不要、下記「実装方針」で例外を明記)
+- `public/sw.js`(`CACHE_NAME`更新のみ)
+- `public/app.js`は原則無変更(下記「JS位置計算の確認箇所」で問題が見つかった場合のみ、該当箇所を個別に修正する可能性あり。ただし調査の結果、既存のJS位置計算はすべて「要素同士の相対計算」または「アンカー要素のgetBoundingClientRect()基準」であり、中央寄せ自体による実害は無いと判断。詳細は下記)
+
+## データモデルの変更
+なし。
+
+## APIの変更
+なし。本設計はフロントエンドのCSSのみの変更であり、`data/*.json`・`/api/*`には一切触れない。
+
+### データ共有の影響確認(CLAUDE.md必須事項)
+1. **後方互換性**: API・データ構造の変更が無いため、旧バージョンのApp Storeアプリへの影響はゼロ
+2. **影響範囲**: `@media (min-width: 900px)`はCapacitorアプリのWebViewの表示幅(通常スマホの物理解像度幅、900px未満)では発火しないため、**Web版(PCブラウザ)のみに閉じた変更**。iOS/Androidアプリは本変更の影響を一切受けない
+3. **リリースタイミング**: アプリのネイティブビルド・審査提出は不要。Web版のみの変更のため、`app.css`/`index.html`/`sw.js`を通常のキャッシュバスティング手順で更新し、サーバー上のファイルを差し替えるだけで即時反映できる(App Storeリリース手順は不要)
+
+## ブレークポイントの提案
+
+**`@media (min-width: 900px)`を採用する。**
+
+理由:
+- CLAUDE.mdの「iOS/Capacitor WKWebViewの禁止事項」にある通り、Capacitorアプリは`webDir`のローカルバンドルをWebViewで表示するが、実機の画面幅はiPhone/Android実機のCSSピクセル幅(縦持ちで最大でも430px程度、iPadなどタブレットでCapacitorアプリを使うケースは本プロジェクトでは想定されていない=iOSアプリはiPhone想定)。900pxという値は、スマホの横持ち表示(最大でも概ね930px程度だが、本アプリは縦スクロール専用設計でランドスケープのレイアウト最適化が無い)や、通常のタブレット縦持ち幅(768px前後)より大きく設定することで、「PCブラウザ(ノートPC以上の画面)でだけ発火し、タブレットの縦持ちや携帯の横持ちでは発火しない」という安全マージンを確保する
+- `about.html`(willoa.net系と似た中央寄せLP)やモダンなWebサイトで一般的な「タブレット–PCの境界」は768〜1024pxの範囲で設定されることが多いが、本アプリはスマホ専用レイアウトを前提に作られているため、タブレットでの中間的な見た目(やや間延びした1列表示)を許容してでも「PCだけに明確に限定する」ことを優先し、900pxという比較的高めの値を選ぶ
+- 900px未満(スマホの縦持ち・横持ち双方、タブレットの縦持ち)は`@media`の範囲外になり、既存のCSS・レイアウトが一切変更されないため、CLAUDE.mdの「モバイル/Capacitorアプリの表示・動作に絶対影響させてはいけない」という制約を安全側に厚く守れる
+- 具体的な最大幅は**480px**(コンテンツ本体、`.main`/`.screen`/`.bottom-nav`等に適用)を提案する。理由: 既存のモーダル類の多く(`.whatsnew-modal`は`min(380px, calc(100vw-40px))`、`.tour-tip`は`min(340px,...)`)がスマホの画面幅相当(360〜430px程度)を前提にデザインされており、コンテンツ本体の最大幅をスマホ実機に近い480px程度に収めることで、既存のカードデザイン・フォントサイズ・余白をそのまま活かしつつ「中央に浮いた縦長のスマホ風ウィンドウ」に見せる(ユーザーが参考に挙げたwilloa.netのような横長の一般的なLPレイアウトではなく、「スマホ版アプリがPC画面の中央に収まる」という軽い改善であることを再確認。より横長(600〜700px)にする場合、カード内レイアウト(横並びの指標ウィジェット3列等)が間延びする可能性があるため、まずは480pxで試すことを推奨)
+
+## 固定要素を中央寄せにする実装方針
+
+### 基本パターン
+`position:fixed; left:0; right:0;`(または`inset:0`の一部)で画面幅いっぱいに広がっている要素に対し、`@media (min-width:900px)`内で以下を追加する:
+
+```css
+@media (min-width: 900px) {
+  .bottom-nav {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    max-width: 480px;
+    width: 100%;
+  }
+}
+```
+
+- `left:50%; transform:translateX(-50%); max-width:480px; width:100%;`のパターンを、`right:0`も指定されている既存ルールに対しては`right:auto`で打ち消す必要がある(`left`と`right`が両方`0`以外の値で競合しないようにする)
+- z-index・`classList.toggle('visible')`方式・既存のtransition/アニメーションは一切変更しない。`@media`ブロック内では`left`/`right`/`max-width`/`width`/`transform`のみを上書きし、他のプロパティ(background/z-index/padding/border-radius等)には触れない
+
+### 対象ごとの具体方針
+
+| 要素 | 現状 | PC(900px以上)での追加ルール |
+|---|---|---|
+| `.main`(おでかけ画面) | 通常フロー、幅は暗黙的に画面幅 | `max-width:480px; margin:0 auto;`(通常フローなので`margin:auto`で中央寄せ可能、fixed対応は不要) |
+| `#screen-news`/`#screen-calendar`/`#screen-settings`(`.screen.visible`) | 通常フロー、`display:flex` | 同上、`max-width:480px; margin:0 auto;` |
+| `.bottom-nav` | `fixed; bottom:0;left:0;right:0;` | `left:50%; right:auto; transform:translateX(-50%); max-width:480px; width:100%;` |
+| `.fab`(`#fab-top`) | `fixed; right:20px;` | 中央寄せされたコンテンツ幅の右端に合わせるため、`right`を固定値ではなく`calc(50% - 240px + 20px)`相当の計算が必要。**具体的には**: `right: calc(50vw - 240px + 20px);`(480px幅の半分=240pxを画面中央からのオフセットとして使う)。この計算値は最大幅480pxを変更した場合に追随して直す必要がある点を実装メモに明記する |
+| `.fab.fab-pin` | `left:20px;` | 同様に`left: calc(50vw - 240px + 20px);` |
+| `.pin-sheet`/`.pin-sheet-overlay` | `fixed; inset:0`(overlay) / `left:0;right:0;bottom:0`(sheet) | overlayは`inset:0`のままで変更不要(背景の暗幕は画面全体のままでよい、中央寄せは不要)。`.pin-sheet`本体のみ`left:50%;right:auto;transform:translateX(-50%);max-width:480px;width:100%;`(下からせり上がるアニメーション`translateY`との併用は`transform`の多重指定に注意、下記「リスク」参照) |
+| `.fare-sheet`/`.fare-sheet-overlay` | 同上(`inset:0`の全高画面) | `.fare-sheet`も同様に中央寄せ。全高画面(`inset:0`)のため、`left`/`right`の打ち消しが`.pin-sheet`より単純(`top:0;bottom:0`はそのまま、`left`/`right`のみ調整) |
+| `.pin-detail-modal` | `fixed; bottom:0;left:0;right:0;` | 同パターンで中央寄せ |
+| `.plan-modal`(QR共有シート流用) | 同上 | 同パターン |
+| `.whatsnew-modal` | `fixed; top:50%;left:50%;transform:translate(-50%,-50%); width:min(380px,calc(100vw-40px));` | 既に`left:50%;transform:translate(-50%,-50%)`で中央寄せ済み・幅も`min()`で頭打ちされているため、**PC用の追加変更は不要**(既存のまま中央に表示される) |
+| `.promo-modal` | 既存CSS未確認(別途確認要、HTML側でz-index上書きのみ確認済み) | `.whatsnew-modal`と同様に既に中央寄せパターンの可能性が高い。実装時に`app.css`内の`.promo-modal`本体定義を確認し、`.whatsnew-modal`と同じ中央配置であれば追加変更不要、画面幅いっぱいの古いパターンであれば`max-width`を追加 |
+| `.toast` | `fixed; bottom:...;left:50%;transform:translateX(-50%);` | 既に中央配置(`white-space:nowrap`で幅は内容依存)。**追加変更不要** |
+| `.tour-layer`/`.tour-hole`/`.tour-tip` | `fixed; inset:0`(layer) / JSで`top/left`を都度計算(hole/tip) | `.tour-layer`自体は画面全体の暗幕レイヤーのため変更不要。`.tour-hole`/`.tour-tip`はJSが`getBoundingClientRect()`で実際のアンカー要素位置を測って配置するため、アンカー要素(`.main`配下等)が中央寄せされれば自動的に追従する。CSS側の変更は不要 |
+
+### 実装の優先順位・段階分け
+1. **骨格(第1段階)**: `.main`/`.screen.visible`3画面/`.bottom-nav`の4つにだけ`@media (min-width:900px)`ブロックを追加し、まず「画面本体とボトムナビが中央寄せされる」状態を作る。この時点でFAB・各種モーダルは画面幅いっぱいの古い位置のままになるが、見た目の破綻(重なり・はみ出し)が起きないことをブラウザで確認してから次に進む
+2. **FAB(第2段階)**: `.fab`/`.fab-pin`の`right`/`left`を`calc(50vw - 240px + 20px)`化し、コンテンツ幅の右下/左下に揃える
+3. **シート・モーダル類(第3段階)**: `.pin-sheet`/`.fare-sheet`/`.pin-detail-modal`/`.plan-modal`を順に中央寄せ化し、都度ブラウザで開閉確認(背景の暗幕`*-overlay`は画面全体のままで問題ないか、中央寄せしたシートとの見た目の整合性を確認)
+4. **細部確認(第4段階)**: 為替/PSI/2時間予報ポップオーバー、月見出し季節アイコンの吹き出し、カレンダーの「今月へスクロール」、ツアー(スポットライト)の位置がPC画面で正しく表示されるかを個別にブラウザで確認。問題があれば該当箇所のみ`app.js`を修正(現時点の調査では相対計算のため問題ない見込みだが、実描画確認がこの環境では不可のため最終確認が必須)
+5. **ブレークポイント境界確認(第5段階)**: 899px⇔900pxの境界でウィンドウをリサイズし、レイアウトが崩れないか確認。問題なければキャッシュバスティング(`app.css?v=`/`sw.js`の`CACHE_NAME`)を上げて完了
+
+## JSによる既存の位置計算の確認箇所(`public/app.js`実調査済み)
+- `_positionCalBubbleUnderBtn(headRow, btn, bubble)`(3595行付近) — 月見出し季節アイコンの吹き出し。`headRow.getBoundingClientRect()`と`btn.getBoundingClientRect()`の相対差分のみで計算しており、**中央寄せの影響を受けない**(要素自体が画面上のどこにあっても正しく動く)
+- `toggleStatCriteria(kind)`(709行付近)が開閉する`#stat-criteria-popover`/`#stat-criteria-popover-home` — CSS側で`position:absolute; left:8px; right:8px`(親`.stat-widget`基準)。JS側に明示的な幅・位置計算は無く、**親要素(`.app-header`配下、中央寄せされる`.main`/`.screen`の子)が中央寄せされれば自動的に追従する**
+- `_scrollCalendarToCurrentMonth()`(3534〜3559行) — `scrollEl.getBoundingClientRect()`と対象月見出し`target.getBoundingClientRect()`の相対差分でスクロール位置を計算。**中央寄せの影響を受けない**
+- `_tourReposition()`(4713〜4747行) — アンカーがあるステップは`el.getBoundingClientRect()`(実測値)基準で穴・吹き出しを配置するため影響なし。**アンカーが無い中央カードのステップのみ**`window.innerWidth`/`window.innerHeight`(画面全体)を基準に`Math.min(340, vw-24)`で幅を決めている。PC画面では`vw`が大きいため幅は340pxに固定されるだけで実害はないが、位置自体は画面全体の中央に出る(中央寄せされたコンテンツの中央とは一致しない可能性がある)。**ただしツアーはオンボーディング用の一時的な表示であり、優先度は低い。致命的な見た目の破綻ではないため、第4段階で確認し、問題が目立つ場合のみ個別対応とする**
+- `_tourVisible(el)`(4597行) — `getBoundingClientRect()`でのサイズ判定のみ。中央寄せの影響を受けない
+
+## リスク・未解決の質問
+1. **`.pin-sheet`の`transform`多重指定の競合**: `.pin-sheet`は開閉アニメーションに`transform: translateY(100%)`→`translateY(0)`を使っている。中央寄せのために`transform: translateX(-50%)`を追加すると、同じ`transform`プロパティに2つの変換を同時に指定する必要がある(`transform: translateX(-50%) translateY(100%);`のように合成する)。実装時は既存の`.pin-sheet-overlay.visible .pin-sheet { transform: translateY(0); }`等のアニメーション用ルールをすべて洗い出し、`translateX(-50%)`を漏れなく合成することが必須(漏れるとPC画面でシートが左右中央からズレる)。`.fare-sheet`(`translateY(100%)`→`translateY(0)`)も同様
+2. **`.promo-modal`の既存CSSが未確認**: 今回の調査で`app.css`内の`.promo-modal`本体定義(セレクタ自体)を直接grepし損ねており、`.whatsnew-modal`と同じ中央配置パターンか、古い画面幅いっぱいパターンかを実装前に確認する必要がある(builderが着手時に最初に確認すべき事項として申し送る)
+3. **実機・ブラウザでの最終確認が必須**: この調査環境(planner)ではブラウザ描画確認ができない。899px⇔900pxの境界でのリサイズ挙動、各モーダル・シートの開閉時の見た目、ポップオーバーの位置は、builder実装後に実際のPCブラウザで確認する必要がある
+4. **タブレット(iPad Safari等、幅900px以上)の扱い**: 900pxという閾値はタブレット横持ち(1024px前後)より小さいため、iPadを横向きで使うユーザーにもPC向け中央寄せが適用される。タッチ操作自体(3点セット: onclickガード+touchend委譲)は変更しないため操作性への影響は無い想定だが、タブレットでの見た目が意図通りか(480px幅に収まった縦長の表示になる)は実機確認が無いため不明。問題が出た場合は`min-width`の値や、タッチデバイス判定(`_touchCapableDetected`)を組み合わせた追加分岐を別途検討する
+5. **最大幅480pxの妥当性はユーザー実機確認待ち**: 480pxはスマホ実機相当の幅を想定した提案値であり、「willoa.netのような横長LP」を期待している場合はユーザーの期待とズレる可能性がある。実装後、ユーザーに実際の見た目を確認してもらい、必要であれば600〜700px程度への調整を検討する(カード内の横並び要素(指標ウィジェット3列、フィルターチップ横スクロール等)が間延びしないか要確認)
+6. **CSSクラスの二重定義禁止ルールとの整合**: `@media`ブロック内の記述は「同じセレクタへの追加ルール」であり、CLAUDE.mdの「CSSクラスの二重定義禁止(再定義時は古い定義を削除)」とは異なる(メディアクエリによる上書きは禁止対象ではなく、レスポンシブデザインの標準的な手法)。ただし同じ`@media`ブロック内で同一セレクタを2回定義しないよう、実装時に1箇所にまとめること
+
+## 実装後の検証チェックリスト(builder→checker向け)
+- `node --check`相当のCSS構文検証(波括弧バランス確認)
+- `public/index.html`の`app.css?v=`と`public/sw.js`の`CACHE_NAME`を同時に更新したことを確認
+- `curl`で配信中の`app.css`に新しい`@media (min-width:900px)`ブロックが含まれることを確認
+- 既存の`@media`が無い状態からの差分が、追加ブロックのみ(既存ルールの変更が無い)であることを`git diff`で確認
+- モバイル幅(899px以下相当の想定)で既存の見た目に変化が無いことをコードレビューで確認(この環境では実描画確認不可のため、ユーザーに実機/ブラウザでの最終確認を依頼する申し送りを残す)
+
+本設計はUIに影響するため、実装後(builder完了後)に design-checker で姉妹アプリ(Willoa系)とのデザイン一貫性チェックを行うことを推奨します。

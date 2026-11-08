@@ -2044,3 +2044,91 @@
       font-size: 14px; font-weight: 700; font-family: inherit; color: white; cursor: pointer;
     }
 
+    /* ─── PCブラウザ向けレイアウト改善(設計書229): 幅900px以上のみ、中央寄せ+最大幅480px。
+       モバイル/Capacitorアプリ(幅900px未満)は本ブロックの対象外のため無変更。既存ルールはここでは一切変更せず、
+       対象セレクタへの追加上書きのみを行う。最大幅を変える場合は480pxとcalc()内の240px(480/2)を両方直すこと。 ─── */
+    @media (min-width: 900px) {
+      /* 骨格: 画面本体4つ(おでかけ=.main、くらし/カレンダー/設定=#screen-*.visible)を中央寄せ */
+      .main {
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      #screen-settings.visible,
+      #screen-news.visible,
+      #screen-calendar.visible {
+        max-width: 480px;
+        margin: 0 auto;
+      }
+
+      /* ボトムナビ: fixedで画面幅いっぱいのため、left:50%+transformで中央寄せ */
+      .bottom-nav {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        max-width: 480px;
+        width: 100%;
+      }
+
+      /* FAB: コンテンツ幅(480px)の右下/左下に合わせるため、画面中央からのオフセットをcalc()で計算 */
+      .fab {
+        right: calc(50vw - 240px + 20px);
+      }
+      .fab-pin {
+        left: calc(50vw - 240px + 20px);
+        right: auto;
+      }
+
+      /* ピン留めボトムシート: transformを translateX(-50%) と既存の translateY(...) を合成する */
+      .pin-sheet {
+        left: 50%;
+        right: auto;
+        max-width: 480px;
+        width: 100%;
+        transform: translateX(-50%) translateY(100%);
+      }
+      .pin-sheet-overlay.visible .pin-sheet {
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* 旅行シーズン情報(全高画面): inset:0のためleft/rightのみ上書きし、top/bottomは既存のまま */
+      .fare-sheet {
+        left: 50%;
+        right: auto;
+        max-width: 480px;
+        width: 100%;
+        transform: translateX(-50%) translateY(100%);
+      }
+      .fare-sheet-overlay.visible .fare-sheet {
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* ピン詳細モーダル: 開くアニメーション(slideUp)がtransform:translateYのみのkeyframeのため、
+         PC用に水平オフセットを含む専用keyframeに差し替える(既存slideUpはモバイル用に残す) */
+      .pin-detail-modal {
+        left: 50%;
+        right: auto;
+        max-width: 480px;
+        width: 100%;
+        animation-name: slideUpCentered;
+      }
+      @keyframes slideUpCentered {
+        from { transform: translateX(-50%) translateY(40px); opacity: 0; }
+        to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+      }
+
+      /* QR共有シート等(.plan-modal流用): transformを合成 */
+      .plan-modal {
+        left: 50%;
+        right: auto;
+        max-width: 480px;
+        width: 100%;
+        transform: translateX(-50%) translateY(100%);
+      }
+      .plan-modal.visible {
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* .whatsnew-modal / .promo-modal / .toast は既に left:50%+transform:translate(-50%,...)で中央配置済み、
+         かつ幅もmin()で頭打ちされているため、PC用の追加変更は不要(設計書229で確認済み) */
+    }
+
