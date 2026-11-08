@@ -100,6 +100,15 @@ ios-app/ (Capacitor + Fastlane) / android-app/ (Capacitor、VPS上でCLIビル�
 - 動的に出るシート(`.pin-sheet`系)は0.25秒でせり上がるため、`before`で開いた後は完了を待ってから位置を測る
 - 実機確認用: 設定のバージョン表示を3秒以内に5回タップすると、紹介・ツアーの記録を消して再読み込みする(開発者向け)
 
+## 祝日・行事の文化的な背景解説(カルーセル式ポップアップ、設計書263)
+- その日最初にアプリを開いた時、今日のholiday-sg/festival(`getTodayCalendarNotification()`と同じ判定)に`triviaKey`が設定されていれば、2〜4ページのカルーセル(画像+解説文)を自動表示する。内容は`content/calendar-trivia.json`の`entries[triviaKey].pages`(手書きのコンテンツのためdata/外、git管理)。`GET /api/calendar-trivia?city=sg`、該当なしは常に200で`{entry:null}`
+- 画像は各ページの`image`フィールドに**Unsplashの完全なURLを直接保存**(ローカル保存・専用静的配信ルートは無い)。コンテンツ追加時は`scripts/lib/unsplash.js`の`fetchUnsplashImage(query)`を一時的に呼んで取得する
+- 重複防止は`localStorage`の`app_daily_trivia_seen`に`dateKey`を1つだけ保存(✕ボタン・オーバーレイタップで中断した場合も記録する)。ページ1のタイトルは`content/calendar-trivia.json`側に持たせず、クライアント側でモードに応じて動的生成(自動表示=「今日は〇〇です」/振り返り=「〇〇とは」)
+- **振り返り**: カレンダー画面で`triviaKey`があり`date`が今日(SGT)以前の行事だけ📖目印が付き、タップで`GET /api/calendar-trivia?key=<triviaKey>&date=<YYYY-MM-DD>`を呼び振り返りモードで再閲覧できる(未来の行事には目印を出さない。`date`は今日以前かつ`calendar-events.json`内の実在項目と一致することをサーバー側で検証)。振り返りモードでは`app_daily_trivia_seen`を更新しない
+- 各エントリに任意で`moreLink:{label,url}`を持たせられる(最後のページの本文下に外部リンクを表示。確実な参照先がある時だけ設定し、無理に付けない)。タップはCapacitorアプリ=`Browser.open()`・Web版=通常のリンク遷移(既存の`openLifeInfoLink()`と同じ分岐パターン)
+- **動作確認用クエリ**: Web版限定で`?trivia=<triviaKey>`を付けると、今日の判定を待たずに強制表示する(What's Newの`?whatsnew=<版>`と同じ確認用パターン)
+- 既存の「今日は〇〇です」プッシュ通知(`POST /api/notify-events-updated`)は本機能と連動させ、本文末尾を「アプリを開いてみましょう。」に変更済み(`bodyMain`自体は無変更)
+
 ## 指標ウィジェット(`GET /api/widget-stats?city=sg`)
 - おでかけ: 気温(OpenWeatherMap)・UV指数(data.gov.sg、0-2低い/3-7高い/8+非常に高い)・デング熱(クラスター数。`dengueLevel()`)
 - くらし: 為替SGD→JPY(`open.er-api.com`、`fxRates`に12通貨)・PM2.5(中心部の1時間値、NEA公式の帯: 0-55通常/56-150やや高い/151-250高い/251+非常に高い。`pm25`が無ければ旧`psi`にフォールバック)・2時間予報(NEAナウキャスト、最も深刻な区分)
@@ -111,6 +120,7 @@ ios-app/ (Capacitor + Fastlane) / android-app/ (Capacitor、VPS上でCLIビル�
 ## カレンダー(`#screen-calendar`)
 - データ: `data/sg/calendar-events.json`(手動キュレーション、**年1回、年末までに翌年分を追記**。**過去年のデータは消さず、同じ`items`に追記**)+`school-calendar.json`(日本人学校、毎年4月更新)→`GET /api/calendar?city=sg&year=`。アプリは**今年と来年の2年分を取得して続けて表示**し、1月の見出しだけ「2027年1月」のように年を付ける。不確実な日付は`confirmed:false`か`note`に明記。日程が未発表のイベントは載せず、発表後に追記
 - カテゴリ: `holiday-sg`(塗りつぶしの赤ラベル)/`holiday-jp`/`festival`(文化・催し)/`school-vacation`(学校行事)/`procedure`(手続き・締切。IRAS所得税の申告など、日付が固定で在住者に当てはまるものだけ。2027年分は仮の日付で`confirmed:false`、公式で要確認)。「すべて」では日本の祝日を除く。SG祝日は日付の列も赤。SG祝日名は現地通用名のカタカナ
+- `holiday-sg`/`festival`の項目には任意で`triviaKey`(文化的な背景解説、下記の節)を付けられる。年をまたいで不変な安定キーにすること
 - 予定の説明は画面ヘッダーの「説明」スイッチで全月まとめて開閉(`localStorage`の`sg_cal_notes`)。`holiday-jp`はnoteを出さない
 - 月見出し右に季節アイコン(`MONTH_SEASONAL_TAGS`)と旅行シーズン情報の入口(✈️)。開くと今月までスクロール(「すべて」のみ)
 - 説明文の折り返しは`_noBreakJa()`(数字+単位・英単語・文末4文字を崩さない)+`line-break:strict`

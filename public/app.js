@@ -553,6 +553,9 @@
     const _WHATSNEW_SEEN_KEY = 'app_whatsnew_seen';
     let _whatsNewPending = null; // 表示中の紹介: { version, persist, cta }
     let _tutorialRun = null;   // 設定のチュートリアルの見直しの実行中: { queue: [id…] }。nullなら実行していない(再入ガード兼、案内の自動表示の抑止)。switchNav()が早く呼ばれても参照できるよう、ここで宣言する
+    // 祝日・行事の文化的な背景解説(カルーセル式ポップアップ、設計書263)。1日1回の自動表示の重複防止キー(dateKeyを1つだけ保存・上書き)
+    const _DAILY_TRIVIA_SEEN_KEY = 'app_daily_trivia_seen';
+    let _triviaPending = null; // 表示中のトリビア: { mode: 'today'|'review', name, pages, moreLink, index, dateKey }
 
     // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
     // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
@@ -2034,6 +2037,12 @@
       if (fareGo) {
         e.preventDefault();
         openFareSheet(Number(fareGo.dataset.month));
+        return;
+      }
+      const triviaBtn = e.target.closest('.cal-trivia-btn');
+      if (triviaBtn) {
+        e.preventDefault();
+        openDailyTriviaReview(triviaBtn.dataset.triviaKey, triviaBtn.dataset.triviaDate);
       }
     }, { passive: false });
 
@@ -2321,6 +2330,9 @@
       ['whatsnew-later-btn', () => whatsNewLater()],
       ['tour-next', () => tourNext()],
       ['tour-skip', () => tourSkip()],
+      ['trivia-overlay', () => closeDailyTrivia()],
+      ['trivia-back-btn', () => triviaBack()],
+      ['trivia-next-btn', () => triviaNext()],
     ].forEach(([id, fn]) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('touchend', e => { e.preventDefault(); fn(); }, { passive: false });
@@ -2357,7 +2369,7 @@
     setTimeout(() => _debugLogScreenMetrics('news'), 500); // 診断: 初期表示時点のメトリクス（使い捨て）
     // 新規インストールでウェルカムツアーを出す時は、通知の許可(OSダイアログ)をツアーの終了後に尋ねる(暗幕の上にダイアログが出て混乱するのを避ける)
     initPushState().then(() => { if (!_maybeStartWelcomeTour()) _maybePromptPushOnboarding(); });
-    initWhatsNew();
+    initWhatsNew().then(() => initDailyTrivia());
     initSettingsProfile();
     initSettingsGenres();
 
@@ -3677,10 +3689,16 @@
           const labelHtml = CALENDAR_FILLED_LABEL_CATEGORIES.includes(it.category)
             ? `<span class="cal-badge" style="background:${c.bg};color:${c.color};">${label}</span>`
             : `<span class="cal-tag">${label}</span>`;
+          // 文化的な背景解説(設計書263): holiday-sg/festivalかつtriviaKeyがあり、かつ日付が今日(SGT)以前の項目だけ📖目印を出す
+          // (未来の行事には目印を一切出さない・タップもできない=内容の存在自体をにおわせない)
+          const triviaHtml = (it.triviaKey && (it.category === 'holiday-sg' || it.category === 'festival') && it.date <= _todaySgtDateStr())
+            ? `<button class="cal-trivia-btn" data-trivia-key="${escapeHtml(it.triviaKey)}" data-trivia-date="${it.date}" aria-label="${escapeHtml(it.name)}について振り返る" onclick="if(!_touchCapableDetected) openDailyTriviaReview('${escapeHtml(it.triviaKey)}', '${it.date}')">📖</button>`
+            : '';
           html += `<div class="cal-item">
             <div class="cal-item-head">
               <span class="cal-name-wrap">
                 <span class="cal-name">${it.name}</span>
+                ${triviaHtml}
               </span>
               ${labelHtml}
             </div>
@@ -4996,6 +5014,132 @@
       unlockScroll();
       document.getElementById('whatsnew-overlay')?.classList.remove('visible');
       document.getElementById('whatsnew-modal')?.classList.remove('visible');
+    }
+
+    // ─── 祝日・行事の文化的な背景解説(カルーセル式ポップアップ、設計書263) ───
+    // その日最初にアプリを開いた時、今日の祝日・行事に紐づく2〜4ページの解説を自動表示する(mode='today')。
+    // カレンダー画面からは、過去の行事を振り返りモード(mode='review')で再閲覧できる。
+    // What's Newが表示される場合・既存ツアーが実行中の場合はスキップし、次回起動時に再判定する。
+
+    // 起動時の自動判定。Web版は ?trivia=<triviaKey> を付けた時だけ、今日の判定を待たずに強制表示する(動作確認用、What'sNewの?whatsnew=と同じパターン)
+    async function initDailyTrivia() {
+      if (_tourState || _whatsNewPending || _tutorialRun) return; // 別の案内の表示中は始めない(次回起動で再判定)
+      try {
+        const previewKey = !_isCapacitorApp ? (new URLSearchParams(location.search).get('trivia') || '') : '';
+        if (previewKey) {
+          const res = await fetch(`${API_BASE}/api/calendar-trivia?city=${getCity()}&key=${encodeURIComponent(previewKey)}&date=${_todaySgtDateStr()}`, { cache: 'no-cache' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data && data.entry) openDailyTrivia(data.entry, 'today', null);
+          return;
+        }
+        let seen = null;
+        try { seen = localStorage.getItem(_DAILY_TRIVIA_SEEN_KEY); } catch (_) {}
+        const res = await fetch(`${API_BASE}/api/calendar-trivia?city=${getCity()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.entry || !data.dateKey) return;
+        if (seen === data.dateKey) return; // 今日はもう見た(途中で閉じた場合も含む)
+        openDailyTrivia(data.entry, 'today', data.dateKey);
+      } catch (_) { /* 通信に失敗した時は何もしない(次回の起動で再試行) */ }
+    }
+
+    // SGT基準の「今日」をYYYY-MM-DD形式で返す(Web版の?trivia=確認用。サーバー側の検証と一致させるためのクライアント側簡易計算)
+    function _todaySgtDateStr() {
+      try { return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' }).slice(0, 10); } catch (_) { return new Date().toISOString().slice(0, 10); }
+    }
+
+    // カレンダー画面の📖目印タップ(振り返りモード)。triviaKey・dateは呼び出し元(renderCalendarList)が検証済みの値を渡す
+    async function openDailyTriviaReview(triviaKey, dateStr) {
+      if (!triviaKey || !dateStr || _triviaPending) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/calendar-trivia?city=${getCity()}&key=${encodeURIComponent(triviaKey)}&date=${encodeURIComponent(dateStr)}`, { cache: 'no-cache' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.entry) openDailyTrivia(data.entry, 'review', null);
+      } catch (_) {}
+    }
+
+    // entry: { name, pages: [{title?, body, image}], moreLink: {label,url}|null }
+    // mode: 'today'(自動表示) | 'review'(カレンダーからの振り返り)。dateKey: 'today'表示時のみ(見た記録に使う)
+    function openDailyTrivia(entry, mode, dateKey) {
+      const overlay = document.getElementById('trivia-overlay');
+      const modal = document.getElementById('trivia-modal');
+      if (!overlay || !modal || _triviaPending || !entry || !Array.isArray(entry.pages) || !entry.pages.length) return;
+      _triviaPending = { mode, name: entry.name || '', pages: entry.pages, moreLink: entry.moreLink || null, index: 0, dateKey: dateKey || null };
+      _sendDebugLog('trivia_opened', { mode, hasDateKey: !!dateKey });
+      _renderDailyTrivia();
+      lockScroll();
+      overlay.classList.add('visible');
+      modal.classList.add('visible');
+    }
+
+    // ページ1のタイトルはモードで動的生成(「今日は〇〇です」/「〇〇とは」)。pages[1]以降はJSON側のtitleをそのまま使う
+    function _triviaPageTitle(p) {
+      const { mode, name, index } = p;
+      if (index === 0) return mode === 'today' ? `今日は${name}です` : `${name}とは`;
+      return (p.pages[index] && p.pages[index].title) || '';
+    }
+
+    function _renderDailyTrivia() {
+      const p = _triviaPending;
+      if (!p) return;
+      const page = p.pages[p.index];
+      const isLast = p.index === p.pages.length - 1;
+      const eyebrow = document.getElementById('trivia-eyebrow');
+      if (eyebrow) eyebrow.textContent = p.mode === 'today' ? '🎉 本日は祝日・行事です' : '📖 振り返り';
+      const moreLinkHtml = (isLast && p.moreLink && p.moreLink.url && p.moreLink.label)
+        ? `<a class="trivia-more-link" href="${escapeHtml(p.moreLink.url)}" target="_blank" rel="noopener" onclick="triviaOpenMoreLink(event, '${escapeHtml(p.moreLink.url)}')">${escapeHtml(p.moreLink.label)} →</a>`
+        : '';
+      const body = document.getElementById('trivia-body');
+      if (body) {
+        body.innerHTML = `
+          <img class="trivia-page-img" src="${escapeHtml(page.image || '')}" alt="" onerror="this.remove()">
+          <div class="trivia-page-title">${escapeHtml(_triviaPageTitle(p))}</div>
+          <div class="trivia-page-body">${escapeHtml(page.body || '')}</div>
+          ${moreLinkHtml}`;
+        body.scrollTop = 0;
+      }
+      const dots = document.getElementById('trivia-dots');
+      if (dots) dots.innerHTML = p.pages.map((_, i) => `<span class="trivia-dot${i === p.index ? ' active' : ''}"></span>`).join('');
+      const backBtn = document.getElementById('trivia-back-btn');
+      if (backBtn) backBtn.hidden = p.index === 0;
+      const nextBtn = document.getElementById('trivia-next-btn');
+      if (nextBtn) nextBtn.textContent = isLast ? '閉じる' : '次へ';
+    }
+
+    // もっと詳しく見るリンク。既存の外部リンク分岐パターン(openLifeInfoLink等)と同じ: Capacitorアプリは Browser.open()、Web版は通常のリンク遷移に任せる
+    function triviaOpenMoreLink(e, url) {
+      if (_isCapacitorApp && window.Capacitor?.Plugins?.Browser) {
+        e.preventDefault();
+        window.Capacitor.Plugins.Browser.open({ url });
+      }
+      // Web版はaタグのtarget="_blank"相当のデフォルト動作に任せる(hrefは既にurlを指している)
+    }
+
+    function triviaNext() {
+      const p = _triviaPending;
+      if (!p) return;
+      if (p.index >= p.pages.length - 1) { closeDailyTrivia(); return; }
+      p.index++;
+      _renderDailyTrivia();
+    }
+    function triviaBack() {
+      const p = _triviaPending;
+      if (!p || p.index === 0) return;
+      p.index--;
+      _renderDailyTrivia();
+    }
+    // ✕ボタン・オーバーレイタップ・最後のページの「閉じる」、どの経路でも呼ばれる。todayモードは中断でも「見た」記録をする(翌日まで再表示しない)
+    function closeDailyTrivia() {
+      const p = _triviaPending;
+      if (!p) return;
+      _triviaPending = null;
+      if (p.mode === 'today' && p.dateKey) { try { localStorage.setItem(_DAILY_TRIVIA_SEEN_KEY, p.dateKey); } catch (_) {} }
+      _blurIfFocusInside('trivia-modal');
+      unlockScroll();
+      document.getElementById('trivia-overlay')?.classList.remove('visible');
+      document.getElementById('trivia-modal')?.classList.remove('visible');
     }
 
     // ─── PROMO MODAL（Web版→iOSアプリ誘導、設計書206） ───
