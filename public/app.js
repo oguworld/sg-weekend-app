@@ -555,7 +555,7 @@
     let _tutorialRun = null;   // 設定のチュートリアルの見直しの実行中: { queue: [id…] }。nullなら実行していない(再入ガード兼、案内の自動表示の抑止)。switchNav()が早く呼ばれても参照できるよう、ここで宣言する
     // 祝日・行事の文化的な背景解説(カルーセル式ポップアップ、設計書263)。1日1回の自動表示の重複防止キー(dateKeyを1つだけ保存・上書き)
     const _DAILY_TRIVIA_SEEN_KEY = 'app_daily_trivia_seen';
-    let _triviaPending = null; // 表示中のトリビア: { mode: 'today'|'review', name, pages, moreLink, index, dateKey }
+    let _triviaPending = null; // 表示中のトリビア: { mode: 'today'|'review', name, pages, index, dateKey }
 
     // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
     // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
@@ -5027,7 +5027,7 @@
       try {
         const previewKey = !_isCapacitorApp ? (new URLSearchParams(location.search).get('trivia') || '') : '';
         if (previewKey) {
-          const res = await fetch(`${API_BASE}/api/calendar-trivia?city=${getCity()}&key=${encodeURIComponent(previewKey)}&date=${_todaySgtDateStr()}`, { cache: 'no-cache' });
+          const res = await fetch(`${API_BASE}/api/calendar-trivia?city=${getCity()}&key=${encodeURIComponent(previewKey)}&preview=1`, { cache: 'no-cache' });
           if (!res.ok) return;
           const data = await res.json();
           if (data && data.entry) openDailyTrivia(data.entry, 'today', null);
@@ -5060,13 +5060,13 @@
       } catch (_) {}
     }
 
-    // entry: { name, pages: [{title?, body, image}], moreLink: {label,url}|null }
+    // entry: { name, pages: [{title?, body, image}] }
     // mode: 'today'(自動表示) | 'review'(カレンダーからの振り返り)。dateKey: 'today'表示時のみ(見た記録に使う)
     function openDailyTrivia(entry, mode, dateKey) {
       const overlay = document.getElementById('trivia-overlay');
       const modal = document.getElementById('trivia-modal');
       if (!overlay || !modal || _triviaPending || !entry || !Array.isArray(entry.pages) || !entry.pages.length) return;
-      _triviaPending = { mode, name: entry.name || '', pages: entry.pages, moreLink: entry.moreLink || null, index: 0, dateKey: dateKey || null };
+      _triviaPending = { mode, name: entry.name || '', pages: entry.pages, index: 0, dateKey: dateKey || null };
       _sendDebugLog('trivia_opened', { mode, hasDateKey: !!dateKey });
       _renderDailyTrivia();
       lockScroll();
@@ -5088,16 +5088,14 @@
       const isLast = p.index === p.pages.length - 1;
       const eyebrow = document.getElementById('trivia-eyebrow');
       if (eyebrow) eyebrow.textContent = p.mode === 'today' ? '🎉 本日は祝日・行事です' : '📖 振り返り';
-      const moreLinkHtml = (isLast && p.moreLink && p.moreLink.url && p.moreLink.label)
-        ? `<a class="trivia-more-link" href="${escapeHtml(p.moreLink.url)}" target="_blank" rel="noopener" onclick="triviaOpenMoreLink(event, '${escapeHtml(p.moreLink.url)}')">${escapeHtml(p.moreLink.label)} →</a>`
-        : '';
       const body = document.getElementById('trivia-body');
       if (body) {
         body.innerHTML = `
           <img class="trivia-page-img" src="${escapeHtml(page.image || '')}" alt="" onerror="this.remove()">
-          <div class="trivia-page-title">${escapeHtml(_triviaPageTitle(p))}</div>
-          <div class="trivia-page-body">${escapeHtml(page.body || '')}</div>
-          ${moreLinkHtml}`;
+          <div class="trivia-page-text">
+            <div class="trivia-page-title">${escapeHtml(_triviaPageTitle(p))}</div>
+            <div class="trivia-page-body">${escapeHtml(page.body || '')}</div>
+          </div>`;
         body.scrollTop = 0;
       }
       const dots = document.getElementById('trivia-dots');
@@ -5106,15 +5104,6 @@
       if (backBtn) backBtn.hidden = p.index === 0;
       const nextBtn = document.getElementById('trivia-next-btn');
       if (nextBtn) nextBtn.textContent = isLast ? '閉じる' : '次へ';
-    }
-
-    // もっと詳しく見るリンク。既存の外部リンク分岐パターン(openLifeInfoLink等)と同じ: Capacitorアプリは Browser.open()、Web版は通常のリンク遷移に任せる
-    function triviaOpenMoreLink(e, url) {
-      if (_isCapacitorApp && window.Capacitor?.Plugins?.Browser) {
-        e.preventDefault();
-        window.Capacitor.Plugins.Browser.open({ url });
-      }
-      // Web版はaタグのtarget="_blank"相当のデフォルト動作に任せる(hrefは既にurlを指している)
     }
 
     function triviaNext() {

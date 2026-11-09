@@ -1732,10 +1732,10 @@
     }
     .trivia-overlay.visible { display: block; opacity: 1; pointer-events: auto; }
     .trivia-modal {
-      position: fixed; top: 50%; left: 50%; z-index: 3803;
-      transform: translate(-50%, -50%);
+      position: fixed; top: 12%; left: 50%; z-index: 3803;
+      transform: translateX(-50%);
       width: min(380px, calc(100vw - 40px));
-      max-height: 86vh; max-height: 86dvh;
+      height: min(560px, 76vh); height: min(560px, 76dvh); /* ページごとの文章量によらず一定の大きさにする(固定height、はみ出す分は.trivia-bodyが内部スクロール) */
       display: none; flex-direction: column;
       background: var(--warm-white); border-radius: var(--radius-card);
       box-shadow: var(--shadow-card);
@@ -1754,11 +1754,13 @@
       display: inline-block; padding: 4px 12px; border-radius: 50px;
       background: var(--caramel-pale); color: var(--caramel); font-size: 12px; font-weight: 700;
     }
-    .trivia-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 14px 22px 8px; text-align: center; }
-    .trivia-page-img { display: block; width: 100%; height: 170px; object-fit: cover; border-radius: 16px; margin: 4px 0 14px; box-shadow: var(--shadow-soft); background: var(--sand); }
-    .trivia-page-title { font-family: var(--font-heading); font-size: 18px; font-weight: 800; color: var(--midnight); margin-bottom: 8px; }
-    .trivia-page-body { font-size: 14px; line-height: 1.7; color: var(--warm-gray); text-align: left; }
-    .trivia-more-link { display: inline-block; margin-top: 14px; font-size: 13px; font-weight: 700; color: var(--caramel); text-decoration: none; cursor: pointer; }
+    /* 画像・見出しは常に同じ位置(画像の直後、上詰め)に固定する。文章量が違っても画像や見出しの位置がページ間でズレないように、
+       .trivia-page-textは中央寄せにしない(以前中央寄せにしていたが、本文の行数でタイトル位置がページごとにずれる問題があったため上詰めに統一)。 */
+    .trivia-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 14px 22px 8px; text-align: center; display: flex; flex-direction: column; }
+    .trivia-page-img { display: block; width: 100%; height: 170px; object-fit: cover; border-radius: 16px; margin: 4px 0 14px; box-shadow: var(--shadow-soft); background: var(--sand); flex-shrink: 0; }
+    .trivia-page-text { flex-shrink: 0; }
+    .trivia-page-title { font-family: var(--font-heading); font-size: 18px; font-weight: 800; color: var(--midnight); margin-bottom: 8px; flex-shrink: 0; }
+    .trivia-page-body { font-size: 15px; line-height: 1.65; color: var(--warm-gray); text-align: left; flex-shrink: 0; }
     .trivia-dots { flex-shrink: 0; display: flex; justify-content: center; gap: 6px; padding: 10px 0; }
     .trivia-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sand); transition: background 0.2s ease, width 0.2s ease; }
     .trivia-dot.active { background: var(--caramel); width: 18px; border-radius: 4px; }

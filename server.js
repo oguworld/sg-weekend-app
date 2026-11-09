@@ -1828,6 +1828,8 @@ const CALENDAR_TRIVIA_PATH = path.join(__dirname, 'content', 'calendar-trivia.js
 // GET /api/calendar-trivia?city=sg — 今日(SGT)該当するholiday-sg/festivalにtriviaKeyがあれば、その解説を返す
 // GET /api/calendar-trivia?key=<triviaKey>&date=<YYYY-MM-DD> — 振り返り用の明示指定。dateが今日(SGT)以前かつ、
 //   calendar-events.json内でそのtriviaKeyに対応する項目のいずれかの日付と一致する時だけ返す(ズル見え防止)。
+// GET /api/calendar-trivia?key=<triviaKey>&preview=1 — 開発確認用(Web版の?trivia=クエリから使用、requireAdminSecret等は無いが
+//   triviaKeyを知らないと使えず、未来の内容も見られる。What'sNewの?whatsnew=と同じ位置づけの確認用バイパス)。日付検証は行わない。
 // どちらの形式でも、該当が無ければ { entry: null }（常に200）
 app.get('/api/calendar-trivia', (req, res) => {
   const cityKey = req.query.city || 'sg';
@@ -1838,6 +1840,17 @@ app.get('/api/calendar-trivia', (req, res) => {
     const todayStr = new Date().toLocaleString('sv-SE', { timeZone: cityConf.timezone }).slice(0, 10);
 
     const explicitKey = typeof req.query.key === 'string' ? req.query.key : '';
+    if (explicitKey && req.query.preview === '1') {
+      const content = entries[explicitKey];
+      if (!content) return res.json({ entry: null });
+      let items = [];
+      try {
+        items = JSON.parse(fs.readFileSync(calendarEventsPath(cityKey), 'utf8')).items || [];
+      } catch (e) { items = []; }
+      const item = items.find(it => it.triviaKey === explicitKey);
+      if (!item) return res.json({ entry: null });
+      return res.json({ entry: { name: item.name, pages: content.pages }, dateKey: todayStr });
+    }
     if (explicitKey) {
       const explicitDate = typeof req.query.date === 'string' ? req.query.date : '';
       if (!/^\d{4}-\d{2}-\d{2}$/.test(explicitDate) || explicitDate > todayStr) {
@@ -1852,7 +1865,7 @@ app.get('/api/calendar-trivia', (req, res) => {
       const content = entries[explicitKey];
       if (!content) return res.json({ entry: null });
       const item = items.find(it => it.triviaKey === explicitKey && it.date === explicitDate);
-      return res.json({ entry: { name: item.name, pages: content.pages, moreLink: content.moreLink || null }, dateKey: explicitDate });
+      return res.json({ entry: { name: item.name, pages: content.pages }, dateKey: explicitDate });
     }
 
     // 明示指定が無い場合: 今日の該当行事を自動判定
@@ -1860,7 +1873,7 @@ app.get('/api/calendar-trivia', (req, res) => {
     if (!todayItem || !todayItem.triviaKey) return res.json({ entry: null });
     const content = entries[todayItem.triviaKey];
     if (!content) return res.json({ entry: null });
-    res.json({ entry: { name: todayItem.name, pages: content.pages, moreLink: content.moreLink || null }, dateKey: todayStr });
+    res.json({ entry: { name: todayItem.name, pages: content.pages }, dateKey: todayStr });
   } catch (e) {
     res.json({ entry: null });
   }
@@ -1879,8 +1892,7 @@ app.post('/api/notify-events-updated', requireAdminSecret, async (req, res) => {
       return res.json({ ok: true, sent: 0, skipped: true, reason: 'no-calendar-event-today' });
     }
     const title = `今日は${todayItem.name}です`;
-    const bodyMain = todayItem.note ? `今日は${todayItem.name}です。${todayItem.note}` : `今日は${todayItem.name}です`;
-    const body = `${bodyMain} アプリを開いてみましょう。`;
+    const body = 'アプリで詳しく見てみましょう。';
     const sent = await sendPushToAll(city, title, body);
     res.json({ ok: true, sent });
   } catch (e) {

@@ -1,39 +1,48 @@
 {
-  "note": "祝日・行事の文化的な背景解説(設計書263)。手書きのコンテンツのためdata/外(git管理)。triviaKeyはdata/sg/calendar-events.jsonのitemから参照される、年をまたいで不変な安定キー。各ページのimageはUnsplashの完全なURL(ローカルファイルではない)。pages[0]のtitleは持たせない(クライアント側でモードに応じて「今日は〇〇です」/「〇〇とは」を動的生成する)。moreLinkは任意フィールドで、確実な参照先がある時だけ設定する。",
+  "note": "祝日・行事の文化的な背景解説(設計書263)。手書きのコンテンツのためdata/外(git管理)。triviaKeyはdata/sg/calendar-events.jsonのitemから参照される、年をまたいで不変な安定キー。各ページのimageはUnsplashの完全なURL(ローカルファイルではない)。pages[0]のtitleは持たせない(クライアント側でモードに応じて「今日は〇〇です」/「〇〇とは」を動的生成する)。構成は基本4ページ: 1=今日は何の日か、2=もう少し掘り下げた説明、3=誰かに話したくなるようなトリビア(「知ってました?」)、4=シンガポールでの過ごし方・現地ならではの視点。モーダルの表示サイズは文章量によらず一定にする(app.cssの.trivia-modal参照)。",
   "entries": {
     "sg-holiday-deepavali": {
       "pages": [
         {
-          "body": "ヒンドゥー教の「光の祭典」。悪を退けた光の勝利を祝う日で、家々や街に灯り(ディヤ)を灯します。シンガポールでは祝日に指定されており、リトルインディア周辺が特に賑わいます。",
+          "body": "ヒンドゥー教の「光の祭典」。悪に対する光の勝利を祝う日で、家々や街に灯り(ディヤ)を灯します。シンガポールでは祝日に指定されています。",
           "image": "https://images.unsplash.com/photo-1667031232692-7e1cee98f977?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzA1NjR8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
-          "title": "歴史的背景",
-          "body": "ラーマ王子が悪魔ラーヴァナを討ち、14年の追放を終えて都アヨーディヤーに帰還した夜を祝うのが起源という説が有名です。地域やコミュニティによって伝わる神話は異なります。",
+          "title": "起源となった物語",
+          "body": "由来とされる物語はいくつかあり、北インドでは英雄ラーマ王子が14年の追放を終えて都へ帰還した夜を祝うとされ、南インドでは神クリシュナが悪魔ナラカースラを討った勝利を祝うとされています。",
           "image": "https://images.unsplash.com/photo-1793808561053-ec493dc1c95d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzA1NjR8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
+          "title": "誰かに話したくなる話",
+          "body": "ディパバリの日付はヒンドゥー暦(太陰暦)の新月の日で決まるため、グレゴリオ暦では毎年変わります。年によっては10月になることもあり、固定の祝日ではありません。",
+          "image": "https://images.unsplash.com/photo-1761203091809-e45f79927820?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyMjg2NzB8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
           "title": "シンガポールでの過ごし方",
-          "body": "数週間前からリトルインディア一帯にイルミネーションが灯り、夜になると大勢の見物客で賑わいます。期間中は路上バザールも開かれ、スイーツやサリー、装飾品などが並びます。",
+          "body": "リトルインディア一帯には数週間前からイルミネーションが灯り、路上バザールも開催。スイーツやサリー、装飾品などが並び、祝日ならではの賑わいを見せます。",
           "image": "https://images.unsplash.com/photo-1648366311540-f9ce685dfb49?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzA1NjV8&ixlib=rb-4.1.0&q=80&w=1080"
         }
-      ],
-      "moreLink": { "label": "Wikipediaで詳しく見る", "url": "https://ja.wikipedia.org/wiki/%E3%83%87%E3%82%A3%E3%83%BC%E3%83%AF%E3%83%BC%E3%83%AA%E3%83%BC" }
+      ]
     },
     "sg-festival-sj60": {
       "pages": [
         {
-          "body": "2026年は日本とシンガポールが国交を樹立してから60周年の節目の年です。両国の友好関係を記念し、さまざまな交流イベントが開催されます。",
+          "body": "2026年は日本とシンガポールが国交を樹立してから60周年の節目の年です。両国の友好関係を記念し、各地で交流イベントが開催されます。",
           "image": "https://images.unsplash.com/photo-1761625635067-943f125e6cb5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5Mzd8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
-          "title": "日星関係の歴史",
-          "body": "シンガポールは1965年に独立し、翌1966年に日本と外交関係を樹立しました。戦後、両国は貿易・投資・人の往来を通じて関係を深め、現在ではシンガポールは日本企業のアジア拠点として、日本はシンガポールにとって重要な貿易相手国として、緊密な経済的つながりを築いています。",
+          "title": "日星関係の歩み",
+          "body": "シンガポールは1965年の独立直後、1966年に日本と外交関係を樹立しました。戦後の関係構築を経て、今ではシンガポールが日本企業のアジア拠点、日本がシンガポールの主要な投資・貿易相手国という、深い経済的つながりへと発展しています。",
           "image": "https://images.unsplash.com/photo-1595005048693-e44ebd31b73b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5Mzh8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
-          "title": "SJ60フラッグシップイベント",
-          "body": "マリーナベイ・サンズ・コンベンションセンターで、盆踊りやゲームブース、チャリティ抽選会などが行われます。例年日本人会が開催していた夏祭り(盆踊り)は、今年はこの記念イベントに統合される形で実施されます。",
+          "title": "誰かに話したくなる話",
+          "body": "日本とシンガポールの関係は、太平洋戦争中の日本占領という歴史を乗り越えて築かれたものです。当時「昭南島」と呼ばれたこの地の記憶は、今もシンガポールの「全面防衛の日(2/15)」などで語り継がれています。",
+          "image": "https://images.unsplash.com/photo-1633189995744-476f46e6a2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyMjg2NzB8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "今年のSJ60フラッグシップイベントは、マリーナベイ・サンズ・コンベンションセンターで開催。盆踊りやゲームブース、チャリティ抽選会などが並び、例年日本人会が主催してきた夏祭り(盆踊り)は、今年はこのイベントに統合される形で行われます。",
           "image": "https://images.unsplash.com/photo-1722479909927-cdb5396f52fc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5Mjh8&ixlib=rb-4.1.0&q=80&w=1080"
         }
       ]
@@ -45,13 +54,18 @@
           "image": "https://images.unsplash.com/photo-1767275735458-f07c07bb5b00?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5Mjl8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
-          "title": "コースとスポンサー",
-          "body": "発着点は歴史的な広場「パダン」やマリーナベイ周辺で、マーライオンやマリーナベイ・サンズを望むコースが特徴です。2026年からタイトルスポンサーが中国の自動車メーカーBYDに変更され、開催日程も3日間に拡大されました。",
+          "title": "大会の歴史",
+          "body": "1982年に始まった歴史ある大会で、年々規模を拡大してきました。2026年からはタイトルスポンサーが中国の自動車メーカーBYDに変わり、開催日程も3日間に拡大されています。",
           "image": "https://images.unsplash.com/photo-1725281097266-8108c26dd128?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5Mjl8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
-          "title": "暑さ対策のナイトレース",
-          "body": "熱帯の暑さを避けるため、フルマラソンは未明にスタートするのが恒例です。給水所や救護体制も充実しており、海外からの参加者にも人気の大会です。開催日は交通規制が敷かれる道路が多いので、車移動の予定がある人は事前に確認しておくと安心です。",
+          "title": "誰かに話したくなる話",
+          "body": "シンガポールは国土がほぼ平坦なため、このコースは「自己ベストが出やすい」大会として世界のランナーに知られています。一方で赤道直下の蒸し暑さは厳しく、フルマラソンは夜が明ける前の未明スタートが恒例です。",
+          "image": "https://images.unsplash.com/photo-1766970096504-145331b0b2cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyMjg2NzF8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "発着点は歴史的な広場「パダン」やマリーナベイ周辺で、マーライオンやマリーナベイ・サンズを望むコースが特徴です。開催日は周辺道路が交通規制されるため、車移動の予定がある人は事前のルート確認がおすすめです。",
           "image": "https://images.unsplash.com/photo-1763621615982-bdb446ffa990?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5Mjh8&ixlib=rb-4.1.0&q=80&w=1080"
         }
       ]
@@ -63,12 +77,21 @@
           "image": "https://images.unsplash.com/photo-1711010345132-be532fced734?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5MzF8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
-          "title": "湯圓(タンユエン)を食べる習慣",
-          "body": "この日に欠かせないのが、もち米粉で作った白玉だんご「湯圓(湯円)」を甘いスープで食べる習慣です。丸い形は家族の「団円(円満・団結)」を象徴し、一家で丸めて作ることも多い、家族の結びつきを感じる行事食です。",
+          "title": "湯圓を食べる習慣",
+          "body": "この日に欠かせないのが、もち米粉で作った白玉だんご「湯圓(タンユエン)」を甘いスープで食べる習慣です。丸い形は家族の「団円(円満・団結)」を象徴し、一家で丸めて作ることもある行事食です。",
           "image": "https://images.unsplash.com/photo-1545217431-172646ec8de6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5MzB8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "中国の古い暦では、冬至が一年の始まりとされていた時代もありました。「冬至を境に陽が生まれ、日が長くなっていく」として、新年以上に重視された時代や地域もあったと言われています。",
+          "image": "https://images.unsplash.com/photo-1656195329754-3eb45e691447?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyMjg2NzJ8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "シンガポールでは祝日ではありませんが、華人家庭では今も大切にされている行事。チャイナタウンの店先にはこの時期、色とりどりの湯圓が並び、季節の風物詩になっています。",
+          "image": "https://images.unsplash.com/photo-1612672695557-332913b0e4fe?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyMjg2MjJ8&ixlib=rb-4.1.0&q=80&w=1080"
         }
-      ],
-      "moreLink": { "label": "Wikipediaで詳しく見る", "url": "https://ja.wikipedia.org/wiki/%E5%86%AC%E8%87%B3" }
+      ]
     },
     "sg-holiday-christmas": {
       "pages": [
@@ -78,16 +101,20 @@
         },
         {
           "title": "起源について",
-          "body": "キリスト教の聖典ではイエス・キリストの誕生日そのものは明記されておらず、12月25日という日付は後世に定められたとされています。宗教的な起源を持つ一方、現在は世界各地で宗教・文化の違いを越えて親しまれる冬の行事になっています。",
+          "body": "聖書にはイエスの誕生日についての記載がなく、12月25日という日付は後世に定められたとされています。宗教的な起源を持つ一方、今では世界各地で宗教・文化の違いを越えて親しまれる冬の行事になっています。",
           "image": "https://images.unsplash.com/photo-1481574548075-e4c8feff4ef6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5MzJ8&ixlib=rb-4.1.0&q=80&w=1080"
         },
         {
+          "title": "誰かに話したくなる話",
+          "body": "クリスマスツリーや花輪など「常緑樹」を飾る習慣は、キリスト教以前のヨーロッパの冬至の祭りに由来するとされています。「厳しい冬でも枯れない生命力」の象徴として取り入れられたのが始まりという説が有力です。",
+          "image": "https://images.unsplash.com/photo-1765147070355-7a0817bd3c8a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyMjg2NzJ8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
           "title": "シンガポールでの過ごし方",
-          "body": "11月頃からオーチャードロード沿いに大規模なイルミネーションが灯り、年末までライトアップイベントが続きます。ショッピングモールのクリスマスセールも本格化するので、買い物を兼ねて散策するのも定番の過ごし方です。",
+          "body": "11月頃からオーチャードロード沿いに大規模なイルミネーションが灯り、年末までライトアップイベントが続きます。常夏の国のクリスマスに雪は降りませんが、南国らしい華やかな年末の風物詩になっています。",
           "image": "https://images.unsplash.com/photo-1541267365358-43ba30c96460?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQxMzE5MzF8&ixlib=rb-4.1.0&q=80&w=1080"
         }
-      ],
-      "moreLink": { "label": "Wikipediaで詳しく見る", "url": "https://ja.wikipedia.org/wiki/%E3%82%AF%E3%83%AA%E3%82%B9%E3%83%9E%E3%82%B9" }
+      ]
     }
   }
 }
