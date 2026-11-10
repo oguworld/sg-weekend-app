@@ -509,6 +509,10 @@
         tourIntro1817Step1: 'アプリの使い方をいつでも見返せる「チュートリアル」を追加しました。ここから開けます',
         tourIntro1817Step2: 'ここを押すと、全部まとめて続けて見られます',
         tourIntro1817Step3: '項目ごとに選んで、個別に見返すこともできます',
+        tutorialName10: 'バージョン1.8.21の新機能',
+        tutorialDesc10: '祝日・行事の文化解説を追加しました',
+        tourIntro1821Step1: '祝日やシンガポールの行事の日にアプリを開くと、その日について知れるカルーセルが自動で出ます',
+        tourIntro1821Step2: '見逃した行事は、この📖マークからいつでも振り返れます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         rainfallDesc: '過去1時間の降水量の変化を自動で再生します。色が濃いほど雨が強いことを示します',
@@ -4630,6 +4634,7 @@
       if (name === 'news-card-pin-sample') return document.querySelector('#news-list .card-pin-link');
       if (name === 'tutorial-sheet-item-sample') return document.querySelector('#tutorial-sheet-body .tutorial-item');
       if (name === 'pin-sheet-card-sample') return document.querySelector('#pins-sectioned-content .spot-card');
+      if (name === 'cal-trivia-sample') return document.querySelector('#calendar-list .cal-trivia-btn');
       if (!_TOUR_ANCHORS.includes(name)) return null;
       const els = Array.from(document.querySelectorAll(`[data-tour="${name}"]`));
       if (name === 'cal-fare-entry') {
@@ -4857,6 +4862,14 @@
         { anchor: 'tutorial-sheet-item-sample', text: t('tourIntro1817Step3') },
       ];
     }
+    // 祝日・行事の文化的な背景解説(カルーセル、設計書263)の紹介。設定の「チュートリアル」一覧専用。
+    // 2ステップ目(📖マーク)は、過去の該当行事が無いとアンカーが出ないため、その場合は自動でスキップされる(_tourVisible()の既存挙動)
+    function _intro1821TourSteps() {
+      return [
+        { anchor: null, text: t('tourIntro1821Step1') },
+        { anchor: 'cal-trivia-sample', text: t('tourIntro1821Step2') },
+      ];
+    }
     // おでかけのイベント情報(カード・カテゴリ絞り込み)の案内。設定の「チュートリアル」専用
     function _eventInfoTourSteps() {
       return [
@@ -4935,6 +4948,10 @@
       {
         id: 'intro-1817', nameKey: 'tutorialName9', descKey: 'tutorialDesc9', steps: _intro1817TourSteps,
         prepare: async () => { switchNav('settings'); await _tutorialWait(400); },
+      },
+      {
+        id: 'intro-1821', nameKey: 'tutorialName10', descKey: 'tutorialDesc10', steps: _intro1821TourSteps,
+        prepare: async () => { switchNav('calendar'); await _tutorialWait(700); },
       },
     ];
 
