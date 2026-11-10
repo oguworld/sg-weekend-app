@@ -1724,38 +1724,33 @@
     .whatsnew-note { font-size: 11px; color: var(--warm-gray); margin-top: 10px; }
 
     /* ─── 祝日・行事の文化的な背景解説(カルーセル式ポップアップ、設計書263)。
-       実機確認の結果、中央モーダルではなく.pin-sheet(チュートリアル等)と同じ下からのスライドシートに変更。
-       bottom:0まで届くfixed要素のためz-indexは10000番台(CLAUDE.mdのルール通り)。 ─── */
+       What's Newと同じ、画面中央のモーダル(ボトムシートではない)。bottom:0に届かないため3000番台のまま。 ─── */
     .trivia-overlay {
-      position: fixed; inset: 0; z-index: 10000;
+      position: fixed; inset: 0; z-index: 3802;
       background: rgba(44,36,32,0.45);
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
+      opacity: 0; pointer-events: none; display: none;
+      transition: opacity 0.3s ease;
     }
-    .trivia-overlay.visible { opacity: 1; pointer-events: auto; }
+    .trivia-overlay.visible { display: block; opacity: 1; pointer-events: auto; }
     .trivia-modal {
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: 10001;
-      width: 100%;
-      max-height: 85dvh; height: min(560px, 85dvh); /* ページごとの文章量によらず一定の大きさにする(固定height、はみ出す分は.trivia-bodyが内部スクロール) */
-      display: flex; flex-direction: column;
-      background: var(--warm-white); border-radius: 20px 20px 0 0;
+      position: fixed; top: 50%; left: 50%; z-index: 3803;
+      transform: translate(-50%, -50%);
+      width: min(380px, calc(100vw - 40px));
+      height: min(560px, 76vh); height: min(560px, 76dvh); /* ページごとの文章量によらず一定の大きさにする(固定height、はみ出す分は.trivia-bodyが内部スクロール) */
+      display: none; flex-direction: column;
+      background: var(--warm-white); border-radius: var(--radius-card);
       box-shadow: var(--shadow-card);
-      padding-bottom: env(safe-area-inset-bottom, 0px);
-      transform: translateY(100%); transition: transform 0.25s ease;
       overflow: hidden;
     }
-    /* #trivia-overlayと#trivia-modalはHTML上は兄弟要素(.pin-sheetのような親子構造ではない)なので、
-       子孫セレクタではなく.trivia-modal.visible自体で判定する(JS側がoverlay/modal両方に個別に'visible'を付けている)。 */
-    .trivia-modal.visible { transform: translateY(0); }
-    .trivia-handle { width: 36px; height: 4px; background: var(--sand-dark); border-radius: 2px; margin: 10px auto 0; flex-shrink: 0; }
+    .trivia-modal.visible { display: flex; }
     .trivia-close-btn {
-      position: absolute; top: 10px; right: 16px; z-index: 2;
+      position: absolute; top: 14px; right: 14px; z-index: 2;
       background: var(--sand); border-radius: 50%;
       width: 32px; height: 32px; font-size: 16px;
       border: none; display: flex; align-items: center; justify-content: center;
       cursor: pointer; color: var(--warm-gray);
     }
-    .trivia-header { flex-shrink: 0; padding: 14px 48px 0; text-align: center; }
+    .trivia-header { flex-shrink: 0; padding: 22px 48px 0; text-align: center; }
     .trivia-eyebrow {
       display: inline-block; padding: 4px 12px; border-radius: 50px;
       background: var(--caramel-pale); color: var(--caramel); font-size: 12px; font-weight: 700;
