@@ -1732,8 +1732,10 @@
     }
     .trivia-overlay.visible { display: block; opacity: 1; pointer-events: auto; }
     .trivia-modal {
-      position: fixed; top: 12%; left: 50%; z-index: 3803;
-      transform: translateX(-50%);
+      /* 実機(iOS)で画面上部寄りの配置が窮屈だったため、What's New/チュートリアルと同じ画面中央に戻した。
+         固定サイズ(文章量によらず一定の大きさ)はそのまま維持する。 */
+      position: fixed; top: 50%; left: 50%; z-index: 3803;
+      transform: translate(-50%, -50%);
       width: min(380px, calc(100vw - 40px));
       height: min(560px, 76vh); height: min(560px, 76dvh); /* ページごとの文章量によらず一定の大きさにする(固定height、はみ出す分は.trivia-bodyが内部スクロール) */
       display: none; flex-direction: column;
