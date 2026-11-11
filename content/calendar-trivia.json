@@ -1,6 +1,29 @@
 {
   "note": "祝日・行事の文化的な背景解説(設計書263)。手書きのコンテンツのためdata/外(git管理)。triviaKeyはdata/sg/calendar-events.jsonのitemから参照される、年をまたいで不変な安定キー。各ページのimageはUnsplashの完全なURL(ローカルファイルではない)。pages[0]のtitleは持たせない(クライアント側でモードに応じて「今日は〇〇です」/「〇〇とは」を動的生成する)。構成は基本4ページ: 1=今日は何の日か、2=もう少し掘り下げた説明、3=誰かに話したくなるようなトリビア(「知ってました?」)、4=シンガポールでの過ごし方・現地ならではの視点。モーダルの表示サイズは文章量によらず一定にする(app.cssの.trivia-modal参照)。",
   "entries": {
+    "sg-infra-rts-link": {
+      "pages": [
+        {
+          "body": "RTS Link(ラピッド・トランジット・システム)は、シンガポールとマレーシア・ジョホールバルを結ぶ鉄道リンク。ウッドランズ・ノース駅〜ブキッ・チャガール駅間、わずか4km・約5分の乗車時間を予定しています。",
+          "image": "https://images.unsplash.com/photo-1772264067497-6227e7e5f0f6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQ0MzY2ODR8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "計画から開通まで",
+          "body": "構想自体は2010年に発表され、当初は2018年の開通を目指していました。しかし工事の遅延や両国間の調整、新型コロナ流行による複数回の中断を経て、開通は幾度となく延期されてきました。",
+          "image": "https://images.unsplash.com/photo-1790247355246-39b7e3abf25c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQ0MzY2ODV8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "構想発表から実際の開通まで、実に16年以上。あまりの延期の多さから、地元メディアでも「本当に開通するのか」と冗談交じりに語られてきた、知る人ぞ知る長寿プロジェクトです。",
+          "image": "https://images.unsplash.com/photo-1725161641421-5d7a79bcb01c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQ0MzY2ODV8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "開通後の見通し",
+          "body": "最新の見通しでは2027年2月の開通が目標ですが、安全認証や両国当局の承認待ちのため、正式な日付はまだ発表されていません。開通すれば、バスで1時間以上かかっていたJBとの移動が、わずか5分に短縮される見込みです。",
+          "image": "https://images.unsplash.com/photo-1768073756346-057c13948f65?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQ0MzY2OTF8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
     "sg-holiday-deepavali": {
       "pages": [
         {
