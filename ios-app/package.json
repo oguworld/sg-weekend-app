@@ -1,6 +1,6 @@
 {
   "name": "odenavi-ios",
-  "version": "1.8.21",
+  "version": "1.9.0",
   "description": "SG在住Navi iOS App (Capacitor)",
   "private": true,
   "scripts": {
