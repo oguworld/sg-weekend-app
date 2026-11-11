@@ -1821,6 +1821,30 @@ function getTodayCalendarNotification(cityKey = 'sg') {
   return holidaySg || candidates[0];
 }
 
+// カルーセルのトリビア用: プッシュ通知(初日だけ)と違い、期間中(date〜endDate)のどこかの日にマッチさせる。
+// 「見た」記録はit.date(開始日=その回を一意に表す値)で付けるため、期間中のどこかで1回見れば、
+// その後その期間中に再度開いても出ない(日付そのものではなく行事の開始日をキーにする)。
+function getCalendarTriviaItemForToday(cityKey = 'sg') {
+  const cityConf = CITIES[cityKey] || CITIES.sg;
+  const today = new Date().toLocaleString('sv-SE', { timeZone: cityConf.timezone }).slice(0, 10);
+  let items;
+  try {
+    items = JSON.parse(fs.readFileSync(calendarEventsPath(cityKey), 'utf8')).items || [];
+  } catch (e) {
+    return null;
+  }
+  const candidates = items.filter(it => {
+    if (it.category !== 'holiday-sg' && it.category !== 'festival') return false;
+    if (it.confirmed === false) return false;
+    const start = it.date;
+    const end = it.endDate || it.date;
+    return start <= today && today <= end;
+  });
+  if (candidates.length === 0) return null;
+  const holidaySg = candidates.find(it => it.category === 'holiday-sg');
+  return holidaySg || candidates[0];
+}
+
 // 祝日・行事の文化的な背景解説(設計書263)。手書きのコンテンツのため data/ 外(git管理対象)。
 // 画像はUnsplashのURLをそのまま保存するため、専用の静的配信ルートは不要。
 const CALENDAR_TRIVIA_PATH = path.join(__dirname, 'content', 'calendar-trivia.json');
@@ -1868,12 +1892,14 @@ app.get('/api/calendar-trivia', (req, res) => {
       return res.json({ entry: { name: item.name, pages: content.pages }, dateKey: explicitDate });
     }
 
-    // 明示指定が無い場合: 今日の該当行事を自動判定
-    const todayItem = getTodayCalendarNotification(cityKey);
+    // 明示指定が無い場合: 今日の該当行事を自動判定(プッシュ通知と違い期間中はどの日でもマッチする)
+    const todayItem = getCalendarTriviaItemForToday(cityKey);
     if (!todayItem || !todayItem.triviaKey) return res.json({ entry: null });
     const content = entries[todayItem.triviaKey];
     if (!content) return res.json({ entry: null });
-    res.json({ entry: { name: todayItem.name, pages: content.pages }, dateKey: todayStr });
+    // dateKeyは今日の日付ではなく行事の開始日(=その回を一意に表す値)にする。
+    // 期間中のどこかで1回見れば、同じ期間中は再表示されない(日付ごとに毎回出ないようにするため)
+    res.json({ entry: { name: todayItem.name, pages: content.pages }, dateKey: todayItem.date });
   } catch (e) {
     res.json({ entry: null });
   }
