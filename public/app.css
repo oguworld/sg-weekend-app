@@ -1736,7 +1736,7 @@
       position: fixed; top: 50%; left: 50%; z-index: 3803;
       transform: translate(-50%, -50%);
       width: min(380px, calc(100vw - 40px));
-      height: min(490px, 70vh); height: min(490px, 70dvh); /* ページごとの文章量によらず一定の大きさにする(固定height、はみ出す分は.trivia-bodyが内部スクロール)。本文〜ボタン間の余白が広すぎたため560pxから縮小 */
+      height: min(520px, 72vh); height: min(520px, 72dvh); /* ページごとの文章量によらず一定の大きさにする(固定height、はみ出す分は.trivia-bodyが内部スクロール)。490pxだと本文が1行分見切れるケースがあったため少し戻した */
       display: none; flex-direction: column;
       background: var(--warm-white); border-radius: var(--radius-card);
       box-shadow: var(--shadow-card);
