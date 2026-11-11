@@ -507,6 +507,9 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
   }
 
   // ── Step1+2のデータを結合してnewItemsに積む ──
+  // バッチ全体は成功していても、個別記事のRSS概要文が空/短すぎる等でsummary_jaだけ空文字になることがある
+  // (2026-11-11、ベドック南駅ほか3駅開業の記事で実際に発生。要約の材料が無くSonnetが空を返した)。
+  // 空の要約をそのまま掲載すると本文なしのカードになるため、enrich失敗と同様に除外する。
   let enrichFailedCount = 0;
   for (const { filtered: f, original } of filtered) {
     if (!enriched.has(f._enrichPos)) {
@@ -514,6 +517,11 @@ async function filterAndSaveLifeInfo(items, { lifeInfoPath, cityKey, dryRun }) {
       continue;
     }
     const enrich = enriched.get(f._enrichPos);
+    if (!enrich.summary_ja || !enrich.summary_ja.trim()) {
+      enrichFailedCount++;
+      console.log(`    ⚠️ 要約が空のため除外: ${original.title || '(無題)'}`);
+      continue;
+    }
     const id = `li_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     const pub = original.pubDate ? new Date(original.pubDate) : new Date();
