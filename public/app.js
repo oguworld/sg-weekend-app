@@ -559,7 +559,9 @@
     let _tutorialRun = null;   // 設定のチュートリアルの見直しの実行中: { queue: [id…] }。nullなら実行していない(再入ガード兼、案内の自動表示の抑止)。switchNav()が早く呼ばれても参照できるよう、ここで宣言する
     // 祝日・行事の文化的な背景解説(カルーセル式ポップアップ、設計書263)。1日1回の自動表示の重複防止キー(dateKeyを1つだけ保存・上書き)
     const _DAILY_TRIVIA_SEEN_KEY = 'app_daily_trivia_seen';
-    let _triviaPending = null; // 表示中のトリビア: { mode: 'today'|'review', name, pages, index, dateKey }
+    // 月替わりの紹介カード(設計書263の拡張)。月1回の自動表示の重複防止キー(YYYY-MM形式を1つだけ保存・上書き)
+    const _MONTH_TRIVIA_SEEN_KEY = 'app_month_trivia_seen';
+    let _triviaPending = null; // 表示中のトリビア: { mode: 'today'|'review'|'month', name, pages, index, dateKey }
 
     // ─── DARK MODE（設計書184で配色機能〈キャラメル/柳グリーン/ダーク〉を廃止し復元）───
     // 旧sg_paletteからの移行: 初回起動時に1回だけ実行
@@ -2373,7 +2375,7 @@
     setTimeout(() => _debugLogScreenMetrics('news'), 500); // 診断: 初期表示時点のメトリクス（使い捨て）
     // 新規インストールでウェルカムツアーを出す時は、通知の許可(OSダイアログ)をツアーの終了後に尋ねる(暗幕の上にダイアログが出て混乱するのを避ける)
     initPushState().then(() => { if (!_maybeStartWelcomeTour()) _maybePromptPushOnboarding(); });
-    initWhatsNew().then(() => initDailyTrivia());
+    initWhatsNew().then(() => initDailyTrivia()).then(() => initMonthTrivia());
     initSettingsProfile();
     initSettingsGenres();
 
@@ -5066,6 +5068,30 @@
       try { return new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Singapore' }).slice(0, 10); } catch (_) { return new Date().toISOString().slice(0, 10); }
     }
 
+    // 月替わりの紹介カード(設計書263の拡張)。月の最初にアプリを開いた時、今月の4ページ解説を自動表示する(mode='month')。
+    // dailyトリビア(initDailyTrivia)の直後に判定し、どちらか一方しか同じ起動では出さない(_triviaPendingで排他)
+    async function initMonthTrivia() {
+      if (_tourState || _whatsNewPending || _tutorialRun || _triviaPending) return;
+      try {
+        const previewMonth = !_isCapacitorApp ? (new URLSearchParams(location.search).get('month') || '') : '';
+        if (previewMonth) {
+          const res = await fetch(`${API_BASE}/api/month-trivia?city=${getCity()}&month=${encodeURIComponent(previewMonth)}`, { cache: 'no-cache' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data && data.entry) openDailyTrivia(data.entry, 'month', null);
+          return;
+        }
+        let seen = null;
+        try { seen = localStorage.getItem(_MONTH_TRIVIA_SEEN_KEY); } catch (_) {}
+        const res = await fetch(`${API_BASE}/api/month-trivia?city=${getCity()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.entry || !data.monthKey) return;
+        if (seen === data.monthKey) return; // 今月はもう見た(途中で閉じた場合も含む)
+        openDailyTrivia(data.entry, 'month', data.monthKey);
+      } catch (_) { /* 通信に失敗した時は何もしない(次回の起動で再試行) */ }
+    }
+
     // カレンダー画面の📖目印タップ(振り返りモード)。triviaKey・dateは呼び出し元(renderCalendarList)が検証済みの値を渡す
     async function openDailyTriviaReview(triviaKey, dateStr) {
       if (!triviaKey || !dateStr || _triviaPending) return;
@@ -5078,7 +5104,7 @@
     }
 
     // entry: { name, pages: [{title?, body, image}] }
-    // mode: 'today'(自動表示) | 'review'(カレンダーからの振り返り)。dateKey: 'today'表示時のみ(見た記録に使う)
+    // mode: 'today'(自動表示) | 'review'(カレンダーからの振り返り) | 'month'(月替わりの紹介カード)。dateKey: today/month表示時のみ(見た記録に使う。todayはYYYY-MM-DD、monthはYYYY-MM)
     function openDailyTrivia(entry, mode, dateKey) {
       const overlay = document.getElementById('trivia-overlay');
       const modal = document.getElementById('trivia-modal');
@@ -5091,10 +5117,11 @@
       modal.classList.add('visible');
     }
 
-    // ページ1のタイトルはモードで動的生成(「今日は〇〇です」/「〇〇とは」)。pages[1]以降はJSON側のtitleをそのまま使う
+    // ページ1のタイトルはモードで動的生成(「今日は〇〇です」/「〇〇とは」)。monthモードは振り返りの概念が無く、
+    // JSON側の静的なtitleをそのまま使う(pages[1]以降と同じ扱い)。pages[1]以降は常にJSON側のtitleをそのまま使う
     function _triviaPageTitle(p) {
       const { mode, name, index } = p;
-      if (index === 0) return mode === 'today' ? `今日は${name}です` : `${name}とは`;
+      if (index === 0 && mode !== 'month') return mode === 'today' ? `今日は${name}です` : `${name}とは`;
       return (p.pages[index] && p.pages[index].title) || '';
     }
 
@@ -5104,7 +5131,7 @@
       const page = p.pages[p.index];
       const isLast = p.index === p.pages.length - 1;
       const eyebrow = document.getElementById('trivia-eyebrow');
-      if (eyebrow) eyebrow.textContent = p.mode === 'today' ? '🎉 本日は祝日・行事です' : '📖 振り返り';
+      if (eyebrow) eyebrow.textContent = p.mode === 'today' ? '🎉 本日は祝日・行事です' : (p.mode === 'month' ? '🗓️ 今月のシンガポール' : '📖 振り返り');
       const body = document.getElementById('trivia-body');
       if (body) {
         body.innerHTML = `
@@ -5136,12 +5163,13 @@
       p.index--;
       _renderDailyTrivia();
     }
-    // ✕ボタン・オーバーレイタップ・最後のページの「閉じる」、どの経路でも呼ばれる。todayモードは中断でも「見た」記録をする(翌日まで再表示しない)
+    // ✕ボタン・オーバーレイタップ・最後のページの「閉じる」、どの経路でも呼ばれる。today/monthモードは中断でも「見た」記録をする(翌日/翌月まで再表示しない)
     function closeDailyTrivia() {
       const p = _triviaPending;
       if (!p) return;
       _triviaPending = null;
       if (p.mode === 'today' && p.dateKey) { try { localStorage.setItem(_DAILY_TRIVIA_SEEN_KEY, p.dateKey); } catch (_) {} }
+      else if (p.mode === 'month' && p.dateKey) { try { localStorage.setItem(_MONTH_TRIVIA_SEEN_KEY, p.dateKey); } catch (_) {} }
       _blurIfFocusInside('trivia-modal');
       unlockScroll();
       document.getElementById('trivia-overlay')?.classList.remove('visible');

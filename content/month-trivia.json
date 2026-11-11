@@ -1,0 +1,305 @@
+{
+  "note": "月替わりの紹介カード(設計書263の拡張)。月の最初にアプリを開いた時に1回表示する。キーは月番号(文字列'1'〜'12')。pages[0]のtitleは省略しない(dailyトリビアと違い振り返りモードが無いため、静的なtitleをそのまま使う)。各ページのimageはUnsplashの完全なURL。",
+  "entries": {
+    "1": {
+      "name": "1月のシンガポール",
+      "pages": [
+        {
+          "title": "1月のシンガポール",
+          "body": "年明けのシンガポールは北東モンスーンの影響で、一年のうち最も雨が多い季節。とはいえ最低気温は24℃前後で、日本の冬とはまったくの別世界です。折りたたみ傘があると安心です。",
+          "image": "https://images.unsplash.com/photo-1560872745-0e11987b22d4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNjk5MTR8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "1月の見どころ: タイプーサム",
+          "body": "ヒンドゥー教の苦行の祭り「タイプーサム」が行われるのもこの時期。信者が身体に金属の串を刺した飾り「カヴァディ」を担ぎ、寺院から寺院へと練り歩く、シンガポールでも屈指の迫力ある宗教行事です。",
+          "image": "https://images.unsplash.com/photo-1741877091574-e8c9c73cebb6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNjk5MTV8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "カヴァディを担ぐ信者の多くは、数週間前から菜食や瞑想で体を清めて本番に臨みます。串を刺しても出血がほとんど無いのは、祈りによるトランス状態で痛みを感じにくくなるためと言われています。",
+          "image": "https://images.unsplash.com/photo-1739249431843-5929a728f248?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNjk5MTV8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "雨が多い時期なので、ショッピングモールや博物館など屋内中心のお出かけ計画がおすすめ。年によっては1月末〜2月に旧正月が重なり、月末に近づくとオーチャードロードやチャイナタウンの装飾が始まります。",
+          "image": "https://images.unsplash.com/photo-1789912625341-9601f466fa9a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNjk5MTZ8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "2": {
+      "name": "2月のシンガポール",
+      "pages": [
+        {
+          "title": "2月のシンガポール",
+          "body": "旧正月(チャイニーズ・ニューイヤー)がこの時期に重なることが多く、街は赤と金で彩られます。チャイナタウンには早くから提灯や飾りが灯り、特別な雰囲気に包まれる月です。",
+          "image": "https://images.unsplash.com/photo-1559329146-2dae6153a7a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNDZ8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "見逃せないチンゲイ・パレード",
+          "body": "旧正月明けの週末には、色とりどりの山車やパフォーマーが練り歩く「チンゲイ・パレード」が開催されます。アジア最大級のストリートパレードのひとつとされ、夜遅くまで賑わいます。",
+          "image": "https://images.unsplash.com/photo-1736952810069-9d75c1c251b8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNDd8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "旧正月に欠かせない料理「魚生(ユーシェン)」は、具材を高く放り上げながら食べると運気が上がるとされる、シンガポール・マレーシア発祥の縁起物料理です。",
+          "image": "https://images.unsplash.com/photo-1612698940563-143c627668e4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNDd8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "チャイナタウンの夜市や、ショッピングモールのライオンダンスは必見。旧正月期間中は多くの店が数日間休業するので、外食・買い物の予定は早めの確認がおすすめです。",
+          "image": "https://images.unsplash.com/photo-1541267365358-43ba30c96460?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNDZ8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "3": {
+      "name": "3月のシンガポール",
+      "pages": [
+        {
+          "title": "3月のシンガポール",
+          "body": "北東モンスーンが落ち着き始め、日中はやや蒸し暑さが増してくる時期。雨の頻度は少しずつ減っていきます。",
+          "image": "https://images.unsplash.com/photo-1640111789692-951e2afb2ba6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNDh8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "学校の長期休暇(ターム1ブレイク)",
+          "body": "シンガポールの現地校は3月に約1週間の学期の節目休み(ターム1ブレイク)があります。国際学校も同時期に休みを設定することが多く、家族旅行の予約が集中しやすい時期です。",
+          "image": "https://images.unsplash.com/photo-1582972584361-05c3582525a3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNDh8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "シンガポールの学年度は1月始まり12月終わり。日本とは学期の区切りが異なるため、現地校・インター校に通う子を持つ家庭は、進級・入学のタイミングに注意が必要です。",
+          "image": "https://images.unsplash.com/photo-1775466990018-79ab2f9d8251?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNDl8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "休暇中は航空券やホテルが値上がりしやすいので、近隣国への旅行を考えているなら早めの予約がおすすめ。国内であれば動物園や科学館など屋内外問わず楽しめるスポットが人気です。",
+          "image": "https://images.unsplash.com/photo-1628620013145-c0547b16936a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTB8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "4": {
+      "name": "4月のシンガポール",
+      "pages": [
+        {
+          "title": "4月のシンガポール",
+          "body": "モンスーンの合間にあたる「インターモンスーン期」に入り、一年で最も気温が高くなりやすい時期。日中は体感35℃を超えることも珍しくありません。",
+          "image": "https://images.unsplash.com/photo-1629595005876-22d82c9ef8be?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTB8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "夕方のスコールに注意",
+          "body": "暑さで大気が不安定になり、午後から夕方にかけて突発的な激しい雷雨(スコール)が発生しやすくなります。晴れていても折りたたみ傘を持ち歩くのが現地流です。",
+          "image": "https://images.unsplash.com/photo-1604640313138-a084f06a92d5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTF8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "シンガポールは赤道からわずか137kmに位置し、年間を通じて気温差がほとんどありません。「暑い季節」というより「雨が多い季節・少ない季節」で体感が変わる国です。",
+          "image": "https://images.unsplash.com/photo-1505522571392-9d188683192e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTF8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "屋外アクティビティは午前中か夕方以降がおすすめ。プールや屋内モールで涼みながら過ごす「暑さ対策」が、この時期を快適に過ごすコツです。",
+          "image": "https://images.unsplash.com/photo-1719941080090-b3d1ba7cb6a1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTJ8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "5": {
+      "name": "5月のシンガポール",
+      "pages": [
+        {
+          "title": "5月のシンガポール",
+          "body": "引き続き暑さが続く月ですが、この時期に多いのが仏教の大切な祝日「ウェサック・デー」。お釈迦様の誕生・悟り・入滅を記念する日です。",
+          "image": "https://images.unsplash.com/photo-1628304885616-8d20f22dd376?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTJ8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "ウェサック・デーの過ごし方",
+          "body": "各地の仏教寺院ではろうそくや灯籠に明かりを灯す「提灯行列」が行われ、信者が寺院を参拝します。放生会(生き物を放す儀式)を行う寺院もあります。",
+          "image": "https://images.unsplash.com/photo-1776325575975-a016a3bd7bdf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTN8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "ウェサック・デーの日付は旧暦で決まるため、年によって4月末〜5月の間で変動します。「仏誕節」と呼ばれることもあり、アジア各国で祝われていますが、祝い方は国ごとに異なります。",
+          "image": "https://images.unsplash.com/photo-1610306634901-85432dd35f28?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTR8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "中華系寺院が多いチャイナタウンやブギスエリアの寺院を訪れると、灯籠や花で彩られた境内を見られます。夜に提灯行列を見学するのもおすすめです。",
+          "image": "https://images.unsplash.com/photo-1628304885616-8d20f22dd376?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTJ8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "6": {
+      "name": "6月のシンガポール",
+      "pages": [
+        {
+          "title": "6月のシンガポール",
+          "body": "南西モンスーンが始まり、やや乾燥した空気に変わる時期。現地校・インター校ともに約4週間の長期休暇に入る、1年で最も大きな学校休みの月です。",
+          "image": "https://images.unsplash.com/photo-1683974020949-6a4176d838ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTR8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "6月ホリデーのシンガポール",
+          "body": "家族旅行のピークシーズンで、空港や観光地が1年で最も混み合います。この時期は多くのイベント・サマーキャンプがキッズ向けに開催されます。",
+          "image": "https://images.unsplash.com/photo-1763888907816-282a22e93fd8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNzh8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "シンガポールの学校は1年に4回の学期休みがありますが、6月の休みが唯一「夏休み」と呼べる長さ(約4週間)。3月・9月は約1週間、12月は約5〜6週間です。",
+          "image": "https://images.unsplash.com/photo-1791560680722-22e292286a9e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTV8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "ユニバーサル・スタジオやS.E.A.アクアリウムなどの大型施設は混雑必至。朝一番の入場や平日の来訪が狙い目です。この時期の長距離旅行は早割予約がおすすめです。",
+          "image": "https://images.unsplash.com/photo-1666614589737-d7256c74298d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTZ8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "7": {
+      "name": "7月のシンガポール",
+      "pages": [
+        {
+          "title": "7月のシンガポール",
+          "body": "南西モンスーンのシーズンで、比較的乾燥した晴れの日が増えてきます。街のあちこちで国旗を見かけるようになるのもこの時期からです。",
+          "image": "https://images.unsplash.com/photo-1610306634901-85432dd35f28?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTd8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "ナショナルデーに向けた準備",
+          "body": "8月9日の建国記念日(ナショナルデー)に向けて、HDB(公営住宅)のベランダや街路に国旗が掲げられ始めます。政府が国旗の無料配布キャンペーンを行うのもこの時期です。",
+          "image": "https://images.unsplash.com/photo-1783144182417-618d34e294dd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTd8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "ナショナルデー・パレード(NDP)の本番前には、マリーナベイ周辺で夜間にリハーサルが行われ、花火やジェット機の編隊飛行を本番さながらに見られることがあります。",
+          "image": "https://images.unsplash.com/photo-1588421211870-3bab46ce2ba6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTh8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "この時期から街中の国旗を探してみるのも楽しみ方のひとつ。NDPのチケットは抽選制で、現地在住者も応募可能です。リハーサルの日程はニュースでチェックしてみましょう。",
+          "image": "https://images.unsplash.com/photo-1631696088500-5dd8949e5a4f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTh8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "8": {
+      "name": "8月のシンガポール",
+      "pages": [
+        {
+          "title": "8月のシンガポール",
+          "body": "8月9日はシンガポールの独立を祝う「ナショナルデー」。街全体がお祝いムードに包まれ、1年で最も国旗を目にする月です。",
+          "image": "https://images.unsplash.com/photo-1761745470633-02f0e5676f77?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTl8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "ナショナルデー・パレード(NDP)",
+          "body": "マリーナベイ等で行われる大規模な式典・パレード。軍のパフォーマンス、花火、エンターテインメントショーなどが披露され、国営放送で生中継もされます。",
+          "image": "https://images.unsplash.com/photo-1763621615982-bdb446ffa990?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNTl8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "シンガポールは1965年8月9日にマレーシアから分離独立しました。当時のリー・クアンユー初代首相が涙を流しながら独立を発表した会見は、今も語り継がれる歴史的な場面です。",
+          "image": "https://images.unsplash.com/photo-1692175478166-377d3f03a31a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjB8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "当日は多くの施設が入場無料や特別イベントを実施。テレビ中継を見ながら家で過ごすのも定番で、夜には各地で花火が見られることもあります。",
+          "image": "https://images.unsplash.com/photo-1706285525640-9ef9bd8a0952?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjB8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "9": {
+      "name": "9月のシンガポール",
+      "pages": [
+        {
+          "title": "9月のシンガポール",
+          "body": "南西モンスーンの終盤で、晴れた日が多くなる時期。近隣国の野焼きの影響で、空気の状態(ヘイズ)に注意が必要になることもあります。",
+          "image": "https://images.unsplash.com/photo-1551441467-4d0f1120ee64?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjF8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "F1シンガポールGP",
+          "body": "マリーナベイ周辺の公道を使った、世界で数少ない「ナイトレース」が開催されます。昼間の暑さを避けるため夜間に行われるようになった、シンガポールならではのF1です。",
+          "image": "https://images.unsplash.com/photo-1658285094535-7b3f508e9b26?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjF8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "F1シンガポールGPは2008年に開幕した、F1史上初めてのナイトレース。公道を照らす照明の明るさは昼間のサッカースタジアム以上とも言われ、独自技術で沿道の建物を傷めないよう設計されています。",
+          "image": "https://images.unsplash.com/photo-1595290429614-88ba93221dba?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjJ8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "レース期間中はマリーナベイ周辺で大規模な交通規制・歩行者規制があります。チケットがなくても、周辺の屋上バーやレストランから観戦できるスポットもあります。",
+          "image": "https://images.unsplash.com/photo-1640507152847-30cae9625990?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjJ8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "10": {
+      "name": "10月のシンガポール",
+      "pages": [
+        {
+          "title": "10月のシンガポール",
+          "body": "乾季が続き、周辺国の野焼きによる「ヘイズ(煙害)」が発生しやすい時期。PSI(大気汚染指数)をこまめにチェックする習慣が役立ちます。",
+          "image": "https://images.unsplash.com/photo-1677750961729-a782105baddd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjN8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "中秋節(ミッドオータムフェスティバル)",
+          "body": "月を愛でながら月餅を食べる中華系の伝統行事。チャイナタウンには提灯のイルミネーションが灯り、子どもたちが手持ちランタンを持って歩く光景が風物詩になっています。",
+          "image": "https://images.unsplash.com/photo-1787310885456-1a9b0f7bbd50?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjR8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "伝統的な月餅はカロリーが高く、1個で茶碗3杯分のご飯に匹敵するとも言われます。近年はアイスクリーム月餅やスノースキン月餅など、現代風にアレンジされた商品も人気です。",
+          "image": "https://images.unsplash.com/photo-1770194962499-6d3377943355?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjR8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "ヘイズがひどい日は屋外アクティビティを控え、マスクの準備も。中秋節の時期はチャイナタウンの提灯ディスプレイが見ものなので、PSIが落ち着いている日の夜に訪れるのがおすすめです。",
+          "image": "https://images.unsplash.com/photo-1699119179445-7200c818fb10?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjV8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "11": {
+      "name": "11月のシンガポール",
+      "pages": [
+        {
+          "title": "11月のシンガポール",
+          "body": "南西モンスーンが終わり、北東モンスーンが戻ってくる季節の変わり目。再び雨の日が増え始めます。",
+          "image": "https://images.unsplash.com/photo-1730130856322-68e3d48b0ab7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjd8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "ディパバリ・シーズン",
+          "body": "ヒンドゥー教の光の祭典「ディパバリ」がこの時期に多く重なります。数週間前からリトルインディア一帯にイルミネーションが灯り、路上バザールで賑わいます。",
+          "image": "https://images.unsplash.com/photo-1731782083126-2ea234e60839?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjV8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "11月下旬になると、クリスマス商戦もスタート。ブラックフライデー・サイバーマンデーのセールは、近年シンガポールでもすっかり定着した年末商戦イベントです。",
+          "image": "https://images.unsplash.com/photo-1671390252376-2bff06d8d8f9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjZ8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "雨具の準備を忘れずに。月末にはオーチャードロードのクリスマスイルミネーションの点灯式も始まり、ディパバリとクリスマス、2つの光の祭典が一度に楽しめる時期です。",
+          "image": "https://images.unsplash.com/photo-1640225076272-e6e21da515ff?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjd8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    },
+    "12": {
+      "name": "12月のシンガポール",
+      "pages": [
+        {
+          "title": "12月のシンガポール",
+          "body": "北東モンスーンが本格化し、雨の多い季節。一方で街は1年で最も華やかなイルミネーションに包まれる、お祝いムード一色の月です。",
+          "image": "https://images.unsplash.com/photo-1789912625341-9601f466fa9a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjh8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "最長の学校休暇(イヤーエンドホリデー)",
+          "body": "現地校・インター校ともに、12月から翌1月にかけて約5〜6週間の長期休暇に入ります。1年で最も長い学校休みで、海外旅行や帰省のピークシーズンです。",
+          "image": "https://images.unsplash.com/photo-1696489648480-6982f31c6a6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjh8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "誰かに話したくなる話",
+          "body": "オーチャードロードのクリスマスイルミネーションは、1984年から続く伝統行事。毎年異なるテーマで装飾され、点灯式には多くの人出で賑わいます。",
+          "image": "https://images.unsplash.com/photo-1705148975653-0c1914e4d8f5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjl8&ixlib=rb-4.1.0&q=80&w=1080"
+        },
+        {
+          "title": "シンガポールでの過ごし方",
+          "body": "年末年始は航空券・ホテルが高騰しやすいため、旅行を考えているなら早めの予約がおすすめ。オーチャードロードの散策や、年越しのカウントダウン花火も人気の過ごし方です。",
+          "image": "https://images.unsplash.com/photo-1791387127919-ff65ed67dcdf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w5ODMwNjB8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTQyNzAxNjl8&ixlib=rb-4.1.0&q=80&w=1080"
+        }
+      ]
+    }
+  }
+}

@@ -1879,6 +1879,37 @@ app.get('/api/calendar-trivia', (req, res) => {
   }
 });
 
+const MONTH_TRIVIA_PATH = path.join(__dirname, 'content', 'month-trivia.json');
+
+// GET /api/month-trivia?city=sg — 今月の紹介カード(4ページ、設計書263の拡張)を返す。月の最初にアプリを開いた時に1回表示する用途。
+// GET /api/month-trivia?city=sg&month=<1-12> — Web版の確認用クエリ(?month=)。未来・過去の区別は無く(月は毎年繰り返すため)、
+//   どの月番号を指定しても常に返す(ズル見え防止の対象外。カレンダーの行事トリビアとは異なり対象が固定の12種類しかないため)。
+// どちらの形式でも、該当が無ければ { entry: null }（常に200）
+app.get('/api/month-trivia', (req, res) => {
+  const cityKey = req.query.city || 'sg';
+  try {
+    const trivia = JSON.parse(fs.readFileSync(MONTH_TRIVIA_PATH, 'utf8'));
+    const entries = (trivia && trivia.entries) || {};
+    const cityConf = CITIES[cityKey] || CITIES.sg;
+    const nowStr = new Date().toLocaleString('sv-SE', { timeZone: cityConf.timezone });
+    const monthKey = nowStr.slice(0, 7); // YYYY-MM(見た記録用)
+
+    const previewMonth = typeof req.query.month === 'string' ? req.query.month : '';
+    if (previewMonth) {
+      const content = entries[previewMonth];
+      if (!content) return res.json({ entry: null });
+      return res.json({ entry: { name: content.name || `${previewMonth}月`, pages: content.pages }, monthKey });
+    }
+
+    const monthNum = String(Number(nowStr.slice(5, 7))); // "01"→"1"
+    const content = entries[monthNum];
+    if (!content) return res.json({ entry: null });
+    res.json({ entry: { name: content.name || `${monthNum}月`, pages: content.pages }, monthKey });
+  } catch (e) {
+    res.json({ entry: null });
+  }
+});
+
 app.post('/api/notify-events-updated', requireAdminSecret, async (req, res) => {
   const city = req.query.city || 'sg';
   try {
