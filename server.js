@@ -1908,8 +1908,8 @@ app.get('/api/calendar-trivia', (req, res) => {
 const MONTH_TRIVIA_PATH = path.join(__dirname, 'content', 'month-trivia.json');
 
 // GET /api/month-trivia?city=sg — 今月の紹介カード(4ページ、設計書263の拡張)を返す。月の最初にアプリを開いた時に1回表示する用途。
-// GET /api/month-trivia?city=sg&month=<1-12> — Web版の確認用クエリ(?month=)。未来・過去の区別は無く(月は毎年繰り返すため)、
-//   どの月番号を指定しても常に返す(ズル見え防止の対象外。カレンダーの行事トリビアとは異なり対象が固定の12種類しかないため)。
+//   月の1〜3日目だけ返し、4日目以降は{entry:null}(「今月になりました」が月末近くに出ると間延びするため、見逃したら次の月まで待つ)。
+// GET /api/month-trivia?city=sg&month=<1-12> — Web版の確認用クエリ(?month=)。1〜3日目の制限は適用せず、常に返す(動作確認用)。
 // どちらの形式でも、該当が無ければ { entry: null }（常に200）
 app.get('/api/month-trivia', (req, res) => {
   const cityKey = req.query.city || 'sg';
@@ -1927,6 +1927,8 @@ app.get('/api/month-trivia', (req, res) => {
       return res.json({ entry: { name: content.name || `${previewMonth}月`, pages: content.pages }, monthKey });
     }
 
+    const dayOfMonth = Number(nowStr.slice(8, 10));
+    if (dayOfMonth > 3) return res.json({ entry: null });
     const monthNum = String(Number(nowStr.slice(5, 7))); // "01"→"1"
     const content = entries[monthNum];
     if (!content) return res.json({ entry: null });
