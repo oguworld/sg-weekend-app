@@ -477,12 +477,6 @@
         tutorialDesc2: '予定一覧の見方・季節アイコン・説明・旅行シーズン情報の入口',
         tutorialName3: '旅行シーズン情報',
         tutorialDesc3: '月の切り替えと、都市ごとの詳細',
-        tutorialName4: 'くらしの指標(PM2.5)',
-        tutorialDesc4: 'PM2.5の見方と、タップで見える詳細',
-        tourPm25Step1: '真ん中は、空気の汚れ具合(PM2.5)です。顔の絵文字と色で、今の状態が分かります',
-        tourPm25Step2: 'エリアごとの値です。緑は安全、黄色はちょっと危険、赤は危険です',
-        tourPm25Step3: 'ここで、PM2.5とPSIを切り替えられます。PSIは、空気の汚れの総合点です',
-        tourPm25Step4: '色と顔の絵文字の見方です',
         tutorialName5: 'くらしの指標ウィジェット',
         tutorialDesc5: '為替・PM2.5・2時間予報の使い方',
         tourWidgetsStep1: 'くらしの指標ウィジェットです。為替・PM2.5・2時間予報が並んでいます。タップすると詳しい情報が見られます',
@@ -504,15 +498,12 @@
         tutorialDesc8: 'イベントカードの見方と絞り込み',
         tourEventInfoStep1: 'おでかけのイベント情報です。写真・説明を確認でき、❤️でいいね、📌でピン留めできます',
         tourEventInfoStep2: 'カテゴリで絞り込めます',
-        tutorialName9: 'バージョン1.8.17の新機能',
-        tutorialDesc9: 'チュートリアルを作りました',
+        tutorialName9: 'チュートリアル機能の使い方',
+        tutorialDesc9: 'この一覧の見方・使い方',
         tourIntro1817Step1: 'アプリの使い方をいつでも見返せる「チュートリアル」を追加しました。ここから開けます',
         tourIntro1817Step2: 'ここを押すと、全部まとめて続けて見られます',
         tourIntro1817Step3: '項目ごとに選んで、個別に見返すこともできます',
-        tutorialName10: 'バージョン1.8.21の新機能',
-        tutorialDesc10: '祝日・行事の文化解説を追加しました',
-        tourIntro1821Step1: '祝日やシンガポールの行事の日にアプリを開くと、その日について知れるカルーセルが自動で出ます',
-        tourIntro1821Step2: '見逃した行事は、この📖マークからいつでも振り返れます',
+        tourCalStep3: '祝日やシンガポールの行事の日にアプリを開くと、その日について知れるカルーセルが自動で出ます。見逃した行事は、ここ(📖マーク)からいつでも振り返れます',
         fareSheetLoading: '読み込み中…',
         fareSheetFailed: '読み込めませんでした。しばらくしてから開き直してください。',
         rainfallDesc: '過去1時間の降水量の変化を自動で再生します。色が濃いほど雨が強いことを示します',
@@ -4846,6 +4837,7 @@
         { anchor: 'cal-season-icon', before: 'open-season-bubble', text: t('tourCalStep0b') },
         { anchor: 'cal-notes-switch', text: t('tourCalStep1') },
         { anchor: 'cal-fare-entry', text: t('tourCalStep2') },
+        { anchor: 'cal-trivia-sample', text: t('tourCalStep3') }, // 祝日・行事の文化解説(設計書263)。元々intro-1821として独立していたが、カレンダーの案内に統合(2026-11-12)
       ];
     }
     // ピン留め(カードの📌→クリップ型FAB→一覧シート)の体験型案内。設定の「チュートリアル」専用(自動表示のCTAには紐付けない)
@@ -4864,29 +4856,11 @@
         { anchor: 'tutorial-sheet-item-sample', text: t('tourIntro1817Step3') },
       ];
     }
-    // 祝日・行事の文化的な背景解説(カルーセル、設計書263)の紹介。設定の「チュートリアル」一覧専用。
-    // 2ステップ目(📖マーク)は、過去の該当行事が無いとアンカーが出ないため、その場合は自動でスキップされる(_tourVisible()の既存挙動)
-    function _intro1821TourSteps() {
-      return [
-        { anchor: null, text: t('tourIntro1821Step1') },
-        { anchor: 'cal-trivia-sample', text: t('tourIntro1821Step2') },
-      ];
-    }
     // おでかけのイベント情報(カード・カテゴリ絞り込み)の案内。設定の「チュートリアル」専用
     function _eventInfoTourSteps() {
       return [
         { anchor: 'home-card-sample', text: t('tourEventInfoStep1') },
         { anchor: 'home-filters', text: t('tourEventInfoStep2') },
-      ];
-    }
-    // くらしの指標(PM2.5)の案内。1.8.16の紹介カードの「使ってみる」(ツアーID pm25-1、文言はサーバー側`content/whats-new.json`)と同じ内容。
-    // 文言は、サーバーの1.8.16のentryとアプリ内`tourPm25Step1`の2か所(変える時は両方)
-    function _pm25TourSteps() {
-      return [
-        { anchor: 'news-stat-pm25', text: t('tourPm25Step1') },
-        { anchor: 'psi-map', before: 'open-psi', text: t('tourPm25Step2') },
-        { anchor: 'psi-toggle', text: t('tourPm25Step3') },
-        { anchor: 'psi-chips', text: t('tourPm25Step4') },
       ];
     }
     // くらし画面の3ウィジェット(為替・PM2.5・2時間予報)の案内。1.8.17の紹介カードの「使ってみる」(ツアーID widgets-1817)と同じ内容。
@@ -4950,10 +4924,6 @@
       {
         id: 'intro-1817', nameKey: 'tutorialName9', descKey: 'tutorialDesc9', steps: _intro1817TourSteps,
         prepare: async () => { switchNav('settings'); await _tutorialWait(400); },
-      },
-      {
-        id: 'intro-1821', nameKey: 'tutorialName10', descKey: 'tutorialDesc10', steps: _intro1821TourSteps,
-        prepare: async () => { switchNav('calendar'); await _tutorialWait(700); },
       },
     ];
 
